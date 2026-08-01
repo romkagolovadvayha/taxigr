@@ -146,6 +146,7 @@ jobs:
       - name: Package release
         shell: bash
         run: |
+          archive="$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz"
           tar \
             --exclude='.git' \
             --exclude='.github' \
@@ -158,8 +159,8 @@ jobs:
             --exclude='server/node_modules' \
             --exclude='tmp' \
             --exclude='*.aab' \
-            -czf "taxigr-${GITHUB_SHA}.tar.gz" .
-          sha256sum "taxigr-${GITHUB_SHA}.tar.gz" | awk '{print $1}' > archive.sha256
+            -czf "$archive" .
+          sha256sum "$archive" | awk '{print $1}' > "$RUNNER_TEMP/archive.sha256"
 
       - name: Setup SSH
         shell: bash
@@ -183,10 +184,10 @@ jobs:
           remote_archive="$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
           remote_env="$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
           remote_script="$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
-          archive_sha256="$(cat archive.sha256)"
+          archive_sha256="$(cat "$RUNNER_TEMP/archive.sha256")"
 
           "${SSH[@]}" "$target" "install -d -m 0755 '$DEPLOY_PATH/incoming'"
-          "${SCP[@]}" "taxigr-${GITHUB_SHA}.tar.gz" "$target:$remote_archive"
+          "${SCP[@]}" "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" "$target:$remote_archive"
           "${SCP[@]}" .taxigr.env "$target:$remote_env"
           "${SCP[@]}" deploy/remote-deploy.sh "$target:$remote_script"
           "${SSH[@]}" "$target" \
