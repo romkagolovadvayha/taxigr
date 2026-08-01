@@ -138,7 +138,7 @@ jobs:
               'PHONE_CODE_RESEND_SECONDS': '30',
               'TRUST_PROXY_HOPS': '1',
               'AUTH_ATTEMPT_RETENTION_DAYS': '30',
-              'GLOBAL_RATE_LIMIT_MAX': '300',
+              'GLOBAL_RATE_LIMIT_MAX': '10000',
           }
           for key, value in values.items():
               if '\n' in value or '\r' in value:

@@ -288,6 +288,19 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     await connection.end();
   });
 
+  it('rejects an untrusted browser origin without reporting an internal error', async () => {
+    const response = await fetch(`${apiUrl}/health/live`, {
+      headers: { Origin: 'https://untrusted.example' },
+    });
+    const payload = (await response.json()) as {
+      error?: { code?: string; message?: string };
+    };
+
+    expect(response.status).toBe(403);
+    expect(payload.error?.code).toBe('CORS_ORIGIN_DENIED');
+    expect(payload.error?.message).toBe('Origin is not allowed');
+  });
+
   it('protects private endpoints and enforces roles', async () => {
     expect((await api('/v1/me')).status).toBe(401);
     expect((await api('/v1/admin/metrics', { token: passengerToken })).status).toBe(403);

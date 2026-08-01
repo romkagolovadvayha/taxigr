@@ -46,7 +46,15 @@ await app.register(cors, {
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   origin(origin, callback) {
     if (!origin || config.corsOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Origin is not allowed'), false);
+    else {
+      callback(
+        Object.assign(new Error('Origin is not allowed'), {
+          statusCode: 403,
+          code: 'CORS_ORIGIN_DENIED',
+        }),
+        false,
+      );
+    }
   },
   credentials: false,
 });
@@ -55,6 +63,17 @@ await app.register(rateLimit, {
   timeWindow: '1 minute',
   hook: 'onRequest',
   keyGenerator: (request) => request.ip,
+  errorResponseBuilder: (_request, context) => {
+    const retryAfterSeconds = Math.ceil(context.ttl / 1_000);
+    return Object.assign(
+      new Error(`Слишком много запросов. Повторите через ${retryAfterSeconds} сек.`),
+      {
+        statusCode: context.statusCode,
+        code: 'RATE_LIMITED',
+        details: { retryAfterSeconds },
+      },
+    );
+  },
 });
 
 const io = new SocketServer(app.server, {
@@ -119,8 +138,18 @@ void pruneAuthAbuseData().catch((error) => {
 });
 
 app.setErrorHandler((error, request, reply) => {
-  const normalized =
-    error instanceof Error ? error : Object.assign(new Error('Unknown server error'), { cause: error });
+  const normalized = (() => {
+    if (error instanceof Error) return error;
+    if (error && typeof error === 'object') {
+      const candidate = error as Record<string, unknown>;
+      return Object.assign(
+        new Error(typeof candidate.message === 'string' ? candidate.message : 'Unknown server error'),
+        candidate,
+        { cause: error },
+      );
+    }
+    return Object.assign(new Error('Unknown server error'), { cause: error });
+  })();
   const statusCode =
     'statusCode' in normalized && typeof normalized.statusCode === 'number' ? normalized.statusCode : 500;
   const code =
@@ -135,15 +164,27 @@ app.setErrorHandler((error, request, reply) => {
       source: 'api',
       error: normalized,
       context: [
-        ['HTTP', `${request.method} ${request.routeOptions.url}`],
+        ['HTTP', `${request.method} ${request.routeOptions.url ?? request.url}`],
         ['Статус', statusCode],
         ['Код', code],
         ['IP', request.ip],
+        ['Origin', request.headers.origin],
         ['Request ID', request.id],
         ['User-Agent', request.headers['user-agent']],
       ],
     });
-  } else request.log.info({ code, message: normalized.message }, 'request rejected');
+  } else {
+    request.log.info(
+      {
+        code,
+        message: normalized.message,
+        method: request.method,
+        url: request.routeOptions.url ?? request.url,
+        origin: request.headers.origin,
+      },
+      'request rejected',
+    );
+  }
   void reply.code(statusCode).send({
     error: {
       code,

@@ -492,11 +492,19 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     );
   };
 
-  app.get('/health/live', async () => ({ data: { status: 'ok', service: 'taxi-grahovo-api' } }));
-  app.get('/health/ready', async () => {
-    await db.query('SELECT 1');
-    return { data: { status: 'ready' } };
-  });
+  app.get(
+    '/health/live',
+    { config: { rateLimit: false } },
+    async () => ({ data: { status: 'ok', service: 'taxi-grahovo-api' } }),
+  );
+  app.get(
+    '/health/ready',
+    { config: { rateLimit: false } },
+    async () => {
+      await db.query('SELECT 1');
+      return { data: { status: 'ready' } };
+    },
+  );
 
   app.post(
     '/v1/client-errors',
