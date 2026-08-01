@@ -164,7 +164,12 @@ const maxUpdateSchema = z.object({
   }).passthrough().optional(),
 }).passthrough();
 const clientErrorSchema = z.object({
-  source: z.enum(['react-error-boundary', 'global-error', 'unhandled-rejection']),
+  source: z.enum([
+    'react-error-boundary',
+    'global-error',
+    'unhandled-rejection',
+    'resource-error',
+  ]),
   name: z.string().trim().min(1).max(120),
   message: z.string().trim().min(1).max(2_000),
   stack: z.string().trim().max(12_000).optional(),
@@ -172,6 +177,12 @@ const clientErrorSchema = z.object({
   platform: z.enum(['android', 'ios', 'web', 'windows', 'macos', 'unknown']),
   appVersion: z.string().trim().max(80).optional(),
   fatal: z.boolean().optional(),
+  filename: z.string().trim().max(1_000).optional(),
+  line: z.number().int().positive().optional(),
+  column: z.number().int().positive().optional(),
+  resource: z.string().trim().max(1_000).optional(),
+  online: z.boolean().optional(),
+  visibilityState: z.enum(['hidden', 'visible', 'prerender', 'unloaded']).optional(),
   occurredAt: z.iso.datetime({ offset: true }).optional(),
 });
 const profileSchema = z.object({
@@ -527,6 +538,12 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           ['Платформа', input.platform],
           ['Версия', input.appVersion],
           ['Маршрут', input.route],
+          ['Файл', input.filename],
+          ['Строка', input.line],
+          ['Колонка', input.column],
+          ['Ресурс', input.resource],
+          ['Сеть', input.online === undefined ? undefined : input.online ? 'онлайн' : 'офлайн'],
+          ['Вкладка', input.visibilityState],
           ['Пользователь', session?.id],
           ['IP', request.ip],
           ['User-Agent', request.headers['user-agent']],

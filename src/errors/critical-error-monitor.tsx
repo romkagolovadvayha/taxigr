@@ -23,11 +23,35 @@ export function CriticalErrorMonitor() {
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const handleError = (event: ErrorEvent) => {
-        void reportCriticalClientError(event.error ?? new Error(event.message), {
+        const target = event.target;
+        const resource =
+          target instanceof HTMLScriptElement
+            ? target.src
+            : target instanceof HTMLLinkElement
+              ? target.href
+              : null;
+        if (resource) {
+          const resourceUrl = new URL(resource, window.location.href);
+          void reportCriticalClientError(
+            new Error(`Не удалось загрузить ${target instanceof HTMLScriptElement ? 'скрипт' : 'стиль'}`),
+            {
+              source: 'resource-error',
+              route: context.current.pathname,
+              token: context.current.token,
+              fatal: target instanceof HTMLScriptElement,
+              resource: `${resourceUrl.origin}${resourceUrl.pathname}`,
+            },
+          );
+          return;
+        }
+        void reportCriticalClientError(event.error ?? new Error(event.message || 'Ошибка браузера'), {
           source: 'global-error',
           route: context.current.pathname,
           token: context.current.token,
           fatal: true,
+          filename: event.filename || undefined,
+          line: event.lineno || undefined,
+          column: event.colno || undefined,
         });
       };
       const handleRejection = (event: PromiseRejectionEvent) => {
@@ -37,10 +61,10 @@ export function CriticalErrorMonitor() {
           token: context.current.token,
         });
       };
-      window.addEventListener('error', handleError);
+      window.addEventListener('error', handleError, true);
       window.addEventListener('unhandledrejection', handleRejection);
       return () => {
-        window.removeEventListener('error', handleError);
+        window.removeEventListener('error', handleError, true);
         window.removeEventListener('unhandledrejection', handleRejection);
       };
     }

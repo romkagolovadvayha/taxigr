@@ -38,4 +38,13 @@ describe('Telegram critical error reports', () => {
 
     expect(message.length).toBeLessThanOrEqual(4_096);
   });
+
+  it('labels browser reports as frontend errors', () => {
+    const message = formatCriticalErrorReport({
+      source: 'client',
+      error: new Error('Chunk failed to load'),
+    });
+
+    expect(message).toContain('🚨 FRONTEND ERROR');
+  });
 });

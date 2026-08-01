@@ -4,7 +4,7 @@ import { sendTelegramMessage } from './telegram-bot';
 export type CriticalErrorReport = {
   source: 'api' | 'server-process' | 'client';
   error: unknown;
-  context?: ReadonlyArray<readonly [label: string, value: unknown]>;
+  context?: readonly (readonly [label: string, value: unknown])[];
 };
 
 const TELEGRAM_MESSAGE_LIMIT = 4_096;
@@ -47,7 +47,7 @@ export function formatCriticalErrorReport(report: CriticalErrorReport): string {
     client: 'Приложение',
   }[report.source];
   const lines = [
-    '🚨 CRITICAL ERROR',
+    report.source === 'client' ? '🚨 FRONTEND ERROR' : '🚨 CRITICAL ERROR',
     `Источник: ${source}`,
     `Тип: ${details.name}`,
     `Ошибка: ${details.message}`,

@@ -1,22 +1,37 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { getApiUrl } from '@/api/client';
-
 export type ClientErrorSource =
   | 'react-error-boundary'
   | 'global-error'
-  | 'unhandled-rejection';
+  | 'unhandled-rejection'
+  | 'resource-error';
 
 type ReportOptions = {
   source: ClientErrorSource;
   route?: string;
   token?: string | null;
   fatal?: boolean;
+  filename?: string;
+  line?: number;
+  column?: number;
+  resource?: string;
 };
 
 const recentErrors = new Map<string, number>();
-const DEDUPLICATION_WINDOW_MS = 5_000;
+const DEDUPLICATION_WINDOW_MS = 60_000;
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+
+function clientErrorEndpoint(): string | null {
+  if (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+  ) {
+    return 'http://localhost:4100/v1/client-errors';
+  }
+  return configuredApiUrl ? `${configuredApiUrl}/v1/client-errors` : null;
+}
 
 function normalizeError(error: unknown): { name: string; message: string; stack?: string } {
   if (error instanceof Error) {
@@ -46,8 +61,15 @@ export async function reportCriticalClientError(
   options: ReportOptions,
 ): Promise<void> {
   try {
+    const endpoint = clientErrorEndpoint();
+    if (!endpoint) return;
     const normalized = normalizeError(error);
-    const fingerprint = `${normalized.name}\n${normalized.message}\n${normalized.stack ?? ''}`;
+    const fingerprint = [
+      normalized.name,
+      normalized.message,
+      normalized.stack ?? '',
+      options.resource ?? '',
+    ].join('\n');
     const now = Date.now();
     const lastReportedAt = recentErrors.get(fingerprint) ?? 0;
     if (now - lastReportedAt < DEDUPLICATION_WINDOW_MS) return;
@@ -61,9 +83,10 @@ export async function reportCriticalClientError(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     try {
-      await fetch(`${getApiUrl()}/v1/client-errors`, {
+      await fetch(endpoint, {
         method: 'POST',
         signal: controller.signal,
+        keepalive: Platform.OS === 'web',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
@@ -78,6 +101,18 @@ export async function reportCriticalClientError(
           platform: platformName(),
           appVersion: Constants.expoConfig?.version,
           fatal: options.fatal,
+          filename: options.filename,
+          line: options.line,
+          column: options.column,
+          resource: options.resource,
+          online:
+            Platform.OS === 'web' && typeof navigator !== 'undefined'
+              ? navigator.onLine
+              : undefined,
+          visibilityState:
+            Platform.OS === 'web' && typeof document !== 'undefined'
+              ? document.visibilityState
+              : undefined,
           occurredAt: new Date().toISOString(),
         }),
       });
