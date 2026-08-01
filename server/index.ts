@@ -10,6 +10,7 @@ import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
 import { registerRoutes } from './routes';
 import { verifySession } from './security';
+import { startTelegramPolling } from './telegram-polling';
 
 const app = Fastify({
   logger: {
@@ -153,8 +154,11 @@ app.setErrorHandler((error, request, reply) => {
   });
 });
 
+let stopTelegramPolling: (() => Promise<void>) | null = null;
+
 app.addHook('onClose', async () => {
   clearInterval(authAbusePruneTimer);
+  await stopTelegramPolling?.();
   io.close();
   await db.end();
 });
@@ -195,3 +199,6 @@ process.on('uncaughtException', (error, origin) => {
 });
 
 await app.listen({ port: config.PORT, host: config.HOST });
+if (config.TELEGRAM_UPDATE_MODE === 'polling') {
+  stopTelegramPolling = startTelegramPolling(app.log);
+}

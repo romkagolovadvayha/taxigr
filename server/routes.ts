@@ -77,12 +77,7 @@ import {
   type AuthUser,
 } from './security';
 import { sendPhoneVerificationCode, verifyPhoneVerificationCode } from './sms';
-import {
-  extractOwnTelegramPhone,
-  requestTelegramContact,
-  sendTelegramConfirmation,
-  telegramStartPayload,
-} from './telegram-bot';
+import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
 
@@ -162,25 +157,6 @@ const maxUpdateSchema = z.object({
   message: z.object({
     sender: z.object({ user_id: z.union([z.string(), z.number()]) }).passthrough().optional(),
     body: z.object({ attachments: z.array(z.unknown()).optional() }).passthrough().nullable().optional(),
-  }).passthrough().optional(),
-}).passthrough();
-const telegramUpdateSchema = z.object({
-  message: z.object({
-    text: z.string().optional(),
-    from: z.object({
-      id: z.union([z.string(), z.number()]),
-      first_name: z.string().trim().max(80).nullish(),
-      last_name: z.string().trim().max(80).nullish(),
-      username: z.string().trim().max(64).nullish(),
-    }).passthrough().optional(),
-    chat: z.object({
-      id: z.union([z.string(), z.number()]),
-      type: z.string(),
-    }).passthrough(),
-    contact: z.object({
-      phone_number: z.string(),
-      user_id: z.union([z.string(), z.number()]).optional(),
-    }).passthrough().optional(),
   }).passthrough().optional(),
 }).passthrough();
 const clientErrorSchema = z.object({
@@ -814,58 +790,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         });
       }
 
-      const update = parse(telegramUpdateSchema, request.body);
-      const message = update.message;
-      if (message?.chat.type === 'private' && message.from?.id != null) {
-        const userId = String(message.from.id);
-        const chatId = String(message.chat.id);
-        const payload = telegramStartPayload(message.text);
-
-        if (payload) {
-          const [result] = await db.execute<import('mysql2/promise').ResultSetHeader>(
-            `UPDATE telegram_auth_challenges
-             SET telegram_user_id = ?, telegram_chat_id = ?, telegram_username = ?,
-               telegram_first_name = ?, telegram_last_name = ?, failure_code = NULL
-             WHERE payload_token = ? AND expires_at > UTC_TIMESTAMP(3)
-               AND verified_at IS NULL`,
-            [
-              userId,
-              chatId,
-              message.from.username ?? null,
-              message.from.first_name ?? null,
-              message.from.last_name ?? null,
-              payload,
-            ],
-          );
-          if (result.affectedRows > 0) await requestTelegramContact(chatId);
-        }
-
-        if (message.contact) {
-          const verifiedPhone = extractOwnTelegramPhone(message.contact, userId);
-          if (verifiedPhone) {
-            const challenge = await firstRow<
-              RowDataPacket & { id: string; expected_phone: string }
-            >(
-              `SELECT id, expected_phone FROM telegram_auth_challenges
-               WHERE telegram_user_id = ? AND expires_at > UTC_TIMESTAMP(3)
-                 AND verified_at IS NULL
-               ORDER BY created_at DESC LIMIT 1`,
-              [userId],
-            );
-            if (challenge) {
-              const matches = verifiedPhone === challenge.expected_phone;
-              await db.execute(
-                `UPDATE telegram_auth_challenges
-                 SET verified_phone = ?, failure_code = ?,
-                   verified_at = IF(?, UTC_TIMESTAMP(3), NULL)
-                 WHERE id = ? AND verified_at IS NULL`,
-                [verifiedPhone, matches ? null : 'PHONE_MISMATCH', matches, challenge.id],
-              );
-              await sendTelegramConfirmation(chatId, matches);
-            }
-          }
-        }
-      }
+      await processTelegramUpdate(parse(telegramUpdateSchema, request.body));
 
       void reply.header('Cache-Control', 'no-store');
       return { ok: true };

@@ -93,6 +93,7 @@ jobs:
           MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
           MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
           TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
+          TELEGRAM_UPDATE_MODE: ${{ vars.TELEGRAM_UPDATE_MODE }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
@@ -129,6 +130,7 @@ jobs:
               'MAX_BOT_TOKEN': os.environ.get('MAX_BOT_TOKEN', ''),
               'MAX_WEBHOOK_SECRET': os.environ.get('MAX_WEBHOOK_SECRET', ''),
               'TELEGRAM_BOT_USERNAME': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
+              'TELEGRAM_UPDATE_MODE': os.environ.get('TELEGRAM_UPDATE_MODE') or 'polling',
               'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
               'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
               'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
