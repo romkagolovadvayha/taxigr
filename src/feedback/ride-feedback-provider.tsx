@@ -11,6 +11,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import { AppState } from 'react-native';
 
@@ -29,6 +30,9 @@ type RideFeedbackContextValue = {
 };
 
 const RideFeedbackContext = createContext<RideFeedbackContextValue | null>(null);
+const inactiveFeedback: RideFeedbackContextValue = {
+  previewFeedback: async () => undefined,
+};
 
 const hapticTypes = {
   success: Haptics.NotificationFeedbackType.Success,
@@ -36,7 +40,7 @@ const hapticTypes = {
   error: Haptics.NotificationFeedbackType.Error,
 } as const;
 
-export function RideFeedbackProvider({ children }: { children: ReactNode }) {
+function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
   const { currentRide } = useRide();
   const { user } = useSession();
   const {
@@ -149,6 +153,26 @@ export function RideFeedbackProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ previewFeedback }), [previewFeedback]);
 
   return <RideFeedbackContext.Provider value={value}>{children}</RideFeedbackContext.Provider>;
+}
+
+export function RideFeedbackProvider({ children }: { children: ReactNode }) {
+  const [audioReady, setAudioReady] = useState(process.env.EXPO_OS !== 'web');
+
+  useEffect(() => {
+    if (process.env.EXPO_OS !== 'web') return;
+    const timer = setTimeout(() => setAudioReady(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!audioReady) {
+    return (
+      <RideFeedbackContext.Provider value={inactiveFeedback}>
+        {children}
+      </RideFeedbackContext.Provider>
+    );
+  }
+
+  return <AudioRideFeedbackProvider>{children}</AudioRideFeedbackProvider>;
 }
 
 export function useRideFeedback(): RideFeedbackContextValue {

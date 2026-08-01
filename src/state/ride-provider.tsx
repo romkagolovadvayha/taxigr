@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
-import { apiRequest, getSocketUrl } from '@/api/client';
+import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
 import {
@@ -84,6 +84,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const destinationDefaultToken = useRef<string | null>(null);
+  const pendingOrderCreation = useRef<{ fingerprint: string; key: string } | null>(null);
+  const transitionInFlight = useRef(false);
 
   const selectPickup = useCallback((address: Address) => {
     setRouteCoordinates([]);
@@ -345,6 +347,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return ride;
       }
       if (!token) return null;
+      const creationFingerprint = JSON.stringify({
+        pickup,
+        destination,
+        tariff: selectedTariff,
+        paymentMethod: 'direct',
+        comment: comment ?? null,
+      });
+      const creationAttempt =
+        pendingOrderCreation.current?.fingerprint === creationFingerprint
+          ? pendingOrderCreation.current
+          : { fingerprint: creationFingerprint, key: idempotencyKey() };
+      pendingOrderCreation.current = creationAttempt;
       setBusy(true);
       setError(null);
       try {
@@ -358,14 +372,47 @@ export function RideProvider({ children }: { children: ReactNode }) {
             tariff: selectedTariff,
             paymentMethod: 'direct',
             comment,
-            idempotencyKey: idempotencyKey(),
+            idempotencyKey: creationAttempt.key,
             deviceId,
           }),
+          timeoutMs: 20_000,
         });
+        pendingOrderCreation.current = null;
         applyOrder(ride);
         return ride;
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Не удалось создать заказ');
+        const uncertainFailure =
+          reason instanceof ApiError &&
+          (reason.code === 'TIMEOUT' || reason.code === 'NETWORK_ERROR' || reason.status >= 500);
+        if (uncertainFailure) {
+          try {
+            const fetched = await apiRequest<RideOrder[]>('/v1/orders', {
+              token,
+              timeoutMs: 8_000,
+            });
+            setOrders(fetched);
+            const recovered = fetched.find(
+              (order) => isActive(order) && order.passengerId === user?.id,
+            );
+            if (recovered) {
+              pendingOrderCreation.current = null;
+              applyOrder(recovered);
+              setError(null);
+              return recovered;
+            }
+          } catch {
+            // Preserve the original creation error; retrying uses the same idempotency key.
+          }
+        } else {
+          pendingOrderCreation.current = null;
+        }
+        setError(
+          uncertainFailure
+            ? 'Сервер отвечает дольше обычного. Нажмите ещё раз — повторный заказ не создастся.'
+            : reason instanceof Error
+              ? reason.message
+              : 'Не удалось создать заказ',
+        );
         return null;
       } finally {
         setBusy(false);
@@ -388,6 +435,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const transitionRide = useCallback(
     async (status: RideStatus) => {
+      if (transitionInFlight.current) return;
       const current = currentRide;
       if (!current || !canTransitionRide(current.status, status)) return;
       if (demoSession) {
@@ -406,7 +454,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!token) return;
+      transitionInFlight.current = true;
       setBusy(true);
+      setError(null);
       try {
         const endpoint =
           current.status === 'searching' && status === 'accepted'
@@ -423,6 +473,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setError(reason instanceof Error ? reason.message : 'Не удалось изменить статус');
         await refresh();
       } finally {
+        transitionInFlight.current = false;
         setBusy(false);
       }
     },
@@ -557,7 +608,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     [applyOrder, currentRide, demoSession, token, user],
   );
 
-  const resetRide = useCallback(() => setCurrentRide(null), []);
+  const resetRide = useCallback(() => {
+    pendingOrderCreation.current = null;
+    setCurrentRide(null);
+  }, []);
   const destinationHistory = useMemo(
     () => buildDestinationHistory(orders, user?.id).items,
     [orders, user?.id],

@@ -171,9 +171,30 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             Комментарий: {currentRide.comment}
           </Text>
         )}
+        {!!error && (
+          <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+            {error}
+          </Text>
+        )}
         <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
-          <AppButton variant="secondary" style={{ flex: 1 }} onPress={resetRide}>Пропустить</AppButton>
-          <AppButton style={{ flex: 2 }} onPress={() => transitionRide('accepted')}>Принять</AppButton>
+          <AppButton
+            variant="secondary"
+            fullWidth={false}
+            disabled={busy}
+            style={{ flex: 1 }}
+            onPress={resetRide}
+          >
+            Пропустить
+          </AppButton>
+          <AppButton
+            fullWidth={false}
+            loading={busy}
+            disabled={busy}
+            style={{ flex: 2 }}
+            onPress={() => void transitionRide('accepted')}
+          >
+            Принять
+          </AppButton>
         </View>
       </View>
     );
@@ -338,6 +359,11 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         </AppButton>
       )}
       <WaitingBreakdown ride={currentRide} compact />
+      {!!error && (
+        <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+          {error}
+        </Text>
+      )}
       {routeTarget && (
         <View style={{ gap: spacing.x2 }}>
           <AppButton
@@ -393,8 +419,9 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
               : 'Начать ожидание'}
           </AppButton>
           <AppButton
-            disabled={Boolean(currentRide.waitingStartedAt)}
-            onPress={() => transitionRide('completed')}
+            loading={busy && !currentRide.waitingStartedAt}
+            disabled={busy || Boolean(currentRide.waitingStartedAt)}
+            onPress={() => void transitionRide('completed')}
           >
             {currentRide.waitingStartedAt
               ? 'Сначала завершите ожидание'
@@ -402,7 +429,11 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           </AppButton>
         </View>
       ) : nextStatus ? (
-        <AppButton onPress={() => transitionRide(nextStatus)}>
+        <AppButton
+          loading={busy}
+          disabled={busy}
+          onPress={() => void transitionRide(nextStatus)}
+        >
           {driverTransitionLabel[currentRide.status] ?? 'Продолжить'}
         </AppButton>
       ) : (

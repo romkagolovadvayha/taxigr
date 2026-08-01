@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { AppButton } from '@/components/ui/app-button';
 import { apiRequest } from '@/api/client';
@@ -12,7 +12,7 @@ import type {
   DriverApplicationStatus,
   VehicleChangeRequest,
 } from '@/domain/models';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { breakpoints, colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
 
 const statusLabels: Record<DriverApplicationStatus, string> = {
@@ -50,17 +50,26 @@ const demoVehicleChanges: VehicleChangeRequest[] = [
   },
 ];
 
+type ModerationAction = {
+  target: 'application' | 'vehicle-change';
+  decision: 'approved' | 'rejected';
+} | null;
+
 export function ApplicationsScreen() {
+  const { width } = useWindowDimensions();
   const { token } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [selectedId, setSelectedId] = useState(applications[0]?.id);
   const [vehicleChanges, setVehicleChanges] = useState<VehicleChangeRequest[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const [moderationAction, setModerationAction] = useState<ModerationAction>(null);
   const [error, setError] = useState<string | null>(null);
   const selected = applications.find((item) => item.id === selectedId);
   const selectedChange = vehicleChanges.find((item) => item.id === selectedChangeId);
+  const isTwoColumn = width >= breakpoints.adminTable;
+  const isCompact = width < breakpoints.tablet;
+  const moderationBusy = moderationAction !== null;
 
   useEffect(() => {
     if (demo) {
@@ -88,8 +97,9 @@ export function ApplicationsScreen() {
 
   const moderate = async (status: 'approved' | 'rejected') => {
     if (!selected) return;
+    setError(null);
     if (!demo && token) {
-      setBusy(true);
+      setModerationAction({ target: 'application', decision: status });
       try {
         await apiRequest(`/v1/admin/applications/${selected.id}/moderate`, {
           method: 'POST',
@@ -98,10 +108,10 @@ export function ApplicationsScreen() {
         });
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Не удалось обработать заявку');
-        setBusy(false);
         return;
+      } finally {
+        setModerationAction(null);
       }
-      setBusy(false);
     }
     setApplications((previous) =>
       previous.map((item) =>
@@ -119,8 +129,9 @@ export function ApplicationsScreen() {
 
   const moderateVehicleChange = async (status: 'approved' | 'rejected') => {
     if (!selectedChange) return;
+    setError(null);
     if (!demo && token) {
-      setBusy(true);
+      setModerationAction({ target: 'vehicle-change', decision: status });
       try {
         await apiRequest(`/v1/admin/vehicle-change-requests/${selectedChange.id}/moderate`, {
           method: 'POST',
@@ -129,10 +140,10 @@ export function ApplicationsScreen() {
         });
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Не удалось обработать изменение');
-        setBusy(false);
         return;
+      } finally {
+        setModerationAction(null);
       }
-      setBusy(false);
     }
     setVehicleChanges((previous) =>
       previous.map((item) =>
@@ -152,16 +163,31 @@ export function ApplicationsScreen() {
 
   return (
     <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
       style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ flexGrow: 1, padding: spacing.x6, gap: spacing.x5 }}
+      contentContainerStyle={{
+        width: '100%',
+        maxWidth: 1440,
+        alignSelf: 'center',
+        padding: isCompact ? spacing.x4 : spacing.x6,
+        paddingBottom: spacing.x10,
+        gap: spacing.x8,
+      }}
     >
       <View>
         <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Заявки водителей</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Проверка личности, документов и автомобиля</Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
-      <View style={{ flex: 1, flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
-        <View style={{ flex: 1, minWidth: 300, gap: spacing.x2 }}>
+      <View
+        style={{
+          flexDirection: isTwoColumn ? 'row' : 'column',
+          alignItems: 'stretch',
+          gap: spacing.x4,
+        }}
+      >
+        <View style={{ flex: isTwoColumn ? 1 : undefined, minWidth: 0, gap: spacing.x2 }}>
           {applications.map((application) => {
             const active = application.id === selectedId;
             return (
@@ -181,8 +207,8 @@ export function ApplicationsScreen() {
                   gap: spacing.x2,
                 })}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.x3 }}>
-                  <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{application.applicantName}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x3 }}>
+                  <Text selectable style={{ ...typography.bodyStrong, color: colors.ink, flex: 1 }}>{application.applicantName}</Text>
                   <StatusChip
                     label={statusLabels[application.status]}
                     tone={application.status === 'approved' ? 'success' : application.status === 'rejected' ? 'danger' : 'warning'}
@@ -200,7 +226,7 @@ export function ApplicationsScreen() {
           <View
             style={{
               flex: 1.3,
-              minWidth: 320,
+              minWidth: 0,
               padding: spacing.x5,
               borderRadius: radius.card,
               backgroundColor: colors.surface,
@@ -226,16 +252,41 @@ export function ApplicationsScreen() {
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{selected.moderationComment}</Text>
             )}
             {selected.status === 'pending' && (
-              <View style={{ flexDirection: 'row', gap: spacing.x3, marginTop: 'auto' }}>
-                <AppButton variant="danger" disabled={busy} style={{ flex: 1 }} onPress={() => void moderate('rejected')}>Отклонить</AppButton>
-                <AppButton loading={busy} style={{ flex: 1 }} onPress={() => void moderate('approved')}>Одобрить</AppButton>
+              <View style={{ flexDirection: 'row', gap: spacing.x3, marginTop: spacing.x2 }}>
+                <AppButton
+                  accessibilityLabel={`Отклонить заявку ${selected.applicantName}`}
+                  variant="danger"
+                  fullWidth={false}
+                  disabled={moderationBusy}
+                  loading={
+                    moderationAction?.target === 'application' &&
+                    moderationAction.decision === 'rejected'
+                  }
+                  style={{ flex: 1, minWidth: 0 }}
+                  onPress={() => void moderate('rejected')}
+                >
+                  Отклонить
+                </AppButton>
+                <AppButton
+                  accessibilityLabel={`Одобрить заявку ${selected.applicantName}`}
+                  fullWidth={false}
+                  disabled={moderationBusy}
+                  loading={
+                    moderationAction?.target === 'application' &&
+                    moderationAction.decision === 'approved'
+                  }
+                  style={{ flex: 1, minWidth: 0 }}
+                  onPress={() => void moderate('approved')}
+                >
+                  Одобрить
+                </AppButton>
               </View>
             )}
           </View>
         )}
       </View>
 
-      <View style={{ gap: spacing.x2, marginTop: spacing.x4 }}>
+      <View style={{ gap: spacing.x2 }}>
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Изменения автомобилей
         </Text>
@@ -243,8 +294,14 @@ export function ApplicationsScreen() {
           Новая машина, цвет, госномер или детское кресло
         </Text>
       </View>
-      <View style={{ flex: 1, flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
-        <View style={{ flex: 1, minWidth: 300, gap: spacing.x2 }}>
+      <View
+        style={{
+          flexDirection: isTwoColumn ? 'row' : 'column',
+          alignItems: 'stretch',
+          gap: spacing.x4,
+        }}
+      >
+        <View style={{ flex: isTwoColumn ? 1 : undefined, minWidth: 0, gap: spacing.x2 }}>
           {vehicleChanges.length === 0 && (
             <Text selectable style={{ ...typography.body, color: colors.inkMuted }}>
               Заявок на изменение пока нет
@@ -269,8 +326,8 @@ export function ApplicationsScreen() {
                   gap: spacing.x2,
                 })}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.x3 }}>
-                  <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x3 }}>
+                  <Text selectable style={{ ...typography.bodyStrong, color: colors.ink, flex: 1 }}>
                     {change.driverName ?? 'Водитель'}
                   </Text>
                   <StatusChip
@@ -299,7 +356,7 @@ export function ApplicationsScreen() {
           <View
             style={{
               flex: 1.3,
-              minWidth: 320,
+              minWidth: 0,
               padding: spacing.x5,
               borderRadius: radius.card,
               backgroundColor: colors.surface,
@@ -311,8 +368,14 @@ export function ApplicationsScreen() {
             <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
               {selectedChange.driverName ?? 'Изменение автомобиля'}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3, flexWrap: 'wrap' }}>
-              <View style={{ flex: 1, minWidth: 210, gap: spacing.x2 }}>
+            <View
+              style={{
+                flexDirection: isTwoColumn ? 'row' : 'column',
+                alignItems: isTwoColumn ? 'center' : 'stretch',
+                gap: spacing.x3,
+              }}
+            >
+              <View style={{ flex: isTwoColumn ? 1 : undefined, minWidth: 0, gap: spacing.x2 }}>
                 <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
                   СЕЙЧАС
                 </Text>
@@ -331,9 +394,9 @@ export function ApplicationsScreen() {
                 </Text>
               </View>
               <Text accessibilityElementsHidden style={{ ...typography.sectionTitle, color: colors.inkMuted }}>
-                →
+                {isTwoColumn ? '→' : '↓'}
               </Text>
-              <View style={{ flex: 1, minWidth: 210, gap: spacing.x2 }}>
+              <View style={{ flex: isTwoColumn ? 1 : undefined, minWidth: 0, gap: spacing.x2 }}>
                 <Text selectable style={{ ...typography.micro, color: colors.warningText }}>
                   ПОСЛЕ ОДОБРЕНИЯ
                 </Text>
@@ -358,18 +421,30 @@ export function ApplicationsScreen() {
               </Text>
             )}
             {selectedChange.status === 'pending' && (
-              <View style={{ flexDirection: 'row', gap: spacing.x3, marginTop: 'auto' }}>
+              <View style={{ flexDirection: 'row', gap: spacing.x3, marginTop: spacing.x2 }}>
                 <AppButton
+                  accessibilityLabel={`Отклонить изменение автомобиля ${selectedChange.driverName ?? 'водителя'}`}
                   variant="danger"
-                  disabled={busy}
-                  style={{ flex: 1 }}
+                  fullWidth={false}
+                  disabled={moderationBusy}
+                  loading={
+                    moderationAction?.target === 'vehicle-change' &&
+                    moderationAction.decision === 'rejected'
+                  }
+                  style={{ flex: 1, minWidth: 0 }}
                   onPress={() => void moderateVehicleChange('rejected')}
                 >
                   Отклонить
                 </AppButton>
                 <AppButton
-                  loading={busy}
-                  style={{ flex: 1 }}
+                  accessibilityLabel={`Одобрить изменение автомобиля ${selectedChange.driverName ?? 'водителя'}`}
+                  fullWidth={false}
+                  disabled={moderationBusy}
+                  loading={
+                    moderationAction?.target === 'vehicle-change' &&
+                    moderationAction.decision === 'approved'
+                  }
+                  style={{ flex: 1, minWidth: 0 }}
                   onPress={() => void moderateVehicleChange('approved')}
                 >
                   Одобрить
