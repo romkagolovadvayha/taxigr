@@ -51,7 +51,26 @@ export function extractPhoneFromMaxVcf(vcfInfo: string): string | null {
   return rawPhone ? normalizeRussianPhone(rawPhone) : null;
 }
 
-async function sendMaxMessage(userId: string, body: Record<string, unknown>): Promise<void> {
+let maxSendQueue = Promise.resolve();
+let nextMaxSendAt = 0;
+
+async function waitForMaxSendSlot(): Promise<void> {
+  const waitMs = Math.max(0, nextMaxSendAt - Date.now());
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  nextMaxSendAt = Date.now() + 40;
+}
+
+export async function sendMaxMessage(
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const previous = maxSendQueue;
+  let releaseQueue: () => void = () => undefined;
+  maxSendQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+  await previous;
+  await waitForMaxSendSlot();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -74,6 +93,7 @@ async function sendMaxMessage(userId: string, body: Record<string, unknown>): Pr
     }
   } finally {
     clearTimeout(timeout);
+    releaseQueue();
   }
 }
 

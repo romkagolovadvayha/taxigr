@@ -1,20 +1,64 @@
 import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
-import { router, usePathname, type Href } from 'expo-router';
+import { router, usePathname, type ErrorBoundaryProps, type Href } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useSession } from '@/auth/session-provider';
 import { BrandGlyph } from '@/components/brand-mark';
+import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { AppProviders } from '@/providers/app-providers';
 import { AppHead } from '@/seo/app-head';
 import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    void reportCriticalClientError(error, {
+      source: 'react-error-boundary',
+      route: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      fatal: true,
+    });
+  }, [error]);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.canvas,
+        padding: spacing.x6,
+        gap: spacing.x4,
+      }}
+    >
+      <BrandGlyph size={72} color={colors.ink} pinColor={colors.brand} />
+      <Text style={{ ...typography.pageTitle, color: colors.ink, textAlign: 'center' }}>
+        Произошла ошибка
+      </Text>
+      <Text style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
+        Администраторы уже получили техническую информацию. Попробуйте открыть экран ещё раз.
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void retry()}
+        style={{
+          borderRadius: 16,
+          backgroundColor: colors.brand,
+          paddingHorizontal: spacing.x6,
+          paddingVertical: spacing.x4,
+        }}
+      >
+        <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Повторить</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function RootNavigator() {
   const { user, loading, sessionReady } = useSession();

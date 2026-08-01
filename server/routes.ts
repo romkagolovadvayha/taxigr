@@ -23,7 +23,13 @@ import {
   finishAuthAttempt,
   refundAuthRateLimits,
 } from './auth-abuse';
+import {
+  formatMoney,
+  sendAdminTelegramAction,
+  type AdminTelegramAction,
+} from './admin-telegram';
 import { config } from './config';
+import { sendCriticalErrorReport } from './critical-telegram';
 import { db, firstRow, withTransaction } from './db';
 import { searchAddresses } from './geocoding';
 import {
@@ -39,6 +45,13 @@ import {
   sendMaxConfirmation,
   verifyMaxContact,
 } from './max-bot';
+import {
+  appUrl,
+  notifyDriversInMessengers,
+  notifyOnlineDriversInMessengers,
+  notifyUsersInMessengers,
+  type PersonalMessengerNotification,
+} from './messenger-notifications';
 import { orderSelect, presentOrder, type OrderRow } from './presenters';
 import {
   deviceFingerprint,
@@ -94,6 +107,25 @@ const addressSchema = z
     path: ['label'],
   });
 const tariffSchema = z.enum(['economy', 'child']);
+const tariffLabels: Record<TariffCode, string> = {
+  economy: 'Эконом',
+  child: 'Детский',
+};
+const paymentMethodLabels = {
+  direct: 'напрямую',
+  cash: 'наличные',
+  transfer: 'перевод',
+} as const;
+const rideStatusLabels: Record<RideStatus, string> = {
+  draft: 'черновик',
+  searching: 'поиск водителя',
+  accepted: 'заказ принят',
+  driver_arriving: 'водитель едет к пассажиру',
+  driver_waiting: 'водитель на месте',
+  in_progress: 'поездка началась',
+  completed: 'поездка завершена',
+  cancelled: 'заказ отменён',
+};
 const quoteSchema = z.object({ pickup: addressSchema, destination: addressSchema });
 const createOrderSchema = quoteSchema.extend({
   tariff: tariffSchema,
@@ -151,6 +183,17 @@ const telegramUpdateSchema = z.object({
     }).passthrough().optional(),
   }).passthrough().optional(),
 }).passthrough();
+const clientErrorSchema = z.object({
+  source: z.enum(['react-error-boundary', 'global-error', 'unhandled-rejection']),
+  name: z.string().trim().min(1).max(120),
+  message: z.string().trim().min(1).max(2_000),
+  stack: z.string().trim().max(12_000).optional(),
+  route: z.string().trim().max(500).optional(),
+  platform: z.enum(['android', 'ios', 'web', 'windows', 'macos', 'unknown']),
+  appVersion: z.string().trim().max(80).optional(),
+  fatal: z.boolean().optional(),
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+});
 const profileSchema = z.object({
   name: z.string().trim().min(2).max(160),
   gender: z.enum(['male', 'female']),
@@ -449,11 +492,62 @@ function requireTelegramConfiguration(): void {
 }
 
 export async function registerRoutes(app: FastifyInstance, publish: EventPublisher): Promise<void> {
+  const notifyAdmins = (action: AdminTelegramAction): void => {
+    void sendAdminTelegramAction(action).catch((error) =>
+      app.log.warn({ error, action: action.title }, 'Telegram admin notification failed'),
+    );
+  };
+  const notifyCritical = (
+    report: Parameters<typeof sendCriticalErrorReport>[0],
+  ): void => {
+    void sendCriticalErrorReport(report).catch((error) =>
+      app.log.warn({ error }, 'Telegram critical notification failed'),
+    );
+  };
+  const notifyMessengers = (notification: Promise<void>, event: string): void => {
+    void notification.catch((error) =>
+      app.log.warn({ error, event }, 'personal messenger notification failed'),
+    );
+  };
+
   app.get('/health/live', async () => ({ data: { status: 'ok', service: 'taxi-grahovo-api' } }));
   app.get('/health/ready', async () => {
     await db.query('SELECT 1');
     return { data: { status: 'ready' } };
   });
+
+  app.post(
+    '/v1/client-errors',
+    {
+      logLevel: 'warn',
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const input = parse(clientErrorSchema, request.body);
+      const session = await authenticate(request).catch(() => null);
+      const reportedError = new Error(input.message);
+      reportedError.name = input.name;
+      if (input.stack) reportedError.stack = input.stack;
+      notifyCritical({
+        source: 'client',
+        error: reportedError,
+        context: [
+          ['Тип события', input.source],
+          ['Fatal', input.fatal ? 'да' : 'нет'],
+          ['Платформа', input.platform],
+          ['Версия', input.appVersion],
+          ['Маршрут', input.route],
+          ['Пользователь', session?.id],
+          ['IP', request.ip],
+          ['User-Agent', request.headers['user-agent']],
+          ['Время на устройстве', input.occurredAt],
+          ['Request ID', request.id],
+        ],
+      });
+      reply.code(202);
+      return { data: { accepted: true } };
+    },
+  );
 
   app.post(
     '/v1/webhooks/max',
@@ -1688,6 +1782,23 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     });
     if (result.created) {
       publish('drivers', 'order:available', result.order);
+      notifyAdmins({
+        icon: '🚕',
+        title: 'Создан новый заказ',
+        actor: {
+          role: 'пассажир',
+          id: session.id,
+          name: result.order.passenger?.name,
+        },
+        entity: { label: 'Заказ', id: result.order.id },
+        details: [
+          ['Маршрут', `${result.order.pickup.label} → ${result.order.destination.label}`],
+          ['Тариф', tariffLabels[result.order.tariff]],
+          ['Стоимость', formatMoney(result.order.priceMinor)],
+          ['Оплата', paymentMethodLabels[result.order.paymentMethod]],
+          ['Комментарий', result.order.comment],
+        ],
+      });
       void notifyOnlineDrivers({
         title: 'Новый заказ',
         body: `${result.order.pickup.label} → ${result.order.destination.label}`,
@@ -1695,6 +1806,33 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         sound: 'new_order.wav',
         channelId: 'driver-orders-v2',
       }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+      notifyMessengers(
+        notifyUsersInMessengers([session.id], {
+          icon: '🔎',
+          title: 'Заказ создан',
+          body: 'Ищем свободного водителя. Сообщим, как только машина будет назначена.',
+          details: [
+            ['Маршрут', `${result.order.pickup.label} → ${result.order.destination.label}`],
+            ['Стоимость', formatMoney(result.order.priceMinor)],
+          ],
+          action: { label: 'Открыть заказ', url: appUrl(`/orders/${result.order.id}`) },
+        }),
+        'order.created.passenger',
+      );
+      notifyMessengers(
+        notifyOnlineDriversInMessengers({
+          icon: '🚕',
+          title: 'Новый заказ',
+          body: `${result.order.pickup.label} → ${result.order.destination.label}`,
+          details: [
+            ['Тариф', tariffLabels[result.order.tariff]],
+            ['Стоимость', formatMoney(result.order.priceMinor)],
+            ['Комментарий', result.order.comment],
+          ],
+          action: { label: 'Посмотреть заказ', url: appUrl('/driver') },
+        }),
+        'order.created.drivers',
+      );
       reply.code(201);
     }
     return { data: result.order };
@@ -1848,6 +1986,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         return {
           passengerId: order.passenger_id,
           driverId: order.driver_id,
+          raterRole,
         };
       });
 
@@ -1856,6 +1995,23 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       const payload = presentOrder(updated);
       publish(`user:${participants.passengerId}`, 'order:updated', payload);
       publish(`driver:${participants.driverId}`, 'order:updated', payload);
+      const rater = participants.raterRole === 'passenger' ? payload.passenger : payload.driver;
+      notifyAdmins({
+        icon: score <= 2 ? '⚠️' : '⭐',
+        title: 'Поставлена оценка за поездку',
+        actor: {
+          role: participants.raterRole === 'passenger' ? 'пассажир' : 'водитель',
+          id: session.id,
+          name: rater?.name,
+          phone: rater?.phone,
+        },
+        entity: { label: 'Заказ', id },
+        details: [
+          ['Оценка', `${score} из 5`],
+          ['Кому', participants.raterRole === 'passenger' ? 'водителю' : 'пассажиру'],
+          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ],
+      });
       return { data: payload };
     },
   );
@@ -1902,6 +2058,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         ],
       );
 
+      let passengerBlocked = false;
       if (row.passenger_id === session.id && !session.roles.includes('admin')) {
         const [countRows] = await connection.query<
           (RowDataPacket & { cancellation_count: number })[]
@@ -1925,6 +2082,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           Number(countRows[0]?.cancellation_count ?? 0) >=
           passengerCancellationPolicy.limit
         ) {
+          passengerBlocked = true;
           await connection.execute(
             `UPDATE users
              SET order_blocked_until = TIMESTAMPADD(HOUR, ?, UTC_TIMESTAMP(3)),
@@ -1942,6 +2100,9 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       return {
         passengerId: row.passenger_id,
         driverId: row.driver_id,
+        fromStatus: row.status,
+        initiatedBy: row.passenger_id === session.id ? 'passenger' as const : 'admin' as const,
+        passengerBlocked,
       };
     });
     const updated = await getOrder(id);
@@ -1949,6 +2110,58 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     const payload = presentOrder(updated);
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     if (participants.driverId) publish(`driver:${participants.driverId}`, 'order:updated', payload);
+    notifyAdmins({
+      icon: participants.passengerBlocked ? '🚨' : '❌',
+      title: participants.passengerBlocked
+        ? 'Заказ отменён — пассажир временно заблокирован'
+        : 'Заказ отменён',
+      actor: {
+        role: participants.initiatedBy === 'passenger' ? 'пассажир' : 'администратор',
+        id: session.id,
+        name: participants.initiatedBy === 'passenger' ? payload.passenger?.name : undefined,
+        phone: participants.initiatedBy === 'passenger' ? payload.passenger?.phone : undefined,
+      },
+      entity: { label: 'Заказ', id },
+      details: [
+        ['Предыдущий статус', rideStatusLabels[participants.fromStatus]],
+        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Стоимость', formatMoney(payload.priceMinor)],
+        ['Назначенный водитель', payload.driver?.name],
+      ],
+    });
+    notifyMessengers(
+      notifyUsersInMessengers([participants.passengerId], {
+        icon: '❌',
+        title: 'Заказ отменён',
+        body: participants.initiatedBy === 'passenger'
+          ? 'Вы отменили заказ.'
+          : 'Заказ отменён администратором.',
+        details: [
+          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+          ['Статус до отмены', rideStatusLabels[participants.fromStatus]],
+          ['Ограничение заказов', participants.passengerBlocked
+            ? `на ${passengerCancellationPolicy.blockHours} ч. из-за частых отмен`
+            : null],
+        ],
+        action: { label: 'Мои заказы', url: appUrl('/orders') },
+      }),
+      'order.cancelled.passenger',
+    );
+    if (participants.driverId) {
+      notifyMessengers(
+        notifyDriversInMessengers([participants.driverId], {
+          icon: '❌',
+          title: 'Заказ отменён',
+          body: 'Пассажир или администратор отменил назначенный вам заказ.',
+          details: [
+            ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+            ['Пассажир', payload.passenger?.name],
+          ],
+          action: { label: 'Искать новые заказы', url: appUrl('/driver') },
+        }),
+        'order.cancelled.driver',
+      );
+    }
     return { data: payload };
   });
 
@@ -2046,6 +2259,15 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       publish('drivers', 'driver:online', { driverId: driver.id });
     } else {
       await closeDriverShift(driver.id);
+    }
+    if (driver.status !== status) {
+      notifyAdmins({
+        icon: status === 'online' ? '🟢' : '⚫',
+        title: status === 'online' ? 'Водитель вышел на линию' : 'Водитель ушёл с линии',
+        actor: { role: 'водитель', id: session.id },
+        entity: { label: 'Водитель', id: driver.id },
+        details: [['Предыдущий статус', driver.status]],
+      });
     }
     return { data: { status } };
   });
@@ -2178,6 +2400,32 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       [id],
     );
     publish('admins', 'vehicle-change:created', { id, driverId: driver.id });
+    notifyAdmins({
+      icon: '🚘',
+      title: 'Водитель запросил смену автомобиля',
+      actor: { role: 'водитель', id: session.id },
+      entity: { label: 'Заявка', id },
+      details: [
+        ['Водитель', driver.id],
+        ['Было', `${current.make} ${current.model}, ${current.plate}`],
+        ['Станет', `${input.vehicleMake} ${input.vehicleModel}, ${normalizedPlate}`],
+        ['Цвет', input.vehicleColor],
+        ['Детское кресло', input.hasChildSeat ? 'есть' : 'нет'],
+      ],
+    });
+    notifyMessengers(
+      notifyUsersInMessengers([session.id], {
+        icon: '🕓',
+        title: 'Заявка на смену автомобиля принята',
+        body: 'Администратор проверит новые данные. О результате сообщим здесь.',
+        details: [
+          ['Автомобиль', `${input.vehicleMake} ${input.vehicleModel}`],
+          ['Госномер', normalizedPlate],
+        ],
+        action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
+      }),
+      'vehicle-change.created',
+    );
     reply.code(201);
     return { data: created ? presentVehicleChangeRequest(created) : { id, status: 'pending' } };
   });
@@ -2315,6 +2563,26 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     const payload = presentOrder(row);
     publish(`user:${updated.passengerId}`, 'order:updated', payload);
     publish(`driver:${updated.driverId}`, 'order:updated', payload);
+    notifyAdmins({
+      icon: '✅',
+      title: 'Водитель принял заказ',
+      actor: {
+        role: 'водитель',
+        id: session.id,
+        name: payload.driver?.name,
+        phone: payload.driver?.phone,
+      },
+      entity: { label: 'Заказ', id },
+      details: [
+        ['Водитель', updated.driverId],
+        ['Автомобиль', payload.driver
+          ? `${payload.driver.vehicle.make} ${payload.driver.vehicle.model}, ${payload.driver.vehicle.plate}`
+          : null],
+        ['Пассажир', payload.passenger?.name],
+        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Стоимость', formatMoney(payload.priceMinor)],
+      ],
+    });
     void notifyUsers([updated.passengerId], {
       title: 'Водитель найден',
       body: `${payload.driver?.vehicle.color ?? ''} ${payload.driver?.vehicle.make ?? ''} · ${payload.driver?.vehicle.plate ?? ''}`.trim(),
@@ -2322,6 +2590,38 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       sound: 'taxi_found.wav',
       channelId: 'ride-taxi-found-v2',
     }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+    notifyMessengers(
+      notifyUsersInMessengers([updated.passengerId], {
+        icon: '✅',
+        title: 'Машина найдена',
+        body: payload.driver
+          ? `${payload.driver.name} едет к вам на ${payload.driver.vehicle.color.toLowerCase()} ${payload.driver.vehicle.make}.`
+          : 'Водитель принял ваш заказ и скоро выедет к месту подачи.',
+        details: [
+          ['Госномер', payload.driver?.vehicle.plate],
+          ['Телефон водителя', payload.driver?.phone],
+          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ],
+        action: { label: 'Следить за поездкой', url: appUrl(`/orders/${id}`) },
+      }),
+      'order.accepted.passenger',
+    );
+    notifyMessengers(
+      notifyUsersInMessengers([session.id], {
+        icon: '✅',
+        title: 'Заказ принят',
+        body: `Подача: ${payload.pickup.label}`,
+        details: [
+          ['Куда', payload.destination.label],
+          ['Пассажир', payload.passenger?.name],
+          ['Телефон пассажира', payload.passenger?.phone],
+          ['Стоимость', formatMoney(payload.priceMinor)],
+          ['Комментарий', payload.comment],
+        ],
+        action: { label: 'Открыть поездку', url: appUrl('/driver') },
+      }),
+      'order.accepted.driver',
+    );
     return { data: payload };
   });
 
@@ -2344,6 +2644,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           { statusCode: 409, code: 'WAITING_NOT_AVAILABLE' },
         );
       }
+      const changed = !row.waiting_started_at;
       if (!row.waiting_started_at) {
         await connection.execute(
           'UPDATE orders SET waiting_started_at = UTC_TIMESTAMP(3) WHERE id = ?',
@@ -2362,13 +2663,38 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           ],
         );
       }
-      return { passengerId: row.passenger_id, driverId: driver.id };
+      return { passengerId: row.passenger_id, driverId: driver.id, changed };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
     const payload = presentOrder(updated);
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
+    if (participants.changed) {
+      notifyAdmins({
+        icon: '⏱️',
+        title: 'Водитель включил платное ожидание',
+        actor: { role: 'водитель', id: session.id, name: payload.driver?.name },
+        entity: { label: 'Заказ', id },
+        details: [
+          ['Бесплатно', `${payload.waitingFreeMinutes ?? 0} мин.`],
+          ['Далее', `${formatMoney(payload.waitingPerMinuteMinor ?? 0)} / мин.`],
+        ],
+      });
+      notifyMessengers(
+        notifyUsersInMessengers([participants.passengerId], {
+          icon: '⏱️',
+          title: 'Включено платное ожидание',
+          body: 'Водитель включил счётчик ожидания во время поездки.',
+          details: [
+            ['Бесплатно', `${payload.waitingFreeMinutes ?? 0} мин.`],
+            ['Далее', `${formatMoney(payload.waitingPerMinuteMinor ?? 0)} / мин.`],
+          ],
+          action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
+        }),
+        'waiting.started.passenger',
+      );
+    }
     return { data: payload };
   });
 
@@ -2391,21 +2717,49 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           { statusCode: 409, code: 'WAITING_NOT_AVAILABLE' },
         );
       }
+      let settled: Awaited<ReturnType<typeof settleWaiting>> | null = null;
       if (row.waiting_started_at) {
-        const settled = await settleWaiting(connection, row);
+        settled = await settleWaiting(connection, row);
         await connection.execute(
           `INSERT INTO order_events (order_id, actor_user_id, event_type, payload)
            VALUES (?, ?, 'waiting.stopped', ?)`,
           [id, session.id, JSON.stringify(settled)],
         );
       }
-      return { passengerId: row.passenger_id, driverId: driver.id };
+      return { passengerId: row.passenger_id, driverId: driver.id, settled };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
     const payload = presentOrder(updated);
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
+    if (participants.settled) {
+      notifyAdmins({
+        icon: '⏹️',
+        title: 'Водитель завершил платное ожидание',
+        actor: { role: 'водитель', id: session.id, name: payload.driver?.name },
+        entity: { label: 'Заказ', id },
+        details: [
+          ['Ожидание', `${Math.ceil(participants.settled.waitingSeconds / 60)} мин.`],
+          ['Начислено', formatMoney(participants.settled.waitingPriceMinor)],
+          ['Итого по заказу', formatMoney(participants.settled.priceMinor)],
+        ],
+      });
+      notifyMessengers(
+        notifyUsersInMessengers([participants.passengerId], {
+          icon: '⏹️',
+          title: 'Платное ожидание завершено',
+          body: 'Счётчик ожидания остановлен, стоимость заказа обновлена.',
+          details: [
+            ['Ожидание', `${Math.ceil(participants.settled.waitingSeconds / 60)} мин.`],
+            ['Начислено', formatMoney(participants.settled.waitingPriceMinor)],
+            ['Итого', formatMoney(participants.settled.priceMinor)],
+          ],
+          action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
+        }),
+        'waiting.stopped.passenger',
+      );
+    }
     return { data: payload };
   });
 
@@ -2464,6 +2818,41 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     const payload = presentOrder(updated);
     publish(`user:${row.passenger_id}`, 'order:updated', payload);
     publish(`driver:${driver.id}`, 'order:updated', payload);
+    notifyAdmins({
+      icon:
+        status === 'completed'
+          ? '🏁'
+          : status === 'driver_waiting'
+            ? '📍'
+            : status === 'in_progress'
+              ? '▶️'
+              : '🚗',
+      title: {
+        driver_arriving: 'Водитель выехал к пассажиру',
+        driver_waiting: 'Водитель прибыл на место подачи',
+        in_progress: 'Поездка началась',
+        completed: 'Поездка завершена',
+      }[status],
+      actor: {
+        role: 'водитель',
+        id: session.id,
+        name: payload.driver?.name,
+        phone: payload.driver?.phone,
+      },
+      entity: { label: 'Заказ', id },
+      details: [
+        ['Статус', rideStatusLabels[status]],
+        ['Пассажир', payload.passenger?.name],
+        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Стоимость', status === 'completed' ? formatMoney(payload.priceMinor) : null],
+        ['Ожидание', status === 'completed' && (payload.waitingPriceMinor ?? 0) > 0
+          ? formatMoney(payload.waitingPriceMinor ?? 0)
+          : null],
+        ['Комиссия сервиса', status === 'completed'
+          ? formatMoney(payload.serviceCommissionMinor)
+          : null],
+      ],
+    });
     const notification =
       status === 'driver_waiting'
         ? {
@@ -2483,6 +2872,70 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     if (notification) {
       void notifyUsers([row.passenger_id], { ...notification, data: { orderId: id } }).catch((error) =>
         app.log.warn({ error }, 'push notification failed'),
+      );
+    }
+    const passengerMessengerNotification: Omit<PersonalMessengerNotification, 'action'> = ({
+      driver_arriving: {
+        icon: '🚗',
+        title: 'Водитель выехал к вам',
+        body: 'Машина направляется к месту подачи.',
+        details: [
+          ['Машина', payload.driver
+            ? `${payload.driver.vehicle.color} ${payload.driver.vehicle.make}`
+            : null],
+          ['Госномер', payload.driver?.vehicle.plate],
+        ],
+      },
+      driver_waiting: {
+        icon: '📍',
+        title: 'Машина приехала',
+        body: 'Водитель ожидает вас в месте подачи.',
+        details: [
+          ['Место подачи', payload.pickup.label],
+          ['Госномер', payload.driver?.vehicle.plate],
+          ['Телефон водителя', payload.driver?.phone],
+        ],
+      },
+      in_progress: {
+        icon: '▶️',
+        title: 'Поездка началась',
+        body: `Направляемся в ${payload.destination.label}.`,
+        details: [['Стоимость', formatMoney(payload.priceMinor)]],
+      },
+      completed: {
+        icon: '🏁',
+        title: 'Поездка завершена',
+        body: 'Спасибо, что выбрали Такси Грахово!',
+        details: [
+          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+          ['Итого', formatMoney(payload.priceMinor)],
+          ['В том числе ожидание', payload.waitingPriceMinor
+            ? formatMoney(payload.waitingPriceMinor)
+            : null],
+        ],
+      },
+    } satisfies Record<typeof status, Omit<PersonalMessengerNotification, 'action'>>)[status];
+    notifyMessengers(
+      notifyUsersInMessengers([row.passenger_id], {
+        ...passengerMessengerNotification,
+        action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
+      }),
+      `order.${status}.passenger`,
+    );
+    if (status === 'completed') {
+      notifyMessengers(
+        notifyUsersInMessengers([session.id], {
+          icon: '🏁',
+          title: 'Заказ завершён',
+          body: `${payload.pickup.label} → ${payload.destination.label}`,
+          details: [
+            ['Стоимость', formatMoney(payload.priceMinor)],
+            ['Комиссия', formatMoney(payload.serviceCommissionMinor)],
+            ['Ваш доход', formatMoney(payload.priceMinor - payload.serviceCommissionMinor)],
+          ],
+          action: { label: 'Открыть поездки', url: appUrl('/driver/trips') },
+        }),
+        'order.completed.driver',
       );
     }
     return { data: payload };
@@ -2580,6 +3033,37 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       });
     });
     publish('admins', 'application:created', { id });
+    notifyAdmins({
+      icon: '🪪',
+      title: 'Подана заявка в водители',
+      actor: {
+        role: 'пассажир',
+        id: session.id,
+        name: input.applicantName,
+        phone: input.phone,
+      },
+      entity: { label: 'Заявка', id },
+      details: [
+        ['Водительское удостоверение', input.licenseNumber],
+        ['Автомобиль', `${input.vehicleMake} ${input.vehicleModel}, ${input.vehicleYear}`],
+        ['Цвет', input.vehicleColor],
+        ['Госномер', input.plate.toUpperCase()],
+        ['Детское кресло', input.hasChildSeat ? 'есть' : 'нет'],
+      ],
+    });
+    notifyMessengers(
+      notifyUsersInMessengers([session.id], {
+        icon: '🕓',
+        title: 'Заявка в водители принята',
+        body: 'Администратор проверит документы и автомобиль. О результате сообщим здесь.',
+        details: [
+          ['Автомобиль', `${input.vehicleMake} ${input.vehicleModel}`],
+          ['Госномер', input.plate.toUpperCase()],
+        ],
+        action: { label: 'Посмотреть заявку', url: appUrl('/driver-application') },
+      }),
+      'application.created',
+    );
     reply.code(201);
     return { data: { id, status: 'pending' } };
   });
@@ -2709,14 +3193,30 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     });
     await audit(session.id, 'application.moderate', 'driver_application', id, changed.before, changed.after, request.ip);
     publish(`user:${changed.userId}`, 'application:updated', { id, status: input.decision });
-    void notifyUsers([changed.userId], {
+    const applicationNotification = {
       title: input.decision === 'approved' ? 'Заявка одобрена' : 'Заявка требует внимания',
       body:
         input.decision === 'approved'
           ? 'Кабинет водителя уже доступен'
           : input.comment || 'Откройте профиль, чтобы увидеть результат проверки',
+    };
+    void notifyUsers([changed.userId], {
+      ...applicationNotification,
       data: { applicationId: id },
     }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+    notifyMessengers(
+      notifyUsersInMessengers([changed.userId], {
+        icon: input.decision === 'approved' ? '🎉' : '⚠️',
+        title: applicationNotification.title,
+        body: applicationNotification.body,
+        details: [['Комментарий администратора', input.comment]],
+        action: {
+          label: input.decision === 'approved' ? 'Открыть кабинет водителя' : 'Посмотреть заявку',
+          url: appUrl(input.decision === 'approved' ? '/driver' : '/driver-application'),
+        },
+      }),
+      'application.moderated',
+    );
     return { data: { id, status: input.decision } };
   });
 
@@ -2824,7 +3324,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       request.ip,
     );
     publish(`user:${changed.userId}`, 'vehicle-change:updated', { id, status: input.decision });
-    void notifyUsers([changed.userId], {
+    const vehicleNotification = {
       title:
         input.decision === 'approved'
           ? 'Изменения автомобиля одобрены'
@@ -2833,8 +3333,21 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         input.decision === 'approved'
           ? 'Новые данные автомобиля уже действуют'
           : input.comment || 'Откройте кабинет водителя, чтобы увидеть решение',
+    };
+    void notifyUsers([changed.userId], {
+      ...vehicleNotification,
       data: { vehicleChangeRequestId: id },
     }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+    notifyMessengers(
+      notifyUsersInMessengers([changed.userId], {
+        icon: input.decision === 'approved' ? '✅' : '⚠️',
+        title: vehicleNotification.title,
+        body: vehicleNotification.body,
+        details: [['Комментарий администратора', input.comment]],
+        action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
+      }),
+      'vehicle-change.moderated',
+    );
     return { data: { id, status: input.decision } };
   });
 
@@ -2889,6 +3402,31 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       await closeDriverShift(id);
     }
     await audit(session.id, 'driver.update', 'driver', id, before, input, request.ip);
+    if (input.status !== undefined || Object.prototype.hasOwnProperty.call(input, 'commissionBps')) {
+      notifyMessengers(
+        notifyDriversInMessengers([id], {
+          icon: input.status === 'suspended' ? '⛔' : 'ℹ️',
+          title: input.status === 'suspended'
+            ? 'Доступ водителя приостановлен'
+            : 'Настройки водителя изменены',
+          body: input.status === 'suspended'
+            ? 'Администратор временно приостановил доступ к заказам.'
+            : 'Администратор обновил настройки вашего профиля водителя.',
+          details: [
+            ['Статус', input.status
+              ? { online: 'на линии', offline: 'не на линии', suspended: 'приостановлен' }[input.status]
+              : null],
+            ['Комиссия', Object.prototype.hasOwnProperty.call(input, 'commissionBps')
+              ? input.commissionBps == null
+                ? 'по тарифу сервиса'
+                : `${input.commissionBps / 100}%`
+              : null],
+          ],
+          action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
+        }),
+        'driver.admin-updated',
+      );
+    }
     return { data: { id, ...input } };
   });
 

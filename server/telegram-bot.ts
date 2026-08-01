@@ -17,7 +17,7 @@ const telegramProxyAgent = config.TELEGRAM_PROXY_URL
   ? new ProxyAgent(config.TELEGRAM_PROXY_URL)
   : undefined;
 
-async function sendTelegramMessage(
+export async function sendTelegramMessage(
   chatId: string,
   body: Record<string, unknown>,
 ): Promise<void> {

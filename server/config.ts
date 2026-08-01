@@ -28,6 +28,8 @@ const schema = z.object({
   MAX_WEBHOOK_SECRET: z.string().regex(/^[A-Za-z0-9_-]*$/u).default(''),
   TELEGRAM_BOT_USERNAME: z.string().regex(/^[A-Za-z0-9_]*$/u).default(''),
   TELEGRAM_BOT_TOKEN: z.string().default(''),
+  TELEGRAM_ADMIN_CHAT_ID: z.string().regex(/^-?\d+$/u).default('-1004215180973'),
+  TELEGRAM_CRITICAL_CHAT_ID: z.string().regex(/^-?\d+$/u).default('-1004442605510'),
   TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[A-Za-z0-9_-]*$/u).default(''),
   TELEGRAM_PROXY_URL: z
     .string()

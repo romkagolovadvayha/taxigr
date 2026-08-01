@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { SessionProvider } from '@/auth/session-provider';
+import { CriticalErrorMonitor } from '@/errors/critical-error-monitor';
 import { RideFeedbackProvider } from '@/feedback/ride-feedback-provider';
 import { FeedbackPreferencesProvider } from '@/preferences/feedback-preferences-provider';
 import { NotificationRegistrar } from '@/providers/notification-registrar';
@@ -32,6 +33,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
+        <CriticalErrorMonitor />
         <PassengerPreferencesProvider>
           <FeedbackPreferencesProvider>
             <NotificationRegistrar />

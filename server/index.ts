@@ -6,6 +6,7 @@ import { Server as SocketServer } from 'socket.io';
 
 import { pruneAuthAbuseData } from './auth-abuse';
 import { config } from './config';
+import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
 import { registerRoutes } from './routes';
 import { verifySession } from './security';
@@ -27,6 +28,14 @@ const app = Fastify({
   bodyLimit: 256 * 1024,
   requestTimeout: 15_000,
 });
+
+const reportCritical = (
+  report: Parameters<typeof sendCriticalErrorReport>[0],
+): void => {
+  void sendCriticalErrorReport(report).catch((error) =>
+    app.log.warn({ error }, 'Telegram critical notification failed'),
+  );
+};
 
 await app.register(helmet, {
   contentSecurityPolicy: false,
@@ -89,10 +98,24 @@ await registerRoutes(app, (room, event, payload) => {
 });
 
 const authAbusePruneTimer = setInterval(() => {
-  void pruneAuthAbuseData().catch((error) => app.log.error(error, 'auth abuse data pruning failed'));
+  void pruneAuthAbuseData().catch((error) => {
+    app.log.error(error, 'auth abuse data pruning failed');
+    reportCritical({
+      source: 'server-process',
+      error,
+      context: [['Задача', 'auth abuse data pruning']],
+    });
+  });
 }, 24 * 60 * 60 * 1_000);
 (authAbusePruneTimer as unknown as { unref?: () => void }).unref?.();
-void pruneAuthAbuseData().catch((error) => app.log.error(error, 'initial auth abuse data pruning failed'));
+void pruneAuthAbuseData().catch((error) => {
+  app.log.error(error, 'initial auth abuse data pruning failed');
+  reportCritical({
+    source: 'server-process',
+    error,
+    context: [['Задача', 'initial auth abuse data pruning']],
+  });
+});
 
 app.setErrorHandler((error, request, reply) => {
   const normalized =
@@ -105,8 +128,21 @@ app.setErrorHandler((error, request, reply) => {
       : statusCode >= 500
         ? 'INTERNAL_ERROR'
         : 'REQUEST_ERROR';
-  if (statusCode >= 500) request.log.error(normalized);
-  else request.log.info({ code, message: normalized.message }, 'request rejected');
+  if (statusCode >= 500) {
+    request.log.error(normalized);
+    reportCritical({
+      source: 'api',
+      error: normalized,
+      context: [
+        ['HTTP', `${request.method} ${request.routeOptions.url}`],
+        ['Статус', statusCode],
+        ['Код', code],
+        ['IP', request.ip],
+        ['Request ID', request.id],
+        ['User-Agent', request.headers['user-agent']],
+      ],
+    });
+  } else request.log.info({ code, message: normalized.message }, 'request rejected');
   void reply.code(statusCode).send({
     error: {
       code,
@@ -123,12 +159,39 @@ app.addHook('onClose', async () => {
   await db.end();
 });
 
-const shutdown = async (signal: string) => {
+let shuttingDown = false;
+const shutdown = async (signal: string, exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   app.log.info({ signal }, 'shutting down');
-  await app.close();
-  process.exit(0);
+  try {
+    await app.close();
+  } finally {
+    process.exit(exitCode);
+  }
 };
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('unhandledRejection', (reason) => {
+  app.log.error({ error: reason }, 'unhandled promise rejection');
+  reportCritical({
+    source: 'server-process',
+    error: reason,
+    context: [['Событие', 'unhandledRejection']],
+  });
+});
+process.on('uncaughtException', (error, origin) => {
+  app.log.fatal({ error, origin }, 'uncaught exception');
+  void Promise.race([
+    sendCriticalErrorReport({
+      source: 'server-process',
+      error,
+      context: [['Событие', 'uncaughtException'], ['Origin', origin]],
+    }),
+    new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+  ])
+    .catch((reportError) => app.log.warn({ error: reportError }, 'fatal error report failed'))
+    .finally(() => void shutdown('uncaughtException', 1));
+});
 
 await app.listen({ port: config.PORT, host: config.HOST });
