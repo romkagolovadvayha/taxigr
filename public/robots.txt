@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /_sitemap
+
+Sitemap: https://taxi-grahovo.ru/sitemap.xml

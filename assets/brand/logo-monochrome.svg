@@ -1,0 +1,14 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="pin-holes">
+      <rect width="512" height="512" fill="white"/>
+      <circle cx="152" cy="145.6" r="27.2" fill="black"/>
+      <circle cx="355.2" cy="332.8" r="27.2" fill="black"/>
+    </mask>
+  </defs>
+  <g mask="url(#pin-holes)">
+    <path d="M152 256C176 308.8 232 308.8 249.6 280C273.6 240 312 225.6 355.2 248" stroke="black" stroke-width="12.8" stroke-linecap="round" stroke-dasharray="28.8 24"/>
+    <path d="M152 60.8C105.2 60.8 67.2 98.8 67.2 145.6C67.2 209.6 152 276.8 152 276.8C152 276.8 236.8 209.6 236.8 145.6C236.8 98.8 198.8 60.8 152 60.8Z" fill="black"/>
+    <path d="M355.2 248C308.4 248 270.4 286 270.4 332.8C270.4 396.8 355.2 464 355.2 464C355.2 464 440 396.8 440 332.8C440 286 402 248 355.2 248Z" fill="black"/>
+  </g>
+</svg>

@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="ru"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #F4F4F2;
+      margin: 0;
+      padding: 0;
+    }
+    .map-container {
+      background-image: url('https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=2000&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center;
+    }
+    .route-line {
+      stroke: #16B96B;
+      stroke-width: 4;
+      stroke-linecap: round;
+      fill: none;
+    }
+    .marker-pickup {
+      background: #181818;
+    }
+    .marker-destination {
+      background: #FFD600;
+    }
+    .continuous-corners {
+      border-radius: 30px;
+    }
+    /* Custom shadow based on design system */
+    .sheet-shadow {
+      box-shadow: 0 -8px 28px rgba(0,0,0,0.10);
+    }
+    .button-press:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="w-full h-screen flex flex-col relative overflow-hidden select-none" data-sd-id="1">
+    
+    <!-- Map Layer (Full Bleed) -->
+    <div class="absolute inset-0 map-container z-0" data-sd-id="2">
+      <!-- Mock Route Drawing -->
+      <svg class="absolute inset-0 w-full h-full opacity-80" data-sd-id="3">
+        <path d="M 100 250 L 150 280 L 250 350 L 320 420" class="route-line"></path>
+      </svg>
+      
+      <!-- Map Markers -->
+      <div class="absolute" style="top: 235px; left: 85px;" data-sd-id="4">
+        <div class="w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-lg" data-sd-id="5">
+          <div class="w-2 h-2 rounded-full marker-pickup" data-sd-id="6"></div>
+        </div>
+      </div>
+      <div class="absolute" style="top: 410px; left: 310px;" data-sd-id="7">
+        <iconify-icon icon="material-symbols:location-on" class="text-3xl" style="color: #FFD600; text-shadow: 0 2px 4px rgba(0,0,0,0.3)"></iconify-icon>
+      </div>
+    </div>
+
+    <!-- Floating Header -->
+    <header class="shrink-0 pt-14 px-4 flex justify-between items-center relative z-20 pointer-events-none" data-sd-id="8">
+      <div class="flex items-center gap-3 bg-white/94 px-3 py-2 rounded-2xl shadow-sm pointer-events-auto border border-[rgba(24,24,24,0.08)]" data-sd-id="9">
+        <!-- Brand Mark -->
+        <div class="w-8 h-8 bg-[#FFD600] rounded-lg flex items-center justify-center flex-shrink-0" data-sd-id="10">
+          <svg viewBox="0 0 32 32" class="w-6 h-6" data-sd-id="11">
+            <path d="M 8 8 L 24 8 L 24 20 L 20 20" stroke="#181818" stroke-width="3.5" fill="none" stroke-linecap="round"></path>
+            <circle cx="19" cy="24" r="2.5" fill="#181818"></circle>
+            <rect x="11" y="8" width="2" height="2" fill="white"></rect>
+          </svg>
+        </div>
+        <span class="font-[750] text-[17px] text-[#181818] tracking-tight" data-sd-id="12">Такси Грахово</span>
+      </div>
+      
+      <button class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md pointer-events-auto border border-[rgba(24,24,24,0.08)] button-press" data-sd-id="13">
+        <iconify-icon icon="lucide:user" class="text-xl text-[#181818]"></iconify-icon>
+      </button>
+    </header>
+
+    <!-- Map Controls (Floating) -->
+    <div class="absolute right-4 bottom-[460px] flex flex-col gap-3 z-20" data-sd-id="14">
+      <button class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md border border-[rgba(24,24,24,0.08)] button-press" data-sd-id="15">
+        <iconify-icon icon="lucide:plus" class="text-xl text-[#181818]"></iconify-icon>
+      </button>
+      <button class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md border border-[rgba(24,24,24,0.08)] button-press" data-sd-id="16">
+        <iconify-icon icon="lucide:navigation" class="text-xl text-[#181818]"></iconify-icon>
+      </button>
+    </div>
+
+    <!-- Bottom Sheet Container -->
+    <div class="mt-auto relative z-30" data-sd-id="17">
+      <div class="bg-white continuous-corners pt-3 pb-[34px] px-4 sheet-shadow flex flex-col" data-sd-id="18">
+        <!-- Handle -->
+        <div class="w-10 h-1 bg-[#ECEDEB] rounded-full self-center mb-5" data-sd-id="19"></div>
+
+        <!-- Address Inputs -->
+        <div class="space-y-0 relative mb-6" data-sd-id="20">
+          <!-- Pickup -->
+          <div class="flex items-center gap-4 h-[56px] border-b border-[rgba(24,24,24,0.08)]" data-sd-id="21">
+            <div class="w-2 h-2 rounded-full marker-pickup flex-shrink-0" data-sd-id="22"></div>
+            <div class="flex-1 flex flex-col" data-sd-id="23">
+              <span class="text-[11px] font-[600] text-[#A8AAA8] uppercase" data-sd-id="24">Откуда</span>
+              <span class="text-[16px] font-[450] text-[#181818] truncate" data-sd-id="25">ул. Мира, 12</span>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-[#A8AAA8]"></iconify-icon>
+          </div>
+          <!-- Destination -->
+          <div class="flex items-center gap-4 h-[56px]" data-sd-id="26">
+            <div class="w-2 h-2 bg-[#FFD600] flex-shrink-0" data-sd-id="27"></div>
+            <div class="flex-1 flex flex-col" data-sd-id="28">
+              <span class="text-[11px] font-[600] text-[#A8AAA8] uppercase" data-sd-id="29">Куда</span>
+              <span class="text-[16px] font-[450] text-[#6F706F] truncate" data-sd-id="30">Деревня Мари-Возжай...</span>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-[#A8AAA8]"></iconify-icon>
+          </div>
+          <!-- Visual connector -->
+          <div class="absolute left-[3px] top-[28px] w-[1px] h-[28px] bg-[#ECEDEB]" data-sd-id="31"></div>
+        </div>
+
+        <!-- Tariff Selector -->
+        <div class="grid grid-cols-2 gap-3 mb-6" data-sd-id="32">
+          <!-- Econom (Selected) -->
+          <div class="flex flex-col p-3 rounded-[24px] bg-[#F4F4F2] border-2 border-[#FFD600] relative" data-sd-id="33">
+            <div class="flex justify-between items-start mb-2" data-sd-id="34">
+              <iconify-icon icon="mdi:car-side" class="text-3xl text-[#181818]"></iconify-icon>
+              <span class="text-[13px] font-[500] text-[#181818]" data-sd-id="35">3 мин</span>
+            </div>
+            <span class="text-[16px] font-[650] text-[#181818]" data-sd-id="36">Эконом</span>
+            <span class="text-[13px] font-[500] text-[#6F706F]" data-sd-id="37">240 ₽</span>
+          </div>
+          <!-- Children -->
+          <div class="flex flex-col p-3 rounded-[24px] bg-[#FFFFFF] border border-[rgba(24,24,24,0.08)] opacity-60" data-sd-id="38">
+            <div class="flex justify-between items-start mb-2" data-sd-id="39">
+              <iconify-icon icon="mdi:car-child-seat" class="text-3xl text-[#181818]"></iconify-icon>
+              <span class="text-[13px] font-[500] text-[#181818]" data-sd-id="40">7 мин</span>
+            </div>
+            <span class="text-[16px] font-[650] text-[#181818]" data-sd-id="41">Детский</span>
+            <span class="text-[13px] font-[500] text-[#6F706F]" data-sd-id="42">310 ₽</span>
+          </div>
+        </div>
+
+        <!-- Options Row -->
+        <div class="flex items-center justify-between py-3 mb-4 border-t border-b border-[rgba(24,24,24,0.08)]" data-sd-id="43">
+          <div class="flex items-center gap-3" data-sd-id="44">
+            <div class="w-10 h-10 bg-[#ECEDEB] rounded-[16px] flex items-center justify-center" data-sd-id="45">
+              <iconify-icon icon="lucide:banknote" class="text-[#181818] text-xl"></iconify-icon>
+            </div>
+            <span class="text-[16px] font-[450] text-[#181818]" data-sd-id="46">Наличные</span>
+          </div>
+          <div class="flex items-center gap-1 text-[#6F706F]" data-sd-id="47">
+            <span class="text-[13px] font-[500]" data-sd-id="48">Комментарий</span>
+            <iconify-icon icon="lucide:chevron-right"></iconify-icon>
+          </div>
+        </div>
+
+        <!-- Price Note -->
+        <div class="mb-4 px-1" data-sd-id="49">
+          <p class="text-[11px] font-[600] text-[#A8AAA8] uppercase tracking-wider" data-sd-id="50">Оценка стоимости</p>
+          <div class="flex items-baseline gap-2" data-sd-id="51">
+            <span class="text-[24px] font-[800] text-[#181818] tabular-nums" data-sd-id="52">240 ₽</span>
+            <span class="text-[13px] font-[500] text-[#6F706F]" data-sd-id="53">фиксированная цена</span>
+          </div>
+        </div>
+
+        <!-- Main CTA -->
+        <button class="w-full h-[60px] bg-[#FFD600] hover:bg-[#E9C400] text-[#181818] rounded-[24px] font-[700] text-[17px] button-press flex items-center justify-center transition-all" data-sd-id="54">
+          Заказать такси
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</body></html>

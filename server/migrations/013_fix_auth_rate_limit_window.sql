@@ -1,0 +1,2 @@
+ALTER TABLE auth_rate_limit_counters
+  MODIFY COLUMN window_started_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);

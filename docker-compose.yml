@@ -1,0 +1,83 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: taxi_grahovo
+      MYSQL_USER: taxi
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - taxi_mysql:/var/lib/mysql
+      - ./server/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+      - ./server/migrations/002_geocoding_cache.sql:/docker-entrypoint-initdb.d/002_geocoding_cache.sql:ro
+      - ./server/migrations/003_driver_shifts.sql:/docker-entrypoint-initdb.d/003_driver_shifts.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env.production}
+    environment:
+      MYSQL_URL: mysql://taxi:${MYSQL_PASSWORD}@mysql:3306/taxi_grahovo
+      ROUTER_BASE_URL: http://osrm:5000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      osrm:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4100/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: "no"
+    env_file: ${ENV_FILE:-.env.production}
+    environment:
+      MYSQL_URL: mysql://taxi:${MYSQL_PASSWORD}@mysql:3306/taxi_grahovo
+    command: ["./node_modules/.bin/tsx", "server/scripts/migrate.ts"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend@sha256:a7091038e39a73659767f34ef2d389909b42ea80b09bd2bdca482dce2991cbad
+    restart: unless-stopped
+    command:
+      - osrm-routed
+      - --algorithm
+      - mld
+      - /data/volga-fed-district-latest.osrm
+    volumes:
+      - ./deploy/osrm/data:/data:ro
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        EXPO_PUBLIC_API_URL: ${PUBLIC_URL}
+        EXPO_PUBLIC_SOCKET_URL: ${PUBLIC_URL}
+        EXPO_PUBLIC_YANDEX_MAPS_API_KEY: ${YANDEX_MAPS_API_KEY}
+        EXPO_PUBLIC_SITE_URL: ${PUBLIC_URL}
+        EXPO_PUBLIC_DEMO_MODE: "false"
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  taxi_mysql:

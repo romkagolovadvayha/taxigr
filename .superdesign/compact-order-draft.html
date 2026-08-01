@@ -1,0 +1,168 @@
+<!DOCTYPE html><html lang="ru"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --brand-yellow: #FFD600;
+      --brand-yellow-pressed: #E9C400;
+      --ink-primary: #181818;
+      --ink-secondary: #6F706F;
+      --ink-muted: #A8AAA8;
+      --surface-canvas: #F4F4F2;
+      --surface-primary: #FFFFFF;
+      --surface-secondary: #ECEDEB;
+      --border-subtle: rgba(24,24,24,0.08);
+      --info: #2684FF;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .map-placeholder {
+      background-color: #E5E7EB;
+      background-image: 
+        linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .route-line {
+      stroke: #16B96B;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .shadow-floating {
+      box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+    }
+
+    .shadow-subtle {
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    .continuous-corner {
+      mask-image: paint(continuous-corners);
+      -webkit-mask-image: paint(continuous-corners);
+    }
+  </style>
+</head>
+<body>
+  <div class="w-full h-screen bg-[#F4F4F2] relative flex flex-col overflow-hidden" data-sd-id="1">
+    
+    <div class="absolute inset-0 map-placeholder z-0" data-sd-id="2">
+      <svg class="w-full h-full" preserveAspectRatio="none" data-sd-id="3">
+        <path d="M100 200 L180 350 L270 500" class="route-line"></path>
+        <circle cx="100" cy="200" r="6" fill="#181818"></circle>
+        <rect x="262" y="492" width="16" height="16" rx="2" fill="#FFD600"></rect>
+      </svg>
+    </div>
+
+    <header class="shrink-0 pt-14 px-4 z-40" data-sd-id="4">
+      <div class="flex justify-between items-center" data-sd-id="5">
+        <div class="bg-white/94 border border-[rgba(24,24,24,0.08)] p-2 pr-3 rounded-[16px] shadow-subtle flex items-center gap-3" data-sd-id="6">
+          <div class="w-[34px] h-[34px] bg-[#FFD600] rounded-[9px] flex items-center justify-center" data-sd-id="7">
+            <svg width="25" height="25" viewBox="0 0 32 32" data-sd-id="8">
+              <path d="M7 7h18v13h-5" stroke="#181818" stroke-width="4.3" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+              <rect x="11" y="6.8" width="2" height="5" rx="1" fill="#fff"></rect>
+              <path d="M20 18a5 5 0 00-5 5c0 3.6 5 6.4 5 6.4s5-2.8 5-6.4a5 5 0 00-5-5z" fill="#181818"></path>
+              <circle cx="20" cy="23" r="1.5" fill="#FFD600"></circle>
+            </svg>
+          </div>
+          <span class="text-[#181818] text-[17px] font-[600] tracking-[-0.25px]" data-sd-id="9">Такси Грахово</span>
+        </div>
+
+        <div class="flex gap-2" data-sd-id="10">
+          <button class="w-12 h-12 rounded-full bg-white shadow-subtle flex items-center justify-center border border-[rgba(24,24,24,0.08)]" aria-label="Мои заказы" data-sd-id="11">
+            <iconify-icon icon="lucide:history" class="text-[24px] text-[#181818]"></iconify-icon>
+          </button>
+          <button class="w-12 h-12 rounded-full bg-white shadow-subtle flex items-center justify-center border border-[rgba(24,24,24,0.08)]" aria-label="Профиль" data-sd-id="12">
+            <iconify-icon icon="lucide:user" class="text-[24px] text-[#181818]"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 relative z-30" data-sd-id="13">
+    </main>
+
+    <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[30px] shadow-floating flex flex-col z-50" data-sd-id="14">
+      <div class="w-10 h-1 bg-[#ECEDEB] rounded-full self-center mt-3 mb-3" data-sd-id="15"></div>
+      
+      <div class="flex-1 px-4 pb-[34px]" data-sd-id="16">
+        <div class="flex flex-col" data-sd-id="17">
+          <button class="h-[48px] flex items-center gap-4" data-sd-id="18">
+            <div class="w-[10px] h-[10px] rounded-full bg-[#181818] shrink-0" data-sd-id="19"></div>
+            <div class="flex-1 text-left" data-sd-id="20">
+              <p class="text-[11px] font-[600] text-[#A8AAA8] uppercase tracking-tight" data-sd-id="21">Откуда</p>
+              <p class="text-[16px] text-[#181818] truncate" data-sd-id="22">Советская улица, 12</p>
+            </div>
+            <span class="text-[20px] font-[700] text-[#A8AAA8]" data-sd-id="23">›</span>
+          </button>
+
+          <button class="ml-[26px] mb-1 text-left" data-sd-id="24">
+            <span class="text-[13px] font-[500] text-[#2684FF]" data-sd-id="25">Использовать моё местоположение</span>
+          </button>
+
+          <div class="h-[1px] bg-[rgba(24,24,24,0.08)] ml-[26px]" data-sd-id="26"></div>
+
+          <button class="h-[48px] flex items-center gap-4" data-sd-id="27">
+            <div class="w-[10px] h-[10px] rounded-[2px] bg-[#FFD600] shrink-0" data-sd-id="28"></div>
+            <div class="flex-1 text-left" data-sd-id="29">
+              <p class="text-[11px] font-[600] text-[#A8AAA8] uppercase tracking-tight" data-sd-id="30">Куда</p>
+              <p class="text-[16px] text-[#6F706F] truncate" data-sd-id="31">Куда поедем?</p>
+            </div>
+            <span class="text-[20px] font-[700] text-[#A8AAA8]" data-sd-id="32">›</span>
+          </button>
+        </div>
+
+        <div class="flex gap-3 mt-3" data-sd-id="33">
+          <button class="flex-1 flex-1 min-w-0 h-[82px] p-2.5 rounded-[20px] border-2 border-[#FFD600] bg-[#F4F4F2] flex flex-col justify-between text-left" data-sd-id="34">
+            <div class="flex items-center justify-between" data-sd-id="35">
+              <iconify-icon icon="lucide:car" class="text-[26px] text-[#181818]"></iconify-icon>
+              <span class="text-[13px] font-[500] text-[#6F706F]" data-sd-id="36">4 мин</span>
+            </div>
+            <span class="text-[17px] font-[600] text-[#181818]" data-sd-id="37">Эконом</span>
+            <span class="text-[17px] font-[600] text-[#181818] font-[tabular-nums]" data-sd-id="38">145 ₽</span>
+          </button>
+
+          <button class="flex-1 min-w-0 h-[82px] p-2.5 rounded-[20px] border border-[rgba(24,24,24,0.08)] bg-white flex flex-col justify-between text-left" data-sd-id="39">
+            <div class="flex items-center justify-between" data-sd-id="40">
+              <iconify-icon icon="lucide:baby" class="text-[26px] text-[#181818]"></iconify-icon>
+              <span class="text-[13px] font-[500] text-[#6F706F]" data-sd-id="41">8 мин</span>
+            </div>
+            <span class="text-[17px] font-[600] text-[#181818]" data-sd-id="42">Детский</span>
+            <span class="text-[17px] font-[600] text-[#181818] font-[tabular-nums]" data-sd-id="43">210 ₽</span>
+          </button>
+        </div>
+
+        <div class="h-[48px] flex items-center gap-3 border-t border-[rgba(24,24,24,0.08)] mt-3" data-sd-id="44">
+          <iconify-icon icon="lucide:wallet" class="text-[20px] text-[#181818]"></iconify-icon>
+          <span class="text-[15px] text-[#181818] flex-1" data-sd-id="45">Наличные</span>
+          <iconify-icon icon="lucide:chevron-right" class="text-[18px] text-[#A8AAA8]"></iconify-icon>
+        </div>
+
+        <div class="mt-4 flex items-center gap-4 bg-[#FFD600] rounded-[24px] p-1 pr-6 active:bg-[#E9C400] transition-transform active:scale-[0.98]" id="order-submit-btn">
+          <div class="flex-1 py-3 px-5">
+             <div class="flex items-baseline gap-1.5">
+                <span class="text-[24px] font-[800] text-[#181818] font-[tabular-nums]">145 ₽</span>
+                <span class="text-[13px] font-[500] text-[#181818]/60">~4 мин</span>
+             </div>
+          </div>
+          <span class="text-[17px] font-[700] text-[#181818]">Заказать</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body></html>

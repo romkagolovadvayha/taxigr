@@ -1,0 +1,115 @@
+{
+  "expo": {
+    "name": "Такси Грахово",
+    "slug": "taxi-grahovo",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/brand/icon.png",
+    "scheme": "taxigrahovo",
+    "userInterfaceStyle": "light",
+    "description": "Заказ местного такси в Грахово и поездок по Удмуртии.",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ru.grahovo.taxi",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке.",
+        "NSUserNotificationsUsageDescription": "Уведомления сообщают о назначении и прибытии водителя."
+      }
+    },
+    "android": {
+      "package": "ru.grahovo.taxi",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFD600",
+        "foregroundImage": "./assets/brand/android-foreground.png",
+        "monochromeImage": "./assets/brand/android-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/brand/favicon.png",
+      "name": "Такси Грахово",
+      "shortName": "Такси Грахово",
+      "display": "standalone",
+      "themeColor": "#FFD600",
+      "backgroundColor": "#F4F4F2",
+      "startUrl": "/",
+      "scope": "/"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Разрешите выбрать фотографию для аватара профиля.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFD600",
+          "image": "./assets/brand/splash-icon.png",
+          "imageWidth": 112
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке."
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Разрешите использовать Face ID для защиты входа в Такси Грахово."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/brand/android-monochrome.png",
+          "color": "#FFD600",
+          "defaultChannel": "ride-taxi-found-v2",
+          "sounds": [
+            "./assets/sounds/taxi_found.wav",
+            "./assets/sounds/driver_arrived.wav",
+            "./assets/sounds/new_order.wav",
+            "./assets/sounds/ride_started.wav",
+            "./assets/sounds/ride_complete.wav",
+            "./assets/sounds/ride_cancelled.wav"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "92f8301d-08c0-44bb-874a-68d1f1fb6ec0"
+      },
+      "router": {}
+    },
+    "owner": "romkadvayha"
+  }
+}

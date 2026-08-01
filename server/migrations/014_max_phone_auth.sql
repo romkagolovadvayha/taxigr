@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS max_auth_challenges (
+  id CHAR(36) PRIMARY KEY,
+  payload_token VARCHAR(64) NOT NULL,
+  exchange_secret_hash CHAR(64) NOT NULL,
+  expected_phone VARCHAR(16) NOT NULL,
+  verified_phone VARCHAR(16) NULL,
+  max_user_id VARCHAR(32) NULL,
+  max_chat_id VARCHAR(32) NULL,
+  legal_acceptance JSON NOT NULL,
+  consent_ip VARCHAR(64) NULL,
+  consent_user_agent VARCHAR(255) NULL,
+  failure_code VARCHAR(64) NULL,
+  expires_at TIMESTAMP(3) NOT NULL,
+  verified_at TIMESTAMP(3) NULL,
+  completed_at TIMESTAMP(3) NULL,
+  created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uniq_max_auth_payload (payload_token),
+  INDEX idx_max_auth_phone_created (expected_phone, created_at),
+  INDEX idx_max_auth_user_pending (max_user_id, verified_at, expires_at),
+  INDEX idx_max_auth_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
