@@ -41,13 +41,13 @@ fi
 
 install -d -m 0755 "$DEPLOY_PATH/releases" "$DEPLOY_PATH/incoming"
 install -d -o taxigr -g taxigr -m 0750 /var/log/taxigr
-install -d -m 0700 /etc/taxigr
+install -d -o root -g taxigr -m 0750 /etc/taxigr
 
 ca_directory=/etc/taxigr/ca
 root_ca="$ca_directory/russian-trusted-root-ca.pem"
 sub_ca="$ca_directory/russian-trusted-sub-ca.pem"
 ca_bundle="$ca_directory/russian-trusted-ca-bundle.pem"
-install -d -m 0755 "$ca_directory"
+install -d -o root -g taxigr -m 0750 "$ca_directory"
 
 install_ca() {
   local url="$1"
