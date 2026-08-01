@@ -91,7 +91,7 @@ await registerRoutes(app, (room, event, payload) => {
 const authAbusePruneTimer = setInterval(() => {
   void pruneAuthAbuseData().catch((error) => app.log.error(error, 'auth abuse data pruning failed'));
 }, 24 * 60 * 60 * 1_000);
-if (typeof authAbusePruneTimer !== 'number') authAbusePruneTimer.unref();
+(authAbusePruneTimer as unknown as { unref?: () => void }).unref?.();
 void pruneAuthAbuseData().catch((error) => app.log.error(error, 'initial auth abuse data pruning failed'));
 
 app.setErrorHandler((error, request, reply) => {
