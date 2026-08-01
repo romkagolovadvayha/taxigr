@@ -101,6 +101,7 @@ jobs:
           mysql_password = os.environ['MYSQL_PASSWORD']
           values = {
               'NODE_ENV': 'production',
+              'NODE_EXTRA_CA_CERTS': '/etc/taxigr/ca/russian-trusted-ca-bundle.pem',
               'HOST': '127.0.0.1',
               'PORT': '4100',
               'PUBLIC_URL': os.environ['PUBLIC_URL'],

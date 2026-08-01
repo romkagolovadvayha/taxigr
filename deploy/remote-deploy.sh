@@ -43,6 +43,44 @@ install -d -m 0755 "$DEPLOY_PATH/releases" "$DEPLOY_PATH/incoming"
 install -d -o taxigr -g taxigr -m 0750 /var/log/taxigr
 install -d -m 0700 /etc/taxigr
 
+ca_directory=/etc/taxigr/ca
+root_ca="$ca_directory/russian-trusted-root-ca.pem"
+sub_ca="$ca_directory/russian-trusted-sub-ca.pem"
+ca_bundle="$ca_directory/russian-trusted-ca-bundle.pem"
+install -d -m 0755 "$ca_directory"
+
+install_ca() {
+  local url="$1"
+  local destination="$2"
+  local expected_fingerprint="$3"
+  local temporary
+  local actual_fingerprint
+  temporary="$(mktemp "$ca_directory/.certificate.XXXXXX")"
+  curl --fail --silent --show-error --location "$url" --output "$temporary"
+  actual_fingerprint="$(
+    openssl x509 -in "$temporary" -noout -fingerprint -sha256 |
+      cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]'
+  )"
+  if [[ "$actual_fingerprint" != "$expected_fingerprint" ]]; then
+    rm -f "$temporary"
+    echo "Unexpected certificate fingerprint from $url" >&2
+    exit 1
+  fi
+  install -m 0644 "$temporary" "$destination"
+  rm -f "$temporary"
+}
+
+install_ca \
+  https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
+  "$root_ca" \
+  D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31
+install_ca \
+  https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt \
+  "$sub_ca" \
+  BBBDE2103E790B999EC62BD03CF625A5A2E7C316E10AFE6A490EEDEAD8B3FD9B
+cat "$root_ca" "$sub_ca" > "$ca_bundle"
+chmod 0644 "$ca_bundle"
+
 release_path="$DEPLOY_PATH/releases/$RELEASE_ID"
 if [[ -e "$release_path" ]]; then
   echo "Release already exists: $RELEASE_ID" >&2
