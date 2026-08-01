@@ -4,7 +4,7 @@ import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useSession } from '@/auth/session-provider';
@@ -15,7 +15,7 @@ import { AppHead } from '@/seo/app-head';
 import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-void SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') void SplashScreen.preventAutoHideAsync();
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
@@ -80,10 +80,11 @@ function RootNavigator() {
 
   useEffect(() => {
     if (!sessionReady || !themeReady) return;
-    void SplashScreen.hideAsync();
+    if (Platform.OS !== 'web') void SplashScreen.hideAsync();
     if (typeof document !== 'undefined') {
       document.documentElement.removeAttribute('data-session-booting');
       document.documentElement.removeAttribute('data-theme-booting');
+      document.getElementById('session-boot')?.remove();
     }
   }, [sessionReady, themeReady]);
 

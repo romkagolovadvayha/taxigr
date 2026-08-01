@@ -22,7 +22,7 @@ export default function RootHtml({ children }: PropsWithChildren) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{document.documentElement.setAttribute('data-theme-booting','true');var t=localStorage.getItem('taxi_grahovo_color_scheme');if(t==='dark')document.documentElement.setAttribute('data-app-theme','dark');if(localStorage.getItem('taxi_grahovo_session_token'))document.documentElement.setAttribute('data-session-booting','true')}catch(e){document.documentElement.setAttribute('data-theme-booting','true')}",
+              "try{document.documentElement.setAttribute('data-theme-booting','true');var t=localStorage.getItem('taxi_grahovo_color_scheme');if(t==='dark')document.documentElement.setAttribute('data-app-theme','dark');if(localStorage.getItem('taxi_grahovo_session_token'))document.documentElement.setAttribute('data-session-booting','true')}catch(e){document.documentElement.setAttribute('data-theme-booting','true')}setTimeout(function(){document.documentElement.removeAttribute('data-session-booting');document.documentElement.removeAttribute('data-theme-booting');var b=document.getElementById('session-boot');if(b)b.remove()},15000)",
           }}
         />
         <style
@@ -44,8 +44,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
               }
               html[data-session-booting="true"] #session-boot,
               html[data-theme-booting="true"] #session-boot { display: flex; }
-              html[data-session-booting="true"] #root,
-              html[data-theme-booting="true"] #root { visibility: hidden; }
               input,
               textarea,
               select {
