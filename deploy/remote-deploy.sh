@@ -78,7 +78,12 @@ install_ca \
   https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt \
   "$sub_ca" \
   BBBDE2103E790B999EC62BD03CF625A5A2E7C316E10AFE6A490EEDEAD8B3FD9B
-cat "$root_ca" "$sub_ca" > "$ca_bundle"
+{
+  cat "$root_ca"
+  printf '\n'
+  cat "$sub_ca"
+  printf '\n'
+} > "$ca_bundle"
 chmod 0644 "$ca_bundle"
 
 release_path="$DEPLOY_PATH/releases/$RELEASE_ID"
