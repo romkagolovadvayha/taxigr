@@ -29,6 +29,15 @@ const schema = z.object({
   TELEGRAM_BOT_USERNAME: z.string().regex(/^[A-Za-z0-9_]*$/u).default(''),
   TELEGRAM_BOT_TOKEN: z.string().default(''),
   TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[A-Za-z0-9_-]*$/u).default(''),
+  TELEGRAM_PROXY_URL: z
+    .string()
+    .url()
+    .or(z.literal(''))
+    .refine(
+      (value) => !value || ['http:', 'https:'].includes(new URL(value).protocol),
+      'Telegram proxy must use http:// or https://',
+    )
+    .default(''),
   PHONE_CODE_TTL_MINUTES: z.coerce.number().int().min(2).max(30).default(10),
   PHONE_CODE_RESEND_SECONDS: z.coerce.number().int().min(30).max(600).default(30),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(1),

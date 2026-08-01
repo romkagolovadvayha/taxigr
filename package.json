@@ -46,6 +46,7 @@
     "react-native-worklets": "0.10.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
+    "undici": "7.29.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -53,7 +53,7 @@ jobs:
               exit 1
             fi
           done
-          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY; do
+          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment secret: $name" >&2
               exit 1
@@ -64,6 +64,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
           NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
+          TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
           YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
 
       - name: Setup Node.js
@@ -94,6 +95,7 @@ jobs:
           TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
         run: |
           python3 - <<'PY'
           import os, shlex
@@ -129,6 +131,7 @@ jobs:
               'TELEGRAM_BOT_USERNAME': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
               'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
               'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
+              'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
               'PHONE_CODE_TTL_MINUTES': '10',
               'PHONE_CODE_RESEND_SECONDS': '30',
               'TRUST_PROXY_HOPS': '1',

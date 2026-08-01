@@ -1,3 +1,5 @@
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
+
 import { config } from './config';
 import { normalizeRussianPhone } from './phone-verification';
 
@@ -11,6 +13,10 @@ type TelegramContact = {
   user_id?: unknown;
 };
 
+const telegramProxyAgent = config.TELEGRAM_PROXY_URL
+  ? new ProxyAgent(config.TELEGRAM_PROXY_URL)
+  : undefined;
+
 async function sendTelegramMessage(
   chatId: string,
   body: Record<string, unknown>,
@@ -18,7 +24,7 @@ async function sendTelegramMessage(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const response = await fetch(
+    const response = await undiciFetch(
       `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
         method: 'POST',
@@ -28,6 +34,7 @@ async function sendTelegramMessage(
         },
         body: JSON.stringify({ chat_id: chatId, ...body }),
         signal: controller.signal,
+        dispatcher: telegramProxyAgent,
       },
     );
     const result = (await response.json().catch(() => ({}))) as TelegramApiResponse;
