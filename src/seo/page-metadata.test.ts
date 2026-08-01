@@ -8,7 +8,7 @@ import {
 
 describe('page metadata', () => {
   it('covers every exported application page with unique, readable metadata', () => {
-    expect(Object.keys(PAGE_METADATA)).toHaveLength(30);
+    expect(Object.keys(PAGE_METADATA)).toHaveLength(33);
 
     const entries = Object.values(PAGE_METADATA);
     expect(new Set(entries.map((item) => item.title)).size).toBe(entries.length);
@@ -28,6 +28,9 @@ describe('page metadata', () => {
   it('uses the private order metadata for every dynamic order page', () => {
     expect(getPageMetadata('/orders/ride-123')).toBe(PAGE_METADATA['/orders/[id]']);
     expect(getPageMetadata('/orders/2026-07-30')).toBe(PAGE_METADATA['/orders/[id]']);
+    expect(getPageMetadata('/driver/trips/ride-123')).toBe(
+      PAGE_METADATA['/driver/trips/[id]'],
+    );
   });
 
   it('keeps unknown application routes out of search results', () => {

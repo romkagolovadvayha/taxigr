@@ -3,6 +3,10 @@ import { useEffect, useRef } from 'react';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import {
+  LIVE_LOCATION_UPDATE_INTERVAL_MS,
+  liveLocationUpdateDelay,
+} from '@/domain/live-location';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
 import { useRide } from '@/state/ride-provider';
 
@@ -44,20 +48,65 @@ export function PassengerLocationPublisher() {
     if (!canShare || !token || !orderId) return;
     let subscription: Location.LocationSubscription | undefined;
     let cancelled = false;
+    let lastPublishedAt = 0;
+    let pendingPosition: Location.LocationObject | null = null;
+    let trailingTimer: ReturnType<typeof setTimeout> | undefined;
+    let publishInFlight = false;
+    let queuedPayload: {
+      orderId: string;
+      latitude: number;
+      longitude: number;
+      accuracyMeters?: number;
+    } | null = null;
+    const requestController = new AbortController();
 
-    const publishPosition = (position: Location.LocationObject) => {
-      if (cancelled) return;
-      lastSharedOrderRef.current = orderId;
+    const publishLatest = () => {
+      if (cancelled || publishInFlight || !queuedPayload) return;
+      const payload = queuedPayload;
+      queuedPayload = null;
+      publishInFlight = true;
       void apiRequest('/v1/passenger/location', {
         method: 'PUT',
         token,
-        body: JSON.stringify({
-          orderId,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracyMeters: position.coords.accuracy ?? undefined,
-        }),
-      }).catch(() => undefined);
+        signal: requestController.signal,
+        body: JSON.stringify(payload),
+      })
+        .catch(() => undefined)
+        .finally(() => {
+          publishInFlight = false;
+          if (!cancelled && queuedPayload) publishLatest();
+        });
+    };
+
+    const commitPosition = (position: Location.LocationObject) => {
+      if (cancelled) return;
+      lastPublishedAt = Date.now();
+      pendingPosition = null;
+      lastSharedOrderRef.current = orderId;
+      queuedPayload = {
+        orderId,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracyMeters: position.coords.accuracy ?? undefined,
+      };
+      publishLatest();
+    };
+
+    const publishPosition = (position: Location.LocationObject) => {
+      if (cancelled) return;
+      pendingPosition = position;
+      const delay = liveLocationUpdateDelay(lastPublishedAt, Date.now());
+      if (delay === 0) {
+        if (trailingTimer) clearTimeout(trailingTimer);
+        trailingTimer = undefined;
+        commitPosition(position);
+        return;
+      }
+      if (trailingTimer) return;
+      trailingTimer = setTimeout(() => {
+        trailingTimer = undefined;
+        if (pendingPosition) commitPosition(pendingPosition);
+      }, delay);
     };
 
     void (async () => {
@@ -70,7 +119,7 @@ export function PassengerLocationPublisher() {
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          timeInterval: 10_000,
+          timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
           distanceInterval: 25,
         },
         publishPosition,
@@ -79,6 +128,8 @@ export function PassengerLocationPublisher() {
 
     return () => {
       cancelled = true;
+      requestController.abort();
+      if (trailingTimer) clearTimeout(trailingTimer);
       subscription?.remove();
     };
   }, [canShare, orderId, token]);

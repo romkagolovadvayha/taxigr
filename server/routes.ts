@@ -13,6 +13,10 @@ import {
 } from '../src/domain/pricing';
 import { hasHouseNumber } from '../src/domain/address-precision';
 import { passengerCancellationPolicy } from '../src/domain/abuse-policy';
+import {
+  LIVE_LOCATION_UPDATE_INTERVAL_MS,
+  liveLocationUpdateDelay,
+} from '../src/domain/live-location';
 import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
 import type { RideStatus, TariffCode, UserRole } from '../src/domain/models';
 import { formatRetryAfter } from '../src/utils/format';
@@ -468,6 +472,8 @@ function requireTelegramConfiguration(): void {
 }
 
 export async function registerRoutes(app: FastifyInstance, publish: EventPublisher): Promise<void> {
+  const lastDriverLocationAcceptedAt = new Map<string, number>();
+  const lastPassengerLocationAcceptedAt = new Map<string, number>();
   const notifyAdmins = (action: AdminTelegramAction): void => {
     void sendAdminTelegramAction(action).catch((error) =>
       app.log.warn({ error, action: action.title }, 'Telegram admin notification failed'),
@@ -2109,23 +2115,42 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         { statusCode: 409 },
       );
     }
-    await db.execute(
-      `INSERT INTO passenger_locations (
-        order_id, passenger_id, latitude, longitude, accuracy_meters, recorded_at
-      ) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(3))
-      ON DUPLICATE KEY UPDATE
-        latitude = VALUES(latitude),
-        longitude = VALUES(longitude),
-        accuracy_meters = VALUES(accuracy_meters),
-        recorded_at = VALUES(recorded_at)`,
-      [
-        order.id,
-        session.id,
-        input.latitude,
-        input.longitude,
-        input.accuracyMeters ?? null,
-      ],
-    );
+    const now = Date.now();
+    const lastAcceptedAt = lastPassengerLocationAcceptedAt.get(order.id) ?? 0;
+    if (
+      liveLocationUpdateDelay(
+        lastAcceptedAt,
+        now,
+        LIVE_LOCATION_UPDATE_INTERVAL_MS,
+      ) > 0
+    ) {
+      return { data: { accepted: true, throttled: true } };
+    }
+    lastPassengerLocationAcceptedAt.set(order.id, now);
+    try {
+      await db.execute(
+        `INSERT INTO passenger_locations (
+          order_id, passenger_id, latitude, longitude, accuracy_meters, recorded_at
+        ) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(3))
+        ON DUPLICATE KEY UPDATE
+          latitude = VALUES(latitude),
+          longitude = VALUES(longitude),
+          accuracy_meters = VALUES(accuracy_meters),
+          recorded_at = VALUES(recorded_at)`,
+        [
+          order.id,
+          session.id,
+          input.latitude,
+          input.longitude,
+          input.accuracyMeters ?? null,
+        ],
+      );
+    } catch (error) {
+      if (lastPassengerLocationAcceptedAt.get(order.id) === now) {
+        lastPassengerLocationAcceptedAt.delete(order.id);
+      }
+      throw error;
+    }
     const coordinates = {
       latitude: input.latitude,
       longitude: input.longitude,
@@ -2152,6 +2177,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       'DELETE FROM passenger_locations WHERE order_id = ? AND passenger_id = ?',
       [orderId, session.id],
     );
+    lastPassengerLocationAcceptedAt.delete(orderId);
     if (order.driver_id) {
       publish(`driver:${order.driver_id}`, 'passenger:location', {
         orderId,
@@ -2363,13 +2389,32 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     if (!['online', 'busy'].includes(driver.status)) {
       throw Object.assign(new Error('Геолокация принимается только во время смены'), { statusCode: 409 });
     }
-    await db.execute(
-      `INSERT INTO driver_locations (driver_id, latitude, longitude, accuracy_meters, recorded_at)
-       VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))
-       ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude),
-         accuracy_meters = VALUES(accuracy_meters), recorded_at = VALUES(recorded_at)`,
-      [driver.id, input.latitude, input.longitude, input.accuracyMeters ?? null],
-    );
+    const now = Date.now();
+    const lastAcceptedAt = lastDriverLocationAcceptedAt.get(driver.id) ?? 0;
+    if (
+      liveLocationUpdateDelay(
+        lastAcceptedAt,
+        now,
+        LIVE_LOCATION_UPDATE_INTERVAL_MS,
+      ) > 0
+    ) {
+      return { data: { accepted: true, throttled: true } };
+    }
+    lastDriverLocationAcceptedAt.set(driver.id, now);
+    try {
+      await db.execute(
+        `INSERT INTO driver_locations (driver_id, latitude, longitude, accuracy_meters, recorded_at)
+         VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))
+         ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude),
+           accuracy_meters = VALUES(accuracy_meters), recorded_at = VALUES(recorded_at)`,
+        [driver.id, input.latitude, input.longitude, input.accuracyMeters ?? null],
+      );
+    } catch (error) {
+      if (lastDriverLocationAcceptedAt.get(driver.id) === now) {
+        lastDriverLocationAcceptedAt.delete(driver.id);
+      }
+      throw error;
+    }
     publish(`driver:${driver.id}`, 'driver:location', input);
     const activeOrder = await firstRow<RowDataPacket & { passenger_id: string }>(
       `SELECT passenger_id FROM orders

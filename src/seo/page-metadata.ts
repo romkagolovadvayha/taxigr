@@ -150,6 +150,24 @@ export const PAGE_METADATA = {
       'Заработок, комиссия сервиса, сумма к выплате и статистика поездок.',
     indexable: false,
   },
+  '/driver/trips': {
+    title: 'Поездки водителя — Такси Грахово',
+    description:
+      'История выполненных и отменённых заказов водителя, выручка, комиссия сервиса и итоговая сумма.',
+    indexable: false,
+  },
+  '/driver/trips/[id]': {
+    title: 'Детали поездки водителя — Такси Грахово',
+    description:
+      'Маршрут, пассажир, стоимость, ожидание, комиссия и оценки по выбранной поездке водителя.',
+    indexable: false,
+  },
+  '/driver/support': {
+    title: 'Помощь водителю — Такси Грахово',
+    description:
+      'Контакты поддержки, экстренная служба, безопасность поездок, условия работы и обработка данных.',
+    indexable: false,
+  },
   '/driver/profile': {
     title: 'Автомобиль и профиль — Такси Грахово',
     description:
@@ -209,5 +227,6 @@ export const FALLBACK_PAGE_METADATA: PageMetadata = {
 
 export function getPageMetadata(pathname: string): PageMetadata {
   if (/^\/orders\/[^/]+$/.test(pathname)) return PAGE_METADATA['/orders/[id]'];
+  if (/^\/driver\/trips\/[^/]+$/.test(pathname)) return PAGE_METADATA['/driver/trips/[id]'];
   return PAGE_METADATA[pathname as keyof typeof PAGE_METADATA] ?? FALLBACK_PAGE_METADATA;
 }

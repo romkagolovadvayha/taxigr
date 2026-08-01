@@ -28,23 +28,21 @@ export function DriverTripDetailScreen() {
 
   useEffect(() => {
     if (!token || token.startsWith('demo:') || !id) return;
-    let active = true;
-    void apiRequest<RideOrder>(`/v1/orders/${id}`, { token })
+    const controller = new AbortController();
+    void apiRequest<RideOrder>(`/v1/orders/${id}`, { token, signal: controller.signal })
       .then((result) => {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setOrder(result);
         setError(null);
       })
       .catch((reason: unknown) => {
-        if (!active) return;
+        if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Не удалось загрузить поездку');
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [id, token]);
 
   if (loading) {

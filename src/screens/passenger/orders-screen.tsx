@@ -30,6 +30,8 @@ export function OrdersScreen() {
         {orders.map((order) => (
           <Pressable
             key={order.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Поездка ${formatDateTime(order.createdAt)}: ${order.pickup.label} → ${order.destination.label}`}
             onPress={() => router.push({ pathname: '/orders/[id]', params: { id: order.id } })}
             style={({ pressed }) => ({
               padding: spacing.x4,
@@ -83,4 +85,3 @@ export function OrdersScreen() {
     </Screen>
   );
 }
-

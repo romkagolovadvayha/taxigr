@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { MapViewportInsets, TaxiMapProps } from '@/components/map/types';
@@ -13,12 +13,15 @@ import {
   fitRouteLocation,
   routePointSizeForZoom,
 } from '@/components/map/route-viewport';
-import { loadYandexMap, type YandexMap } from '@/components/map/yandex-map-loader';
+import {
+  loadYandexMap,
+  type YandexMap,
+  type YandexMapEntity,
+} from '@/components/map/yandex-map-loader';
 import { grahovoCenter } from '@/data/demo';
 import { useAppTheme } from '@/theme/theme-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-type YandexEntity = unknown;
 type MapMargin = [number, number, number, number];
 
 const ROUTE_PADDING = 18;
@@ -139,7 +142,7 @@ function markerElement(
   return element;
 }
 
-export function TaxiMap({
+export const TaxiMap = memo(function TaxiMap({
   pickup,
   destination,
   routeCoordinates,
@@ -160,12 +163,16 @@ export function TaxiMap({
   const { colorScheme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YandexMap | null>(null);
-  const entitiesRef = useRef<YandexEntity[]>([]);
+  const staticEntitiesRef = useRef<YandexMapEntity[]>([]);
+  const driverMarkerRef = useRef<YandexMapEntity | null>(null);
+  const driverElementRef = useRef<HTMLDivElement | null>(null);
+  const passengerMarkerRef = useRef<YandexMapEntity | null>(null);
   const apiRef = useRef<Awaited<ReturnType<typeof loadYandexMap>> | null>(null);
   const routePointElementsRef = useRef<HTMLDivElement[]>([]);
   const zoomRef = useRef(14);
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const routeDriver = trimCompletedRoute ? driver : null;
 
   useEffect(() => {
     let active = true;
@@ -211,6 +218,12 @@ export function TaxiMap({
       active = false;
       mapRef.current?.destroy();
       mapRef.current = null;
+      apiRef.current = null;
+      staticEntitiesRef.current = [];
+      driverMarkerRef.current = null;
+      driverElementRef.current = null;
+      passengerMarkerRef.current = null;
+      routePointElementsRef.current = [];
       setMapReady(false);
     };
   }, [colorScheme, onMapError, onMapReady]);
@@ -220,13 +233,13 @@ export function TaxiMap({
     const api = apiRef.current;
     if (!map || !api) return;
 
-    entitiesRef.current.forEach((entity) => map.removeChild(entity));
-    entitiesRef.current = [];
+    staticEntitiesRef.current.forEach((entity) => map.removeChild(entity));
+    staticEntitiesRef.current = [];
     routePointElementsRef.current = [];
 
-    const add = (entity: YandexEntity) => {
+    const add = (entity: YandexMapEntity) => {
       map.addChild(entity);
-      entitiesRef.current.push(entity);
+      staticEntitiesRef.current.push(entity);
     };
     const margin = mapMargin(
       viewportInsets,
@@ -235,7 +248,7 @@ export function TaxiMap({
     map.update({ margin });
     const renderedRouteCoordinates = smoothRouteCoordinates(
       trimCompletedRoute
-        ? remainingRouteCoordinates(routeCoordinates, driver)
+        ? remainingRouteCoordinates(routeCoordinates, routeDriver)
         : routeCoordinates,
     );
     const pickupMarkerCoordinates =
@@ -323,18 +336,51 @@ export function TaxiMap({
         if (location) map.update({ margin, location: { ...location, duration: 500 } });
       }
     }
+  }, [
+    colorScheme,
+    destination,
+    destinationArrivalLabel,
+    followDriver,
+    mapReady,
+    pickup,
+    pickupEtaMinutes,
+    routeCoordinates,
+    routeDriver,
+    routeTarget,
+    trimCompletedRoute,
+    viewportInsets,
+  ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const api = apiRef.current;
+    if (!map || !api) return;
+
     if (driver) {
-      add(
-        new api.YMapMarker(
-          { coordinates: [driver.longitude, driver.latitude], zIndex: 1200 },
-          markerElement('driver', driverHeading, navigationMode),
-        ),
-      );
+      const coordinates = [driver.longitude, driver.latitude];
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.update({ coordinates });
+      } else {
+        const element = markerElement('driver', driverHeading, navigationMode);
+        const marker = new api.YMapMarker({ coordinates, zIndex: 1200 }, element);
+        map.addChild(marker);
+        driverMarkerRef.current = marker;
+        driverElementRef.current = element;
+      }
+      const rotation = navigationMode ? 0 : (driverHeading ?? 0);
+      if (driverElementRef.current) {
+        driverElementRef.current.style.transform =
+          `translate(-50%, -50%) rotate(${rotation}deg)`;
+      }
       if (followDriver) {
+        const margin = mapMargin(
+          viewportInsets,
+          Boolean(pickupEtaMinutes || destinationArrivalLabel),
+        );
         map.update({
           margin,
           location: {
-            center: [driver.longitude, driver.latitude],
+            center: coordinates,
             zoom: followZoom ?? (navigationMode ? 17 : 16),
             duration: 350,
             easing: 'linear',
@@ -349,18 +395,29 @@ export function TaxiMap({
             : { tilt: 0, azimuth: 0, duration: 350 },
         });
       }
+    } else if (driverMarkerRef.current) {
+      map.removeChild(driverMarkerRef.current);
+      driverMarkerRef.current = null;
+      driverElementRef.current = null;
     }
+
     if (passenger) {
-      add(
-        new api.YMapMarker(
-          { coordinates: [passenger.longitude, passenger.latitude], zIndex: 32 },
+      const coordinates = [passenger.longitude, passenger.latitude];
+      if (passengerMarkerRef.current) {
+        passengerMarkerRef.current.update({ coordinates });
+      } else {
+        const marker = new api.YMapMarker(
+          { coordinates, zIndex: 32 },
           markerElement('passenger'),
-        ),
-      );
+        );
+        map.addChild(marker);
+        passengerMarkerRef.current = marker;
+      }
+    } else if (passengerMarkerRef.current) {
+      map.removeChild(passengerMarkerRef.current);
+      passengerMarkerRef.current = null;
     }
   }, [
-    colorScheme,
-    destination,
     destinationArrivalLabel,
     driver,
     driverHeading,
@@ -369,11 +426,7 @@ export function TaxiMap({
     mapReady,
     navigationMode,
     passenger,
-    pickup,
     pickupEtaMinutes,
-    routeCoordinates,
-    routeTarget,
-    trimCompletedRoute,
     viewportInsets,
   ]);
 
@@ -394,4 +447,4 @@ export function TaxiMap({
       accessibilityLabel="Карта поездки"
     />
   );
-}
+});

@@ -28,9 +28,15 @@ export function AdminSettingsScreen() {
 
   useEffect(() => {
     if (demo || !token) return;
-    void apiRequest<PricingRules>('/v1/admin/tariffs', { token })
+    const controller = new AbortController();
+    void apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal: controller.signal })
       .then(setRules)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить тарифы'));
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить тарифы');
+        }
+      });
+    return () => controller.abort();
   }, [demo, token]);
 
   const changeRubles = (key: EditableKey, value: string) => {

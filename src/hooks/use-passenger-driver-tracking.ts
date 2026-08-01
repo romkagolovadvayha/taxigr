@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { getDemoDriverSnapshot, getDemoPassengerProgression } from '@/domain/demo-flow';
 import type { Coordinates, RideOrder } from '@/domain/models';
@@ -8,7 +9,7 @@ import {
   type RoutePosition,
 } from '@/domain/route-tracking';
 
-const FRAME_INTERVAL_MS = 80;
+const FRAME_INTERVAL_MS = 250;
 const LIVE_ANIMATION_MS = 800;
 
 const emptyPosition: RoutePosition = {
@@ -54,6 +55,22 @@ export function usePassengerDriverTracking(
         clearTimeout(startTimer);
         clearInterval(timer);
       };
+    }
+
+    if (Platform.OS === 'web') {
+      const origin = currentRef.current?.coordinates ?? rawCoordinates;
+      const position = {
+        coordinates: rawCoordinates,
+        heading:
+          headingBetweenCoordinates(origin, rawCoordinates) ??
+          currentRef.current?.heading ??
+          null,
+      };
+      currentRef.current = position;
+      const timer = setTimeout(() => {
+        setRendered({ rideId: ride.id, position });
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const origin = currentRef.current?.coordinates ?? rawCoordinates;

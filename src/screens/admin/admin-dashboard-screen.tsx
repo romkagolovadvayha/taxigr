@@ -30,9 +30,15 @@ export function AdminDashboardScreen() {
       const timer = setTimeout(() => setMetrics(demoAdminMetrics), 0);
       return () => clearTimeout(timer);
     }
-    void apiRequest<AdminMetrics>('/v1/admin/metrics', { token })
+    const controller = new AbortController();
+    void apiRequest<AdminMetrics>('/v1/admin/metrics', { token, signal: controller.signal })
       .then(setMetrics)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить сводку'));
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить сводку');
+        }
+      });
+    return () => controller.abort();
   }, [token]);
   return (
     <ScrollView

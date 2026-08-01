@@ -82,9 +82,16 @@ export function ApplicationsScreen() {
       return () => clearTimeout(timer);
     }
     if (!token) return;
+    const controller = new AbortController();
     void Promise.all([
-      apiRequest<DriverApplication[]>('/v1/admin/applications', { token }),
-      apiRequest<VehicleChangeRequest[]>('/v1/admin/vehicle-change-requests', { token }),
+      apiRequest<DriverApplication[]>('/v1/admin/applications', {
+        token,
+        signal: controller.signal,
+      }),
+      apiRequest<VehicleChangeRequest[]>('/v1/admin/vehicle-change-requests', {
+        token,
+        signal: controller.signal,
+      }),
     ])
       .then(([items, changes]) => {
         setApplications(items);
@@ -92,7 +99,12 @@ export function ApplicationsScreen() {
         setSelectedId((current) => current ?? items[0]?.id);
         setSelectedChangeId((current) => current ?? changes[0]?.id);
       })
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заявки'));
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заявки');
+        }
+      });
+    return () => controller.abort();
   }, [demo, token]);
 
   const moderate = async (status: 'approved' | 'rejected') => {

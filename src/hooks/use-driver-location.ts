@@ -1,7 +1,12 @@
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
+import {
+  LIVE_LOCATION_UPDATE_INTERVAL_MS,
+  liveLocationUpdateDelay,
+} from '@/domain/live-location';
 import type { Coordinates } from '@/domain/models';
 
 type DriverLocationState = {
@@ -33,26 +38,68 @@ export function useDriverLocation({
 }): DriverLocationState {
   const demo = token?.startsWith('demo:') ?? false;
   const [state, setState] = useState<DriverLocationState>(emptyState);
+  const lastRenderedRef = useRef<{ token: string; at: number } | null>(null);
+  const lastPublishedRef = useRef<{ token: string; at: number } | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
-    if (demo) {
-      const timer = setTimeout(() => {
-        setState((current) => ({
-          ...current,
-          coordinates: demoCoordinates ?? current.coordinates,
-          error: null,
-        }));
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-    if (!token) return;
+    if (!enabled || !demo) return;
+    const timer = setTimeout(() => {
+      setState((current) => ({
+        ...current,
+        coordinates: demoCoordinates ?? current.coordinates,
+        error: null,
+      }));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [demo, demoCoordinates, enabled]);
+
+  useEffect(() => {
+    if (!enabled || demo || !token) return;
 
     let subscription: Location.LocationSubscription | undefined;
     let cancelled = false;
+    let pendingPosition: Location.LocationObject | null = null;
+    let trailingTimer: ReturnType<typeof setTimeout> | undefined;
+    let publishInFlight = false;
+    let queuedPublish: {
+      latitude: number;
+      longitude: number;
+      accuracyMeters?: number;
+    } | null = null;
+    const requestController = new AbortController();
 
-    const applyPosition = (position: Location.LocationObject) => {
+    const publishLatest = () => {
+      if (cancelled || publishInFlight || !queuedPublish) return;
+      const payload = queuedPublish;
+      queuedPublish = null;
+      publishInFlight = true;
+      void apiRequest('/v1/driver/location', {
+        method: 'PUT',
+        token,
+        signal: requestController.signal,
+        body: JSON.stringify(payload),
+      })
+        .catch((reason: unknown) => {
+          if (cancelled) return;
+          setState((current) => ({
+            ...current,
+            error:
+              reason instanceof Error
+                ? reason.message
+                : 'Не удалось передать геопозицию',
+          }));
+        })
+        .finally(() => {
+          publishInFlight = false;
+          if (!cancelled && queuedPublish) publishLatest();
+        });
+    };
+
+    const commitPosition = (position: Location.LocationObject) => {
       if (cancelled) return;
+      const now = Date.now();
+      lastRenderedRef.current = { token, at: now };
+      pendingPosition = null;
       const coordinates = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -70,23 +117,40 @@ export function useDriverLocation({
         accuracyMeters: position.coords.accuracy,
         error: null,
       }));
-      void apiRequest('/v1/driver/location', {
-        method: 'PUT',
-        token,
-        body: JSON.stringify({
-          ...coordinates,
-          accuracyMeters: position.coords.accuracy ?? undefined,
-        }),
-      }).catch((reason: unknown) => {
-        if (cancelled) return;
-        setState((current) => ({
-          ...current,
-          error:
-            reason instanceof Error
-              ? reason.message
-              : 'Не удалось передать геопозицию',
-        }));
-      });
+      const lastPublished = lastPublishedRef.current;
+      if (
+        lastPublished?.token === token &&
+        liveLocationUpdateDelay(lastPublished.at, now) > 0
+      ) {
+        return;
+      }
+      lastPublishedRef.current = { token, at: now };
+      queuedPublish = {
+        ...coordinates,
+        accuracyMeters: position.coords.accuracy ?? undefined,
+      };
+      publishLatest();
+    };
+
+    const applyPosition = (position: Location.LocationObject) => {
+      if (cancelled) return;
+      pendingPosition = position;
+      const lastRendered = lastRenderedRef.current;
+      const delay =
+        lastRendered?.token === token
+          ? liveLocationUpdateDelay(lastRendered.at, Date.now())
+          : 0;
+      if (delay === 0) {
+        if (trailingTimer) clearTimeout(trailingTimer);
+        trailingTimer = undefined;
+        commitPosition(position);
+        return;
+      }
+      if (trailingTimer) return;
+      trailingTimer = setTimeout(() => {
+        trailingTimer = undefined;
+        if (pendingPosition) commitPosition(pendingPosition);
+      }, delay);
     };
 
     void (async () => {
@@ -108,14 +172,17 @@ export function useDriverLocation({
       subscription = await Location.watchPositionAsync(
         navigationActive
           ? {
-              accuracy: Location.Accuracy.BestForNavigation,
-              timeInterval: 2_000,
-              distanceInterval: 5,
+              accuracy:
+                Platform.OS === 'web'
+                  ? Location.Accuracy.High
+                  : Location.Accuracy.BestForNavigation,
+              timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
+              distanceInterval: 10,
               mayShowUserSettingsDialog: true,
             }
           : {
               accuracy: Location.Accuracy.Balanced,
-              timeInterval: 10_000,
+              timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
               distanceInterval: 25,
               mayShowUserSettingsDialog: true,
             },
@@ -136,9 +203,11 @@ export function useDriverLocation({
 
     return () => {
       cancelled = true;
+      requestController.abort();
+      if (trailingTimer) clearTimeout(trailingTimer);
       subscription?.remove();
     };
-  }, [demo, demoCoordinates, enabled, navigationActive, token]);
+  }, [demo, enabled, navigationActive, token]);
 
   return state;
 }

@@ -58,7 +58,11 @@ export function DriverApplicationScreen() {
 
   useEffect(() => {
     if (!token || token.startsWith('demo:')) return;
-    void apiRequest<DriverApplication[]>('/v1/driver-applications/me', { token })
+    const controller = new AbortController();
+    void apiRequest<DriverApplication[]>('/v1/driver-applications/me', {
+      token,
+      signal: controller.signal,
+    })
       .then((applications) => {
         const latest = applications[0];
         if (!latest) return;
@@ -69,8 +73,11 @@ export function DriverApplicationScreen() {
         }
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус заявки');
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус заявки');
+        }
       });
+    return () => controller.abort();
   }, [refreshSession, token, user?.roles]);
 
   const year = Number(values.vehicleYear);

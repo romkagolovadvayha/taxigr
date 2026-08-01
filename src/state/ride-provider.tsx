@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
 import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
@@ -177,6 +178,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       transports: ['websocket', 'polling'],
       reconnectionDelayMax: 8_000,
     });
+    const handleReconnect = () => void refresh();
+    socket.io.on('reconnect', handleReconnect);
     socket.on('order:updated', (order: RideOrder) => applyOrder(order));
     socket.on('driver:location', (coordinates: Coordinates) => {
       setCurrentRide((current) => {
@@ -210,9 +213,26 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       clearTimeout(refreshTimer);
+      socket.io.off('reconnect', handleReconnect);
       socket.disconnect();
     };
   }, [applyOrder, demoSession, refresh, refreshSession, token, user?.roles]);
+
+  useEffect(() => {
+    if (!token || demoSession) return;
+    let previousState = AppState.currentState;
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      const returnedToForeground = nextState === 'active' && previousState !== 'active';
+      previousState = nextState;
+      if (returnedToForeground) void refresh();
+    });
+    const handleOnline = () => void refresh();
+    if (typeof window !== 'undefined') window.addEventListener('online', handleOnline);
+    return () => {
+      appStateSubscription.remove();
+      if (typeof window !== 'undefined') window.removeEventListener('online', handleOnline);
+    };
+  }, [demoSession, refresh, token]);
 
   useEffect(() => {
     if (

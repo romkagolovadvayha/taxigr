@@ -1,6 +1,5 @@
 import {
   setAudioModeAsync,
-  type AudioPlayer,
   useAudioPlayer,
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
@@ -40,6 +39,15 @@ const hapticTypes = {
   error: Haptics.NotificationFeedbackType.Error,
 } as const;
 
+const soundSources: Record<NonNullable<RideFeedback['sound']>, number> = {
+  'taxi-found': require('../../assets/sounds/taxi_found.wav'),
+  'driver-arrived': require('../../assets/sounds/driver_arrived.wav'),
+  'new-order': require('../../assets/sounds/new_order.wav'),
+  'ride-started': require('../../assets/sounds/ride_started.wav'),
+  'ride-complete': require('../../assets/sounds/ride_complete.wav'),
+  'ride-cancelled': require('../../assets/sounds/ride_cancelled.wav'),
+};
+
 function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
   const { currentRide } = useRide();
   const { user } = useSession();
@@ -48,13 +56,8 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
     vibrationEnabled,
   } = useFeedbackPreferences();
   const previousRide = useRef(currentRide);
-  const activePlayer = useRef<AudioPlayer | null>(null);
-  const taxiFoundPlayer = useAudioPlayer(require('../../assets/sounds/taxi_found.wav'));
-  const driverArrivedPlayer = useAudioPlayer(require('../../assets/sounds/driver_arrived.wav'));
-  const newOrderPlayer = useAudioPlayer(require('../../assets/sounds/new_order.wav'));
-  const rideStartedPlayer = useAudioPlayer(require('../../assets/sounds/ride_started.wav'));
-  const rideCompletePlayer = useAudioPlayer(require('../../assets/sounds/ride_complete.wav'));
-  const rideCancelledPlayer = useAudioPlayer(require('../../assets/sounds/ride_cancelled.wav'));
+  const player = useAudioPlayer(null);
+  const playerRef = useRef(player);
 
   useEffect(() => {
     void setAudioModeAsync({
@@ -68,28 +71,6 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const playerForSound = useCallback(
-    (sound: NonNullable<RideFeedback['sound']>): AudioPlayer => {
-      const players: Record<NonNullable<RideFeedback['sound']>, AudioPlayer> = {
-        'taxi-found': taxiFoundPlayer,
-        'driver-arrived': driverArrivedPlayer,
-        'new-order': newOrderPlayer,
-        'ride-started': rideStartedPlayer,
-        'ride-complete': rideCompletePlayer,
-        'ride-cancelled': rideCancelledPlayer,
-      };
-      return players[sound];
-    },
-    [
-      driverArrivedPlayer,
-      newOrderPlayer,
-      rideCancelledPlayer,
-      rideCompletePlayer,
-      rideStartedPlayer,
-      taxiFoundPlayer,
-    ],
-  );
-
   const performFeedback = useCallback(
     async (feedback: RideFeedback, allowWebSound = false) => {
       const actions: Promise<unknown>[] = [];
@@ -98,23 +79,13 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
         allowWebSound,
       );
       if (soundEnabled && feedback.sound && soundAllowedByPlatform) {
-        const player = playerForSound(feedback.sound);
         actions.push(
           (async () => {
-            if (activePlayer.current && activePlayer.current !== player) {
-              activePlayer.current.pause();
-            }
-            player.pause();
-            player.volume = 0.82;
-            if (process.env.EXPO_OS === 'web') {
-              const seek = player.seekTo(0);
-              player.play();
-              await seek;
-            } else {
-              await player.seekTo(0);
-              player.play();
-            }
-            activePlayer.current = player;
+            const audioPlayer = playerRef.current;
+            audioPlayer.pause();
+            audioPlayer.replace(soundSources[feedback.sound!]);
+            audioPlayer.volume = 0.82;
+            audioPlayer.play();
           })(),
         );
       }
@@ -123,7 +94,7 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
       }
       await Promise.allSettled(actions);
     },
-    [playerForSound, soundEnabled, vibrationEnabled],
+    [soundEnabled, vibrationEnabled],
   );
 
   useEffect(() => {

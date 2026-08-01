@@ -56,12 +56,21 @@ export function EarningsScreen() {
       }, 0);
       return () => clearTimeout(timer);
     }
-    void apiRequest<EarningsSummary>(`/v1/driver/earnings?period=${period}`, { token })
+    const controller = new AbortController();
+    void apiRequest<EarningsSummary>(`/v1/driver/earnings?period=${period}`, {
+      token,
+      signal: controller.signal,
+    })
       .then((result) => {
         setEarnings(result);
         setError(null);
       })
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заработок'));
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заработок');
+        }
+      });
+    return () => controller.abort();
   }, [period, token]);
 
   const commissionPercent = earnings.grossMinor

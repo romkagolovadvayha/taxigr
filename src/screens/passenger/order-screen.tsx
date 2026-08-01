@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -132,6 +132,16 @@ export function OrderScreen() {
   const followDriver =
     currentRide?.status === 'driver_arriving' || rideInProgress;
   const selectedPreviewTariff = tariffs.find((tariff) => tariff.code === selectedTariff);
+  const mapViewportInsets = useMemo(
+    () =>
+      isPhone
+        ? {
+            top: insets.top + 64,
+            bottom: bookingPanelHeight,
+          }
+        : undefined,
+    [bookingPanelHeight, insets.top, isPhone],
+  );
   const expandSheet = useCallback(() => {
     if (currentRide) {
       router.push({ pathname: '/orders/[id]', params: { id: currentRide.id } });
@@ -187,14 +197,7 @@ export function OrderScreen() {
       followDriver={followDriver}
       followZoom={rideInProgress ? 17 : 16}
       trimCompletedRoute={rideInProgress || routeCompleted}
-      viewportInsets={
-        isPhone
-          ? {
-              top: insets.top + 64,
-              bottom: bookingPanelHeight,
-            }
-          : undefined
-      }
+      viewportInsets={mapViewportInsets}
     />
   );
 

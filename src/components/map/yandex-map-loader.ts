@@ -5,8 +5,8 @@ declare global {
       YMap: new (element: HTMLElement, props: unknown, children?: unknown[]) => YandexMap;
       YMapDefaultSchemeLayer: new (props?: unknown) => unknown;
       YMapDefaultFeaturesLayer: new (props?: unknown) => unknown;
-      YMapFeature: new (props: unknown) => unknown;
-      YMapMarker: new (props: unknown, element: HTMLElement) => unknown;
+      YMapFeature: new (props: unknown) => YandexMapEntity;
+      YMapMarker: new (props: unknown, element: HTMLElement) => YandexMapEntity;
       YMapListener: new (props: {
         layer: 'any';
         onUpdate?: (event: { location: { zoom: number } }) => void;
@@ -14,6 +14,10 @@ declare global {
     };
   }
 }
+
+export type YandexMapEntity = {
+  update: (props: unknown) => void;
+};
 
 export type YandexMap = {
   addChild: (child: unknown) => YandexMap;

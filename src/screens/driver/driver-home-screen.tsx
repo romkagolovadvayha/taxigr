@@ -498,14 +498,21 @@ export function DriverHomeScreen() {
       const timer = setTimeout(() => setOnline(false), 0);
       return () => clearTimeout(timer);
     }
-    void apiRequest<{ status: string }>('/v1/driver/profile', { token })
+    const controller = new AbortController();
+    void apiRequest<{ status: string }>('/v1/driver/profile', {
+      token,
+      signal: controller.signal,
+    })
       .then((profile) => {
         setOnline(profile.status === 'online' || profile.status === 'busy');
         setStatusError(null);
       })
       .catch((reason: unknown) => {
-        setStatusError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус водителя');
+        if (!controller.signal.aborted) {
+          setStatusError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус водителя');
+        }
       });
+    return () => controller.abort();
   }, [demo, token]);
 
   const changeOnline = async (next: boolean) => {

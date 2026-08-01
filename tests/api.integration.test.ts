@@ -526,7 +526,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       method: 'POST',
       body: {
         phone: outsiderPhone,
-        code: '0000',
+        code: sent.data?.debugCode === '0000' ? '0001' : '0000',
         installationId: authInstallationId,
       },
     });
@@ -826,6 +826,14 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       transports: ['websocket'],
       forceNew: true,
     });
+    let driverLocationEvents = 0;
+    let passengerLocationEvents = 0;
+    passengerSocket.on('driver:location', () => {
+      driverLocationEvents += 1;
+    });
+    driverSocket.on('passenger:location', (payload: { coordinates: unknown }) => {
+      if (payload.coordinates) passengerLocationEvents += 1;
+    });
     try {
       await Promise.all([
         socketEvent(passengerSocket, 'connect'),
@@ -866,6 +874,23 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       const location = await locationEvent;
       expect(location.latitude).toBeCloseTo(56.048);
       expect(location.longitude).toBeCloseTo(51.959);
+      const driverLocationBurst = await Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          api<{ accepted: boolean; throttled?: boolean }>('/v1/driver/location', {
+            method: 'PUT',
+            token: driverOneToken,
+            body: {
+              latitude: 56.048 + index / 100_000,
+              longitude: 51.959 + index / 100_000,
+              accuracyMeters: 6,
+            },
+          }),
+        ),
+      );
+      expect(driverLocationBurst.every((result) => result.status === 200)).toBe(true);
+      expect(driverLocationBurst.every((result) => result.data?.throttled)).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(driverLocationEvents).toBe(1);
 
       const passengerLocationEvent = socketEvent<{
         orderId: string;
@@ -888,6 +913,24 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       const passengerLocation = await passengerLocationEvent;
       expect(passengerLocation.orderId).toBe(order.data!.id);
       expect(passengerLocation.coordinates?.latitude).toBeCloseTo(56.0479);
+      const passengerLocationBurst = await Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          api<{ accepted: boolean; throttled?: boolean }>('/v1/passenger/location', {
+            method: 'PUT',
+            token: passengerToken,
+            body: {
+              orderId: order.data!.id,
+              latitude: 56.0479 + index / 100_000,
+              longitude: 51.9588 + index / 100_000,
+              accuracyMeters: 7,
+            },
+          }),
+        ),
+      );
+      expect(passengerLocationBurst.every((result) => result.status === 200)).toBe(true);
+      expect(passengerLocationBurst.every((result) => result.data?.throttled)).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(passengerLocationEvents).toBe(1);
       expect(
         (
           await api('/v1/passenger/location', {

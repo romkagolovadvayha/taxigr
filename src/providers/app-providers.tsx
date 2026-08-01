@@ -11,6 +11,7 @@ import { NotificationRegistrar } from '@/providers/notification-registrar';
 import { PassengerLocationPublisher } from '@/providers/passenger-location-publisher';
 import { PassengerPreferencesProvider } from '@/preferences/passenger-preferences-provider';
 import { RideProvider } from '@/state/ride-provider';
+import { WebResilience } from '@/providers/web-resilience';
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
@@ -32,6 +33,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <WebResilience />
       <SessionProvider>
         <CriticalErrorMonitor />
         <PassengerPreferencesProvider>
