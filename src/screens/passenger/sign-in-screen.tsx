@@ -310,7 +310,7 @@ export function SignInScreen() {
           {telegramChallenge && (
             <View style={{ gap: spacing.x1, alignItems: 'center' }}>
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
-                В Telegram нажмите «Поделиться номером», затем вернитесь в приложение.
+                В Telegram нажмите «Запустить» (Start), затем «Поделиться номером» и вернитесь в приложение.
               </Text>
               <Pressable
                 accessibilityRole="link"
