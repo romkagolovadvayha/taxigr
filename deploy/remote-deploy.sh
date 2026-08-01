@@ -82,6 +82,8 @@ SQL
 cd "$release_path"
 npm ci --omit=dev --prefix server --no-audit --no-fund
 ./server/node_modules/.bin/tsx server/scripts/migrate.ts
+chgrp -R taxigr "$release_path"
+chmod -R g+rX "$release_path"
 
 install -m 0644 deploy/taxigr-api.service /etc/systemd/system/taxigr-api.service
 systemctl daemon-reload
