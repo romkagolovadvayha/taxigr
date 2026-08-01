@@ -33,7 +33,9 @@ export async function openExternalAuthUrl(
     if (!externalWindow) throw new ExternalAuthWindowBlockedError();
 
     externalWindow.opener = null;
-    externalWindow.location.replace(url);
+    // Custom messenger schemes are unreliable in browsers. Prefer the HTTPS
+    // fallback there, while native keeps trying the installed app first.
+    externalWindow.location.replace(nativeFallbackUrl ?? url);
     externalWindow.focus();
     return;
   }

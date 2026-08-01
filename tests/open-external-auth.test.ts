@@ -50,6 +50,27 @@ describe('external messenger authorization window', () => {
     );
   });
 
+  it('uses the HTTPS fallback instead of a custom Telegram scheme on web', async () => {
+    vi.stubEnv('EXPO_OS', 'web');
+    const replace = vi.fn();
+    const externalWindow = {
+      opener: null,
+      closed: false,
+      location: { replace },
+      focus: vi.fn(),
+    } as unknown as Window;
+    vi.stubGlobal('window', { open: vi.fn().mockReturnValue(externalWindow) });
+
+    await openExternalAuthUrl(
+      'tg://resolve?domain=taxigr_bot&start=test',
+      externalWindow,
+      'https://t.me/taxigr_bot?start=test',
+    );
+
+    expect(replace).toHaveBeenCalledWith('https://t.me/taxigr_bot?start=test');
+    expect(Linking.openURL).not.toHaveBeenCalled();
+  });
+
   it('uses Expo Linking in the native app', async () => {
     vi.stubEnv('EXPO_OS', 'android');
 
