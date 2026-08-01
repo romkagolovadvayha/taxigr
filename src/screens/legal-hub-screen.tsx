@@ -85,6 +85,27 @@ export function LegalHubScreen() {
         </View>
       ))}
 
+      <View style={{ gap: spacing.x3 }}>
+        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Управление данными
+        </Text>
+        <Link
+          href="/account-deletion"
+          style={{
+            ...typography.bodyStrong,
+            color: colors.ink,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.md,
+            paddingHorizontal: spacing.x4,
+            paddingVertical: spacing.x4,
+          }}
+        >
+          Запросить удаление аккаунта и данных →
+        </Link>
+      </View>
+
       <View style={{ gap: spacing.x2, padding: spacing.x4, borderRadius: radius.lg, backgroundColor: colors.surface }}>
         <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Оператор сервиса

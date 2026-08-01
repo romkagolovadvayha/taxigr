@@ -1,6 +1,6 @@
 # Security
 
-Не публикуйте уязвимости в открытом issue. Отправьте описание и шаги воспроизведения на `security@taxi-grahovo.ru`.
+Не публикуйте уязвимости в открытом issue. Отправьте описание и шаги воспроизведения на `security@taxigr.ru`.
 
 Никогда не коммитьте `.env.production`, Apple `.p8` или Google service account
 JSON. Не публикуйте MySQL и OSRM напрямую в интернет. При утечке секретов

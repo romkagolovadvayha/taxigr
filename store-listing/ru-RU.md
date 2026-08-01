@@ -29,9 +29,9 @@
 
 ## URL
 
-- Маркетинговая страница: https://taxi-grahovo.ru/
-- Поддержка: mailto:support@taxi-grahovo.ru
-- Конфиденциальность: https://taxi-grahovo.ru/privacy
+- Маркетинговая страница: https://taxigr.ru/
+- Поддержка: mailto:support@taxigr.ru
+- Конфиденциальность: https://taxigr.ru/privacy
 
 ## Материалы, которые нужно предоставить перед отправкой
 

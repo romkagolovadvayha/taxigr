@@ -1,47 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://taxi-grahovo.ru/</loc>
+    <loc>https://taxigr.ru/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/legal</loc>
+    <loc>https://taxigr.ru/legal</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/privacy</loc>
+    <loc>https://taxigr.ru/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/terms</loc>
+    <loc>https://taxigr.ru/account-deletion</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://taxigr.ru/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/passenger-rules</loc>
+    <loc>https://taxigr.ru/passenger-rules</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/personal-data-consent</loc>
+    <loc>https://taxigr.ru/personal-data-consent</loc>
     <changefreq>yearly</changefreq>
     <priority>0.1</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/driver-terms</loc>
+    <loc>https://taxigr.ru/driver-terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/driver-data-consent</loc>
+    <loc>https://taxigr.ru/driver-data-consent</loc>
     <changefreq>yearly</changefreq>
     <priority>0.1</priority>
   </url>
   <url>
-    <loc>https://taxi-grahovo.ru/safety</loc>
+    <loc>https://taxigr.ru/safety</loc>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4100),
+  HOST: z.string().default('0.0.0.0'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   CORS_ORIGINS: z.string().default('http://localhost:8081,http://localhost:19006'),
   MYSQL_URL: z.string().min(1).default('mysql://root@127.0.0.1:3306/taxi_grahovo'),
@@ -40,13 +41,6 @@ const parsed = schema.safeParse(process.env);
 if (!parsed.success) {
   const details = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
   throw new Error(`Invalid server configuration: ${details}`);
-}
-
-if (
-  parsed.data.SMS_PROVIDER === 'notificore' &&
-  !parsed.data.NOTIFICORE_ORIGINATOR.trim()
-) {
-  throw new Error('Notificore requires NOTIFICORE_ORIGINATOR (SMS sender name)');
 }
 
 if (

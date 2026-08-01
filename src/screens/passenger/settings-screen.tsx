@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { type ComponentProps, useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, Switch, Text, View } from 'react-native';
 
@@ -169,6 +169,40 @@ export function SettingsScreen() {
         настройке. Управлять системным разрешением геолокации можно в настройках
         устройства.
       </Text>
+      <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Аккаунт и данные</Text>
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderRadius: radius.card,
+          paddingHorizontal: spacing.x4,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Запросить удаление аккаунта и данных"
+          onPress={() => router.push('/account-deletion' as Href)}
+          style={({ pressed }) => ({
+            minHeight: 72,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.x3,
+            opacity: pressed ? 0.62 : 1,
+          })}
+        >
+          <AppIcon name="document" size={22} color={colors.dangerText} />
+          <View style={{ flex: 1 }}>
+            <Text selectable style={{ ...typography.bodyStrong, color: colors.dangerText }}>
+              Удалить аккаунт
+            </Text>
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+              Инструкция, сроки и запрос в поддержку
+            </Text>
+          </View>
+          <AppIcon name="chevron" size={20} color={colors.inkMuted} />
+        </Pressable>
+      </View>
     </Screen>
   );
 }

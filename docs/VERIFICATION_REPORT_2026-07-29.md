@@ -41,7 +41,7 @@
 
 ## Web/SEO
 
-- production canonical: `https://taxi-grahovo.ru/`;
+- production canonical: `https://taxigr.ru/`;
 - страницы `/privacy` и `/terms` имеют собственные title, description и canonical;
 - главная содержит Open Graph, Twitter Card и JSON-LD `TaxiService`;
 - `robots.txt`, `sitemap.xml` и `llms.txt` присутствуют;
@@ -59,7 +59,7 @@
 
 ## Внешние блокеры production
 
-1. `taxi-grahovo.ru` сейчас возвращает DNS `NXDOMAIN`; сервер и TLS недоступны.
+1. `taxigr.ru` сейчас возвращает DNS `NXDOMAIN`; сервер и TLS недоступны.
 2. `SUPERADMIN_PHONES` не заполнен, поэтому реальный пользователь ещё не получает роль администратора.
 3. Полный VK-вход не завершён реальным пользователем. Локальный OAuth-редирект с
    PKCE и App ID `54698895` проверен.

@@ -8,7 +8,7 @@ import {
 
 describe('page metadata', () => {
   it('covers every exported application page with unique, readable metadata', () => {
-    expect(Object.keys(PAGE_METADATA)).toHaveLength(29);
+    expect(Object.keys(PAGE_METADATA)).toHaveLength(30);
 
     const entries = Object.values(PAGE_METADATA);
     expect(new Set(entries.map((item) => item.title)).size).toBe(entries.length);

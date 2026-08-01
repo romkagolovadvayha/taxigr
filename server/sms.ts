@@ -109,7 +109,7 @@ export async function sendPhoneVerificationCode(
   const { response, body } = await notificoreRequest('/2fa/authentications/otp', {
     channel: 'sms',
     recipient: phone.replace(/\D/gu, ''),
-    sender: config.NOTIFICORE_ORIGINATOR,
+    ...(config.NOTIFICORE_ORIGINATOR ? { sender: config.NOTIFICORE_ORIGINATOR } : {}),
     template_id: Number(config.NOTIFICORE_TEMPLATE_ID),
     code_digits: 4,
     code_max_tries: 3,

@@ -47,6 +47,7 @@ import {
   normalizeRussianPhone,
   phoneCodeHash,
 } from './phone-verification';
+import { isPlayReviewPhone, PLAY_REVIEW_CODE } from './play-review-auth';
 import { notifyOnlineDrivers, notifyUsers } from './push';
 import {
   findOrCreatePhoneUser,
@@ -1006,6 +1007,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
             code: 'PHONE_INVALID',
           });
         }
+        const isPlayReviewAccount = isPlayReviewPhone(phone);
 
         const recent = await firstRow<RowDataPacket & { age_seconds: number }>(
           `SELECT GREATEST(
@@ -1053,7 +1055,9 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         rateLimitConsumedAt = consumedAt;
 
         const challengeId = randomUUID();
-        const code = String(randomInt(1_000, 10_000));
+        const code = isPlayReviewAccount
+          ? PLAY_REVIEW_CODE
+          : String(randomInt(1_000, 10_000));
         const codeHash = phoneCodeHash(challengeId, phone, code, config.JWT_SECRET);
         const fallbackExpiresInSeconds = config.PHONE_CODE_TTL_MINUTES * 60;
         let expiresInSeconds = fallbackExpiresInSeconds;
@@ -1073,31 +1077,37 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           ],
         );
 
-        try {
-          const smsSession = await sendPhoneVerificationCode(phone, code, identity.ipAddress);
-          expiresInSeconds = smsSession.expiresInSeconds;
-          const sessionExpiresAt = new Date(Date.now() + smsSession.expiresInSeconds * 1_000);
-          await db.execute(
-            `UPDATE phone_auth_challenges
-             SET provider_authentication_id = ?, expires_at = ?
-             WHERE id = ?`,
-            [smsSession.providerAuthenticationId, sessionExpiresAt, challengeId],
-          );
-        } catch (error) {
-          await db.execute('DELETE FROM phone_auth_challenges WHERE id = ?', [challengeId]);
-          await finalize('sms_failed', undefined, challengeId);
-          request.log.warn(
-            { error: error instanceof Error ? error.message : 'unknown' },
-            'phone authentication SMS failed',
-          );
-          throw Object.assign(new Error('Не удалось отправить SMS. Попробуйте позднее'), {
-            statusCode: 502,
-            code: 'SMS_SEND_FAILED',
-          });
+        if (!isPlayReviewAccount) {
+          try {
+            const smsSession = await sendPhoneVerificationCode(phone, code, identity.ipAddress);
+            expiresInSeconds = smsSession.expiresInSeconds;
+            const sessionExpiresAt = new Date(Date.now() + smsSession.expiresInSeconds * 1_000);
+            await db.execute(
+              `UPDATE phone_auth_challenges
+               SET provider_authentication_id = ?, expires_at = ?
+               WHERE id = ?`,
+              [smsSession.providerAuthenticationId, sessionExpiresAt, challengeId],
+            );
+          } catch (error) {
+            await db.execute('DELETE FROM phone_auth_challenges WHERE id = ?', [challengeId]);
+            await finalize('sms_failed', undefined, challengeId);
+            request.log.warn(
+              { error: error instanceof Error ? error.message : 'unknown' },
+              'phone authentication SMS failed',
+            );
+            throw Object.assign(new Error('Не удалось отправить SMS. Попробуйте позднее'), {
+              statusCode: 502,
+              code: 'SMS_SEND_FAILED',
+            });
+          }
         }
 
         rateLimitConsumedAt = null;
-        await finalize('sms_sent', undefined, challengeId);
+        await finalize(
+          isPlayReviewAccount ? 'play_review_code_ready' : 'sms_sent',
+          undefined,
+          challengeId,
+        );
         return {
           data: {
             phone: maskPhone(phone),
@@ -1239,6 +1249,21 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           [challenge.id],
         );
         const id = await findOrCreatePhoneUser(connection, phone);
+        if (isPlayReviewPhone(phone)) {
+          await connection.execute(
+            `UPDATE users
+             SET name = 'Тестовый пассажир Google Play',
+                 gender = 'male',
+                 profile_completed_at = COALESCE(profile_completed_at, UTC_TIMESTAMP(3)),
+                 phone_verified_at = UTC_TIMESTAMP(3)
+             WHERE id = ?`,
+            [id],
+          );
+          await connection.execute(
+            "DELETE FROM user_roles WHERE user_id = ? AND role <> 'passenger'",
+            [id],
+          );
+        }
         const acceptance = parse(
           initialLegalAcceptanceSchema,
           typeof challenge.legal_acceptance === 'string'

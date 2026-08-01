@@ -15,7 +15,7 @@ export const operatorDetails = {
     'не указан',
   ),
   address: publicValue(process.env.EXPO_PUBLIC_OPERATOR_ADDRESS, 'не указан'),
-  email: publicValue(process.env.EXPO_PUBLIC_OPERATOR_EMAIL, 'support@taxi-grahovo.ru'),
+  email: publicValue(process.env.EXPO_PUBLIC_OPERATOR_EMAIL, 'support@taxigr.ru'),
   phone: publicValue(process.env.EXPO_PUBLIC_OPERATOR_PHONE, 'не указан'),
   taxiRegistryNumber: publicValue(
     process.env.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER,
@@ -31,4 +31,3 @@ export const operatorDetailsReady = [
   process.env.EXPO_PUBLIC_OPERATOR_PHONE,
   process.env.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER,
 ].every((value) => Boolean(value?.trim()));
-

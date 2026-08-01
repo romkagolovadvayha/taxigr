@@ -87,6 +87,7 @@ function RootNavigator() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="privacy" />
+        <Stack.Screen name="account-deletion" />
         <Stack.Screen name="terms" />
         <Stack.Screen name="legal" />
         <Stack.Screen name="passenger-rules" />

@@ -43,6 +43,13 @@ export const PAGE_METADATA = {
     indexable: true,
     canonicalPath: legalDocuments.privacy.path,
   },
+  '/account-deletion': {
+    title: 'Удаление аккаунта — Такси Грахово',
+    description:
+      'Как запросить удаление аккаунта Такси Грахово, какие данные удаляются, что сохраняется и на какой срок.',
+    indexable: true,
+    canonicalPath: '/account-deletion',
+  },
   '/personal-data-consent': {
     title: `${legalDocuments.personalDataConsent.title} — Такси Грахово`,
     description:

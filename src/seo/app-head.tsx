@@ -6,7 +6,7 @@ type Props = {
   pathname: string;
 };
 
-const DEFAULT_SITE_URL = 'https://taxi-grahovo.ru';
+const DEFAULT_SITE_URL = 'https://taxigr.ru';
 
 export function AppHead({ pathname }: Props) {
   const metadata = getPageMetadata(pathname);

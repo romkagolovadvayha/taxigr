@@ -94,7 +94,7 @@ export function TaxiMap(props: TaxiMapProps) {
   return (
     <WebView
       ref={webViewRef}
-      source={{ html, baseUrl: 'https://taxi-grahovo.ru/' }}
+      source={{ html, baseUrl: 'https://taxigr.ru/' }}
       style={{ flex: 1, backgroundColor: colors.mapFallback }}
       onMessage={onMessage}
       onLoadEnd={pushState}

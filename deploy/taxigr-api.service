@@ -1,0 +1,25 @@
+[Unit]
+Description=TaxiGR API
+After=network-online.target mysql.service
+Wants=network-online.target
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=taxigr
+Group=taxigr
+WorkingDirectory=/var/www/taxigr/current
+EnvironmentFile=/etc/taxigr/taxigr.env
+ExecStart=/usr/bin/node /var/www/taxigr/current/server/node_modules/tsx/dist/cli.mjs server/index.ts
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=60
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/taxigr /var/log/taxigr
+
+[Install]
+WantedBy=multi-user.target

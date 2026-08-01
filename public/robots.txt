@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /_sitemap
 
-Sitemap: https://taxi-grahovo.ru/sitemap.xml
+Sitemap: https://taxigr.ru/sitemap.xml

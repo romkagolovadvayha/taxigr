@@ -1,0 +1,200 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: taxigr-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      WEB_DOMAIN: ${{ vars.WEB_DOMAIN }}
+      API_DOMAIN: ${{ vars.API_DOMAIN }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_PORT: ${{ vars.SSH_PORT }}
+      SSH_USER: ${{ vars.SSH_USER }}
+      PUBLIC_URL: https://${{ vars.WEB_DOMAIN }}
+      EXPO_PUBLIC_API_URL: https://${{ vars.API_DOMAIN }}
+      EXPO_PUBLIC_SOCKET_URL: https://${{ vars.API_DOMAIN }}
+      EXPO_PUBLIC_SITE_URL: https://${{ vars.WEB_DOMAIN }}
+      EXPO_PUBLIC_DEMO_MODE: "false"
+      EXPO_PUBLIC_YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
+      EXPO_PUBLIC_OPERATOR_LEGAL_NAME: ${{ vars.EXPO_PUBLIC_OPERATOR_LEGAL_NAME }}
+      EXPO_PUBLIC_OPERATOR_STATUS: ${{ vars.EXPO_PUBLIC_OPERATOR_STATUS }}
+      EXPO_PUBLIC_OPERATOR_INN: ${{ vars.EXPO_PUBLIC_OPERATOR_INN }}
+      EXPO_PUBLIC_OPERATOR_REGISTRATION_NUMBER: ${{ vars.EXPO_PUBLIC_OPERATOR_REGISTRATION_NUMBER }}
+      EXPO_PUBLIC_OPERATOR_ADDRESS: ${{ vars.EXPO_PUBLIC_OPERATOR_ADDRESS }}
+      EXPO_PUBLIC_OPERATOR_EMAIL: ${{ vars.EXPO_PUBLIC_OPERATOR_EMAIL }}
+      EXPO_PUBLIC_OPERATOR_PHONE: ${{ vars.EXPO_PUBLIC_OPERATOR_PHONE }}
+      EXPO_PUBLIC_TAXI_REGISTRY_NUMBER: ${{ vars.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub Environment variable: $name" >&2
+              exit 1
+            fi
+          done
+          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub Environment secret: $name" >&2
+              exit 1
+            fi
+          done
+        env:
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+          NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
+          YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify and build
+        run: npm run check
+
+      - name: Create server environment file
+        shell: bash
+        env:
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUPERADMIN_PHONES: ${{ secrets.SUPERADMIN_PHONES }}
+          NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
+          NOTIFICORE_BEARER_TOKEN: ${{ secrets.NOTIFICORE_BEARER_TOKEN }}
+          NOTIFICORE_ORIGINATOR: ${{ vars.NOTIFICORE_ORIGINATOR }}
+          NOTIFICORE_TEMPLATE_ID: ${{ vars.NOTIFICORE_TEMPLATE_ID }}
+          MAX_BOT_USERNAME: ${{ vars.MAX_BOT_USERNAME }}
+          MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
+          MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
+          TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import os, shlex
+
+          mysql_password = os.environ['MYSQL_PASSWORD']
+          values = {
+              'NODE_ENV': 'production',
+              'HOST': '127.0.0.1',
+              'PORT': '4100',
+              'PUBLIC_URL': os.environ['PUBLIC_URL'],
+              'CORS_ORIGINS': os.environ['PUBLIC_URL'],
+              'MYSQL_PASSWORD': mysql_password,
+              'MYSQL_URL': f'mysql://taxigr:{mysql_password}@127.0.0.1:3306/taxi_grahovo',
+              'JWT_SECRET': os.environ['JWT_SECRET'],
+              'SUPERADMIN_PHONES': os.environ.get('SUPERADMIN_PHONES', ''),
+              'YANDEX_MAPS_API_KEY': os.environ.get('EXPO_PUBLIC_YANDEX_MAPS_API_KEY', ''),
+              'ROUTER_BASE_URL': 'https://router.project-osrm.org',
+              'ROUTER_TIMEOUT_MS': '5000',
+              'ROUTER_CACHE_TTL_SECONDS': '600',
+              'ROUTER_CACHE_MAX_ENTRIES': '2000',
+              'ROUTER_CIRCUIT_BREAKER_SECONDS': '30',
+              'NOMINATIM_BASE_URL': 'https://nominatim.openstreetmap.org',
+              'GEOCODER_CACHE_TTL_DAYS': '30',
+              'SMS_PROVIDER': 'notificore',
+              'NOTIFICORE_API_KEY': os.environ['NOTIFICORE_API_KEY'],
+              'NOTIFICORE_BEARER_TOKEN': os.environ.get('NOTIFICORE_BEARER_TOKEN', ''),
+              'NOTIFICORE_TEMPLATE_ID': os.environ.get('NOTIFICORE_TEMPLATE_ID') or '271',
+              'NOTIFICORE_ORIGINATOR': os.environ.get('NOTIFICORE_ORIGINATOR', ''),
+              'MAX_BOT_USERNAME': os.environ.get('MAX_BOT_USERNAME', ''),
+              'MAX_BOT_TOKEN': os.environ.get('MAX_BOT_TOKEN', ''),
+              'MAX_WEBHOOK_SECRET': os.environ.get('MAX_WEBHOOK_SECRET', ''),
+              'TELEGRAM_BOT_USERNAME': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
+              'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
+              'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
+              'PHONE_CODE_TTL_MINUTES': '10',
+              'PHONE_CODE_RESEND_SECONDS': '30',
+              'TRUST_PROXY_HOPS': '1',
+              'AUTH_ATTEMPT_RETENTION_DAYS': '30',
+              'GLOBAL_RATE_LIMIT_MAX': '300',
+          }
+          for key, value in values.items():
+              if '\n' in value or '\r' in value:
+                  raise SystemExit(f'Newlines are not allowed in {key}')
+          with open('.taxigr.env', 'w', encoding='utf-8', newline='\n') as output:
+              for key, value in values.items():
+                  output.write(f'{key}={shlex.quote(value)}\n')
+          PY
+          chmod 600 .taxigr.env
+
+      - name: Package release
+        shell: bash
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.expo' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='.env.production' \
+            --exclude='.taxigr.env' \
+            --exclude='node_modules' \
+            --exclude='server/node_modules' \
+            --exclude='tmp' \
+            --exclude='*.aab' \
+            -czf "taxigr-${GITHUB_SHA}.tar.gz" .
+          sha256sum "taxigr-${GITHUB_SHA}.tar.gz" | awk '{print $1}' > archive.sha256
+
+      - name: Setup SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/taxigr_deploy
+          chmod 600 ~/.ssh/taxigr_deploy
+          ssh-keygen -y -f ~/.ssh/taxigr_deploy >/dev/null
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload and activate release
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH=(ssh -i ~/.ssh/taxigr_deploy -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes)
+          SCP=(scp -i ~/.ssh/taxigr_deploy -P "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes)
+          target="${SSH_USER}@${SSH_HOST}"
+          remote_archive="$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
+          remote_env="$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
+          remote_script="$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
+          archive_sha256="$(cat archive.sha256)"
+
+          "${SSH[@]}" "$target" "install -d -m 0755 '$DEPLOY_PATH/incoming'"
+          "${SCP[@]}" "taxigr-${GITHUB_SHA}.tar.gz" "$target:$remote_archive"
+          "${SCP[@]}" .taxigr.env "$target:$remote_env"
+          "${SCP[@]}" deploy/remote-deploy.sh "$target:$remote_script"
+          "${SSH[@]}" "$target" \
+            "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_ID='$GITHUB_SHA' ARCHIVE='$remote_archive' ENV_UPLOAD='$remote_env' ARCHIVE_SHA256='$archive_sha256' bash '$remote_script'"
+
+      - name: Verify public endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
