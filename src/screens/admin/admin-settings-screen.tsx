@@ -11,9 +11,9 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type EditableKey =
   | 'serviceCommissionBps'
-  | 'grahovoFixedFareMinor'
-  | 'districtPerKilometerMinor'
-  | 'intercityPerKilometerMinor'
+  | 'fare07To22Minor'
+  | 'fare22To02Minor'
+  | 'fare02To07Minor'
   | 'childSurchargeMinor'
   | 'waitingFreeMinutes'
   | 'waitingPerMinuteMinor';
@@ -138,22 +138,22 @@ export function AdminSettingsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'Внутри Грахово',
-            String(rules.grahovoFixedFareMinor / 100),
-            (value) => changeRubles('grahovoFixedFareMinor', value),
-            '₽ фикс.',
+            'С 07:00 до 22:00',
+            String(rules.fare07To22Minor / 100),
+            (value) => changeRubles('fare07To22Minor', value),
+            '₽',
           )}
           {field(
-            'По Граховскому району',
-            String(rules.districtPerKilometerMinor / 100),
-            (value) => changeRubles('districtPerKilometerMinor', value),
-            '₽/км',
+            'С 22:00 до 02:00',
+            String(rules.fare22To02Minor / 100),
+            (value) => changeRubles('fare22To02Minor', value),
+            '₽',
           )}
           {field(
-            'Межгород',
-            String(rules.intercityPerKilometerMinor / 100),
-            (value) => changeRubles('intercityPerKilometerMinor', value),
-            '₽/км',
+            'С 02:00 до 07:00',
+            String(rules.fare02To07Minor / 100),
+            (value) => changeRubles('fare02To07Minor', value),
+            '₽',
           )}
           {field(
             'Надбавка за детский тариф',
@@ -163,9 +163,8 @@ export function AdminSettingsScreen() {
           )}
         </View>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
-          Внутри села действует фиксированная цена. Между населёнными пунктами
-          Граховского района и за пределами района стоимость считается отдельно
-          за километр.
+          Для всех поездок действует фиксированная цена по времени оформления заказа.
+          Интервалы рассчитываются по самарскому времени.
         </Text>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           Детский тариф назначает любую машину с подтверждённым креслом — пассажир

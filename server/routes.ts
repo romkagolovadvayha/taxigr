@@ -8,6 +8,8 @@ import {
   calculateFareMinor,
   calculateWaitingChargeMinor,
   classifyPricingScope,
+  farePeriodAt,
+  farePeriodLabel,
   type PricingRules,
   type PricingScope,
 } from '../src/domain/pricing';
@@ -318,9 +320,9 @@ async function auth(request: FastifyRequest, role?: UserRole): Promise<AuthUser>
 }
 
 type PricingRow = RowDataPacket & {
-  grahovo_fixed_fare_minor: number;
-  district_per_kilometer_minor: number;
-  intercity_per_kilometer_minor: number;
+  fare_07_22_minor: number;
+  fare_22_02_minor: number;
+  fare_02_07_minor: number;
   child_surcharge_minor: number;
   waiting_free_minutes: number;
   waiting_per_minute_minor: number;
@@ -334,9 +336,9 @@ async function pricingRules(connection?: PoolConnection): Promise<PricingRules> 
   if (!row) throw Object.assign(new Error('Тарифы временно недоступны'), { statusCode: 503, code: 'NO_TARIFFS' });
   return {
     currency: 'RUB',
-    grahovoFixedFareMinor: row.grahovo_fixed_fare_minor,
-    districtPerKilometerMinor: row.district_per_kilometer_minor,
-    intercityPerKilometerMinor: row.intercity_per_kilometer_minor,
+    fare07To22Minor: row.fare_07_22_minor,
+    fare22To02Minor: row.fare_22_02_minor,
+    fare02To07Minor: row.fare_02_07_minor,
     childSurchargeMinor: row.child_surcharge_minor,
     waitingFreeMinutes: row.waiting_free_minutes,
     waitingPerMinuteMinor: row.waiting_per_minute_minor,
@@ -345,20 +347,18 @@ async function pricingRules(connection?: PoolConnection): Promise<PricingRules> 
 }
 
 function quoteTariffs(route: RouteMetrics, rules: PricingRules, scope: PricingScope) {
+  const pricedAt = new Date();
+  const periodDescription = farePeriodLabel[farePeriodAt(pricedAt)];
   return (['economy', 'child'] as const).map((code) => ({
     code,
     title: code === 'child' ? 'Детский' : 'Эконом',
     description:
       code === 'child'
         ? 'Подходящее детское кресло без выбора типа'
-        : scope === 'grahovo'
-          ? 'Фиксированная цена по Грахово'
-          : scope === 'district'
-            ? 'Поездка по Граховскому району'
-            : 'Междугородняя поездка',
+        : `Фиксированная цена · ${periodDescription}`,
     childSeatIncluded: code === 'child',
     etaMinutes: code === 'child' ? 7 : 4,
-    priceMinor: calculateFareMinor(route.distanceMeters, code, scope, rules),
+    priceMinor: calculateFareMinor(route.distanceMeters, code, scope, rules, pricedAt),
   }));
 }
 
@@ -1683,6 +1683,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         input.tariff,
         pricingScope,
         rules,
+        new Date(),
       );
       const commission = calculateCommissionMinor(price, rules.serviceCommissionBps);
       await connection.execute(
@@ -3434,9 +3435,9 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     const session = await auth(request, 'admin');
     const input = parse(
       z.object({
-        grahovoFixedFareMinor: z.number().int().min(0).max(1_000_000),
-        districtPerKilometerMinor: z.number().int().min(0).max(1_000_000),
-        intercityPerKilometerMinor: z.number().int().min(0).max(1_000_000),
+        fare07To22Minor: z.number().int().min(0).max(1_000_000),
+        fare22To02Minor: z.number().int().min(0).max(1_000_000),
+        fare02To07Minor: z.number().int().min(0).max(1_000_000),
         childSurchargeMinor: z.number().int().min(0).max(1_000_000),
         waitingFreeMinutes: z.number().int().min(0).max(120),
         waitingPerMinuteMinor: z.number().int().min(0).max(100_000),
@@ -3446,15 +3447,15 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     );
     const before = await pricingRules();
     await db.execute(
-      `UPDATE tariff_settings SET grahovo_fixed_fare_minor = ?,
-       district_per_kilometer_minor = ?, intercity_per_kilometer_minor = ?,
+      `UPDATE tariff_settings SET fare_07_22_minor = ?,
+       fare_22_02_minor = ?, fare_02_07_minor = ?,
        child_surcharge_minor = ?, waiting_free_minutes = ?,
        waiting_per_minute_minor = ?, service_commission_bps = ?,
        updated_by = ? WHERE id = 1`,
       [
-        input.grahovoFixedFareMinor,
-        input.districtPerKilometerMinor,
-        input.intercityPerKilometerMinor,
+        input.fare07To22Minor,
+        input.fare22To02Minor,
+        input.fare02To07Minor,
         input.childSurchargeMinor,
         input.waitingFreeMinutes,
         input.waitingPerMinuteMinor,

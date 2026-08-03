@@ -1,63 +1,43 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Address } from '../src/domain/models';
 import {
   calculateCommissionMinor,
   calculateFareMinor,
   calculateWaitingChargeMinor,
-  classifyPricingScope,
   defaultPricingRules,
+  farePeriodAt,
 } from '../src/domain/pricing';
 
-const grahovo: Address = {
-  id: 'grahovo',
-  label: 'с. Грахово, ул. Ачинцева, 5',
-  houseNumber: '5',
-  coordinates: { latitude: 56.0477, longitude: 51.9586 },
-};
-const grahovoSecond: Address = {
-  id: 'grahovo-second',
-  label: 'с. Грахово, ул. 50 лет Победы, 19',
-  houseNumber: '19',
-  coordinates: { latitude: 56.055332, longitude: 51.960263 },
-};
-const districtVillage: Address = {
-  id: 'district',
-  label: 'д. Благодатное, ул. Благодатновская, 53А',
-  details: 'Граховский район, Удмуртская Республика',
-  houseNumber: '53А',
-  coordinates: { latitude: 55.9995786, longitude: 51.8684492 },
-};
-const mozhga: Address = {
-  id: 'mozhga',
-  label: 'г. Можга, Привокзальная ул., 6',
-  houseNumber: '6',
-  coordinates: { latitude: 56.445658, longitude: 52.1972249 },
-};
-
 describe('route pricing', () => {
-  it('uses a fixed 150 ruble fare inside Grahovo', () => {
-    const scope = classifyPricingScope(grahovo, grahovoSecond);
-    expect(scope).toBe('grahovo');
-    expect(calculateFareMinor(500, 'economy', scope)).toBe(15_000);
-    expect(calculateFareMinor(8_000, 'economy', scope)).toBe(15_000);
+  const rules = {
+    ...defaultPricingRules,
+    fare07To22Minor: 15_000,
+    fare22To02Minor: 20_000,
+    fare02To07Minor: 25_000,
+  };
+
+  it('uses the 07:00–22:00 fixed fare regardless of distance or area', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z'); // 07:00 in Samara
+    expect(calculateFareMinor(500, 'economy', 'grahovo', rules, daytime)).toBe(15_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(15_000);
   });
 
-  it('uses 60 rubles per kilometer inside Grahovo district', () => {
-    const scope = classifyPricingScope(grahovo, districtVillage);
-    expect(scope).toBe('district');
-    expect(calculateFareMinor(9_500, 'economy', scope)).toBe(57_000);
-  });
+  it('switches periods exactly at 22:00, 02:00 and 07:00 Samara time', () => {
+    expect(farePeriodAt(new Date('2026-08-03T17:59:59.999Z'))).toBe('07-22');
+    expect(farePeriodAt(new Date('2026-08-03T18:00:00.000Z'))).toBe('22-02');
+    expect(farePeriodAt(new Date('2026-08-03T21:59:59.999Z'))).toBe('22-02');
+    expect(farePeriodAt(new Date('2026-08-03T22:00:00.000Z'))).toBe('02-07');
+    expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('02-07');
+    expect(farePeriodAt(new Date('2026-08-04T03:00:00.000Z'))).toBe('07-22');
 
-  it('uses 30 rubles per kilometer for intercity rides', () => {
-    const scope = classifyPricingScope(grahovo, mozhga);
-    expect(scope).toBe('intercity');
-    expect(calculateFareMinor(61_000, 'economy', scope)).toBe(183_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(20_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(25_000);
   });
 
   it('adds the fixed child tariff surcharge without seat selection', () => {
-    const economy = calculateFareMinor(9_500, 'economy', 'district');
-    const child = calculateFareMinor(9_500, 'child', 'district');
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    const economy = calculateFareMinor(9_500, 'economy', 'district', rules, daytime);
+    const child = calculateFareMinor(9_500, 'child', 'district', rules, daytime);
     expect(child - economy).toBe(defaultPricingRules.childSurchargeMinor);
   });
 });
