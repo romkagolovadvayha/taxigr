@@ -6,9 +6,13 @@ export type FarePeriod = '07-22' | '22-02' | '02-07';
 
 export type PricingRules = {
   currency: 'RUB';
-  fare07To22Minor: number;
-  fare22To02Minor: number;
-  fare02To07Minor: number;
+  grahovoFare07To22Minor: number;
+  grahovoFare22To02Minor: number;
+  grahovoFare02To07Minor: number;
+  districtPerKilometer07To22Minor: number;
+  districtPerKilometer22To02Minor: number;
+  districtPerKilometer02To07Minor: number;
+  intercityPerKilometerMinor: number;
   childSurchargeMinor: number;
   waitingFreeMinutes: number;
   waitingPerMinuteMinor: number;
@@ -17,9 +21,13 @@ export type PricingRules = {
 
 export const defaultPricingRules: PricingRules = {
   currency: 'RUB',
-  fare07To22Minor: 15_000,
-  fare22To02Minor: 15_000,
-  fare02To07Minor: 15_000,
+  grahovoFare07To22Minor: 15_000,
+  grahovoFare22To02Minor: 15_000,
+  grahovoFare02To07Minor: 15_000,
+  districtPerKilometer07To22Minor: 6_000,
+  districtPerKilometer22To02Minor: 6_000,
+  districtPerKilometer02To07Minor: 6_000,
+  intercityPerKilometerMinor: 3_000,
   childSurchargeMinor: 7_000,
   waitingFreeMinutes: 3,
   waitingPerMinuteMinor: 400,
@@ -79,24 +87,40 @@ export const farePeriodLabel: Record<FarePeriod, string> = {
   '02-07': 'С 02:00 до 07:00',
 };
 
-export function baseFareMinorAt(
-  rules = defaultPricingRules,
-  date = new Date(),
-): number {
+function grahovoFareMinorAt(rules: PricingRules, date: Date): number {
   const period = farePeriodAt(date);
-  if (period === '07-22') return rules.fare07To22Minor;
-  if (period === '22-02') return rules.fare22To02Minor;
-  return rules.fare02To07Minor;
+  if (period === '07-22') return rules.grahovoFare07To22Minor;
+  if (period === '22-02') return rules.grahovoFare22To02Minor;
+  return rules.grahovoFare02To07Minor;
+}
+
+function districtPerKilometerMinorAt(rules: PricingRules, date: Date): number {
+  const period = farePeriodAt(date);
+  if (period === '07-22') return rules.districtPerKilometer07To22Minor;
+  if (period === '22-02') return rules.districtPerKilometer22To02Minor;
+  return rules.districtPerKilometer02To07Minor;
+}
+
+function roundToTenRubles(minor: number): number {
+  return Math.ceil(minor / 1_000) * 1_000;
 }
 
 export function calculateFareMinor(
-  _distanceMeters: number,
+  distanceMeters: number,
   tariff: TariffCode,
-  _scope: PricingScope,
+  scope: PricingScope,
   rules = defaultPricingRules,
   date = new Date(),
 ): number {
-  return baseFareMinorAt(rules, date) +
+  const routePrice = scope === 'grahovo'
+    ? grahovoFareMinorAt(rules, date)
+    : roundToTenRubles(
+        (distanceMeters / 1_000) *
+          (scope === 'district'
+            ? districtPerKilometerMinorAt(rules, date)
+            : rules.intercityPerKilometerMinor),
+      );
+  return routePrice +
     (tariff === 'child' ? rules.childSurchargeMinor : 0);
 }
 

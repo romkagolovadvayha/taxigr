@@ -11,15 +11,31 @@ import {
 describe('route pricing', () => {
   const rules = {
     ...defaultPricingRules,
-    fare07To22Minor: 15_000,
-    fare22To02Minor: 20_000,
-    fare02To07Minor: 25_000,
+    grahovoFare07To22Minor: 15_000,
+    grahovoFare22To02Minor: 20_000,
+    grahovoFare02To07Minor: 25_000,
+    districtPerKilometer07To22Minor: 6_000,
+    districtPerKilometer22To02Minor: 7_000,
+    districtPerKilometer02To07Minor: 8_000,
+    intercityPerKilometerMinor: 3_000,
   };
 
-  it('uses the 07:00–22:00 fixed fare regardless of distance or area', () => {
+  it('uses a fixed time-based fare inside Grahovo', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z'); // 07:00 in Samara
     expect(calculateFareMinor(500, 'economy', 'grahovo', rules, daytime)).toBe(15_000);
-    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(15_000);
+    expect(calculateFareMinor(8_000, 'economy', 'grahovo', rules, daytime)).toBe(15_000);
+  });
+
+  it('uses a separate time-based per-kilometer rate inside Grahovo district', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(57_000);
+  });
+
+  it('keeps a separate intercity per-kilometer rate', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    const late = new Date('2026-08-03T18:00:00.000Z');
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(183_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(183_000);
   });
 
   it('switches periods exactly at 22:00, 02:00 and 07:00 Samara time', () => {
@@ -30,8 +46,8 @@ describe('route pricing', () => {
     expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('02-07');
     expect(farePeriodAt(new Date('2026-08-04T03:00:00.000Z'))).toBe('07-22');
 
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(20_000);
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(25_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(67_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(76_000);
   });
 
   it('adds the fixed child tariff surcharge without seat selection', () => {

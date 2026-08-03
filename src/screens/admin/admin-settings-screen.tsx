@@ -11,9 +11,13 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type EditableKey =
   | 'serviceCommissionBps'
-  | 'fare07To22Minor'
-  | 'fare22To02Minor'
-  | 'fare02To07Minor'
+  | 'grahovoFare07To22Minor'
+  | 'grahovoFare22To02Minor'
+  | 'grahovoFare02To07Minor'
+  | 'districtPerKilometer07To22Minor'
+  | 'districtPerKilometer22To02Minor'
+  | 'districtPerKilometer02To07Minor'
+  | 'intercityPerKilometerMinor'
   | 'childSurchargeMinor'
   | 'waitingFreeMinutes'
   | 'waitingPerMinuteMinor';
@@ -136,25 +140,67 @@ export function AdminSettingsScreen() {
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Стоимость поездки
         </Text>
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          По Грахово · фиксированная стоимость
+        </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
             'С 07:00 до 22:00',
-            String(rules.fare07To22Minor / 100),
-            (value) => changeRubles('fare07To22Minor', value),
+            String(rules.grahovoFare07To22Minor / 100),
+            (value) => changeRubles('grahovoFare07To22Minor', value),
             '₽',
           )}
           {field(
             'С 22:00 до 02:00',
-            String(rules.fare22To02Minor / 100),
-            (value) => changeRubles('fare22To02Minor', value),
+            String(rules.grahovoFare22To02Minor / 100),
+            (value) => changeRubles('grahovoFare22To02Minor', value),
             '₽',
           )}
           {field(
             'С 02:00 до 07:00',
-            String(rules.fare02To07Minor / 100),
-            (value) => changeRubles('fare02To07Minor', value),
+            String(rules.grahovoFare02To07Minor / 100),
+            (value) => changeRubles('grahovoFare02To07Minor', value),
             '₽',
           )}
+        </View>
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          По Граховскому району · стоимость за километр
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
+          {field(
+            'С 07:00 до 22:00',
+            String(rules.districtPerKilometer07To22Minor / 100),
+            (value) => changeRubles('districtPerKilometer07To22Minor', value),
+            '₽/км',
+          )}
+          {field(
+            'С 22:00 до 02:00',
+            String(rules.districtPerKilometer22To02Minor / 100),
+            (value) => changeRubles('districtPerKilometer22To02Minor', value),
+            '₽/км',
+          )}
+          {field(
+            'С 02:00 до 07:00',
+            String(rules.districtPerKilometer02To07Minor / 100),
+            (value) => changeRubles('districtPerKilometer02To07Minor', value),
+            '₽/км',
+          )}
+        </View>
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          Межгород
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
+          {field(
+            'Стоимость за километр',
+            String(rules.intercityPerKilometerMinor / 100),
+            (value) => changeRubles('intercityPerKilometerMinor', value),
+            '₽/км',
+          )}
+        </View>
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          Доплата
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
             'Надбавка за детский тариф',
             String(rules.childSurchargeMinor / 100),
@@ -163,8 +209,9 @@ export function AdminSettingsScreen() {
           )}
         </View>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
-          Для всех поездок действует фиксированная цена по времени оформления заказа.
-          Интервалы рассчитываются по самарскому времени.
+          В Грахово действует фиксированная сумма, в Граховском районе — ставка за
+          километр по времени оформления заказа. Межгород рассчитывается по отдельной
+          ставке за километр. Временные интервалы считаются по самарскому времени.
         </Text>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           Детский тариф назначает любую машину с подтверждённым креслом — пассажир

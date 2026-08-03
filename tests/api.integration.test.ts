@@ -427,8 +427,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(demoFarQuote.data?.route.distanceMeters).toBeGreaterThan(
       demoNearQuote.data?.route.distanceMeters ?? 0,
     );
-    expect(demoFarQuote.data?.tariffs[0]?.priceMinor).toBe(
-      demoNearQuote.data?.tariffs[0]?.priceMinor,
+    expect(demoFarQuote.data?.tariffs[0]?.priceMinor).toBeGreaterThan(
+      demoNearQuote.data?.tariffs[0]?.priceMinor ?? 0,
     );
 
     for (const routeCase of [
@@ -1378,9 +1378,13 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
 
   it('updates tariffs, metrics, driver suspension and audit records', async () => {
     const changedTariffs = {
-      fare07To22Minor: originalTariffs.fare07To22Minor + 100,
-      fare22To02Minor: originalTariffs.fare22To02Minor,
-      fare02To07Minor: originalTariffs.fare02To07Minor,
+      grahovoFare07To22Minor: originalTariffs.grahovoFare07To22Minor + 100,
+      grahovoFare22To02Minor: originalTariffs.grahovoFare22To02Minor,
+      grahovoFare02To07Minor: originalTariffs.grahovoFare02To07Minor,
+      districtPerKilometer07To22Minor: originalTariffs.districtPerKilometer07To22Minor,
+      districtPerKilometer22To02Minor: originalTariffs.districtPerKilometer22To02Minor,
+      districtPerKilometer02To07Minor: originalTariffs.districtPerKilometer02To07Minor,
+      intercityPerKilometerMinor: originalTariffs.intercityPerKilometerMinor,
       childSurchargeMinor: originalTariffs.childSurchargeMinor,
       waitingFreeMinutes: originalTariffs.waitingFreeMinutes,
       waitingPerMinuteMinor: originalTariffs.waitingPerMinuteMinor,
