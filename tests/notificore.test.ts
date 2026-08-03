@@ -64,7 +64,7 @@ describe('Notificore 2FA provider', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { verifyPhoneVerificationCode } = await import('../server/sms');
 
-    await expect(verifyPhoneVerificationCode('authentication-1', '1234'))
+    await expect(verifyPhoneVerificationCode('authentication-1', '0123'))
       .resolves.toBe('verified');
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -76,7 +76,7 @@ describe('Notificore 2FA provider', () => {
       'https://one-api.notificore.ru/api/2fa/authentications/otp/authentication-1/verify',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer received_bearer' }),
-        body: JSON.stringify({ access_code: 1234 }),
+        body: JSON.stringify({ access_code: '0123' }),
       }),
     );
   });

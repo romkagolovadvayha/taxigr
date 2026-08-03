@@ -42,7 +42,7 @@ const schema = z.object({
     )
     .default(''),
   PHONE_CODE_TTL_MINUTES: z.coerce.number().int().min(2).max(30).default(10),
-  PHONE_CODE_RESEND_SECONDS: z.coerce.number().int().min(30).max(600).default(30),
+  PHONE_CODE_RESEND_SECONDS: z.coerce.number().int().min(30).max(600).default(180),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(1),
   AUTH_ATTEMPT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   GLOBAL_RATE_LIMIT_MAX: z.coerce.number().int().min(60).max(50_000).default(10_000),

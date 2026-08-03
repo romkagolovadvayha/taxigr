@@ -254,6 +254,54 @@ export function SignInScreen() {
             }}
           />
 
+          {maskedPhone && (
+            <View style={{ gap: spacing.x3 }}>
+              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+                Код отправлен по SMS на {maskedPhone}
+              </Text>
+              <TextInput
+                value={code}
+                onChangeText={(value) => {
+                  setCode(value.replace(/\D/gu, '').slice(0, 4));
+                  clearAuthError();
+                }}
+                editable={!authenticating}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                maxLength={4}
+                accessibilityLabel="Код из SMS"
+                placeholder="0000"
+                placeholderTextColor={colors.inkMuted}
+                style={{
+                  ...typography.pageTitle,
+                  minHeight: 60,
+                  paddingHorizontal: spacing.x4,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: colors.borderStrong,
+                  backgroundColor: colors.canvas,
+                  color: colors.ink,
+                  letterSpacing: 8,
+                  textAlign: 'center',
+                  fontVariant: ['tabular-nums'],
+                }}
+              />
+              {!!debugCode && (
+                <Text selectable style={{ ...typography.caption, color: colors.warningText }}>
+                  Тестовый код: {debugCode}
+                </Text>
+              )}
+              <AppButton
+                loading={authenticating && authAction === 'code'}
+                disabled={code.length !== 4}
+                onPress={() => void verifyCode()}
+              >
+                Подтвердить код
+              </AppButton>
+            </View>
+          )}
+
           <ConsentCheckbox
             checked={legalAccepted}
             onChange={setLegalAccepted}
@@ -371,54 +419,6 @@ export function SignInScreen() {
             </View>
           </Pressable>
         </View>
-
-        {maskedPhone && (
-          <View style={{ gap: spacing.x3 }}>
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-              Код отправлен по SMS на {maskedPhone}
-            </Text>
-            <TextInput
-              value={code}
-              onChangeText={(value) => {
-                setCode(value.replace(/\D/gu, '').slice(0, 4));
-                clearAuthError();
-              }}
-              editable={!authenticating}
-              keyboardType="number-pad"
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-              maxLength={4}
-              accessibilityLabel="Код из SMS"
-              placeholder="0000"
-              placeholderTextColor={colors.inkMuted}
-              style={{
-                ...typography.pageTitle,
-                minHeight: 60,
-                paddingHorizontal: spacing.x4,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: colors.borderStrong,
-                backgroundColor: colors.canvas,
-                color: colors.ink,
-                letterSpacing: 8,
-                textAlign: 'center',
-                fontVariant: ['tabular-nums'],
-              }}
-            />
-            {!!debugCode && (
-              <Text selectable style={{ ...typography.caption, color: colors.warningText }}>
-                Тестовый код: {debugCode}
-              </Text>
-            )}
-            <AppButton
-              loading={authenticating && authAction === 'code'}
-              disabled={code.length !== 4}
-              onPress={() => void verifyCode()}
-            >
-              Подтвердить код
-            </AppButton>
-          </View>
-        )}
 
         {visibleAuthError && (
           <View

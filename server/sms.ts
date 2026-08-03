@@ -132,7 +132,7 @@ export async function verifyPhoneVerificationCode(
 ): Promise<PhoneVerificationResult> {
   const { response, body } = await notificoreRequest(
     `/2fa/authentications/otp/${encodeURIComponent(providerAuthenticationId)}/verify`,
-    { access_code: Number(code) },
+    { access_code: code },
   );
   const data = asRecord(body.data);
   if (response.ok && data.status === 'verified') return 'verified';

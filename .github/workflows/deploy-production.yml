@@ -135,7 +135,7 @@ jobs:
               'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
               'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
               'PHONE_CODE_TTL_MINUTES': '10',
-              'PHONE_CODE_RESEND_SECONDS': '30',
+              'PHONE_CODE_RESEND_SECONDS': '180',
               'TRUST_PROXY_HOPS': '1',
               'AUTH_ATTEMPT_RETENTION_DAYS': '30',
               'GLOBAL_RATE_LIMIT_MAX': '10000',
