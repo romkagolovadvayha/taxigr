@@ -87,7 +87,7 @@ jobs:
           SUPERADMIN_PHONES: ${{ secrets.SUPERADMIN_PHONES }}
           NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
           NOTIFICORE_BEARER_TOKEN: ${{ secrets.NOTIFICORE_BEARER_TOKEN }}
-          NOTIFICORE_ORIGINATOR: ${{ vars.NOTIFICORE_ORIGINATOR }}
+          NOTIFICORE_ORIGINATOR: ${{ vars.NOTIFICORE_ORIGINATOR || 'TaxiGr' }}
           NOTIFICORE_TEMPLATE_ID: ${{ vars.NOTIFICORE_TEMPLATE_ID }}
           MAX_BOT_USERNAME: ${{ vars.MAX_BOT_USERNAME }}
           MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
@@ -125,7 +125,7 @@ jobs:
               'NOTIFICORE_API_KEY': os.environ['NOTIFICORE_API_KEY'],
               'NOTIFICORE_BEARER_TOKEN': os.environ.get('NOTIFICORE_BEARER_TOKEN', ''),
               'NOTIFICORE_TEMPLATE_ID': os.environ.get('NOTIFICORE_TEMPLATE_ID') or '271',
-              'NOTIFICORE_ORIGINATOR': os.environ.get('NOTIFICORE_ORIGINATOR', ''),
+              'NOTIFICORE_ORIGINATOR': os.environ.get('NOTIFICORE_ORIGINATOR') or 'TaxiGr',
               'MAX_BOT_USERNAME': os.environ.get('MAX_BOT_USERNAME', ''),
               'MAX_BOT_TOKEN': os.environ.get('MAX_BOT_TOKEN', ''),
               'MAX_WEBHOOK_SECRET': os.environ.get('MAX_WEBHOOK_SECRET', ''),
