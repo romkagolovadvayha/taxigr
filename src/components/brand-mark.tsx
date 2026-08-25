@@ -5,6 +5,7 @@ import { colors, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   compact?: boolean;
+  label?: string;
   size?: number;
 };
 
@@ -42,7 +43,7 @@ export function BrandGlyph({
   );
 }
 
-export function BrandMark({ compact = false, size = 40 }: Props) {
+export function BrandMark({ compact = false, label = 'Такси Грахово', size = 40 }: Props) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
       <View
@@ -67,7 +68,7 @@ export function BrandMark({ compact = false, size = 40 }: Props) {
             letterSpacing: -0.25,
           }}
         >
-          Такси Грахово
+          {label}
         </Text>
       )}
     </View>

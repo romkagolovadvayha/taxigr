@@ -266,30 +266,34 @@ export function SignInScreen() {
         minHeight: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: isPhone ? spacing.x4 : spacing.x6,
+        paddingVertical: spacing.x10,
       }}
     >
       <View
         style={{
           width: '100%',
           maxWidth: 480,
-          gap: spacing.x3,
+          gap: spacing.x5,
           alignItems: 'center',
         }}
       >
-        <BrandMark label="Авторизация" size={isPhone ? 48 : 56} />
+        <BrandMark size={56} />
         <View
           style={{
             width: '100%',
             backgroundColor: colors.surface,
             borderRadius: radius.sheet,
             borderCurve: 'continuous',
-            padding: isPhone ? spacing.x4 : spacing.x6,
-            gap: spacing.x3,
+            padding: isPhone ? spacing.x5 : spacing.x8,
+            gap: spacing.x5,
             borderWidth: 1,
             borderColor: colors.border,
           }}
-        >
+          >
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+            Подтверждение телефона
+          </Text>
+
           <RussianPhoneInput
             value={phoneDigits}
             onChange={(value) => {
@@ -497,7 +501,7 @@ export function SignInScreen() {
                   ? cooldown > 0
                     ? `Отправить SMS снова через ${formatRetryAfter(cooldown)}`
                     : 'Отправить SMS снова'
-                  : 'Войти по SMS'}
+                  : 'У меня нет VK, MAX, Telegram'}
               </Text>
             </View>
           </AnimatedPressable>
