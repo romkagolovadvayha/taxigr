@@ -218,12 +218,30 @@ jobs:
       - name: Verify public endpoints
         shell: bash
         env:
+          MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
+          MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
+          max_subscription_payload="$(jq -cn \
+            --arg url "https://${API_DOMAIN}/v1/webhooks/max" \
+            --arg secret "$MAX_WEBHOOK_SECRET" \
+            '{url:$url, update_types:["message_callback","bot_started","message_created"], secret:$secret}')"
+          curl --fail --silent --show-error \
+            --cacert certs/russian-trusted-root-ca.pem \
+            -H "Authorization: ${MAX_BOT_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$max_subscription_payload" \
+            'https://platform-api2.max.ru/subscriptions' | jq -e '.success == true' >/dev/null
+          max_probe_response="$(curl --fail --silent --show-error \
+            -H "X-Max-Bot-Api-Secret: ${MAX_WEBHOOK_SECRET}" \
+            -H 'Content-Type: application/json' \
+            --data-binary '{"update_type":"diagnostic_probe"}' \
+            "https://${API_DOMAIN}/v1/webhooks/max")"
+          test "$(jq -r '.success' <<<"$max_probe_response")" = "true"
           callback_payload="$(jq -cn \
             --arg group_id "$VK_COMMUNITY_ID" \
             --arg secret "$VK_CALLBACK_SECRET" \

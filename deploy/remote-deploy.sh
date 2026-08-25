@@ -87,13 +87,17 @@ install_ca \
 chmod 0644 "$ca_bundle"
 
 release_path="$DEPLOY_PATH/releases/$RELEASE_ID"
-if [[ -e "$release_path" ]]; then
-  echo "Release already exists: $RELEASE_ID" >&2
+if [[ -e "$release_path" && ! -d "$release_path" ]]; then
+  echo "Release path is not a directory: $RELEASE_ID" >&2
   exit 1
 fi
 
-mkdir -m 0755 "$release_path"
-tar -xzf "$ARCHIVE" -C "$release_path"
+if [[ -d "$release_path" ]]; then
+  echo "Reusing existing release $RELEASE_ID"
+else
+  mkdir -m 0755 "$release_path"
+  tar -xzf "$ARCHIVE" -C "$release_path"
+fi
 
 test -f "$release_path/package.json"
 test -f "$release_path/server/index.ts"
