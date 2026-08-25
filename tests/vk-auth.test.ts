@@ -25,11 +25,15 @@ describe('VK ID authorization', () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       response_type: 'code',
       client_id: '123456',
+      app_id: '123456',
       redirect_uri: 'https://api.taxigr.ru/v1/auth/vk/callback',
       state: 'state-token',
       code_challenge: 'pkce-challenge',
       code_challenge_method: 's256',
       scope: 'phone',
+      prompt: 'consent',
+      sdk_type: 'vkid',
+      v: '2.6.1',
     });
   });
 

@@ -1,6 +1,10 @@
 import { config } from './config';
 import { normalizeRussianPhone } from './phone-verification';
 
+// Keep server-generated authorization links compatible with the current
+// official @vkid/sdk URL contract.
+const VK_ID_SDK_VERSION = '2.6.1';
+
 type VkTokenResponse = {
   access_token?: unknown;
   user_id?: unknown;
@@ -43,11 +47,15 @@ export function vkAuthorizationUrl(input: {
   const url = new URL('https://id.vk.ru/authorize');
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', config.VK_APP_ID);
+  url.searchParams.set('app_id', config.VK_APP_ID);
   url.searchParams.set('redirect_uri', config.VK_REDIRECT_URI);
   url.searchParams.set('state', input.state);
   url.searchParams.set('code_challenge', input.codeChallenge);
   url.searchParams.set('code_challenge_method', 's256');
   url.searchParams.set('scope', 'phone');
+  url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('sdk_type', 'vkid');
+  url.searchParams.set('v', VK_ID_SDK_VERSION);
   return url.toString();
 }
 
