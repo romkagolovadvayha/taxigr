@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Заказать такси",
+    "image": "menu-order.png",
+    "url": "https://vk.ru/wall-193790756_982"
+  },
+  {
+    "title": "Как заказать",
+    "image": "menu-how.png",
+    "url": "https://vk.ru/wall-193790756_981"
+  },
+  {
+    "title": "Тарифы",
+    "image": "menu-tariffs.png",
+    "url": "https://vk.ru/wall-193790756_980"
+  },
+  {
+    "title": "Поддержка",
+    "image": "menu-support.png",
+    "url": "https://vk.ru/im/convo/-193790756"
+  },
+  {
+    "title": "Безопасность",
+    "image": "menu-safety.png",
+    "url": "https://vk.ru/wall-193790756_977"
+  },
+  {
+    "title": "Водителям",
+    "image": "menu-drivers.png",
+    "url": "https://vk.ru/wall-193790756_978"
+  }
+]

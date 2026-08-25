@@ -20,6 +20,7 @@
     "android": {
       "package": "ru.grahovo.taxi",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFD600",
         "foregroundImage": "./assets/brand/android-foreground.png",

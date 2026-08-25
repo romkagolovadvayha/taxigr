@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1031118469596",
+    "project_id": "taxi-grahovo-play",
+    "storage_bucket": "taxi-grahovo-play.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031118469596:android:f718d51fc1faf7da98f719",
+        "android_client_info": {
+          "package_name": "ru.grahovo.taxi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzHi-zq70XLOlWuhzoxxl7LpzjSpnQHBc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
