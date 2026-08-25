@@ -984,7 +984,8 @@ export async function registerRoutes(
       );
       for (const row of rows) {
         await connection.execute(
-          `UPDATE orders SET status = 'cancelled', cancelled_at = UTC_TIMESTAMP(3),
+          `UPDATE orders SET status = 'cancelled', active_driver_id = NULL,
+            cancelled_at = UTC_TIMESTAMP(3),
             cancellation_code = 'search_timeout', cancellation_reason = ?
            WHERE id = ?`,
           ['Свободный водитель не найден за отведённое время', row.id],
@@ -3158,7 +3159,8 @@ export async function registerRoutes(
       }
 
       await connection.execute(
-        `UPDATE orders SET status = 'cancelled', cancelled_at = UTC_TIMESTAMP(3),
+        `UPDATE orders SET status = 'cancelled', active_driver_id = NULL,
+          cancelled_at = UTC_TIMESTAMP(3),
           waiting_started_at = NULL, cancellation_code = ?, cancellation_reason = ?
          WHERE id = ?`,
         [adminCancellation ? 'admin' : 'passenger', reason ?? null, id],
@@ -3775,10 +3777,10 @@ export async function registerRoutes(
       const commissionBps = driver.commission_bps ?? rules.serviceCommissionBps;
       const commissionMinor = calculateCommissionMinor(row.price_minor, commissionBps);
       await connection.execute(
-        `UPDATE orders SET driver_id = ?, vehicle_id = ?, status = 'accepted',
+        `UPDATE orders SET driver_id = ?, active_driver_id = ?, vehicle_id = ?, status = 'accepted',
           commission_minor = ?, commission_bps = ?
          WHERE id = ? AND status = 'searching'`,
-        [driver.id, driver.vehicle_id, commissionMinor, commissionBps, id],
+        [driver.id, driver.id, driver.vehicle_id, commissionMinor, commissionBps, id],
       );
       await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
       await connection.execute(
@@ -3866,7 +3868,8 @@ export async function registerRoutes(
         [id, driver.id],
       );
       await connection.execute(
-        `UPDATE orders SET driver_id = NULL, vehicle_id = NULL, status = 'searching',
+        `UPDATE orders SET driver_id = NULL, active_driver_id = NULL,
+          vehicle_id = NULL, status = 'searching',
           waiting_started_at = NULL, waiting_seconds = 0, waiting_price_minor = 0,
           price_minor = ?, commission_bps = ?, commission_minor = ?
          WHERE id = ?`,
@@ -4165,10 +4168,11 @@ export async function registerRoutes(
       }
       await connection.execute(
         `UPDATE orders SET status = ?,
+          active_driver_id = IF(? = 'completed', NULL, active_driver_id),
           completed_at = IF(? = 'completed', UTC_TIMESTAMP(3), completed_at),
           payment_confirmed_at = IF(? = 'completed', UTC_TIMESTAMP(3), payment_confirmed_at)
          WHERE id = ?`,
-        [status, status, status, id],
+        [status, status, status, status, id],
       );
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, from_status, to_status)

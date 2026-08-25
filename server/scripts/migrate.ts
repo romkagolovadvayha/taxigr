@@ -15,6 +15,9 @@ const compatiblePreviousChecksums: Readonly<Record<string, readonly string[]>> =
     // The original generated-column implementation is schema-equivalent, but some
     // production MySQL installations cannot rebuild its existing foreign keys.
     '2f6848474d1caf8ea0f7a7f023a2d09e80a0d94e576582abbe50ee09257027a7',
+    // The first portable revision used triggers, which require SUPER when binary
+    // logging is enabled. Migration 031 normalizes installations that applied it.
+    '08c521b742f309633f18768a89dbdea9fd70adad36c8b41437ab24889af080a1',
   ],
 };
 

@@ -14,28 +14,6 @@ PREPARE active_driver_column_statement FROM @active_driver_column_sql;
 EXECUTE active_driver_column_statement;
 DEALLOCATE PREPARE active_driver_column_statement;
 
-DROP TRIGGER IF EXISTS trg_orders_active_driver_insert;
-CREATE TRIGGER trg_orders_active_driver_insert
-BEFORE INSERT ON orders
-FOR EACH ROW
-SET NEW.active_driver_id = CASE
-  WHEN NEW.driver_id IS NOT NULL
-    AND NEW.status IN ('accepted', 'driver_arriving', 'driver_waiting', 'in_progress')
-  THEN NEW.driver_id
-  ELSE NULL
-END;
-
-DROP TRIGGER IF EXISTS trg_orders_active_driver_update;
-CREATE TRIGGER trg_orders_active_driver_update
-BEFORE UPDATE ON orders
-FOR EACH ROW
-SET NEW.active_driver_id = CASE
-  WHEN NEW.driver_id IS NOT NULL
-    AND NEW.status IN ('accepted', 'driver_arriving', 'driver_waiting', 'in_progress')
-  THEN NEW.driver_id
-  ELSE NULL
-END;
-
 UPDATE orders
 SET active_driver_id = CASE
   WHEN driver_id IS NOT NULL
