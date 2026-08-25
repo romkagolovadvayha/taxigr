@@ -5,6 +5,7 @@ import { processTelegramUpdate, telegramUpdateSchema } from '../server/telegram-
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   firstRow: vi.fn(),
+  answerTelegramCallback: vi.fn(),
   extractOwnTelegramPhone: vi.fn(),
   requestTelegramContact: vi.fn(),
   sendTelegramConfirmation: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('../server/db', () => ({
 }));
 
 vi.mock('../server/telegram-bot', () => ({
+  answerTelegramCallback: mocks.answerTelegramCallback,
   extractOwnTelegramPhone: mocks.extractOwnTelegramPhone,
   requestTelegramContact: mocks.requestTelegramContact,
   sendTelegramConfirmation: mocks.sendTelegramConfirmation,
@@ -61,5 +63,52 @@ describe('Telegram update processing', () => {
 
     expect(mocks.execute).toHaveBeenCalledOnce();
     expect(mocks.sendTelegramConfirmation).toHaveBeenCalledWith('42', true);
+  });
+
+  it('routes a private callback to the order action handler and answers it', async () => {
+    const onAction = vi.fn().mockResolvedValue({ text: 'Заказ принят ✅' });
+    const update = telegramUpdateSchema.parse({
+      update_id: 3,
+      callback_query: {
+        id: 'callback-1',
+        data: 'r:a:123e4567-e89b-12d3-a456-426614174000',
+        from: { id: 42 },
+        message: { chat: { id: 42, type: 'private' } },
+      },
+    });
+
+    await processTelegramUpdate(update, onAction);
+
+    expect(onAction).toHaveBeenCalledWith({
+      provider: 'telegram',
+      externalUserId: '42',
+      chatId: '42',
+      data: 'r:a:123e4567-e89b-12d3-a456-426614174000',
+    });
+    expect(mocks.answerTelegramCallback).toHaveBeenCalledWith(
+      'callback-1',
+      'Заказ принят ✅',
+      undefined,
+    );
+  });
+
+  it('always closes the callback spinner when an action fails', async () => {
+    const onAction = vi.fn().mockRejectedValue(new Error('database unavailable'));
+    const update = telegramUpdateSchema.parse({
+      callback_query: {
+        id: 'callback-2',
+        data: 'r:refresh:123e4567-e89b-12d3-a456-426614174000',
+        from: { id: 42 },
+        message: { chat: { id: 42, type: 'private' } },
+      },
+    });
+
+    await processTelegramUpdate(update, onAction);
+
+    expect(mocks.answerTelegramCallback).toHaveBeenCalledWith(
+      'callback-2',
+      expect.stringContaining('Не удалось'),
+      true,
+    );
   });
 });

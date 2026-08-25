@@ -113,7 +113,7 @@ io.on('connection', async (socket) => {
   if (session.roles.includes('admin')) void socket.join('admins');
 });
 
-await registerRoutes(app, (room, event, payload) => {
+const routeHandlers = await registerRoutes(app, (room, event, payload) => {
   io.to(room).emit(event, payload);
 });
 
@@ -241,5 +241,8 @@ process.on('uncaughtException', (error, origin) => {
 
 await app.listen({ port: config.PORT, host: config.HOST });
 if (config.TELEGRAM_UPDATE_MODE === 'polling') {
-  stopTelegramPolling = startTelegramPolling(app.log);
+  stopTelegramPolling = startTelegramPolling(
+    app.log,
+    routeHandlers.handleMessengerOrderAction,
+  );
 }

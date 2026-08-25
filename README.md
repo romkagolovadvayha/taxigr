@@ -32,17 +32,20 @@ Web откроется по адресу Expo, API слушает `http://localh
 `NOTIFICORE_TEMPLATE_ID=271`. При наличии зарегистрированного имени отправителя
 задайте `NOTIFICORE_ORIGINATOR`. Для основного входа через MAX задайте `MAX_BOT_USERNAME`,
 `MAX_BOT_TOKEN`, `MAX_WEBHOOK_SECRET` и подпишите webhook
-`https://<ваш-домен>/v1/webhooks/max` на события `bot_started` и `message_created`.
+`https://<ваш-домен>/v1/webhooks/max` на события `bot_started`,
+`message_created` и `message_callback`.
 Для входа через Telegram задайте `TELEGRAM_BOT_USERNAME`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_WEBHOOK_SECRET` и установите webhook Bot API на
-`https://<ваш-домен>/v1/webhooks/telegram` с `allowed_updates=["message"]` и тем же
+`https://<ваш-домен>/v1/webhooks/telegram` с
+`allowed_updates=["message","callback_query"]` и тем же
 `secret_token`. Операционные уведомления для администраторов отправляются тем же ботом
 в `TELEGRAM_ADMIN_CHAT_ID` (по умолчанию `-1004215180973`). Критические ошибки API,
 серверного процесса и Expo-клиента отправляются в `TELEGRAM_CRITICAL_CHAT_ID`
 (по умолчанию `-1004442605510`); Telegram-токен в клиентскую сборку не включается.
 После входа через MAX или Telegram привязанный бот также отправляет пользователю
 персональные транзакционные уведомления о поиске машины, этапах поездки, отменах и
-результатах модерации. При наличии обеих привязок сообщение доставляется в оба мессенджера.
+результатах модерации. Из чата можно управлять уже созданным заказом; сам вызов такси
+остаётся в приложении. При наличии обеих привязок сообщение доставляется в оба мессенджера.
 Все секреты хранятся только на сервере и не должны иметь префикс `EXPO_PUBLIC_`.
 
 ## Команды проверки

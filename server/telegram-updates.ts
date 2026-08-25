@@ -3,13 +3,35 @@ import { z } from 'zod';
 
 import { db, firstRow } from './db';
 import {
+  answerTelegramCallback,
   extractOwnTelegramPhone,
   requestTelegramContact,
   sendTelegramConfirmation,
   telegramStartPayload,
 } from './telegram-bot';
+import type {
+  MessengerOrderActionRequest,
+  MessengerOrderActionResult,
+} from './messenger-order-actions';
+
+export type TelegramActionHandler = (
+  request: MessengerOrderActionRequest,
+) => Promise<MessengerOrderActionResult>;
 
 export const telegramUpdateSchema = z.object({
+  callback_query: z.object({
+    id: z.string().min(1),
+    data: z.string().optional(),
+    from: z.object({
+      id: z.union([z.string(), z.number()]),
+    }).passthrough(),
+    message: z.object({
+      chat: z.object({
+        id: z.union([z.string(), z.number()]),
+        type: z.string(),
+      }).passthrough(),
+    }).passthrough().optional(),
+  }).passthrough().optional(),
   message: z.object({
     text: z.string().optional(),
     from: z.object({
@@ -31,7 +53,36 @@ export const telegramUpdateSchema = z.object({
 
 export type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
 
-export async function processTelegramUpdate(update: TelegramUpdate): Promise<void> {
+export async function processTelegramUpdate(
+  update: TelegramUpdate,
+  onAction?: TelegramActionHandler,
+): Promise<void> {
+  const callback = update.callback_query;
+  if (callback) {
+    const chat = callback.message?.chat;
+    let result: MessengerOrderActionResult = {
+      text: 'Действия в чате временно недоступны.',
+      alert: true,
+    };
+    if (chat?.type === 'private' && onAction) {
+      try {
+        result = await onAction({
+          provider: 'telegram',
+          externalUserId: String(callback.from.id),
+          chatId: String(chat.id),
+          data: callback.data,
+        });
+      } catch {
+        result = {
+          text: 'Не удалось выполнить действие. Повторите позже.',
+          alert: true,
+        };
+      }
+    }
+    await answerTelegramCallback(callback.id, result.text, result.alert);
+    return;
+  }
+
   const message = update.message;
   if (message?.chat.type !== 'private' || message.from?.id == null) return;
 

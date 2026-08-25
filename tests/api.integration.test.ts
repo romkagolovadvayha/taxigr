@@ -43,6 +43,16 @@ const fixture = {
   profileUserId: randomUUID(),
 };
 
+const integrationPhones = [
+  '+79000000001',
+  '+79000000002',
+  '+79000000003',
+  '+79000000004',
+  '+79000000005',
+  '+79000000006',
+  '+79000000007',
+];
+
 const pickup = {
   id: 'integration-pickup',
   label: 'с. Грахово, ул. Ачинцева, 5',
@@ -124,14 +134,46 @@ function socketEvent<T = unknown>(socket: Socket, event: string): Promise<T> {
 }
 
 async function cleanup(): Promise<void> {
+  const phonePlaceholders = integrationPhones.map(() => '?').join(', ');
+  await connection.execute(
+    `DELETE o FROM orders o
+     JOIN users passenger ON passenger.id = o.passenger_id
+     WHERE passenger.phone IN (${phonePlaceholders})`,
+    integrationPhones,
+  );
+  await connection.execute(
+    `DELETE application FROM driver_applications application
+     JOIN users applicant ON applicant.id = application.user_id
+     WHERE applicant.phone IN (${phonePlaceholders})`,
+    integrationPhones,
+  );
+  await connection.execute(
+    `DELETE request FROM vehicle_change_requests request
+     JOIN drivers d ON d.id = request.driver_id
+     JOIN users driver_user ON driver_user.id = d.user_id
+     WHERE driver_user.phone IN (${phonePlaceholders})`,
+    integrationPhones,
+  );
+  await connection.execute(
+    `DELETE d FROM drivers d
+     JOIN users driver_user ON driver_user.id = d.user_id
+     WHERE driver_user.phone IN (${phonePlaceholders})`,
+    integrationPhones,
+  );
+  await connection.execute(
+    `DELETE FROM users WHERE phone IN (${phonePlaceholders})`,
+    integrationPhones,
+  );
   await connection.execute(
     `DELETE FROM orders
-     WHERE passenger_id IN (?, ?, ?)
+     WHERE passenger_id IN (?, ?, ?, ?, ?)
        OR driver_id IN (?, ?)`,
     [
       fixture.passengerId,
       fixture.outsiderId,
       fixture.applicantId,
+      fixture.driverUserOneId,
+      fixture.driverUserTwoId,
       fixture.driverOneId,
       fixture.driverTwoId,
     ],
@@ -935,6 +977,25 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     );
     expect(rows[0]?.status).toBe('online');
   }, 20_000);
+
+  it('does not let a dual-role driver accept their own passenger order', async () => {
+    await setDriverStatus(driverOneToken, 'online');
+    const order = await createOrder(driverOneToken);
+    expect(order.status).toBe(201);
+
+    const accepted = await api<RideOrder>(`/v1/driver/orders/${order.data!.id}/accept`, {
+      method: 'POST',
+      token: driverOneToken,
+      body: {},
+    });
+
+    expect(accepted.status).toBe(409);
+    expect(accepted.error?.code).toBe('SELF_ACCEPT_FORBIDDEN');
+    await api(`/v1/orders/${order.data!.id}/cancel`, {
+      method: 'POST',
+      token: driverOneToken,
+    });
+  }, 15_000);
 
   it('keeps passenger and driver order scopes separate for dual-role users', async () => {
     await setDriverStatus(driverOneToken, 'online');

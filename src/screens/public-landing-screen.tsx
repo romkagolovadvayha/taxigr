@@ -1,6 +1,7 @@
 import { Link, router } from 'expo-router';
 import { Image } from 'expo-image';
 import { Text, View } from 'react-native';
+import Svg, { Circle, Defs, Path, Text as SvgText, TextPath } from 'react-native-svg';
 
 import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandGlyph, BrandMark } from '@/components/brand-mark';
@@ -45,7 +46,8 @@ function CommissionVerification({ compact }: { compact: boolean }) {
       accessible
       accessibilityLabel="Ноль процентов комиссии для пассажиров. Проверено Такси Грахово."
       style={{
-        width: '100%',
+        minHeight: sealSize,
+        position: 'relative',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -53,7 +55,13 @@ function CommissionVerification({ compact }: { compact: boolean }) {
         zIndex: 2,
       }}
     >
-      <View style={{ flexShrink: 1 }}>
+      <View
+        style={{
+          flex: 1,
+          minWidth: 0,
+          paddingRight: compact ? sealSize + spacing.x3 : 0,
+        }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <Text
             selectable
@@ -102,55 +110,76 @@ function CommissionVerification({ compact }: { compact: boolean }) {
           width: sealSize,
           height: sealSize,
           flexShrink: 0,
-          borderRadius: sealSize / 2,
-          borderWidth: 2,
-          borderStyle: 'dashed',
-          borderColor: colors.brandInk,
-          backgroundColor: colors.brand,
-          padding: compact ? 5 : 7,
+          ...(compact
+            ? {
+                position: 'absolute',
+                right: 0,
+                top: 0,
+              }
+            : {}),
           opacity: 0.78,
           transform: [{ rotate: '-9deg' }],
         }}
       >
+        <Svg width="100%" height="100%" viewBox="0 0 120 120">
+          <Defs>
+            <Path id="verification-seal-top" d="M 14 63 A 47 47 0 0 1 106 63" />
+            <Path id="verification-seal-bottom" d="M 18 73 A 45 45 0 0 0 102 73" />
+          </Defs>
+          <Circle
+            cx="60"
+            cy="60"
+            r="57"
+            fill={colors.brand}
+            stroke={colors.brandInk}
+            strokeWidth="2.4"
+            strokeDasharray="4 3"
+          />
+          <Circle
+            cx="60"
+            cy="60"
+            r="49"
+            fill="none"
+            stroke={colors.brandInk}
+            strokeWidth="1.6"
+          />
+          <SvgText
+            fill={colors.brandInk}
+            fontSize="12"
+            fontWeight="900"
+            letterSpacing="1.5"
+            textAnchor="middle"
+          >
+            <TextPath href="#verification-seal-top" startOffset="50%">
+              ПРОВЕРЕНО
+            </TextPath>
+          </SvgText>
+          <SvgText
+            fill={colors.brandInk}
+            fontSize="8.5"
+            fontWeight="800"
+            letterSpacing="1.1"
+            textAnchor="middle"
+          >
+            <TextPath href="#verification-seal-bottom" startOffset="50%">
+              ТАКСИ ГРАХОВО
+            </TextPath>
+          </SvgText>
+        </Svg>
         <View
           style={{
-            flex: 1,
-            borderRadius: sealSize / 2,
-            borderWidth: 1.5,
-            borderColor: colors.brandInk,
+            position: 'absolute',
+            inset: 0,
             alignItems: 'center',
             justifyContent: 'center',
-            gap: compact ? 0 : 2,
           }}
         >
-          <Text
-            style={{
-              color: colors.brandInk,
-              fontSize: compact ? 9 : 12,
-              lineHeight: compact ? 11 : 15,
-              fontWeight: '900',
-              letterSpacing: compact ? 0.7 : 1.2,
-            }}
-          >
-            ПРОВЕРЕНО
-          </Text>
           <AppIcon
             name="check"
-            size={compact ? 28 : 39}
+            size={compact ? 27 : 38}
             color={colors.brandInk}
             strokeWidth={compact ? 3 : 3.2}
           />
-          <Text
-            style={{
-              color: colors.brandInk,
-              fontSize: compact ? 7 : 9,
-              lineHeight: compact ? 9 : 11,
-              fontWeight: '800',
-              letterSpacing: compact ? 0.4 : 0.8,
-            }}
-          >
-            ТАКСИ ГРАХОВО
-          </Text>
         </View>
       </View>
     </View>

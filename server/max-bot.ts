@@ -13,6 +13,29 @@ type MaxApiError = {
   message?: string;
 };
 
+async function callMaxApi(path: string, body: Record<string, unknown>): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(`https://platform-api2.max.ru/${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: config.MAX_BOT_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const error = (await response.json().catch(() => ({}))) as MaxApiError;
+      throw new Error(error.message ?? error.code ?? `MAX Bot API HTTP ${response.status}`);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function normalizeMaxVcfInfo(value: string): string {
   return value.replace(/\\r\\n/gu, '\r\n');
 }
@@ -53,11 +76,19 @@ export function extractPhoneFromMaxVcf(vcfInfo: string): string | null {
 
 let maxSendQueue = Promise.resolve();
 let nextMaxSendAt = 0;
+const nextMaxSendByUser = new Map<string, number>();
 
-async function waitForMaxSendSlot(): Promise<void> {
-  const waitMs = Math.max(0, nextMaxSendAt - Date.now());
+async function waitForMaxSendSlot(userId: string): Promise<void> {
+  const now = Date.now();
+  const waitMs = Math.max(
+    0,
+    nextMaxSendAt - now,
+    (nextMaxSendByUser.get(userId) ?? 0) - now,
+  );
   if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
-  nextMaxSendAt = Date.now() + 40;
+  const sentAt = Date.now();
+  nextMaxSendAt = sentAt + 40;
+  nextMaxSendByUser.set(userId, sentAt + 500);
 }
 
 export async function sendMaxMessage(
@@ -70,7 +101,7 @@ export async function sendMaxMessage(
     releaseQueue = resolve;
   });
   await previous;
-  await waitForMaxSendSlot();
+  await waitForMaxSendSlot(userId);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -95,6 +126,34 @@ export async function sendMaxMessage(
     clearTimeout(timeout);
     releaseQueue();
   }
+}
+
+export async function sendMaxLocation(
+  userId: string,
+  location: {
+    latitude: number;
+    longitude: number;
+    title: string;
+    address: string;
+  },
+): Promise<void> {
+  await sendMaxMessage(userId, {
+    text: `📍 ${location.title}\n${location.address}`,
+    attachments: [{
+      type: 'location',
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }],
+  });
+}
+
+export async function answerMaxCallback(
+  callbackId: string,
+  notification: string,
+): Promise<void> {
+  await callMaxApi(`answers?callback_id=${encodeURIComponent(callbackId)}`, {
+    notification: notification.slice(0, 200),
+  });
 }
 
 export async function requestMaxContact(userId: string): Promise<void> {

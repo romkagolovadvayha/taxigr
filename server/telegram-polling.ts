@@ -2,7 +2,11 @@ import type { FastifyBaseLogger } from 'fastify';
 import { fetch as undiciFetch, ProxyAgent } from 'undici';
 
 import { config } from './config';
-import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
+import {
+  processTelegramUpdate,
+  telegramUpdateSchema,
+  type TelegramActionHandler,
+} from './telegram-updates';
 
 type TelegramApiResponse = {
   ok?: boolean;
@@ -19,7 +23,10 @@ function safeError(error: unknown): { name: string; message: string } {
     : { name: 'UnknownError', message: String(error) };
 }
 
-export function startTelegramPolling(logger: FastifyBaseLogger): () => Promise<void> {
+export function startTelegramPolling(
+  logger: FastifyBaseLogger,
+  onAction?: TelegramActionHandler,
+): () => Promise<void> {
   const dispatcher = config.TELEGRAM_PROXY_URL
     ? new ProxyAgent(config.TELEGRAM_PROXY_URL)
     : undefined;
@@ -66,7 +73,7 @@ export function startTelegramPolling(logger: FastifyBaseLogger): () => Promise<v
         const response = await call('getUpdates', {
           offset,
           timeout: POLL_SECONDS,
-          allowed_updates: ['message'],
+          allowed_updates: ['message', 'callback_query'],
         });
         const updates = Array.isArray(response.result) ? response.result : [];
         for (const rawUpdate of updates) {
@@ -79,7 +86,7 @@ export function startTelegramPolling(logger: FastifyBaseLogger): () => Promise<v
             offset = updateId + 1;
             continue;
           }
-          await processTelegramUpdate(parsed.data);
+          await processTelegramUpdate(parsed.data, onAction);
           offset = updateId + 1;
         }
       } catch (error) {

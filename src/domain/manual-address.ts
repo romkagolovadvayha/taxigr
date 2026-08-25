@@ -30,6 +30,16 @@ function normalizeLabel(value: string): string {
   return value.trim().replace(/\s+/g, ' ').replace(/\s*,\s*/g, ', ');
 }
 
+const anchorTokenCache = new WeakMap<Address, Set<string>>();
+
+function addressTokens(address: Address): Set<string> {
+  const cached = anchorTokenCache.get(address);
+  if (cached) return cached;
+  const indexed = new Set(tokens(`${address.label} ${address.details ?? ''}`));
+  anchorTokenCache.set(address, indexed);
+  return indexed;
+}
+
 function manualId(value: string): string {
   return `manual:${value
     .toLocaleLowerCase('ru')
@@ -37,14 +47,14 @@ function manualId(value: string): string {
     .replace(/^-|-$/g, '')}`;
 }
 
-export function findBestAddressAnchor(query: string, addresses: Address[]): Address | null {
+export function findBestAddressAnchor(query: string, addresses: readonly Address[]): Address | null {
   const queryTokens = tokens(query).filter((token) => !/^\d/iu.test(token));
   if (!queryTokens.length) return null;
 
   let best: { address: Address; score: number } | null = null;
   for (const address of addresses) {
     if (hasHouseNumber(address)) continue;
-    const haystack = new Set(tokens(`${address.label} ${address.details ?? ''}`));
+    const haystack = addressTokens(address);
     const matches = queryTokens.filter((token) => haystack.has(token)).length;
     if (!matches) continue;
     const score =

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -9,7 +9,7 @@ import { remainingRouteCoordinates } from '@/domain/route-tracking';
 import { useAppTheme } from '@/theme/theme-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-export function TaxiMap(props: TaxiMapProps) {
+export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const { colorScheme } = useAppTheme();
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
@@ -106,4 +106,4 @@ export function TaxiMap(props: TaxiMapProps) {
       androidLayerType="hardware"
     />
   );
-}
+});

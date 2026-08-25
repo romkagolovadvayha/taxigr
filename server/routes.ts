@@ -52,19 +52,25 @@ import {
   recordInitialConsents,
 } from './legal';
 import {
+  answerMaxCallback,
   extractPhoneFromMaxVcf,
   requestMaxContact,
   sendMaxConfirmation,
   verifyMaxContact,
 } from './max-bot';
 import {
+  createMessengerOrderActionHandler,
+  type MessengerOrderActionRequest,
+  type MessengerOrderActionResult,
+} from './messenger-order-actions';
+import {
   appUrl,
   notifyDriversInMessengers,
   notifyOnlineDriversInMessengers,
   notifyUsersInMessengers,
-  type PersonalMessengerNotification,
 } from './messenger-notifications';
 import { orderSelect, presentOrder, type OrderRow } from './presenters';
+import { driverRideNotification, passengerRideNotification } from './ride-messenger';
 import { findPlace, listPlaces, placeToAddress, searchPlaces } from './places';
 import {
   deviceFingerprint,
@@ -206,6 +212,13 @@ const maxUpdateSchema = z.object({
     user_id: z.union([z.string(), z.number()]),
     name: z.string().trim().max(160).nullish(),
     username: z.string().trim().max(64).nullish(),
+  }).passthrough().optional(),
+  callback: z.object({
+    callback_id: z.string().min(1),
+    payload: z.string().optional(),
+    user: z.object({
+      user_id: z.union([z.string(), z.number()]),
+    }).passthrough(),
   }).passthrough().optional(),
   message: z.object({
     sender: z.object({ user_id: z.union([z.string(), z.number()]) }).passthrough().optional(),
@@ -776,7 +789,16 @@ function requireTelegramConfiguration(): void {
   }
 }
 
-export async function registerRoutes(app: FastifyInstance, publish: EventPublisher): Promise<void> {
+export type RegisteredRouteHandlers = {
+  handleMessengerOrderAction: (
+    request: MessengerOrderActionRequest,
+  ) => Promise<MessengerOrderActionResult>;
+};
+
+export async function registerRoutes(
+  app: FastifyInstance,
+  publish: EventPublisher,
+): Promise<RegisteredRouteHandlers> {
   const lastDriverLocationAcceptedAt = new Map<string, number>();
   const lastPassengerLocationAcceptedAt = new Map<string, number>();
   const notifyAdmins = (action: AdminTelegramAction): void => {
@@ -796,6 +818,7 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       app.log.warn({ error, event }, 'personal messenger notification failed'),
     );
   };
+  const handleMessengerOrderAction = createMessengerOrderActionHandler(app);
 
   app.get(
     '/health/live',
@@ -863,6 +886,25 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       }
 
       const update = parse(maxUpdateSchema, request.body);
+      if (update.update_type === 'message_callback' && update.callback) {
+        let result: MessengerOrderActionResult;
+        try {
+          result = await handleMessengerOrderAction({
+            provider: 'max',
+            externalUserId: String(update.callback.user.user_id),
+            data: update.callback.payload,
+          });
+        } catch (error) {
+          request.log.warn({ error }, 'MAX order callback failed');
+          result = {
+            text: 'Не удалось выполнить действие. Повторите позже.',
+            alert: true,
+          };
+        }
+        await answerMaxCallback(update.callback.callback_id, result.text).catch((error) =>
+          request.log.warn({ error }, 'MAX callback answer failed'),
+        );
+      }
       if (update.update_type === 'bot_started' && update.payload && update.user?.user_id != null) {
         const userId = String(update.user.user_id);
         const chatId = update.chat_id == null ? null : String(update.chat_id);
@@ -1115,7 +1157,10 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         });
       }
 
-      await processTelegramUpdate(parse(telegramUpdateSchema, request.body));
+      await processTelegramUpdate(
+        parse(telegramUpdateSchema, request.body),
+        handleMessengerOrderAction,
+      );
 
       void reply.header('Cache-Control', 'no-store');
       return { ok: true };
@@ -2113,30 +2158,11 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         channelId: 'driver-orders-v2',
       }).catch((error) => app.log.warn({ error }, 'push notification failed'));
       notifyMessengers(
-        notifyUsersInMessengers([session.id], {
-          icon: '🔎',
-          title: 'Заказ создан',
-          body: 'Ищем свободного водителя. Сообщим, как только машина будет назначена.',
-          details: [
-            ['Маршрут', `${result.order.pickup.label} → ${result.order.destination.label}`],
-            ['Стоимость', formatMoney(result.order.priceMinor)],
-          ],
-          action: { label: 'Открыть заказ', url: appUrl(`/orders/${result.order.id}`) },
-        }),
+        notifyUsersInMessengers([session.id], passengerRideNotification(result.order)),
         'order.created.passenger',
       );
       notifyMessengers(
-        notifyOnlineDriversInMessengers({
-          icon: '🚕',
-          title: 'Новый заказ',
-          body: `${result.order.pickup.label} → ${result.order.destination.label}`,
-          details: [
-            ['Тариф', tariffLabels[result.order.tariff]],
-            ['Стоимость', formatMoney(result.order.priceMinor)],
-            ['Комментарий', result.order.comment],
-          ],
-          action: { label: 'Посмотреть заказ', url: appUrl('/driver') },
-        }),
+        notifyOnlineDriversInMessengers(driverRideNotification(result.order)),
         'order.created.drivers',
       );
       reply.code(201);
@@ -2312,16 +2338,10 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           channelId: 'driver-orders-v2',
         }).catch((error) => app.log.warn({ error }, 'push notification failed'));
         notifyMessengers(
-          notifyOnlineDriversInMessengers({
+          notifyOnlineDriversInMessengers(driverRideNotification(payload, {
             icon: '💰',
-            title: 'Стоимость заказа повышена',
-            body: `${payload.pickup.label} → ${payload.destination.label}`,
-            details: [
-              ['Новая стоимость', formatMoney(payload.priceMinor)],
-              ['Комментарий', payload.comment],
-            ],
-            action: { label: 'Посмотреть заказ', url: appUrl('/driver') },
-          }),
+            title: 'Цена повышена',
+          })),
           'order.search_price_increased.drivers',
         );
       }
@@ -2444,6 +2464,23 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
         ],
       });
+      if (participants.raterRole === 'passenger') {
+        notifyMessengers(
+          notifyDriversInMessengers([participants.driverId], driverRideNotification(payload, {
+            icon: '⭐',
+            title: `Пассажир оценил поездку на ${score}/5`,
+          })),
+          'order.rated.driver',
+        );
+      } else {
+        notifyMessengers(
+          notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
+            icon: '⭐',
+            title: `Водитель оценил поездку на ${score}/5`,
+          })),
+          'order.rated.passenger',
+        );
+      }
       return { data: payload };
     },
   );
@@ -2562,35 +2599,22 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       ],
     });
     notifyMessengers(
-      notifyUsersInMessengers([participants.passengerId], {
-        icon: '❌',
-        title: 'Заказ отменён',
+      notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
         body: participants.initiatedBy === 'passenger'
           ? 'Вы отменили заказ.'
           : 'Заказ отменён администратором.',
         details: [
-          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
           ['Статус до отмены', rideStatusLabels[participants.fromStatus]],
-          ['Ограничение заказов', participants.passengerBlocked
-            ? `на ${passengerCancellationPolicy.blockHours} ч. из-за частых отмен`
+          ['Ограничение', participants.passengerBlocked
+            ? `${passengerCancellationPolicy.blockHours} ч. из-за частых отмен`
             : null],
         ],
-        action: { label: 'Мои заказы', url: appUrl('/orders') },
-      }),
+      })),
       'order.cancelled.passenger',
     );
     if (participants.driverId) {
       notifyMessengers(
-        notifyDriversInMessengers([participants.driverId], {
-          icon: '❌',
-          title: 'Заказ отменён',
-          body: 'Пассажир или администратор отменил назначенный вам заказ.',
-          details: [
-            ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
-            ['Пассажир', payload.passenger?.name],
-          ],
-          action: { label: 'Искать новые заказы', url: appUrl('/driver') },
-        }),
+        notifyDriversInMessengers([participants.driverId], driverRideNotification(payload)),
         'order.cancelled.driver',
       );
     }
@@ -3003,6 +3027,12 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
           code: 'ORDER_ALREADY_TAKEN',
         });
       }
+      if (row.passenger_id === session.id) {
+        throw Object.assign(new Error('Нельзя принять собственный заказ'), {
+          statusCode: 409,
+          code: 'SELF_ACCEPT_FORBIDDEN',
+        });
+      }
       if (row.tariff === 'child') {
         const [eligibleRows] = await connection.query<(RowDataPacket & { has_child_seat: number })[]>(
           'SELECT has_child_seat FROM drivers WHERE id = ?',
@@ -3062,35 +3092,11 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
       channelId: 'ride-taxi-found-v2',
     }).catch((error) => app.log.warn({ error }, 'push notification failed'));
     notifyMessengers(
-      notifyUsersInMessengers([updated.passengerId], {
-        icon: '✅',
-        title: 'Машина найдена',
-        body: payload.driver
-          ? `${payload.driver.name} едет к вам на ${payload.driver.vehicle.color.toLowerCase()} ${payload.driver.vehicle.make}.`
-          : 'Водитель принял ваш заказ и скоро выедет к месту подачи.',
-        details: [
-          ['Госномер', payload.driver?.vehicle.plate],
-          ['Телефон водителя', payload.driver?.phone],
-          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
-        ],
-        action: { label: 'Следить за поездкой', url: appUrl(`/orders/${id}`) },
-      }),
+      notifyUsersInMessengers([updated.passengerId], passengerRideNotification(payload)),
       'order.accepted.passenger',
     );
     notifyMessengers(
-      notifyUsersInMessengers([session.id], {
-        icon: '✅',
-        title: 'Заказ принят',
-        body: `Подача: ${payload.pickup.label}`,
-        details: [
-          ['Куда', payload.destination.label],
-          ['Пассажир', payload.passenger?.name],
-          ['Телефон пассажира', payload.passenger?.phone],
-          ['Стоимость', formatMoney(payload.priceMinor)],
-          ['Комментарий', payload.comment],
-        ],
-        action: { label: 'Открыть поездку', url: appUrl('/driver') },
-      }),
+      notifyDriversInMessengers([updated.driverId], driverRideNotification(payload)),
       'order.accepted.driver',
     );
     return { data: payload };
@@ -3153,17 +3159,19 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         ],
       });
       notifyMessengers(
-        notifyUsersInMessengers([participants.passengerId], {
+        notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
           icon: '⏱️',
-          title: 'Включено платное ожидание',
-          body: 'Водитель включил счётчик ожидания во время поездки.',
-          details: [
-            ['Бесплатно', `${payload.waitingFreeMinutes ?? 0} мин.`],
-            ['Далее', `${formatMoney(payload.waitingPerMinuteMinor ?? 0)} / мин.`],
-          ],
-          action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
-        }),
+          title: 'Платное ожидание включено',
+          body: `Бесплатно ${payload.waitingFreeMinutes ?? 0} мин., затем ${formatMoney(payload.waitingPerMinuteMinor ?? 0)}/мин.`,
+        })),
         'waiting.started.passenger',
+      );
+      notifyMessengers(
+        notifyDriversInMessengers([participants.driverId], driverRideNotification(payload, {
+          icon: '⏱️',
+          title: 'Ожидание включено',
+        })),
+        'waiting.started.driver',
       );
     }
     return { data: payload };
@@ -3217,18 +3225,20 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         ],
       });
       notifyMessengers(
-        notifyUsersInMessengers([participants.passengerId], {
+        notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
           icon: '⏹️',
-          title: 'Платное ожидание завершено',
-          body: 'Счётчик ожидания остановлен, стоимость заказа обновлена.',
-          details: [
-            ['Ожидание', `${Math.ceil(participants.settled.waitingSeconds / 60)} мин.`],
-            ['Начислено', formatMoney(participants.settled.waitingPriceMinor)],
-            ['Итого', formatMoney(participants.settled.priceMinor)],
-          ],
-          action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
-        }),
+          title: 'Ожидание завершено',
+          body: `${Math.ceil(participants.settled.waitingSeconds / 60)} мин. · +${formatMoney(participants.settled.waitingPriceMinor)}`,
+        })),
         'waiting.stopped.passenger',
+      );
+      notifyMessengers(
+        notifyDriversInMessengers([participants.driverId], driverRideNotification(payload, {
+          icon: '⏹️',
+          title: 'Ожидание остановлено',
+          body: `+${formatMoney(participants.settled.waitingPriceMinor)} · итого ${formatMoney(participants.settled.priceMinor)}`,
+        })),
+        'waiting.stopped.driver',
       );
     }
     return { data: payload };
@@ -3345,70 +3355,14 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
         app.log.warn({ error }, 'push notification failed'),
       );
     }
-    const passengerMessengerNotification: Omit<PersonalMessengerNotification, 'action'> = ({
-      driver_arriving: {
-        icon: '🚗',
-        title: 'Водитель выехал к вам',
-        body: 'Машина направляется к месту подачи.',
-        details: [
-          ['Машина', payload.driver
-            ? `${payload.driver.vehicle.color} ${payload.driver.vehicle.make}`
-            : null],
-          ['Госномер', payload.driver?.vehicle.plate],
-        ],
-      },
-      driver_waiting: {
-        icon: '📍',
-        title: 'Машина приехала',
-        body: 'Водитель ожидает вас в месте подачи.',
-        details: [
-          ['Место подачи', payload.pickup.label],
-          ['Госномер', payload.driver?.vehicle.plate],
-          ['Телефон водителя', payload.driver?.phone],
-        ],
-      },
-      in_progress: {
-        icon: '▶️',
-        title: 'Поездка началась',
-        body: `Направляемся в ${payload.destination.label}.`,
-        details: [['Стоимость', formatMoney(payload.priceMinor)]],
-      },
-      completed: {
-        icon: '🏁',
-        title: 'Поездка завершена',
-        body: 'Спасибо, что выбрали Такси Грахово!',
-        details: [
-          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
-          ['Итого', formatMoney(payload.priceMinor)],
-          ['В том числе ожидание', payload.waitingPriceMinor
-            ? formatMoney(payload.waitingPriceMinor)
-            : null],
-        ],
-      },
-    } satisfies Record<typeof status, Omit<PersonalMessengerNotification, 'action'>>)[status];
     notifyMessengers(
-      notifyUsersInMessengers([row.passenger_id], {
-        ...passengerMessengerNotification,
-        action: { label: 'Открыть поездку', url: appUrl(`/orders/${id}`) },
-      }),
+      notifyUsersInMessengers([row.passenger_id], passengerRideNotification(payload)),
       `order.${status}.passenger`,
     );
-    if (status === 'completed') {
-      notifyMessengers(
-        notifyUsersInMessengers([session.id], {
-          icon: '🏁',
-          title: 'Заказ завершён',
-          body: `${payload.pickup.label} → ${payload.destination.label}`,
-          details: [
-            ['Стоимость', formatMoney(payload.priceMinor)],
-            ['Комиссия', formatMoney(payload.serviceCommissionMinor)],
-            ['Ваш доход', formatMoney(payload.priceMinor - payload.serviceCommissionMinor)],
-          ],
-          action: { label: 'Открыть поездки', url: appUrl('/driver/trips') },
-        }),
-        'order.completed.driver',
-      );
-    }
+    notifyMessengers(
+      notifyDriversInMessengers([driver.id], driverRideNotification(payload)),
+      `order.${status}.driver`,
+    );
     return { data: payload };
   });
 
@@ -4402,4 +4356,6 @@ export async function registerRoutes(app: FastifyInstance, publish: EventPublish
     publish('admins', 'tariffs:updated', input);
     return { data: { currency: 'RUB', ...input } };
   });
+
+  return { handleMessengerOrderAction };
 }

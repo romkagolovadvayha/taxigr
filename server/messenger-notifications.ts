@@ -1,15 +1,38 @@
 import type { RowDataPacket } from 'mysql2/promise';
 
 import { config } from './config';
-import { db } from './db';
-import { sendMaxMessage } from './max-bot';
-import { sendTelegramMessage } from './telegram-bot';
+import { db, firstRow } from './db';
+import { sendMaxLocation, sendMaxMessage } from './max-bot';
+import { sendTelegramMessage, sendTelegramVenue } from './telegram-bot';
+
+export type MessengerButton =
+  | {
+      type: 'callback';
+      label: string;
+      data: string;
+      intent?: 'default' | 'positive' | 'negative';
+    }
+  | {
+      type: 'link';
+      label: string;
+      url: string;
+      intent?: 'default' | 'positive' | 'negative';
+    };
+
+export type MessengerLocation = {
+  title: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+};
 
 export type PersonalMessengerNotification = {
   icon?: string;
   title: string;
   body: string;
   details?: ReadonlyArray<readonly [label: string, value: unknown]>;
+  buttons?: ReadonlyArray<ReadonlyArray<MessengerButton>>;
+  locations?: ReadonlyArray<MessengerLocation>;
   action?: {
     label: string;
     url: string;
@@ -52,25 +75,47 @@ async function deliver(
   notification: PersonalMessengerNotification,
 ): Promise<void> {
   const text = formatPersonalMessengerNotification(notification);
+  const buttonRows: ReadonlyArray<ReadonlyArray<MessengerButton>> = [
+    ...(notification.buttons ?? []),
+    ...(notification.action
+      ? [[{
+          type: 'link' as const,
+          label: notification.action.label,
+          url: notification.action.url,
+        }]]
+      : []),
+  ];
   if (account.provider === 'max') {
     if (!config.MAX_BOT_TOKEN) return;
     await sendMaxMessage(account.external_user_id, {
       text,
-      ...(notification.action
+      ...(buttonRows.length
         ? {
             attachments: [{
               type: 'inline_keyboard',
               payload: {
-                buttons: [[{
-                  type: 'link',
-                  text: notification.action.label,
-                  url: notification.action.url,
-                }]],
+                buttons: buttonRows.map((row) => row.map((button) =>
+                  button.type === 'callback'
+                    ? {
+                        type: 'callback',
+                        text: button.label,
+                        payload: button.data,
+                        intent: button.intent ?? 'default',
+                      }
+                    : {
+                        type: 'link',
+                        text: button.label,
+                        url: button.url,
+                      },
+                )),
               },
             }],
           }
         : {}),
     });
+    for (const location of notification.locations ?? []) {
+      await sendMaxLocation(account.external_user_id, location);
+    }
     return;
   }
 
@@ -78,17 +123,44 @@ async function deliver(
   await sendTelegramMessage(account.chat_id, {
     text,
     disable_web_page_preview: true,
-    ...(notification.action
+    ...(buttonRows.length
       ? {
           reply_markup: {
-            inline_keyboard: [[{
-              text: notification.action.label,
-              url: notification.action.url,
-            }]],
+            inline_keyboard: buttonRows.map((row) => row.map((button) => ({
+              text: button.label,
+              style:
+                button.intent === 'positive'
+                  ? 'success'
+                  : button.intent === 'negative'
+                    ? 'danger'
+                    : 'primary',
+              ...(button.type === 'callback'
+                ? { callback_data: button.data }
+                : { url: button.url }),
+            }))),
           },
         }
       : {}),
   });
+  for (const location of notification.locations ?? []) {
+    await sendTelegramVenue(account.chat_id, location);
+  }
+}
+
+export async function notifyMessengerAccount(
+  provider: 'max' | 'telegram',
+  externalUserId: string,
+  notification: PersonalMessengerNotification,
+): Promise<void> {
+  const account = await firstRow<MessengerAccountRow>(
+    `SELECT provider, external_user_id, chat_id
+     FROM user_messenger_accounts
+     WHERE provider = ? AND external_user_id = ?
+       AND active = TRUE AND bot_contact_available = TRUE
+     LIMIT 1`,
+    [provider, externalUserId],
+  );
+  if (account) await deliver(account, notification);
 }
 
 export async function notifyUsersInMessengers(

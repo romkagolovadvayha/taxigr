@@ -26,6 +26,10 @@ function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
   const [dismissedOfferKey, setDismissedOfferKey] = useState<string | null>(null);
   const intervalMinutes = ride.searchPriceIncreaseIntervalMinutes ?? 4;
   const increaseMinor = ride.searchPriceIncreaseStepMinor ?? SEARCH_PRICE_INCREASE_MINOR;
+  const [closingOffer, setClosingOffer] = useState<{
+    priceMinor: number;
+    increaseMinor: number;
+  } | null>(null);
   const offerSlot = searchPriceIncreaseOfferSlot(ride, now);
   const offerKey = offerSlot == null ? null : `${ride.id}:${offerSlot}`;
 
@@ -58,16 +62,25 @@ function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
   }, [ride.driverId, ride.status]);
 
   const visible = offerKey != null && dismissedOfferKey !== offerKey;
-  const increasedPriceMinor = ride.priceMinor + increaseMinor;
+  // React Native keeps modal children mounted during fade-out. Preserve the offer that the
+  // passenger just confirmed so the next price step cannot flash before the modal disappears.
+  const displayedOffer = visible || !closingOffer
+    ? { priceMinor: ride.priceMinor, increaseMinor }
+    : closingOffer;
+  const increasedPriceMinor = displayedOffer.priceMinor + displayedOffer.increaseMinor;
   const dismiss = () => {
     if (offerKey) setDismissedOfferKey(offerKey);
+  };
+  const confirm = () => {
+    setClosingOffer({ priceMinor: ride.priceMinor, increaseMinor });
+    void onConfirm();
   };
 
   return (
     <AppModal
       visible={visible}
       title="Водитель пока не найден"
-      description={`Повысить стоимость на ${formatMoney(increaseMinor)}? Новая цена сразу появится у свободных водителей.`}
+      description={`Повысить стоимость на ${formatMoney(displayedOffer.increaseMinor)}? Новая цена сразу появится у свободных водителей.`}
       onClose={dismiss}
     >
       <View
@@ -82,7 +95,7 @@ function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
           backgroundColor: colors.warningSoft,
         }}
       >
-        <MoneyValue valueMinor={ride.priceMinor} compact color={colors.inkSecondary} />
+        <MoneyValue valueMinor={displayedOffer.priceMinor} compact color={colors.inkSecondary} />
         <Text selectable style={{ ...typography.bodyStrong, color: colors.warningText }}>
           →
         </Text>
@@ -91,7 +104,7 @@ function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
       <AppButton
         loading={busy}
         accessibilityLabel={`Подтвердить повышение стоимости до ${formatMoney(increasedPriceMinor)}`}
-        onPress={() => void onConfirm()}
+        onPress={confirm}
       >
         Повысить до {formatMoney(increasedPriceMinor)}
       </AppButton>

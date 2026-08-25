@@ -3,9 +3,10 @@ import { fetch as undiciFetch, ProxyAgent } from 'undici';
 import { config } from './config';
 import { normalizeRussianPhone } from './phone-verification';
 
-type TelegramApiResponse = {
+type TelegramApiResponse<T = unknown> = {
   ok?: boolean;
   description?: string;
+  result?: T;
 };
 
 type TelegramContact = {
@@ -17,33 +18,71 @@ const telegramProxyAgent = config.TELEGRAM_PROXY_URL
   ? new ProxyAgent(config.TELEGRAM_PROXY_URL)
   : undefined;
 
-export async function sendTelegramMessage(
-  chatId: string,
+async function callTelegramApi<T>(
+  method: string,
   body: Record<string, unknown>,
-): Promise<void> {
+): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const response = await undiciFetch(
-      `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/${method}`,
       {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ chat_id: chatId, ...body }),
+        body: JSON.stringify(body),
         signal: controller.signal,
         dispatcher: telegramProxyAgent,
       },
     );
-    const result = (await response.json().catch(() => ({}))) as TelegramApiResponse;
+    const result = (await response.json().catch(() => ({}))) as TelegramApiResponse<T>;
     if (!response.ok || result.ok !== true) {
       throw new Error(result.description ?? `Telegram Bot API HTTP ${response.status}`);
     }
+    return result.result as T;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function sendTelegramMessage(
+  chatId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  await callTelegramApi('sendMessage', { chat_id: chatId, ...body });
+}
+
+export async function sendTelegramVenue(
+  chatId: string,
+  location: {
+    latitude: number;
+    longitude: number;
+    title: string;
+    address: string;
+  },
+): Promise<void> {
+  await callTelegramApi('sendVenue', {
+    chat_id: chatId,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    title: location.title.slice(0, 256),
+    address: location.address.slice(0, 256),
+  });
+}
+
+export async function answerTelegramCallback(
+  callbackQueryId: string,
+  text: string,
+  showAlert = false,
+): Promise<void> {
+  await callTelegramApi('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    text: text.slice(0, 200),
+    show_alert: showAlert,
+  });
 }
 
 export function telegramStartPayload(text: unknown): string | null {

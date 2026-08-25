@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
@@ -13,7 +13,11 @@ import { StatusChip } from '@/components/ui/status-chip';
 import { demoAddresses } from '@/data/demo';
 import { grahovoDirectoryAddresses } from '@/data/grahovo-address-directory';
 import type { DestinationHistoryItem } from '@/domain/address-history';
-import { addressSearchScore } from '@/domain/address-search';
+import {
+  addressSearchScore,
+  rankAddressSearchResults,
+  uniqueAddressesByLabel,
+} from '@/domain/address-search';
 import {
   extractHouseNumber,
   extractQueryHouseNumber,
@@ -26,7 +30,7 @@ import type { Address } from '@/domain/models';
 import { getPlaceOpenStatus, placeCategoryLabels } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
 
 function addressKey(address: Address): string {
   return `${address.placeId ?? address.label.toLocaleLowerCase('ru')}:${address.houseNumber?.toLocaleLowerCase('ru') ?? 'place'}:${address.coordinates.latitude.toFixed(5)}:${address.coordinates.longitude.toFixed(5)}`;
@@ -46,14 +50,11 @@ function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
   });
 }
 
-const localAddressDirectory = [
+const localAddressDirectory = uniqueAddressesByLabel([
   ...demoAddresses,
   ...grahovoDirectoryAddresses,
   ...buildStreetSuggestions(grahovoDirectoryAddresses),
-].filter((address, index, addresses) => {
-  const label = address.label.toLocaleLowerCase('ru');
-  return addresses.findIndex((candidate) => candidate.label.toLocaleLowerCase('ru') === label) === index;
-});
+]);
 
 function searchTokens(value: string): string[] {
   return value
@@ -63,6 +64,20 @@ function searchTokens(value: string): string[] {
     .split(' ')
     .filter((token) => token.length > 1);
 }
+
+function collectKnownStreetTokens(addresses: readonly Address[]): Set<string> {
+  const result = new Set<string>();
+  for (const address of addresses) {
+    if (!address.details?.includes('улица') || hasHouseNumber(address)) continue;
+    const streetPart = address.label.split(',').at(-1) ?? address.label;
+    for (const token of searchTokens(streetPart)) {
+      if (!['ул', 'улица', 'пер', 'переулок'].includes(token)) result.add(token);
+    }
+  }
+  return result;
+}
+
+const knownStreetTokens = collectKnownStreetTokens(localAddressDirectory);
 
 function relativeDate(value: string): string {
   const date = new Date(value);
@@ -274,16 +289,18 @@ export function AddressSearchScreen() {
   const inputRef = useRef<TextInput>(null);
   const { token } = useSession();
   const { setPickup, setDestination, destinationHistory } = useRide();
+
+  useFocusEffect(
+    useCallback(() => {
+      const focusTimer = setTimeout(() => inputRef.current?.focus(), motion.duration.pressIn);
+      return () => clearTimeout(focusTimer);
+    }, []),
+  );
+
   const normalizedQuery = query.trim().toLocaleLowerCase('ru');
   const localResults = useMemo(() => {
     if (!normalizedQuery) return mergeAddresses(buildStreetSuggestions(demoAddresses), demoAddresses);
-    return localAddressDirectory
-      .filter((address) => matchesAddress(address, normalizedQuery))
-      .sort(
-        (left, right) =>
-          addressSearchScore(right, normalizedQuery) - addressSearchScore(left, normalizedQuery),
-      )
-      .slice(0, 120);
+    return rankAddressSearchResults(localAddressDirectory, normalizedQuery);
   }, [normalizedQuery]);
   const matchingHistory = useMemo(
     () =>
@@ -302,14 +319,7 @@ export function AddressSearchScreen() {
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
   const baseResults = canSearchRemote && edited && remoteResults.length ? remoteResults : localResults;
   const queryTokens = searchTokens(query);
-  const queryMatchesKnownStreetName = localAddressDirectory.some((address) => {
-    if (hasHouseNumber(address) || !address.details?.includes('улица')) return false;
-    const streetPart = address.label.split(',').at(-1) ?? address.label;
-    const streetTokens = searchTokens(streetPart).filter(
-      (token) => !['ул', 'улица', 'пер', 'переулок'].includes(token),
-    );
-    return queryTokens.some((token) => streetTokens.includes(token));
-  });
+  const queryMatchesKnownStreetName = queryTokens.some((token) => knownStreetTokens.has(token));
   const showHouseSuggestions =
     !!selectedStreet || queryHasHouseNumber(query) || queryMatchesKnownStreetName;
   const results = mergeAddresses(
@@ -329,12 +339,19 @@ export function AddressSearchScreen() {
         extractHouseNumber(address)?.toLocaleLowerCase('ru') ===
         requestedHouseNumber.toLocaleLowerCase('ru'),
     );
+  const manualAnchorDirectory = useMemo(
+    () =>
+      remoteResults.length
+        ? mergeAddresses(remoteResults, localAddressDirectory)
+        : localAddressDirectory,
+    [remoteResults],
+  );
   const manualAnchor = useMemo(
     () =>
       selectedStreet ??
-      findBestAddressAnchor(query, mergeAddresses(remoteResults, localAddressDirectory)) ??
+      findBestAddressAnchor(query, manualAnchorDirectory) ??
       demoAddresses[0]!,
-    [query, remoteResults, selectedStreet],
+    [manualAnchorDirectory, query, selectedStreet],
   );
   const manualAddress = hasExactHouseResult ? null : buildManualAddress(query, manualAnchor);
 
@@ -443,7 +460,6 @@ export function AddressSearchScreen() {
         <AppIcon name="location" color={colors.inkSecondary} />
         <TextInput
           ref={inputRef}
-          autoFocus
           value={query}
           onChangeText={(value) => {
             searchRequestId.current += 1;

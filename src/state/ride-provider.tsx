@@ -314,6 +314,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       return () => clearTimeout(idleTimer);
     }
     let active = true;
+    const controller = new AbortController();
     const loadingTimer = setTimeout(() => {
       if (!active) return;
       setQuoteStatus('loading');
@@ -325,6 +326,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         token: demoSession ? undefined : token,
         body: JSON.stringify({ pickup, destination }),
+        signal: controller.signal,
       })
         .then((response) => {
           if (!active) return;
@@ -348,6 +350,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }, 250);
     return () => {
       active = false;
+      controller.abort();
       clearTimeout(loadingTimer);
       clearTimeout(timer);
     };
