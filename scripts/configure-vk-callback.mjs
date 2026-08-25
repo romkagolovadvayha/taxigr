@@ -46,13 +46,18 @@ if (existing) {
   });
   console.log(`Updated VK Callback API server ${serverId}.`);
 } else {
-  serverId = await vk('groups.addCallbackServer', {
+  const added = await vk('groups.addCallbackServer', {
     group_id: groupId,
     url: callbackUrl,
     title,
     secret_key: secret,
   });
+  serverId = typeof added === 'object' && added !== null ? added.server_id : added;
   console.log(`Added VK Callback API server ${serverId}.`);
+}
+
+if (!Number.isInteger(Number(serverId))) {
+  throw new Error('VK Callback API did not return a valid server_id.');
 }
 
 await vk('groups.setCallbackSettings', {
