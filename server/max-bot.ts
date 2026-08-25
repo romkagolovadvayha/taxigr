@@ -14,11 +14,11 @@ type MaxApiError = {
   success?: boolean;
 };
 
-async function callMaxApi(
+async function callMaxApi<T = unknown>(
   path: string,
   body: Record<string, unknown> | undefined,
-  method: 'POST' | 'PUT' | 'DELETE' = 'POST',
-): Promise<void> {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'POST',
+): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -32,13 +32,32 @@ async function callMaxApi(
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    const result = (await response.json().catch(() => ({}))) as MaxApiError;
+    const result = (await response.json().catch(() => ({}))) as MaxApiError & T;
     if (!response.ok || result.success === false) {
       throw new Error(result.message ?? result.code ?? `MAX Bot API HTTP ${response.status}`);
     }
+    return result;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function getMaxDialogProfilePhotoUrl(
+  chatId: string,
+  userId: string,
+): Promise<string | null> {
+  const chat = await callMaxApi<{
+    type?: unknown;
+    dialog_with_user?: {
+      user_id?: unknown;
+      avatar_url?: unknown;
+      full_avatar_url?: unknown;
+    } | null;
+  }>(`chats/${encodeURIComponent(chatId)}`, undefined, 'GET');
+  const profile = chat.type === 'dialog' ? chat.dialog_with_user : null;
+  if (!profile || String(profile.user_id ?? '') !== userId) return null;
+  if (typeof profile.full_avatar_url === 'string') return profile.full_avatar_url;
+  return typeof profile.avatar_url === 'string' ? profile.avatar_url : null;
 }
 
 export function normalizeMaxVcfInfo(value: string): string {

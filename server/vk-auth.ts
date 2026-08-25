@@ -29,6 +29,7 @@ type VkUserInfoResponse = {
     phone?: unknown;
     first_name?: unknown;
     last_name?: unknown;
+    avatar?: unknown;
   };
   error?: unknown;
   error_description?: unknown;
@@ -39,6 +40,7 @@ export type VkIdentity = {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
+  avatarUrl: string | null;
 };
 
 function vkError(payload: { error?: unknown; error_description?: unknown }, fallback: string): Error {
@@ -135,6 +137,7 @@ export async function exchangeVkAuthorizationCode(input: {
         : null,
       firstName: typeof result.user?.first_name === 'string' ? result.user.first_name : null,
       lastName: typeof result.user?.last_name === 'string' ? result.user.last_name : null,
+      avatarUrl: typeof result.user?.avatar === 'string' ? result.user.avatar : null,
     };
   } finally {
     clearTimeout(infoTimeout);

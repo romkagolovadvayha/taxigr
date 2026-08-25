@@ -1,14 +1,16 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   extractPhoneFromMaxVcf,
+  getMaxDialogProfilePhotoUrl,
   maxContactHash,
   normalizeMaxVcfInfo,
   verifyMaxContact,
 } from '../server/max-bot';
 
 describe('MAX phone confirmation', () => {
+  afterEach(() => vi.unstubAllGlobals());
   const token = 'max-bot-token';
   const vcf = [
     'BEGIN:VCARD',
@@ -38,5 +40,19 @@ describe('MAX phone confirmation', () => {
     expect(extractPhoneFromMaxVcf(vcf)).toBe('+79123456789');
     expect(extractPhoneFromMaxVcf(vcf.replace('79123456789', '+7 (912) 345-67-89')))
       .toBe('+79123456789');
+  });
+
+  it('reads the user avatar from a private dialog', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      type: 'dialog',
+      dialog_with_user: {
+        user_id: 42,
+        avatar_url: 'https://cdn.max.ru/small.jpg',
+        full_avatar_url: 'https://cdn.max.ru/full.jpg',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    await expect(getMaxDialogProfilePhotoUrl('100', '42'))
+      .resolves.toBe('https://cdn.max.ru/full.jpg');
   });
 });

@@ -78,6 +78,27 @@ export async function deleteTelegramMessage(chatId: string, messageId: string): 
   });
 }
 
+export async function getTelegramProfilePhotoUrl(userId: string): Promise<string | null> {
+  const result = await callTelegramApi<{
+    total_count?: number;
+    photos?: { file_id?: string; width?: number; height?: number }[][];
+  }>('getUserProfilePhotos', { user_id: userId, offset: 0, limit: 1 });
+  const sizes = result.photos?.[0] ?? [];
+  const largest = [...sizes]
+    .filter((photo): photo is { file_id: string; width?: number; height?: number } =>
+      typeof photo.file_id === 'string',
+    )
+    .sort((left, right) =>
+      (right.width ?? 0) * (right.height ?? 0) - (left.width ?? 0) * (left.height ?? 0),
+    )[0];
+  if (!largest) return null;
+  const file = await callTelegramApi<{ file_path?: unknown }>('getFile', {
+    file_id: largest.file_id,
+  });
+  if (typeof file.file_path !== 'string' || !file.file_path) return null;
+  return `https://api.telegram.org/file/bot${config.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+}
+
 export async function sendTelegramVenue(
   chatId: string,
   location: {

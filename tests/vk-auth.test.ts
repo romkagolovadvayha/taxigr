@@ -58,6 +58,7 @@ describe('VK ID authorization', () => {
           phone: '8 (912) 345-67-89',
           first_name: 'Иван',
           last_name: 'Иванов',
+          avatar: 'https://sun.example.userapi.com/avatar.jpg',
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
@@ -72,6 +73,7 @@ describe('VK ID authorization', () => {
       phone: '+79123456789',
       firstName: 'Иван',
       lastName: 'Иванов',
+      avatarUrl: 'https://sun.example.userapi.com/avatar.jpg',
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

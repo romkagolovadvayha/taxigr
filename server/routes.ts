@@ -55,6 +55,7 @@ import {
 import {
   answerMaxCallback,
   extractPhoneFromMaxVcf,
+  getMaxDialogProfilePhotoUrl,
   requestMaxContact,
   sendMaxConfirmation,
   verifyMaxContact,
@@ -110,6 +111,11 @@ import {
   type AuthUser,
 } from './security';
 import { sendPhoneVerificationCode, verifyPhoneVerificationCode } from './sms';
+import {
+  syncUserAvatarFromRemoteUrlIfEmpty,
+  userHasNoAvatar,
+} from './social-avatar';
+import { getTelegramProfilePhotoUrl } from './telegram-bot';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
 import {
   exchangeVkAuthorizationCode,
@@ -256,6 +262,8 @@ const maxUpdateSchema = z.object({
     user_id: z.union([z.string(), z.number()]),
     name: z.string().trim().max(160).nullish(),
     username: z.string().trim().max(64).nullish(),
+    avatar_url: z.string().url().max(2_000).nullish(),
+    full_avatar_url: z.string().url().max(2_000).nullish(),
   }).passthrough().optional(),
   callback: z.object({
     callback_id: z.string().min(1),
@@ -1185,13 +1193,14 @@ export async function registerRoutes(
       await db.execute(
         `UPDATE vk_auth_challenges
          SET verified_phone = ?, vk_user_id = ?, vk_first_name = ?, vk_last_name = ?,
-           failure_code = ?, verified_at = IF(?, UTC_TIMESTAMP(3), NULL)
+           vk_avatar_url = ?, failure_code = ?, verified_at = IF(?, UTC_TIMESTAMP(3), NULL)
          WHERE id = ? AND verified_at IS NULL`,
         [
           vkIdentity.phone,
           vkIdentity.userId,
           vkIdentity.firstName,
           vkIdentity.lastName,
+          vkIdentity.avatarUrl,
           matches ? null : vkIdentity.phone ? 'PHONE_MISMATCH' : 'PHONE_NOT_SHARED',
           matches,
           challenge.id,
@@ -1260,11 +1269,12 @@ export async function registerRoutes(
           vk_user_id: string | null;
           vk_first_name: string | null;
           vk_last_name: string | null;
+          vk_avatar_url: string | null;
         })[]
       >(
         `SELECT exchange_secret_hash, expected_phone, verified_phone, failure_code,
            legal_acceptance, consent_ip, consent_user_agent, expires_at,
-           vk_user_id, vk_first_name, vk_last_name
+           vk_user_id, vk_first_name, vk_last_name, vk_avatar_url
          FROM vk_auth_challenges WHERE id = ? FOR UPDATE`,
         [input.challengeId],
       );
@@ -1309,10 +1319,13 @@ export async function registerRoutes(
         'UPDATE vk_auth_challenges SET completed_at = UTC_TIMESTAMP(3) WHERE id = ?',
         [input.challengeId],
       );
-      return { status: 'verified' as const, userId };
+      return { status: 'verified' as const, userId, avatarUrl: challenge.vk_avatar_url };
     });
 
     if (result.status !== 'verified') return { data: result };
+    await syncUserAvatarFromRemoteUrlIfEmpty(result.userId, result.avatarUrl).catch((error) =>
+      request.log.warn({ error }, 'VK profile avatar sync failed'),
+    );
     const user = await findUserWithRoles(result.userId);
     if (!user) {
       throw Object.assign(new Error('Пользователь не найден'), {
@@ -1466,13 +1479,14 @@ export async function registerRoutes(
         const chatId = update.chat_id == null ? null : String(update.chat_id);
         const [result] = await db.execute<import('mysql2/promise').ResultSetHeader>(
           `UPDATE max_auth_challenges
-           SET max_user_id = ?, max_chat_id = ?, max_username = ?,
+           SET max_user_id = ?, max_chat_id = ?, max_avatar_url = ?, max_username = ?,
              max_display_name = ?, failure_code = NULL
            WHERE payload_token = ? AND expires_at > UTC_TIMESTAMP(3)
              AND verified_at IS NULL`,
           [
             userId,
             chatId,
+            update.user.full_avatar_url ?? update.user.avatar_url ?? null,
             update.user.username ?? null,
             update.user.name ?? null,
             update.payload,
@@ -1627,11 +1641,12 @@ export async function registerRoutes(
           max_chat_id: string | null;
           max_username: string | null;
           max_display_name: string | null;
+          max_avatar_url: string | null;
         })[]
       >(
         `SELECT exchange_secret_hash, expected_phone, verified_phone, failure_code,
            legal_acceptance, consent_ip, consent_user_agent, expires_at,
-           max_user_id, max_chat_id, max_username, max_display_name
+           max_user_id, max_chat_id, max_username, max_display_name, max_avatar_url
          FROM max_auth_challenges WHERE id = ? FOR UPDATE`,
         [input.challengeId],
       );
@@ -1678,10 +1693,30 @@ export async function registerRoutes(
         'UPDATE max_auth_challenges SET completed_at = UTC_TIMESTAMP(3) WHERE id = ?',
         [input.challengeId],
       );
-      return { status: 'verified' as const, userId };
+      return {
+        status: 'verified' as const,
+        userId,
+        avatarUrl: challenge.max_avatar_url,
+        maxChatId: challenge.max_chat_id,
+        maxUserId: challenge.max_user_id,
+      };
     });
 
     if (result.status !== 'verified') return { data: result };
+    try {
+      let avatarUrl = result.avatarUrl;
+      if (
+        !avatarUrl &&
+        result.maxChatId &&
+        result.maxUserId &&
+        await userHasNoAvatar(result.userId)
+      ) {
+        avatarUrl = await getMaxDialogProfilePhotoUrl(result.maxChatId, result.maxUserId);
+      }
+      await syncUserAvatarFromRemoteUrlIfEmpty(result.userId, avatarUrl);
+    } catch (error) {
+      request.log.warn({ error }, 'MAX profile avatar sync failed');
+    }
     const user = await findUserWithRoles(result.userId);
     if (!user) {
       throw Object.assign(new Error('Пользователь не найден'), {
@@ -1879,10 +1914,24 @@ export async function registerRoutes(
         'UPDATE telegram_auth_challenges SET completed_at = UTC_TIMESTAMP(3) WHERE id = ?',
         [input.challengeId],
       );
-      return { status: 'verified' as const, userId };
+      return {
+        status: 'verified' as const,
+        userId,
+        telegramUserId: challenge.telegram_user_id,
+      };
     });
 
     if (result.status !== 'verified') return { data: result };
+    if (result.telegramUserId && await userHasNoAvatar(result.userId)) {
+      try {
+        const avatarUrl = await getTelegramProfilePhotoUrl(result.telegramUserId);
+        await syncUserAvatarFromRemoteUrlIfEmpty(result.userId, avatarUrl, {
+          proxyUrl: config.TELEGRAM_PROXY_URL || undefined,
+        });
+      } catch (error) {
+        request.log.warn({ error }, 'Telegram profile avatar sync failed');
+      }
+    }
     const user = await findUserWithRoles(result.userId);
     if (!user) {
       throw Object.assign(new Error('Пользователь не найден'), {
