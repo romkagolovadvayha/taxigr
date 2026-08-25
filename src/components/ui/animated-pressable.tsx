@@ -1,11 +1,13 @@
-import { forwardRef, useCallback, useRef, useState } from 'react';
+import { forwardRef, useCallback, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
   type GestureResponderEvent,
   type MouseEvent,
   type PressableProps,
   type PressableStateCallbackType,
+  type StyleProp,
   type View,
+  type ViewStyle,
 } from 'react-native';
 import Animated, {
   Easing,
@@ -17,16 +19,24 @@ import Animated, {
 
 import { motion } from '@/theme/tokens';
 
+export type AnimatedPressableState = PressableStateCallbackType & {
+  readonly hovered: boolean;
+};
+
+type AnimatedPressableStyle =
+  | StyleProp<ViewStyle>
+  | ((state: AnimatedPressableState) => StyleProp<ViewStyle>);
+
 type Props = Omit<PressableProps, 'children' | 'style'> & {
-  children?: PressableProps['children'];
+  children?: ReactNode | ((state: AnimatedPressableState) => ReactNode);
   /**
    * Style owned by this component. Use it when rendered through Expo Router's
    * Link `asChild`, whose Slot replaces the standard `style` prop on web.
    */
-  contentStyle?: PressableProps['style'];
+  contentStyle?: AnimatedPressableStyle;
   feedback?: 'standard' | 'subtle';
   onKeyDown?: (event: WebKeyDownEvent) => void;
-  style?: PressableProps['style'];
+  style?: AnimatedPressableStyle;
 };
 
 type WebKeyDownEvent = {
@@ -159,7 +169,7 @@ export const AnimatedPressable = forwardRef<View, Props>(function AnimatedPressa
       },
     ],
   }));
-  const state: PressableStateCallbackType = { pressed, hovered };
+  const state: AnimatedPressableState = { pressed, hovered };
   const ownedStyle = contentStyle ?? style;
   const resolvedStyle = typeof ownedStyle === 'function' ? ownedStyle(state) : ownedStyle;
   const resolvedChildren = typeof children === 'function' ? children(state) : children;
