@@ -64,7 +64,6 @@ export function SignInScreen() {
   const [maxChallenge, setMaxChallenge] = useState<MaxAuthChallenge | null>(null);
   const [telegramChallenge, setTelegramChallenge] = useState<TelegramAuthChallenge | null>(null);
   const [vkChallenge, setVkChallenge] = useState<VkAuthChallenge | null>(null);
-  const [vkNeedsMessagePermission, setVkNeedsMessagePermission] = useState(false);
   const [authAction, setAuthAction] = useState<AuthAction>(null);
   const [externalWindowError, setExternalWindowError] = useState<string | null>(null);
   const checkingMax = useRef(false);
@@ -130,8 +129,7 @@ export function SignInScreen() {
       checkingVk.current = true;
       try {
         const status = await checkVkPhoneAuth(vkChallenge);
-        setVkNeedsMessagePermission(status === 'message_required');
-        if (status !== 'pending' && status !== 'message_required') setVkChallenge(null);
+        if (status !== 'pending') setVkChallenge(null);
       } catch {
         // A later poll can recover from a temporary network error.
       } finally {
@@ -160,7 +158,6 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setTelegramChallenge(null);
     setVkChallenge(null);
-    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -186,7 +183,6 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setMaxChallenge(null);
     setVkChallenge(null);
-    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -212,7 +208,6 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setMaxChallenge(null);
     setTelegramChallenge(null);
-    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -236,7 +231,6 @@ export function SignInScreen() {
     setMaxChallenge(null);
     setTelegramChallenge(null);
     setVkChallenge(null);
-    setVkNeedsMessagePermission(false);
     try {
       const result = await startPhoneAuth(phone, acceptance);
       setMaskedPhone(result.phone);
@@ -272,34 +266,30 @@ export function SignInScreen() {
         minHeight: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: spacing.x10,
+        paddingVertical: isPhone ? spacing.x4 : spacing.x6,
       }}
     >
       <View
         style={{
           width: '100%',
           maxWidth: 480,
-          gap: spacing.x5,
+          gap: spacing.x3,
           alignItems: 'center',
         }}
       >
-        <BrandMark size={56} />
+        <BrandMark label="Авторизация" size={isPhone ? 48 : 56} />
         <View
           style={{
             width: '100%',
             backgroundColor: colors.surface,
             borderRadius: radius.sheet,
             borderCurve: 'continuous',
-            padding: isPhone ? spacing.x5 : spacing.x8,
-            gap: spacing.x5,
+            padding: isPhone ? spacing.x4 : spacing.x6,
+            gap: spacing.x3,
             borderWidth: 1,
             borderColor: colors.border,
           }}
         >
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
-            Подтверждение телефона
-          </Text>
-
           <RussianPhoneInput
             value={phoneDigits}
             onChange={(value) => {
@@ -308,7 +298,6 @@ export function SignInScreen() {
               setMaxChallenge(null);
               setTelegramChallenge(null);
               setVkChallenge(null);
-              setVkNeedsMessagePermission(false);
               setCode('');
               setDebugCode(null);
               setExternalWindowError(null);
@@ -471,37 +460,9 @@ export function SignInScreen() {
             {vkChallenge ? 'Ждём подтверждения в VK…' : 'Подтвердить через VK'}
           </AppButton>
           {vkChallenge && (
-            <View style={{ gap: spacing.x1, alignItems: 'center' }}>
-              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
-                {vkNeedsMessagePermission
-                  ? 'Номер подтверждён. Разрешите сообщения сообщества в окне VK или отправьте боту «Начать».'
-                  : 'Разрешите VK передать номер телефона. Затем включите сообщения сообщества — вход завершится автоматически.'}
-              </Text>
-              {vkNeedsMessagePermission && (
-                <AnimatedPressable
-                  feedback="subtle"
-                  accessibilityRole="link"
-                  onPress={() => {
-                    const externalWindow = prepareExternalAuthWindow();
-                    void openExternalAuthUrl(vkChallenge.communityUrl, externalWindow).catch(() => {
-                      closePreparedExternalAuthWindow(externalWindow);
-                      setExternalWindowError('Не удалось открыть чат VK. Попробуйте ещё раз.');
-                    });
-                  }}
-                  style={({ pressed }) => ({
-                    minHeight: 44,
-                    paddingHorizontal: spacing.x2,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.68 : 1,
-                  })}
-                >
-                  <Text style={{ ...typography.caption, color: VK_BRAND_COLOR, textDecorationLine: 'underline' }}>
-                    Открыть чат VK
-                  </Text>
-                </AnimatedPressable>
-              )}
-            </View>
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
+              Разрешите VK передать номер телефона. После подтверждения вход завершится автоматически.
+            </Text>
           )}
           <AnimatedPressable
             feedback="subtle"

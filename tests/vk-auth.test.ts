@@ -75,15 +75,11 @@ describe('VK ID authorization', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('renders the VK message permission widget after phone confirmation', () => {
-    const html = vkCallbackHtml(true, {
-      challengeId: '11111111-1111-4111-8111-111111111111',
-      communityId: '193790756',
-    });
-    expect(html).toContain('VK.Widgets.AllowMessagesFromCommunity');
-    expect(html).toContain('key:\'11111111-1111-4111-8111-111111111111\'');
-    expect(html).toContain('https://vk.ru/im/convo/-193790756');
+  it('finishes VK phone confirmation without blocking on community messages', () => {
+    const html = vkCallbackHtml(true);
     expect(html).toContain('Вход подтверждён');
-    expect(vkCallbackHtml(false)).not.toContain('Написать сообществу');
+    expect(html).toContain('вход завершится автоматически');
+    expect(html).not.toContain('AllowMessagesFromCommunity');
+    expect(html).not.toContain('Открыть чат сообщества');
   });
 });

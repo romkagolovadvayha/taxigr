@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { SessionProvider, useSession } from '@/auth/session-provider';
+import { VkCommunityPromptHost } from '@/components/auth/vk-community-prompt';
 import { SearchPriceIncreaseModalHost } from '@/components/passenger/search-price-increase-card';
 import { CriticalErrorMonitor } from '@/errors/critical-error-monitor';
 import { RideFeedbackProvider } from '@/feedback/ride-feedback-provider';
@@ -50,6 +51,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <CriticalErrorMonitor />
+        <VkCommunityPromptHost />
         <PassengerPreferencesProvider>
           <FeedbackPreferencesProvider>
             <NotificationRegistrar />

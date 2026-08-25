@@ -1053,10 +1053,7 @@ export async function registerRoutes(
           challenge.id,
         ],
       );
-      return reply.send(vkCallbackHtml(matches, matches ? {
-        challengeId: challenge.id,
-        communityId: config.VK_COMMUNITY_ID,
-      } : undefined));
+      return reply.send(vkCallbackHtml(matches));
     } catch (error) {
       if (state) {
         await db.execute(
@@ -1105,14 +1102,6 @@ export async function registerRoutes(
       request.log.warn({ error }, 'VK message permission check failed');
       return false;
     });
-    if (!messagesAllowed) {
-      return {
-        data: {
-          status: 'message_required' as const,
-          communityUrl: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}`,
-        },
-      };
-    }
     const result = await withTransaction(async (connection) => {
       const [rows] = await connection.query<
         (RowDataPacket & {
@@ -1159,7 +1148,7 @@ export async function registerRoutes(
         chatId: challenge.vk_user_id,
         firstName: challenge.vk_first_name,
         lastName: challenge.vk_last_name,
-        botContactAvailable: true,
+        botContactAvailable: messagesAllowed,
       });
       const acceptance = parse(
         initialLegalAcceptanceSchema,
@@ -1192,6 +1181,9 @@ export async function registerRoutes(
         status: 'verified',
         token: await signSession({ id: user.id, roles: user.roles }),
         user,
+        communityPrompt: messagesAllowed
+          ? undefined
+          : { url: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}` },
       },
     };
   });

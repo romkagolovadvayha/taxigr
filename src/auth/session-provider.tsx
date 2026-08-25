@@ -38,8 +38,13 @@ type MaxAuthStatus =
   | { status: 'verified'; token: string; user: SessionUser };
 
 type VkAuthStatus =
-  | MaxAuthStatus
-  | { status: 'message_required'; communityUrl: string };
+  | Exclude<MaxAuthStatus, { status: 'verified' }>
+  | {
+    status: 'verified';
+    token: string;
+    user: SessionUser;
+    communityPrompt?: { url: string };
+  };
 
 type SessionContextValue = {
   user: SessionUser | null;
@@ -48,6 +53,7 @@ type SessionContextValue = {
   sessionReady: boolean;
   authenticating: boolean;
   authError: string | null;
+  vkCommunityPromptUrl: string | null;
   demoMode: boolean;
   startPhoneAuth: (
     phone: string,
@@ -81,6 +87,7 @@ type SessionContextValue = {
   removeAvatar: () => Promise<void>;
   refreshSession: () => Promise<void>;
   signOut: () => Promise<void>;
+  dismissVkCommunityPrompt: () => void;
   clearAuthError: () => void;
 };
 
@@ -117,6 +124,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [authenticating, setAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [vkCommunityPromptUrl, setVkCommunityPromptUrl] = useState<string | null>(null);
 
   const applySession = useCallback(async (result: { token: string; user: SessionUser }) => {
     await writeSessionToken(result.token);
@@ -351,6 +359,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           );
         } else if (result.status === 'verified') {
           await applySession(result);
+          setVkCommunityPromptUrl(result.communityPrompt?.url ?? null);
           const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
           router.replace(destination);
         }
@@ -469,6 +478,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setAuthError(null);
+    setVkCommunityPromptUrl(null);
     router.replace('/sign-in');
   }, []);
 
@@ -490,6 +500,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refreshSession, token, user?.blockedAt]);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
+  const dismissVkCommunityPrompt = useCallback(() => setVkCommunityPromptUrl(null), []);
 
   const value = useMemo(
     () => ({
@@ -499,6 +510,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sessionReady,
       authenticating,
       authError,
+      vkCommunityPromptUrl,
       demoMode: demoEnabled,
       startPhoneAuth,
       startMaxPhoneAuth,
@@ -514,6 +526,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       removeAvatar,
       refreshSession,
       signOut,
+      dismissVkCommunityPrompt,
       clearAuthError,
     }),
     [
@@ -524,6 +537,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkVkPhoneAuth,
       clearAuthError,
       continueDemo,
+      dismissVkCommunityPrompt,
       loading,
       refreshSession,
       removeAvatar,
@@ -538,6 +552,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       uploadAvatar,
       user,
       verifyPhoneAuth,
+      vkCommunityPromptUrl,
     ],
   );
 
