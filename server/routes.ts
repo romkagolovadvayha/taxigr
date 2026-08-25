@@ -109,7 +109,7 @@ import {
 import { sendPhoneVerificationCode, verifyPhoneVerificationCode } from './sms';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
 import { exchangeVkAuthorizationCode, vkAuthorizationUrl, vkCallbackHtml } from './vk-auth';
-import { answerVkMessageEvent, sendVkMessage } from './vk-bot';
+import { answerVkMessageEvent, isVkMessagesAllowed, sendVkMessage } from './vk-bot';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
 
@@ -1053,7 +1053,10 @@ export async function registerRoutes(
           challenge.id,
         ],
       );
-      return reply.send(vkCallbackHtml(matches));
+      return reply.send(vkCallbackHtml(matches, matches ? {
+        challengeId: challenge.id,
+        communityId: config.VK_COMMUNITY_ID,
+      } : undefined));
     } catch (error) {
       if (state) {
         await db.execute(
@@ -1070,6 +1073,46 @@ export async function registerRoutes(
   app.post('/v1/auth/vk/status', async (request, reply) => {
     void reply.header('Cache-Control', 'no-store');
     const input = parse(maxAuthStatusSchema, request.body);
+    const preview = await firstRow<
+      RowDataPacket & {
+        exchange_secret_hash: string;
+        verified_phone: string | null;
+        failure_code: string | null;
+        expires_at: Date | string;
+        vk_user_id: string | null;
+      }
+    >(
+      `SELECT exchange_secret_hash, verified_phone, failure_code, expires_at, vk_user_id
+       FROM vk_auth_challenges WHERE id = ? LIMIT 1`,
+      [input.challengeId],
+    );
+    if (!preview || !hashesMatch(preview.exchange_secret_hash, sha256(input.exchangeToken))) {
+      throw Object.assign(new Error('Подтверждение VK не найдено'), {
+        statusCode: 404,
+        code: 'VK_CHALLENGE_NOT_FOUND',
+      });
+    }
+    if (new Date(preview.expires_at).getTime() <= Date.now()) {
+      return { data: { status: 'expired' as const } };
+    }
+    if (preview.failure_code) {
+      return { data: { status: 'failed' as const, errorCode: preview.failure_code } };
+    }
+    if (!preview.verified_phone || !preview.vk_user_id) {
+      return { data: { status: 'pending' as const } };
+    }
+    const messagesAllowed = await isVkMessagesAllowed(preview.vk_user_id).catch((error) => {
+      request.log.warn({ error }, 'VK message permission check failed');
+      return false;
+    });
+    if (!messagesAllowed) {
+      return {
+        data: {
+          status: 'message_required' as const,
+          communityUrl: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}`,
+        },
+      };
+    }
     const result = await withTransaction(async (connection) => {
       const [rows] = await connection.query<
         (RowDataPacket & {
@@ -1116,7 +1159,7 @@ export async function registerRoutes(
         chatId: challenge.vk_user_id,
         firstName: challenge.vk_first_name,
         lastName: challenge.vk_last_name,
-        botContactAvailable: false,
+        botContactAvailable: true,
       });
       const acceptance = parse(
         initialLegalAcceptanceSchema,
@@ -1195,6 +1238,18 @@ export async function registerRoutes(
             message: 'Чтобы подключить уведомления, войдите через VK в приложении «Такси Грахово»: https://taxigr.ru/sign-in',
           });
         }
+      }
+
+      if (
+        (update.type === 'message_allow' || update.type === 'message_deny') &&
+        update.object?.user_id != null
+      ) {
+        await db.execute(
+          `UPDATE user_messenger_accounts
+           SET active = TRUE, bot_contact_available = ?, updated_at = UTC_TIMESTAMP(3)
+           WHERE provider = 'vk' AND external_user_id = ?`,
+          [update.type === 'message_allow', String(update.object.user_id)],
+        );
       }
 
       if (

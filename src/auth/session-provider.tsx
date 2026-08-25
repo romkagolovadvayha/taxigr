@@ -37,6 +37,10 @@ type MaxAuthStatus =
   | { status: 'failed'; errorCode: string }
   | { status: 'verified'; token: string; user: SessionUser };
 
+type VkAuthStatus =
+  | MaxAuthStatus
+  | { status: 'message_required'; communityUrl: string };
+
 type SessionContextValue = {
   user: SessionUser | null;
   token: string | null;
@@ -63,7 +67,7 @@ type SessionContextValue = {
     phone: string,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<VkAuthChallenge>;
-  checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<MaxAuthStatus['status']>;
+  checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<VkAuthStatus['status']>;
   verifyPhoneAuth: (phone: string, code: string) => Promise<void>;
   continueDemo: (
     persona: DemoPersona | undefined,
@@ -324,10 +328,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const checkVkPhoneAuth = useCallback(
-    async (challenge: VkAuthChallenge): Promise<MaxAuthStatus['status']> => {
+    async (challenge: VkAuthChallenge): Promise<VkAuthStatus['status']> => {
       try {
         const installationId = await getInstallationId();
-        const result = await apiRequest<MaxAuthStatus>('/v1/auth/vk/status', {
+        const result = await apiRequest<VkAuthStatus>('/v1/auth/vk/status', {
           method: 'POST',
           body: JSON.stringify({
             challengeId: challenge.challengeId,

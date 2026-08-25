@@ -64,6 +64,7 @@ export function SignInScreen() {
   const [maxChallenge, setMaxChallenge] = useState<MaxAuthChallenge | null>(null);
   const [telegramChallenge, setTelegramChallenge] = useState<TelegramAuthChallenge | null>(null);
   const [vkChallenge, setVkChallenge] = useState<VkAuthChallenge | null>(null);
+  const [vkNeedsMessagePermission, setVkNeedsMessagePermission] = useState(false);
   const [authAction, setAuthAction] = useState<AuthAction>(null);
   const [externalWindowError, setExternalWindowError] = useState<string | null>(null);
   const checkingMax = useRef(false);
@@ -129,7 +130,8 @@ export function SignInScreen() {
       checkingVk.current = true;
       try {
         const status = await checkVkPhoneAuth(vkChallenge);
-        if (status !== 'pending') setVkChallenge(null);
+        setVkNeedsMessagePermission(status === 'message_required');
+        if (status !== 'pending' && status !== 'message_required') setVkChallenge(null);
       } catch {
         // A later poll can recover from a temporary network error.
       } finally {
@@ -158,6 +160,7 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setTelegramChallenge(null);
     setVkChallenge(null);
+    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -183,6 +186,7 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setMaxChallenge(null);
     setVkChallenge(null);
+    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -208,6 +212,7 @@ export function SignInScreen() {
     setMaskedPhone(null);
     setMaxChallenge(null);
     setTelegramChallenge(null);
+    setVkNeedsMessagePermission(false);
     setCode('');
     setDebugCode(null);
     try {
@@ -231,6 +236,7 @@ export function SignInScreen() {
     setMaxChallenge(null);
     setTelegramChallenge(null);
     setVkChallenge(null);
+    setVkNeedsMessagePermission(false);
     try {
       const result = await startPhoneAuth(phone, acceptance);
       setMaskedPhone(result.phone);
@@ -302,6 +308,7 @@ export function SignInScreen() {
               setMaxChallenge(null);
               setTelegramChallenge(null);
               setVkChallenge(null);
+              setVkNeedsMessagePermission(false);
               setCode('');
               setDebugCode(null);
               setExternalWindowError(null);
@@ -461,12 +468,40 @@ export function SignInScreen() {
               boxShadow: '0 8px 22px rgba(0, 119, 255, 0.24)',
             }}
           >
-            {vkChallenge ? 'Ждём подтверждения в VK…' : 'Продолжить с VK ID'}
+            {vkChallenge ? 'Ждём подтверждения в VK…' : 'Подтвердить через VK'}
           </AppButton>
           {vkChallenge && (
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
-              Разрешите VK передать номер телефона, затем вернитесь в приложение.
-            </Text>
+            <View style={{ gap: spacing.x1, alignItems: 'center' }}>
+              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
+                {vkNeedsMessagePermission
+                  ? 'Номер подтверждён. Разрешите сообщения сообщества в окне VK или отправьте боту «Начать».'
+                  : 'Разрешите VK передать номер телефона. Затем включите сообщения сообщества — вход завершится автоматически.'}
+              </Text>
+              {vkNeedsMessagePermission && (
+                <AnimatedPressable
+                  feedback="subtle"
+                  accessibilityRole="link"
+                  onPress={() => {
+                    const externalWindow = prepareExternalAuthWindow();
+                    void openExternalAuthUrl(vkChallenge.communityUrl, externalWindow).catch(() => {
+                      closePreparedExternalAuthWindow(externalWindow);
+                      setExternalWindowError('Не удалось открыть чат VK. Попробуйте ещё раз.');
+                    });
+                  }}
+                  style={({ pressed }) => ({
+                    minHeight: 44,
+                    paddingHorizontal: spacing.x2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.68 : 1,
+                  })}
+                >
+                  <Text style={{ ...typography.caption, color: VK_BRAND_COLOR, textDecorationLine: 'underline' }}>
+                    Открыть чат VK
+                  </Text>
+                </AnimatedPressable>
+              )}
+            </View>
           )}
           <AnimatedPressable
             feedback="subtle"

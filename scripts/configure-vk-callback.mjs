@@ -66,6 +66,8 @@ await vk('groups.setCallbackSettings', {
   api_version: version,
   message_new: '1',
   message_event: '1',
+  message_allow: '1',
+  message_deny: '1',
 });
 
-console.log(`Enabled message_new and message_event for ${callbackUrl}.`);
+console.log(`Enabled message_new, message_event, message_allow and message_deny for ${callbackUrl}.`);

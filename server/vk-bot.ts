@@ -29,6 +29,17 @@ async function callVkApi<T>(method: string, params: Record<string, string>): Pro
   }
 }
 
+export async function isVkMessagesAllowed(userId: string): Promise<boolean> {
+  const result = await callVkApi<{ is_allowed?: number | boolean }>(
+    'messages.isMessagesFromGroupAllowed',
+    {
+      group_id: config.VK_COMMUNITY_ID,
+      user_id: userId,
+    },
+  );
+  return result.is_allowed === true || result.is_allowed === 1;
+}
+
 export async function sendVkMessage(
   peerId: string,
   input: { message: string; keyboard?: unknown },

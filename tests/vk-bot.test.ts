@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../server/config', () => ({
   config: {
     VK_BOT_TOKEN: 'community-token',
+    VK_COMMUNITY_ID: '193790756',
     VK_API_VERSION: '5.199',
   },
 }));
 
-import { sendVkMessage, vkInlineKeyboard } from '../server/vk-bot';
+import { isVkMessagesAllowed, sendVkMessage, vkInlineKeyboard } from '../server/vk-bot';
 
 describe('VK community bot', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -46,5 +47,18 @@ describe('VK community bot', () => {
         },
       ]],
     });
+  });
+
+  it('checks that the community may write to the authenticated user', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      response: { is_allowed: 1 },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(isVkMessagesAllowed('42')).resolves.toBe(true);
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = new URLSearchParams(String(request.body));
+    expect(body.get('group_id')).toBe('193790756');
+    expect(body.get('user_id')).toBe('42');
   });
 });
