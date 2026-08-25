@@ -1002,7 +1002,7 @@ export async function registerRoutes(
             challengeId,
             exchangeToken,
             authorizationUrl: vkAuthorizationUrl({ state: stateToken, codeChallenge }),
-            communityUrl: 'https://vk.ru/taxigr',
+            communityUrl: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}`,
             expiresInSeconds: config.PHONE_CODE_TTL_MINUTES * 60,
           },
         };
