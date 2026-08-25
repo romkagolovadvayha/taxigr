@@ -277,7 +277,7 @@ export function SignInScreen() {
           alignItems: 'center',
         }}
       >
-        <BrandMark size={56} />
+        <BrandMark label="Авторизация" size={56} />
         <View
           style={{
             width: '100%',
@@ -290,10 +290,6 @@ export function SignInScreen() {
             borderColor: colors.border,
           }}
           >
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
-            Подтверждение телефона
-          </Text>
-
           <RussianPhoneInput
             value={phoneDigits}
             onChange={(value) => {
