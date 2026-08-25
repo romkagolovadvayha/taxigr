@@ -60,6 +60,9 @@ Production endpoint: `https://api.taxigr.ru/v1/webhooks/vk`.
 - `VK_CALLBACK_SECRET`;
 - `VK_CALLBACK_CONFIRMATION`.
 
+`VK_CALLBACK_SECRET` должен содержать не более 50 символов — это ограничение
+метода регистрации Callback API VK.
+
 Deployment workflow передаёт их серверу и после выкладки отправляет контрольный
 запрос `confirmation`. Деплой завершается ошибкой, если endpoint не вернул точную
 строку из `VK_CALLBACK_CONFIRMATION`.
