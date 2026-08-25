@@ -6,7 +6,7 @@ import { config } from './config';
 import { db, withTransaction } from './db';
 import { maskPhone, normalizeRussianPhone } from './phone-verification';
 
-export type AuthAction = 'send_code' | 'verify_code' | 'start_max' | 'start_telegram';
+export type AuthAction = 'send_code' | 'verify_code' | 'start_max' | 'start_telegram' | 'start_vk';
 export type AuthRateLimitScope = 'phone' | 'ip' | 'subnet' | 'installation';
 
 export type AuthIdentity = {
@@ -211,7 +211,7 @@ function rateLimitBuckets(
   identity: AuthIdentity,
   now: Date,
 ): RateLimitBucket[] {
-  if (action === 'start_max' || action === 'start_telegram') return [];
+  if (action === 'start_max' || action === 'start_telegram' || action === 'start_vk') return [];
   const rules = action === 'send_code' ? sendCodeRules : verifyCodeRules;
   return rules
     .map((rule) => ({ rule, subjectHash: subjectForScope(identity, rule.scope) }))

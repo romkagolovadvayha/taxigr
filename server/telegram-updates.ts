@@ -26,6 +26,7 @@ export const telegramUpdateSchema = z.object({
       id: z.union([z.string(), z.number()]),
     }).passthrough(),
     message: z.object({
+      message_id: z.union([z.string(), z.number()]).optional(),
       chat: z.object({
         id: z.union([z.string(), z.number()]),
         type: z.string(),
@@ -70,6 +71,9 @@ export async function processTelegramUpdate(
           provider: 'telegram',
           externalUserId: String(callback.from.id),
           chatId: String(chat.id),
+          sourceMessageId: callback.message?.message_id != null
+            ? String(callback.message.message_id)
+            : undefined,
           data: callback.data,
         });
       } catch {

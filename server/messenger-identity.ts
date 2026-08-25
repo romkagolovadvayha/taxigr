@@ -1,4 +1,4 @@
-export type MessengerProvider = 'max' | 'telegram';
+export type MessengerProvider = 'max' | 'telegram' | 'vk';
 
 export type MessengerIdentityInput = {
   provider: MessengerProvider;
@@ -8,6 +8,7 @@ export type MessengerIdentityInput = {
   displayName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  botContactAvailable?: boolean;
 };
 
 function clean(value: string | null | undefined, maxLength: number): string | null {
@@ -30,5 +31,6 @@ export function normalizeMessengerIdentity(input: MessengerIdentityInput) {
     firstName,
     lastName,
     profileName: displayName,
+    botContactAvailable: input.botContactAvailable ?? true,
   };
 }

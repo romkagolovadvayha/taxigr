@@ -198,6 +198,28 @@ export function presentOrder(row: OrderRow): RideOrder {
   };
 }
 
+export type OrderRatingViewer = 'passenger' | 'driver' | 'admin';
+
+export function limitOrderRatings(
+  order: RideOrder,
+  viewer: OrderRatingViewer,
+): RideOrder {
+  if (!order.ratings || viewer === 'admin') return order;
+
+  const ownScore = viewer === 'passenger'
+    ? order.ratings.byPassenger
+    : order.ratings.byDriver;
+
+  return {
+    ...order,
+    ratings: ownScore == null
+      ? undefined
+      : viewer === 'passenger'
+        ? { byPassenger: ownScore }
+        : { byDriver: ownScore },
+  };
+}
+
 export const orderSelect = `
   SELECT o.*,
     u.name AS driver_name, u.phone AS driver_phone, d.rating,

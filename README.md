@@ -48,6 +48,13 @@ Web откроется по адресу Expo, API слушает `http://localh
 остаётся в приложении. При наличии обеих привязок сообщение доставляется в оба мессенджера.
 Все секреты хранятся только на сервере и не должны иметь префикс `EXPO_PUBLIC_`.
 
+Для входа через VK ID и уведомлений от сообщества задайте `VK_APP_ID`,
+`VK_REDIRECT_URI`, `VK_COMMUNITY_ID`, `VK_BOT_TOKEN`, `VK_CALLBACK_SECRET` и
+`VK_CALLBACK_CONFIRMATION`. Redirect VK ID:
+`https://<api-домен>/v1/auth/vk/callback`; Callback API сообщества:
+`https://<api-домен>/v1/webhooks/vk`. Полная настройка описана в
+[`docs/VK_INTEGRATION.md`](docs/VK_INTEGRATION.md).
+
 ## Команды проверки
 
 ```bash

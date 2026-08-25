@@ -1,5 +1,5 @@
 import type { Address } from '../src/domain/models';
-import { isGrahovoAddress } from '../src/domain/pricing';
+import { classifyPricingScope, isGrahovoAddress } from '../src/domain/pricing';
 import { config } from './config';
 
 export type Point = { latitude: number; longitude: number };
@@ -165,6 +165,7 @@ export async function getPricedRouteMetrics(
   destination: Address,
   resolveRoute: RouteMetricsResolver = getRouteMetrics,
 ): Promise<PricedRouteMetrics> {
+  const pricingScope = classifyPricingScope(pickup, destination);
   const tripRoutePromise = resolveRoute(pickup.coordinates, destination.coordinates);
   const driverApproachRoutePromise = isGrahovoAddress(pickup)
     ? Promise.resolve<RouteMetrics | null>(null)
@@ -178,6 +179,7 @@ export async function getPricedRouteMetrics(
     tripRoute,
     driverApproachRoute,
     pricingDistanceMeters:
-      tripRoute.distanceMeters + (driverApproachRoute?.distanceMeters ?? 0),
+      tripRoute.distanceMeters +
+      (pricingScope === 'intercity' ? (driverApproachRoute?.distanceMeters ?? 0) : 0),
   };
 }

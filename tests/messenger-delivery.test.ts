@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
+  execute: vi.fn(),
+  editMaxMessage: vi.fn(),
+  editTelegramMessage: vi.fn(),
   sendMaxLocation: vi.fn(),
   sendMaxMessage: vi.fn(),
   sendTelegramMessage: vi.fn(),
@@ -17,16 +20,18 @@ vi.mock('../server/config', () => ({
 }));
 
 vi.mock('../server/db', () => ({
-  db: { query: mocks.query },
+  db: { query: mocks.query, execute: mocks.execute },
   firstRow: vi.fn(),
 }));
 
 vi.mock('../server/max-bot', () => ({
+  editMaxMessage: mocks.editMaxMessage,
   sendMaxLocation: mocks.sendMaxLocation,
   sendMaxMessage: mocks.sendMaxMessage,
 }));
 
 vi.mock('../server/telegram-bot', () => ({
+  editTelegramMessage: mocks.editTelegramMessage,
   sendTelegramMessage: mocks.sendTelegramMessage,
   sendTelegramVenue: mocks.sendTelegramVenue,
 }));
@@ -100,6 +105,53 @@ describe('messenger platform delivery', () => {
     expect(mocks.sendTelegramVenue).toHaveBeenCalledWith(
       'tg-chat',
       notification.locations[0],
+    );
+  });
+
+  it('updates every earlier order card before sending the next status', async () => {
+    mocks.query
+      .mockResolvedValueOnce([[
+        {
+          id: 7,
+          user_id: 'user-1',
+          provider: 'telegram',
+          external_user_id: 'tg-user',
+          chat_id: 'tg-chat',
+        },
+      ]])
+      .mockResolvedValueOnce([[
+        { message_id: '10' },
+        { message_id: '11' },
+      ]]);
+    mocks.sendTelegramMessage.mockResolvedValueOnce('12');
+
+    await notifyUsersInMessengers(['user-1'], {
+      ...notification,
+      orderId: '123e4567-e89b-12d3-a456-426614174000',
+      audience: 'passenger',
+      title: 'Поездка завершена',
+      buttons: [[{
+        type: 'link',
+        label: '🏁 Поездка завершена',
+        url: 'https://taxi.example/orders',
+      }]],
+    });
+
+    expect(mocks.editTelegramMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.editTelegramMessage).toHaveBeenCalledWith(
+      'tg-chat',
+      '10',
+      expect.objectContaining({
+        reply_markup: {
+          inline_keyboard: [[expect.objectContaining({
+            text: '🏁 Поездка завершена',
+          })]],
+        },
+      }),
+    );
+    expect(mocks.execute).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT IGNORE INTO messenger_order_messages'),
+      expect.arrayContaining(['12']),
     );
   });
 });

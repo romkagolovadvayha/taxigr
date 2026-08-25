@@ -38,6 +38,9 @@ jobs:
       EXPO_PUBLIC_OPERATOR_EMAIL: ${{ vars.EXPO_PUBLIC_OPERATOR_EMAIL }}
       EXPO_PUBLIC_OPERATOR_PHONE: ${{ vars.EXPO_PUBLIC_OPERATOR_PHONE }}
       EXPO_PUBLIC_TAXI_REGISTRY_NUMBER: ${{ vars.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER }}
+      VK_APP_ID: ${{ vars.VK_APP_ID }}
+      VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
+      VK_API_VERSION: ${{ vars.VK_API_VERSION || '5.199' }}
 
     steps:
       - name: Checkout
@@ -47,13 +50,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER; do
+          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER VK_APP_ID VK_COMMUNITY_ID; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment variable: $name" >&2
               exit 1
             fi
           done
-          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL; do
+          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment secret: $name" >&2
               exit 1
@@ -66,6 +69,9 @@ jobs:
           NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
           TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
           YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
+          VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
+          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
+          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -97,6 +103,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
+          VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
+          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
+          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
         run: |
           python3 - <<'PY'
           import os, shlex
@@ -134,6 +143,13 @@ jobs:
               'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
               'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
               'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
+              'VK_APP_ID': os.environ['VK_APP_ID'],
+              'VK_REDIRECT_URI': f"https://{os.environ['API_DOMAIN']}/v1/auth/vk/callback",
+              'VK_COMMUNITY_ID': os.environ['VK_COMMUNITY_ID'],
+              'VK_BOT_TOKEN': os.environ['VK_BOT_TOKEN'],
+              'VK_CALLBACK_SECRET': os.environ['VK_CALLBACK_SECRET'],
+              'VK_CALLBACK_CONFIRMATION': os.environ['VK_CALLBACK_CONFIRMATION'],
+              'VK_API_VERSION': os.environ.get('VK_API_VERSION') or '5.199',
               'PHONE_CODE_TTL_MINUTES': '10',
               'PHONE_CODE_RESEND_SECONDS': '180',
               'TRUST_PROXY_HOPS': '1',
@@ -201,7 +217,20 @@ jobs:
 
       - name: Verify public endpoints
         shell: bash
+        env:
+          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
+          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
+          callback_payload="$(jq -cn \
+            --arg group_id "$VK_COMMUNITY_ID" \
+            --arg secret "$VK_CALLBACK_SECRET" \
+            '{type:"confirmation", group_id:$group_id, secret:$secret}')"
+          callback_response="$(curl --fail --silent --show-error \
+            --retry 8 --retry-all-errors --retry-delay 3 \
+            -H 'Content-Type: application/json' \
+            --data-binary "$callback_payload" \
+            "https://${API_DOMAIN}/v1/webhooks/vk")"
+          test "$callback_response" = "$VK_CALLBACK_CONFIRMATION"

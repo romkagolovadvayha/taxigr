@@ -2,10 +2,11 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,7 +24,8 @@ export function NotificationRegistrar() {
 
   useEffect(() => {
     if (!Device.isDevice || !token || token.startsWith('demo:')) return;
-    void (async () => {
+    let active = true;
+    const register = async () => {
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('ride-taxi-found-v2', {
           name: 'Статусы поездки',
@@ -53,6 +55,13 @@ export function NotificationRegistrar() {
           vibrationPattern: [0, 160],
           lightColor: '#FFD600',
         });
+        await Notifications.setNotificationChannelAsync('ride-started-v2', {
+          name: 'Поездка началась',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: 'ride_started.wav',
+          vibrationPattern: [0, 180],
+          lightColor: '#FFD600',
+        });
         await Notifications.setNotificationChannelAsync('ride-cancelled-v2', {
           name: 'Поездка отменена',
           importance: Notifications.AndroidImportance.HIGH,
@@ -69,14 +78,32 @@ export function NotificationRegistrar() {
         Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       if (!projectId) return;
       const pushToken = await Notifications.getExpoPushTokenAsync({ projectId });
+      if (!active) return;
       await apiRequest('/v1/push-tokens', {
         method: 'PUT',
         token,
         body: JSON.stringify({ token: pushToken.data, platform: Platform.OS }),
       });
-    })().catch(() => {
-      // Push registration is retried on the next authenticated app start.
+    };
+    const retryRegistration = () => void register().catch((error) => {
+      void reportCriticalClientError(error, {
+        source: 'push-registration',
+        token,
+        resource: 'expo-notifications',
+      });
+      // Registration is retried when the app becomes active again.
     });
+    retryRegistration();
+    const pushTokenSubscription = Notifications.addPushTokenListener(retryRegistration);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') retryRegistration();
+    });
+
+    return () => {
+      active = false;
+      pushTokenSubscription.remove();
+      appStateSubscription.remove();
+    };
   }, [token]);
 
   return null;

@@ -1331,9 +1331,20 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       body: { score: 4 },
     });
     expect(driverRating.status).toBe(200);
-    expect(driverRating.data?.ratings).toEqual({ byPassenger: 5, byDriver: 4 });
+    expect(driverRating.data?.ratings).toEqual({ byDriver: 4 });
     expect(driverRating.data?.passenger?.rating).toBe(4);
     expect(driverRating.data?.passenger?.ratingCount).toBe(1);
+
+    const passengerOrderAfterRatings = await api<RideOrder>(
+      `/v1/orders/${order.data!.id}`,
+      { token: passengerToken },
+    );
+    const driverOrderAfterRatings = await api<RideOrder>(
+      `/v1/orders/${order.data!.id}`,
+      { token: driverOneToken },
+    );
+    expect(passengerOrderAfterRatings.data?.ratings).toEqual({ byPassenger: 5 });
+    expect(driverOrderAfterRatings.data?.ratings).toEqual({ byDriver: 4 });
 
     const passengerDetail = await api<AdminPassengerDetail>(
       `/v1/admin/passengers/${fixture.passengerId}`,

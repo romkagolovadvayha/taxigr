@@ -9,7 +9,10 @@ import {
 import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMoney } from './admin-telegram';
 import { db, firstRow } from './db';
-import { notifyMessengerAccount } from './messenger-notifications';
+import {
+  notifyMessengerAccount,
+  refreshMessengerAccountOrderMessages,
+} from './messenger-notifications';
 import { findUserWithRoles } from './repositories';
 import {
   driverRideNotification,
@@ -21,9 +24,10 @@ import {
 import { signSession } from './security';
 
 export type MessengerOrderActionRequest = {
-  provider: 'max' | 'telegram';
+  provider: 'max' | 'telegram' | 'vk';
   externalUserId: string;
   chatId?: string;
+  sourceMessageId?: string;
   data: unknown;
 };
 
@@ -69,7 +73,8 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
     );
     if (
       !account ||
-      (request.provider === 'telegram' && request.chatId && account.chat_id !== request.chatId)
+      ((request.provider === 'telegram' || request.provider === 'vk') &&
+        request.chatId && account.chat_id !== request.chatId)
     ) {
       return {
         text: 'Сначала подтвердите этот аккаунт мессенджера в приложении.',
@@ -117,9 +122,29 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         'POST',
         `/v1/driver/orders/${parsed.orderId}/accept`,
       );
-      return accepted.ok
-        ? { text: 'Заказ принят ✅' }
-        : { text: accepted.message, alert: true };
+      if (accepted.ok) {
+        await refreshMessengerAccountOrderMessages(
+          request.provider,
+          request.externalUserId,
+          driverRideNotification(accepted.data),
+          request.sourceMessageId,
+        ).catch(() => undefined);
+        return { text: 'Заказ принят ✅' };
+      }
+      await refreshMessengerAccountOrderMessages(
+        request.provider,
+        request.externalUserId,
+        {
+          orderId: parsed.orderId,
+          audience: 'driver',
+          icon: '🚕',
+          title: 'Заказ уже недоступен',
+          body: accepted.message,
+          buttons: [],
+        },
+        request.sourceMessageId,
+      ).catch(() => undefined);
+      return { text: accepted.message, alert: true };
     }
 
     const orderResult = await call<RideOrder>('GET', `/v1/orders/${parsed.orderId}`);
@@ -132,18 +157,19 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         : null;
     if (!audience) return { text: 'Этот заказ вам недоступен.', alert: true };
 
-    const sendCurrentStatus = async (currentRide = ride): Promise<void> => {
-      await notifyMessengerAccount(
+    const refreshCurrentStatus = async (currentRide = ride): Promise<void> => {
+      await refreshMessengerAccountOrderMessages(
         request.provider,
         request.externalUserId,
         audience === 'passenger'
           ? passengerRideNotification(currentRide)
           : driverRideNotification(currentRide),
+        request.sourceMessageId,
       );
     };
 
     if (parsed.action === 'refresh') {
-      await sendCurrentStatus();
+      await refreshCurrentStatus();
       return {
         text: ride.status === 'searching'
           ? `Поиск идёт ${formatElapsedClock(ride.createdAt)}`
@@ -153,7 +179,19 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
 
     if (parsed.action === 'cancel') {
       if (audience !== 'passenger') return { text: 'Отменить заказ может пассажир.', alert: true };
+      if (!['searching', 'accepted', 'driver_arriving', 'driver_waiting'].includes(ride.status)) {
+        await refreshCurrentStatus().catch(() => undefined);
+        return {
+          text: ride.status === 'completed'
+            ? 'Поездка уже завершена.'
+            : 'Заказ уже нельзя отменить.',
+          alert: true,
+        };
+      }
       await notifyMessengerAccount(request.provider, request.externalUserId, {
+        orderId: ride.id,
+        audience,
+        syncExistingOrderMessages: false,
         icon: '⚠️',
         title: 'Отменить заказ?',
         body: 'После отмены поиск или поездка будут остановлены.',
@@ -177,6 +215,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
 
     if (parsed.action === 'increase') {
       if (audience !== 'passenger' || ride.status !== 'searching') {
+        await refreshCurrentStatus().catch(() => undefined);
         return { text: 'Повышение цены сейчас недоступно.', alert: true };
       }
       const offerSlot = searchPriceIncreaseOfferSlot(ride);
@@ -195,6 +234,9 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
       }
       const increaseMinor = ride.searchPriceIncreaseStepMinor ?? 3_000;
       await notifyMessengerAccount(request.provider, request.externalUserId, {
+        orderId: ride.id,
+        audience,
+        syncExistingOrderMessages: false,
         icon: '💰',
         title: `Повысить цену на ${formatMoney(increaseMinor)}?`,
         body: `Новая стоимость: ${formatMoney(ride.priceMinor + increaseMinor)}.`,
@@ -210,9 +252,13 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
 
     if (parsed.action === 'complete') {
       if (audience !== 'driver' || ride.status !== 'in_progress') {
+        await refreshCurrentStatus().catch(() => undefined);
         return { text: 'Завершить эту поездку сейчас нельзя.', alert: true };
       }
       await notifyMessengerAccount(request.provider, request.externalUserId, {
+        orderId: ride.id,
+        audience,
+        syncExistingOrderMessages: false,
         icon: '🏁',
         title: 'Завершить поездку?',
         body: 'Убедитесь, что пассажир доставлен в место назначения.',
@@ -263,11 +309,11 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
     if (!endpoint) return { text: 'Действие не поддерживается.', alert: true };
 
     const result = await call<RideOrder>(endpoint[0], endpoint[1], endpoint[2]);
-    if (!result.ok) return { text: result.message, alert: true };
-
-    if (parsed.action === 'increase-confirm' || parsed.action.startsWith('rate-')) {
-      await sendCurrentStatus(result.data).catch(() => undefined);
+    if (!result.ok) {
+      await refreshCurrentStatus().catch(() => undefined);
+      return { text: result.message, alert: true };
     }
+    await refreshCurrentStatus(result.data).catch(() => undefined);
     const priceWasIncreased = result.data.priceMinor > ride.priceMinor;
     return {
       text: parsed.action.startsWith('rate-')

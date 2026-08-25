@@ -27,6 +27,11 @@ export type TelegramAuthChallenge = MaxAuthChallenge & {
   appUrl: string;
 };
 
+export type VkAuthChallenge = Omit<MaxAuthChallenge, 'botUrl'> & {
+  authorizationUrl: string;
+  communityUrl: string;
+};
+
 type MaxAuthStatus =
   | { status: 'pending' | 'expired' }
   | { status: 'failed'; errorCode: string }
@@ -54,6 +59,11 @@ type SessionContextValue = {
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<TelegramAuthChallenge>;
   checkTelegramPhoneAuth: (challenge: TelegramAuthChallenge) => Promise<MaxAuthStatus['status']>;
+  startVkPhoneAuth: (
+    phone: string,
+    legalAcceptance: InitialLegalAcceptance,
+  ) => Promise<VkAuthChallenge>;
+  checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<MaxAuthStatus['status']>;
   verifyPhoneAuth: (phone: string, code: string) => Promise<void>;
   continueDemo: (
     persona: DemoPersona | undefined,
@@ -290,6 +300,68 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const startVkPhoneAuth = useCallback(
+    async (phone: string, legalAcceptance: InitialLegalAcceptance) => {
+      setAuthenticating(true);
+      setAuthError(null);
+      try {
+        const installationId = await getInstallationId();
+        return await apiRequest<VkAuthChallenge>('/v1/auth/vk/start', {
+          method: 'POST',
+          body: JSON.stringify({ phone, legalAcceptance, installationId }),
+        });
+      } catch (error) {
+        const message = error instanceof ApiError
+          ? error.message
+          : 'Не удалось открыть вход через VK.';
+        setAuthError(message);
+        throw error;
+      } finally {
+        setAuthenticating(false);
+      }
+    },
+    [],
+  );
+
+  const checkVkPhoneAuth = useCallback(
+    async (challenge: VkAuthChallenge): Promise<MaxAuthStatus['status']> => {
+      try {
+        const installationId = await getInstallationId();
+        const result = await apiRequest<MaxAuthStatus>('/v1/auth/vk/status', {
+          method: 'POST',
+          body: JSON.stringify({
+            challengeId: challenge.challengeId,
+            exchangeToken: challenge.exchangeToken,
+            installationId,
+          }),
+        });
+        if (result.status === 'expired') {
+          setAuthError('Подтверждение через VK устарело. Попробуйте ещё раз.');
+        } else if (result.status === 'failed') {
+          setAuthError(
+            result.errorCode === 'PHONE_MISMATCH'
+              ? 'Номер в VK не совпадает с указанным номером.'
+              : result.errorCode === 'PHONE_NOT_SHARED'
+                ? 'Разрешите VK передать номер телефона для безопасного входа.'
+                : 'Не удалось подтвердить вход через VK.',
+          );
+        } else if (result.status === 'verified') {
+          await applySession(result);
+          const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
+          router.replace(destination);
+        }
+        return result.status;
+      } catch (error) {
+        const message = error instanceof ApiError
+          ? error.message
+          : 'Не удалось проверить подтверждение через VK.';
+        setAuthError(message);
+        throw error;
+      }
+    },
+    [applySession],
+  );
+
   const verifyPhoneAuth = useCallback(
     async (phone: string, code: string) => {
       setAuthenticating(true);
@@ -429,6 +501,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkMaxPhoneAuth,
       startTelegramPhoneAuth,
       checkTelegramPhoneAuth,
+      startVkPhoneAuth,
+      checkVkPhoneAuth,
       verifyPhoneAuth,
       continueDemo,
       updateProfile,
@@ -443,6 +517,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       authenticating,
       checkMaxPhoneAuth,
       checkTelegramPhoneAuth,
+      checkVkPhoneAuth,
       clearAuthError,
       continueDemo,
       loading,
@@ -453,6 +528,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       startPhoneAuth,
       startMaxPhoneAuth,
       startTelegramPhoneAuth,
+      startVkPhoneAuth,
       token,
       updateProfile,
       uploadAvatar,

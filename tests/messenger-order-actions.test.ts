@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   firstRow: vi.fn(),
   findUserWithRoles: vi.fn(),
   notifyMessengerAccount: vi.fn(),
+  refreshMessengerAccountOrderMessages: vi.fn(),
   signSession: vi.fn(),
 }));
 
@@ -27,6 +28,7 @@ vi.mock('../server/security', () => ({
 vi.mock('../server/messenger-notifications', () => ({
   appUrl: (path: string) => `https://taxi.example${path}`,
   notifyMessengerAccount: mocks.notifyMessengerAccount,
+  refreshMessengerAccountOrderMessages: mocks.refreshMessengerAccountOrderMessages,
 }));
 
 import { createMessengerOrderActionHandler } from '../server/messenger-order-actions';
@@ -72,6 +74,8 @@ describe('messenger order actions', () => {
     vi.clearAllMocks();
     mocks.execute.mockResolvedValue([{}]);
     mocks.signSession.mockResolvedValue('internal-session');
+    mocks.notifyMessengerAccount.mockResolvedValue(undefined);
+    mocks.refreshMessengerAccountOrderMessages.mockResolvedValue(undefined);
   });
 
   it('rejects a callback coming from a different Telegram chat', async () => {
@@ -149,6 +153,70 @@ describe('messenger order actions', () => {
           [expect.objectContaining({ intent: 'negative', data: `r:cancel-ok:${orderId}` })],
         ]),
       }),
+    );
+  });
+
+  it('refreshes existing buttons instead of sending another card after rating', async () => {
+    const completed = order({ status: 'completed', ratings: {} });
+    const rated = order({ status: 'completed', ratings: { byPassenger: 5 } });
+    mocks.firstRow.mockResolvedValueOnce({ user_id: 'passenger-user', chat_id: 'tg-chat' });
+    mocks.findUserWithRoles.mockResolvedValue({
+      id: 'passenger-user',
+      roles: ['passenger'],
+      blockedAt: undefined,
+    });
+    const inject = vi.fn()
+      .mockResolvedValueOnce(response(completed))
+      .mockResolvedValueOnce(response(rated));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+
+    const result = await handle({
+      provider: 'telegram',
+      externalUserId: '42',
+      chatId: 'tg-chat',
+      sourceMessageId: '101',
+      data: `r:rate-5:${orderId}`,
+    });
+
+    expect(result.text).toContain('Оценка сохранена');
+    expect(mocks.notifyMessengerAccount).not.toHaveBeenCalled();
+    expect(mocks.refreshMessengerAccountOrderMessages).toHaveBeenCalledWith(
+      'telegram',
+      '42',
+      expect.objectContaining({
+        orderId,
+        audience: 'passenger',
+        buttons: [[expect.objectContaining({ label: '🏁 Поездка завершена' })]],
+      }),
+      '101',
+    );
+  });
+
+  it('replaces a stale cancel button when the ride is already completed', async () => {
+    mocks.firstRow.mockResolvedValueOnce({ user_id: 'passenger-user', chat_id: 'tg-chat' });
+    mocks.findUserWithRoles.mockResolvedValue({
+      id: 'passenger-user',
+      roles: ['passenger'],
+      blockedAt: undefined,
+    });
+    const inject = vi.fn().mockResolvedValue(response(order({ status: 'completed' })));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+
+    const result = await handle({
+      provider: 'telegram',
+      externalUserId: '42',
+      chatId: 'tg-chat',
+      sourceMessageId: '55',
+      data: `r:cancel:${orderId}`,
+    });
+
+    expect(result).toEqual({ text: 'Поездка уже завершена.', alert: true });
+    expect(mocks.notifyMessengerAccount).not.toHaveBeenCalled();
+    expect(mocks.refreshMessengerAccountOrderMessages).toHaveBeenCalledWith(
+      'telegram',
+      '42',
+      expect.objectContaining({ orderId, audience: 'passenger' }),
+      '55',
     );
   });
 });

@@ -2,8 +2,13 @@ import type { RowDataPacket } from 'mysql2/promise';
 
 import { config } from './config';
 import { db, firstRow } from './db';
-import { sendMaxLocation, sendMaxMessage } from './max-bot';
-import { sendTelegramMessage, sendTelegramVenue } from './telegram-bot';
+import { editMaxMessage, sendMaxLocation, sendMaxMessage } from './max-bot';
+import {
+  editTelegramMessage,
+  sendTelegramMessage,
+  sendTelegramVenue,
+} from './telegram-bot';
+import { editVkMessage, sendVkMessage, vkInlineKeyboard } from './vk-bot';
 
 export type MessengerButton =
   | {
@@ -27,6 +32,9 @@ export type MessengerLocation = {
 };
 
 export type PersonalMessengerNotification = {
+  orderId?: string;
+  audience?: 'passenger' | 'driver';
+  syncExistingOrderMessages?: boolean;
   icon?: string;
   title: string;
   body: string;
@@ -40,9 +48,15 @@ export type PersonalMessengerNotification = {
 };
 
 type MessengerAccountRow = RowDataPacket & {
-  provider: 'max' | 'telegram';
+  id: number;
+  user_id: string;
+  provider: 'max' | 'telegram' | 'vk';
   external_user_id: string;
   chat_id: string;
+};
+
+type TrackedOrderMessageRow = RowDataPacket & {
+  message_id: string;
 };
 
 function clean(value: unknown): string | null {
@@ -70,12 +84,10 @@ export function formatPersonalMessengerNotification(
   return message.length <= 4_000 ? message : `${message.slice(0, 3_999)}…`;
 }
 
-async function deliver(
-  account: MessengerAccountRow,
+function notificationButtonRows(
   notification: PersonalMessengerNotification,
-): Promise<void> {
-  const text = formatPersonalMessengerNotification(notification);
-  const buttonRows: ReadonlyArray<ReadonlyArray<MessengerButton>> = [
+): ReadonlyArray<ReadonlyArray<MessengerButton>> {
+  return [
     ...(notification.buttons ?? []),
     ...(notification.action
       ? [[{
@@ -85,75 +97,175 @@ async function deliver(
         }]]
       : []),
   ];
+}
+
+function maxMessageBody(notification: PersonalMessengerNotification): Record<string, unknown> {
+  const buttonRows = notificationButtonRows(notification);
+  return {
+    text: formatPersonalMessengerNotification(notification),
+    attachments: buttonRows.length
+      ? [{
+          type: 'inline_keyboard',
+          payload: {
+            buttons: buttonRows.map((row) => row.map((button) =>
+              button.type === 'callback'
+                ? {
+                    type: 'callback',
+                    text: button.label,
+                    payload: button.data,
+                    intent: button.intent ?? 'default',
+                  }
+                : {
+                    type: 'link',
+                    text: button.label,
+                    url: button.url,
+                  },
+            )),
+          },
+        }]
+      : [],
+  };
+}
+
+function telegramMessageBody(
+  notification: PersonalMessengerNotification,
+): Record<string, unknown> {
+  const buttonRows = notificationButtonRows(notification);
+  return {
+    text: formatPersonalMessengerNotification(notification),
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: buttonRows.map((row) => row.map((button) => ({
+        text: button.label,
+        style:
+          button.intent === 'positive'
+            ? 'success'
+            : button.intent === 'negative'
+              ? 'danger'
+              : 'primary',
+        ...(button.type === 'callback'
+          ? { callback_data: button.data }
+          : { url: button.url }),
+      }))),
+    },
+  };
+}
+
+function vkMessageBody(notification: PersonalMessengerNotification) {
+  const buttonRows = notificationButtonRows(notification);
+  return {
+    message: [
+      formatPersonalMessengerNotification(notification),
+      ...(notification.locations ?? []).map((location) =>
+        `📍 ${location.title}\n${location.address}\nhttps://yandex.ru/maps/?pt=${location.longitude},${location.latitude}&z=16&l=map`,
+      ),
+    ].join('\n\n'),
+    ...(buttonRows.length
+      ? { keyboard: vkInlineKeyboard(buttonRows.map((row) => row.map((button) => ({
+          type: button.type,
+          label: button.label,
+          data: button.type === 'callback' ? button.data : undefined,
+          url: button.type === 'link' ? button.url : undefined,
+          intent: button.intent,
+        })))) }
+      : {}),
+  };
+}
+
+async function editOrderMessage(
+  account: MessengerAccountRow,
+  messageId: string,
+  notification: PersonalMessengerNotification,
+): Promise<void> {
+  if (account.provider === 'max') {
+    if (config.MAX_BOT_TOKEN) {
+      await editMaxMessage(account.external_user_id, messageId, maxMessageBody(notification));
+    }
+    return;
+  }
+  if (account.provider === 'telegram' && config.TELEGRAM_BOT_TOKEN) {
+    await editTelegramMessage(account.chat_id, messageId, telegramMessageBody(notification));
+    return;
+  }
+  if (account.provider === 'vk' && config.VK_BOT_TOKEN) {
+    await editVkMessage(account.chat_id, messageId, vkMessageBody(notification));
+  }
+}
+
+async function trackOrderMessage(
+  account: MessengerAccountRow,
+  notification: PersonalMessengerNotification,
+  messageId: string,
+): Promise<void> {
+  if (!notification.orderId || !notification.audience) return;
+  await db.execute(
+    `INSERT IGNORE INTO messenger_order_messages
+      (order_id, messenger_account_id, audience, message_id)
+     VALUES (?, ?, ?, ?)`,
+    [notification.orderId, account.id, notification.audience, messageId],
+  );
+}
+
+async function syncTrackedOrderMessages(
+  account: MessengerAccountRow,
+  notification: PersonalMessengerNotification,
+  sourceMessageId?: string,
+): Promise<void> {
+  if (!notification.orderId) return;
+  const [rows] = await db.query<TrackedOrderMessageRow[]>(
+    `SELECT message_id FROM messenger_order_messages
+     WHERE order_id = ? AND messenger_account_id = ?`,
+    [notification.orderId, account.id],
+  );
+  const messageIds = [...new Set([
+    ...rows.map((row) => row.message_id),
+    ...(sourceMessageId ? [sourceMessageId] : []),
+  ])];
+  if (sourceMessageId) await trackOrderMessage(account, notification, sourceMessageId);
+  for (const messageId of messageIds) {
+    await editOrderMessage(account, messageId, notification).catch(() => undefined);
+  }
+}
+
+async function deliver(
+  account: MessengerAccountRow,
+  notification: PersonalMessengerNotification,
+): Promise<void> {
+  if (notification.syncExistingOrderMessages !== false) {
+    await syncTrackedOrderMessages(account, notification);
+  }
   if (account.provider === 'max') {
     if (!config.MAX_BOT_TOKEN) return;
-    await sendMaxMessage(account.external_user_id, {
-      text,
-      ...(buttonRows.length
-        ? {
-            attachments: [{
-              type: 'inline_keyboard',
-              payload: {
-                buttons: buttonRows.map((row) => row.map((button) =>
-                  button.type === 'callback'
-                    ? {
-                        type: 'callback',
-                        text: button.label,
-                        payload: button.data,
-                        intent: button.intent ?? 'default',
-                      }
-                    : {
-                        type: 'link',
-                        text: button.label,
-                        url: button.url,
-                      },
-                )),
-              },
-            }],
-          }
-        : {}),
-    });
+    const messageId = await sendMaxMessage(account.external_user_id, maxMessageBody(notification));
+    if (messageId) await trackOrderMessage(account, notification, messageId);
     for (const location of notification.locations ?? []) {
       await sendMaxLocation(account.external_user_id, location);
     }
     return;
   }
 
+  if (account.provider === 'vk') {
+    if (!config.VK_BOT_TOKEN) return;
+    const messageId = await sendVkMessage(account.chat_id, vkMessageBody(notification));
+    if (messageId) await trackOrderMessage(account, notification, messageId);
+    return;
+  }
+
   if (!config.TELEGRAM_BOT_TOKEN) return;
-  await sendTelegramMessage(account.chat_id, {
-    text,
-    disable_web_page_preview: true,
-    ...(buttonRows.length
-      ? {
-          reply_markup: {
-            inline_keyboard: buttonRows.map((row) => row.map((button) => ({
-              text: button.label,
-              style:
-                button.intent === 'positive'
-                  ? 'success'
-                  : button.intent === 'negative'
-                    ? 'danger'
-                    : 'primary',
-              ...(button.type === 'callback'
-                ? { callback_data: button.data }
-                : { url: button.url }),
-            }))),
-          },
-        }
-      : {}),
-  });
+  const messageId = await sendTelegramMessage(account.chat_id, telegramMessageBody(notification));
+  if (messageId) await trackOrderMessage(account, notification, messageId);
   for (const location of notification.locations ?? []) {
     await sendTelegramVenue(account.chat_id, location);
   }
 }
 
 export async function notifyMessengerAccount(
-  provider: 'max' | 'telegram',
+  provider: 'max' | 'telegram' | 'vk',
   externalUserId: string,
   notification: PersonalMessengerNotification,
 ): Promise<void> {
   const account = await firstRow<MessengerAccountRow>(
-    `SELECT provider, external_user_id, chat_id
+    `SELECT id, user_id, provider, external_user_id, chat_id
      FROM user_messenger_accounts
      WHERE provider = ? AND external_user_id = ?
        AND active = TRUE AND bot_contact_available = TRUE
@@ -161,6 +273,55 @@ export async function notifyMessengerAccount(
     [provider, externalUserId],
   );
   if (account) await deliver(account, notification);
+}
+
+export async function refreshMessengerAccountOrderMessages(
+  provider: 'max' | 'telegram' | 'vk',
+  externalUserId: string,
+  notification: PersonalMessengerNotification,
+  sourceMessageId?: string,
+): Promise<void> {
+  const account = await firstRow<MessengerAccountRow>(
+    `SELECT id, user_id, provider, external_user_id, chat_id
+     FROM user_messenger_accounts
+     WHERE provider = ? AND external_user_id = ?
+       AND active = TRUE AND bot_contact_available = TRUE
+     LIMIT 1`,
+    [provider, externalUserId],
+  );
+  if (account) {
+    await syncTrackedOrderMessages(account, notification, sourceMessageId);
+  }
+}
+
+export async function closeUnassignedDriverOrderOffers(
+  orderId: string,
+  assignedDriverUserId: string,
+): Promise<void> {
+  const [rows] = await db.query<(MessengerAccountRow & TrackedOrderMessageRow)[]>(
+    `SELECT uma.id, uma.user_id, uma.provider, uma.external_user_id, uma.chat_id,
+       mom.message_id
+     FROM messenger_order_messages mom
+     JOIN user_messenger_accounts uma ON uma.id = mom.messenger_account_id
+     WHERE mom.order_id = ? AND mom.audience = 'driver'
+       AND uma.user_id <> ? AND uma.active = TRUE AND uma.bot_contact_available = TRUE`,
+    [orderId, assignedDriverUserId],
+  );
+  const notification: PersonalMessengerNotification = {
+    orderId,
+    audience: 'driver',
+    icon: '🚕',
+    title: 'Заказ уже принят',
+    body: 'Этот заказ принял другой водитель.',
+    buttons: [[{
+      type: 'link',
+      label: '🚕 К доступным заказам',
+      url: appUrl('/driver'),
+    }]],
+  };
+  for (const row of rows) {
+    await editOrderMessage(row, row.message_id, notification).catch(() => undefined);
+  }
 }
 
 export async function notifyUsersInMessengers(
@@ -171,7 +332,7 @@ export async function notifyUsersInMessengers(
   if (!uniqueUserIds.length) return;
   const placeholders = uniqueUserIds.map(() => '?').join(',');
   const [accounts] = await db.query<MessengerAccountRow[]>(
-    `SELECT provider, external_user_id, chat_id
+    `SELECT id, user_id, provider, external_user_id, chat_id
      FROM user_messenger_accounts
      WHERE user_id IN (${placeholders})
        AND active = TRUE AND bot_contact_available = TRUE`,

@@ -110,12 +110,12 @@ export async function linkMessengerIdentity(
     `INSERT INTO user_messenger_accounts
       (user_id, provider, external_user_id, chat_id, username, display_name,
        first_name, last_name, active, bot_contact_available, bot_started_at, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, TRUE, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))
      ON DUPLICATE KEY UPDATE
        user_id = VALUES(user_id), chat_id = VALUES(chat_id),
        username = VALUES(username), display_name = VALUES(display_name),
        first_name = VALUES(first_name), last_name = VALUES(last_name),
-       active = TRUE, bot_contact_available = TRUE,
+       active = TRUE, bot_contact_available = VALUES(bot_contact_available),
        bot_started_at = COALESCE(bot_started_at, UTC_TIMESTAMP(3)),
        last_seen_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3)`,
     [
@@ -127,6 +127,7 @@ export async function linkMessengerIdentity(
       identity.displayName,
       identity.firstName,
       identity.lastName,
+      identity.botContactAvailable,
     ],
   );
 

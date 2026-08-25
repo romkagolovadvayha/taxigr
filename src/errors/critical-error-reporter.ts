@@ -5,7 +5,8 @@ export type ClientErrorSource =
   | 'react-error-boundary'
   | 'global-error'
   | 'unhandled-rejection'
-  | 'resource-error';
+  | 'resource-error'
+  | 'push-registration';
 
 type ReportOptions = {
   source: ClientErrorSource;

@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
@@ -65,11 +65,18 @@ import {
 } from './messenger-order-actions';
 import {
   appUrl,
+  closeUnassignedDriverOrderOffers,
   notifyDriversInMessengers,
   notifyOnlineDriversInMessengers,
   notifyUsersInMessengers,
 } from './messenger-notifications';
-import { orderSelect, presentOrder, type OrderRow } from './presenters';
+import {
+  limitOrderRatings,
+  orderSelect,
+  presentOrder,
+  type OrderRatingViewer,
+  type OrderRow,
+} from './presenters';
 import { driverRideNotification, passengerRideNotification } from './ride-messenger';
 import { findPlace, listPlaces, placeToAddress, searchPlaces } from './places';
 import {
@@ -80,7 +87,8 @@ import {
   phoneCodeHash,
 } from './phone-verification';
 import { isPlayReviewPhone, PLAY_REVIEW_CODE } from './play-review-auth';
-import { notifyOnlineDrivers, notifyUsers } from './push';
+import { notifyDrivers, notifyOnlineDrivers, notifyUsers } from './push';
+import { driverOrderAvailablePush, passengerRidePush } from './ride-push';
 import {
   findOrCreatePhoneUser,
   findUserWithRoles,
@@ -100,6 +108,8 @@ import {
 } from './security';
 import { sendPhoneVerificationCode, verifyPhoneVerificationCode } from './sms';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
+import { exchangeVkAuthorizationCode, vkAuthorizationUrl, vkCallbackHtml } from './vk-auth';
+import { answerVkMessageEvent, sendVkMessage } from './vk-bot';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
 
@@ -204,6 +214,28 @@ const maxAuthStatusSchema = z.object({
   exchangeToken: z.string().min(32).max(128),
   installationId: z.string().trim().min(16).max(128),
 });
+const vkCallbackSchema = z.object({
+  code: z.string().min(1).max(4096),
+  state: z.string().min(20).max(128),
+  device_id: z.string().min(1).max(256),
+});
+const vkCallbackUpdateSchema = z.object({
+  type: z.string(),
+  group_id: z.union([z.string(), z.number()]),
+  secret: z.string().optional(),
+  object: z.object({
+    message: z.object({
+      from_id: z.union([z.string(), z.number()]),
+      peer_id: z.union([z.string(), z.number()]),
+      text: z.string().optional(),
+    }).passthrough().optional(),
+    user_id: z.union([z.string(), z.number()]).optional(),
+    peer_id: z.union([z.string(), z.number()]).optional(),
+    conversation_message_id: z.union([z.string(), z.number()]).optional(),
+    event_id: z.string().optional(),
+    payload: z.unknown().optional(),
+  }).passthrough().optional(),
+}).passthrough();
 const maxUpdateSchema = z.object({
   update_type: z.string(),
   chat_id: z.union([z.string(), z.number()]).optional(),
@@ -222,7 +254,10 @@ const maxUpdateSchema = z.object({
   }).passthrough().optional(),
   message: z.object({
     sender: z.object({ user_id: z.union([z.string(), z.number()]) }).passthrough().optional(),
-    body: z.object({ attachments: z.array(z.unknown()).optional() }).passthrough().nullable().optional(),
+    body: z.object({
+      mid: z.string().optional(),
+      attachments: z.array(z.unknown()).optional(),
+    }).passthrough().nullable().optional(),
   }).passthrough().optional(),
 }).passthrough();
 const clientErrorSchema = z.object({
@@ -231,6 +266,7 @@ const clientErrorSchema = z.object({
     'global-error',
     'unhandled-rejection',
     'resource-error',
+    'push-registration',
   ]),
   name: z.string().trim().min(1).max(120),
   message: z.string().trim().min(1).max(2_000),
@@ -459,6 +495,19 @@ function quoteTariffs(
 
 async function getOrder(id: string): Promise<OrderRow | null> {
   return firstRow<OrderRow>(`${orderSelect} WHERE o.id = ?`, [id]);
+}
+
+function ratingViewerForOrder(
+  row: OrderRow,
+  session: AuthUser,
+  driverId?: string,
+): OrderRatingViewer {
+  if (session.roles.includes('admin')) return 'admin';
+  return row.passenger_id === session.id
+    ? 'passenger'
+    : driverId === row.driver_id
+      ? 'driver'
+      : 'passenger';
 }
 
 async function settleWaiting(
@@ -789,6 +838,22 @@ function requireTelegramConfiguration(): void {
   }
 }
 
+function requireVkConfiguration(): void {
+  if (
+    !config.VK_APP_ID ||
+    !config.VK_REDIRECT_URI ||
+    !config.VK_COMMUNITY_ID ||
+    !config.VK_BOT_TOKEN ||
+    !config.VK_CALLBACK_SECRET ||
+    !config.VK_CALLBACK_CONFIRMATION
+  ) {
+    throw Object.assign(new Error('Вход через VK пока не настроен'), {
+      statusCode: 503,
+      code: 'VK_NOT_CONFIGURED',
+    });
+  }
+}
+
 export type RegisteredRouteHandlers = {
   handleMessengerOrderAction: (
     request: MessengerOrderActionRequest,
@@ -874,6 +939,305 @@ export async function registerRoutes(
   );
 
   app.post(
+    '/v1/auth/vk/start',
+    { logLevel: 'warn', config: { rateLimit: false } },
+    async (request, reply) => {
+      void reply.header('Cache-Control', 'no-store');
+      requireVkConfiguration();
+      const raw = request.body && typeof request.body === 'object'
+        ? request.body as Record<string, unknown>
+        : {};
+      const rawPhone = typeof raw.phone === 'string' ? raw.phone : undefined;
+      const rawInstallationId = typeof raw.installationId === 'string'
+        ? raw.installationId
+        : undefined;
+      const identity = buildAuthIdentity(request.ip, rawPhone, rawInstallationId);
+      const eventId = await createAuthAttempt({
+        requestId: String(request.id),
+        action: 'start_vk',
+        identity,
+        userAgent: request.headers['user-agent'],
+      });
+      let finalized = false;
+      const finalize = async (outcome: string, challengeId?: string) => {
+        await finishAuthAttempt(eventId, outcome, undefined, challengeId);
+        finalized = true;
+      };
+      try {
+        const input = parse(phoneAuthStartSchema, request.body);
+        const phone = normalizeRussianPhone(input.phone);
+        if (!phone) {
+          await finalize('invalid_phone');
+          throw Object.assign(new Error('Укажите российский мобильный номер'), {
+            statusCode: 400,
+            code: 'PHONE_INVALID',
+          });
+        }
+        const challengeId = randomUUID();
+        const stateToken = randomToken(32);
+        const exchangeToken = randomToken(32);
+        const codeVerifier = randomToken(48);
+        const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+        const expiresAt = new Date(Date.now() + config.PHONE_CODE_TTL_MINUTES * 60_000);
+        await db.execute(
+          `INSERT INTO vk_auth_challenges
+            (id, state_token, code_verifier, exchange_secret_hash, expected_phone,
+             legal_acceptance, consent_ip, consent_user_agent, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            challengeId,
+            stateToken,
+            codeVerifier,
+            sha256(exchangeToken),
+            phone,
+            JSON.stringify(input.legalAcceptance),
+            identity.ipAddress,
+            request.headers['user-agent']?.slice(0, 255) ?? null,
+            expiresAt,
+          ],
+        );
+        await finalize('vk_challenge_created', challengeId);
+        return {
+          data: {
+            challengeId,
+            exchangeToken,
+            authorizationUrl: vkAuthorizationUrl({ state: stateToken, codeChallenge }),
+            communityUrl: 'https://vk.ru/taxigr',
+            expiresInSeconds: config.PHONE_CODE_TTL_MINUTES * 60,
+          },
+        };
+      } catch (error) {
+        if (!finalized) await finishAuthAttempt(eventId, 'internal_error').catch(() => undefined);
+        throw error;
+      }
+    },
+  );
+
+  app.get('/v1/auth/vk/callback', { logLevel: 'warn' }, async (request, reply) => {
+    void reply.header('Cache-Control', 'no-store');
+    void reply.type('text/html; charset=utf-8');
+    let state: string | null = null;
+    try {
+      requireVkConfiguration();
+      const input = parse(vkCallbackSchema, request.query);
+      state = input.state;
+      const challenge = await firstRow<
+        RowDataPacket & { id: string; code_verifier: string; expected_phone: string; expires_at: Date | string }
+      >(
+        `SELECT id, code_verifier, expected_phone, expires_at
+         FROM vk_auth_challenges WHERE state_token = ? LIMIT 1`,
+        [input.state],
+      );
+      if (!challenge || new Date(challenge.expires_at).getTime() <= Date.now()) {
+        throw new Error('VK challenge is missing or expired');
+      }
+      const vkIdentity = await exchangeVkAuthorizationCode({
+        code: input.code,
+        codeVerifier: challenge.code_verifier,
+        deviceId: input.device_id,
+        state: input.state,
+      });
+      const matches = Boolean(vkIdentity.phone && vkIdentity.phone === challenge.expected_phone);
+      await db.execute(
+        `UPDATE vk_auth_challenges
+         SET verified_phone = ?, vk_user_id = ?, vk_first_name = ?, vk_last_name = ?,
+           failure_code = ?, verified_at = IF(?, UTC_TIMESTAMP(3), NULL)
+         WHERE id = ? AND verified_at IS NULL`,
+        [
+          vkIdentity.phone,
+          vkIdentity.userId,
+          vkIdentity.firstName,
+          vkIdentity.lastName,
+          matches ? null : vkIdentity.phone ? 'PHONE_MISMATCH' : 'PHONE_NOT_SHARED',
+          matches,
+          challenge.id,
+        ],
+      );
+      return reply.send(vkCallbackHtml(matches));
+    } catch (error) {
+      if (state) {
+        await db.execute(
+          `UPDATE vk_auth_challenges SET failure_code = 'VK_OAUTH_FAILED'
+           WHERE state_token = ? AND verified_at IS NULL`,
+          [state],
+        ).catch(() => undefined);
+      }
+      request.log.warn({ error }, 'VK ID callback failed');
+      return reply.send(vkCallbackHtml(false));
+    }
+  });
+
+  app.post('/v1/auth/vk/status', async (request, reply) => {
+    void reply.header('Cache-Control', 'no-store');
+    const input = parse(maxAuthStatusSchema, request.body);
+    const result = await withTransaction(async (connection) => {
+      const [rows] = await connection.query<
+        (RowDataPacket & {
+          exchange_secret_hash: string;
+          expected_phone: string;
+          verified_phone: string | null;
+          failure_code: string | null;
+          legal_acceptance: string | object;
+          consent_ip: string | null;
+          consent_user_agent: string | null;
+          expires_at: Date | string;
+          vk_user_id: string | null;
+          vk_first_name: string | null;
+          vk_last_name: string | null;
+        })[]
+      >(
+        `SELECT exchange_secret_hash, expected_phone, verified_phone, failure_code,
+           legal_acceptance, consent_ip, consent_user_agent, expires_at,
+           vk_user_id, vk_first_name, vk_last_name
+         FROM vk_auth_challenges WHERE id = ? FOR UPDATE`,
+        [input.challengeId],
+      );
+      const challenge = rows[0];
+      if (!challenge || !hashesMatch(challenge.exchange_secret_hash, sha256(input.exchangeToken))) {
+        throw Object.assign(new Error('Подтверждение VK не найдено'), {
+          statusCode: 404,
+          code: 'VK_CHALLENGE_NOT_FOUND',
+        });
+      }
+      if (new Date(challenge.expires_at).getTime() <= Date.now()) {
+        return { status: 'expired' as const };
+      }
+      if (challenge.failure_code) {
+        return { status: 'failed' as const, errorCode: challenge.failure_code };
+      }
+      if (!challenge.verified_phone || !challenge.vk_user_id) {
+        return { status: 'pending' as const };
+      }
+
+      const userId = await findOrCreatePhoneUser(connection, challenge.expected_phone);
+      await linkMessengerIdentity(connection, userId, {
+        provider: 'vk',
+        externalUserId: challenge.vk_user_id,
+        chatId: challenge.vk_user_id,
+        firstName: challenge.vk_first_name,
+        lastName: challenge.vk_last_name,
+        botContactAvailable: false,
+      });
+      const acceptance = parse(
+        initialLegalAcceptanceSchema,
+        typeof challenge.legal_acceptance === 'string'
+          ? JSON.parse(challenge.legal_acceptance)
+          : challenge.legal_acceptance,
+      );
+      await recordInitialConsents(connection, userId, acceptance, {
+        source: 'phone_auth',
+        ip: challenge.consent_ip ?? undefined,
+        userAgent: challenge.consent_user_agent ?? undefined,
+      });
+      await connection.execute(
+        'UPDATE vk_auth_challenges SET completed_at = UTC_TIMESTAMP(3) WHERE id = ?',
+        [input.challengeId],
+      );
+      return { status: 'verified' as const, userId };
+    });
+
+    if (result.status !== 'verified') return { data: result };
+    const user = await findUserWithRoles(result.userId);
+    if (!user) {
+      throw Object.assign(new Error('Пользователь не найден'), {
+        statusCode: 404,
+        code: 'USER_NOT_FOUND',
+      });
+    }
+    return {
+      data: {
+        status: 'verified',
+        token: await signSession({ id: user.id, roles: user.roles }),
+        user,
+      },
+    };
+  });
+
+  app.post(
+    '/v1/webhooks/vk',
+    { logLevel: 'warn', config: { rateLimit: false } },
+    async (request, reply) => {
+      requireVkConfiguration();
+      const update = parse(vkCallbackUpdateSchema, request.body);
+      if (String(update.group_id) !== config.VK_COMMUNITY_ID) {
+        throw Object.assign(new Error('Неизвестное сообщество VK'), {
+          statusCode: 401,
+          code: 'VK_GROUP_MISMATCH',
+        });
+      }
+      if (update.secret !== config.VK_CALLBACK_SECRET) {
+        throw Object.assign(new Error('Недействительная подпись webhook VK'), {
+          statusCode: 401,
+          code: 'VK_WEBHOOK_UNAUTHORIZED',
+        });
+      }
+      if (update.type === 'confirmation') {
+        return reply.type('text/plain').send(config.VK_CALLBACK_CONFIRMATION);
+      }
+
+      if (update.type === 'message_new' && update.object?.message) {
+        const message = update.object.message;
+        const userId = String(message.from_id);
+        const peerId = String(message.peer_id);
+        const [result] = await db.execute<import('mysql2/promise').ResultSetHeader>(
+          `UPDATE user_messenger_accounts
+           SET chat_id = ?, active = TRUE, bot_contact_available = TRUE,
+             last_seen_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3)
+           WHERE provider = 'vk' AND external_user_id = ?`,
+          [peerId, userId],
+        );
+        if (result.affectedRows > 0) {
+          await sendVkMessage(peerId, {
+            message: 'VK подключён к «Такси Грахово». Здесь будут приходить статусы поездок и доступные действия.',
+          });
+        } else {
+          await sendVkMessage(peerId, {
+            message: 'Чтобы подключить уведомления, войдите через VK в приложении «Такси Грахово»: https://taxigr.ru/sign-in',
+          });
+        }
+      }
+
+      if (
+        update.type === 'message_event' &&
+        update.object?.event_id &&
+        update.object.user_id != null &&
+        update.object.peer_id != null
+      ) {
+        const userId = String(update.object.user_id);
+        const peerId = String(update.object.peer_id);
+        const data = typeof update.object.payload === 'string'
+          ? update.object.payload
+          : update.object.payload && typeof update.object.payload === 'object'
+            ? String((update.object.payload as { data?: unknown }).data ?? '')
+            : '';
+        let actionResult: MessengerOrderActionResult;
+        try {
+          actionResult = await handleMessengerOrderAction({
+            provider: 'vk',
+            externalUserId: userId,
+            chatId: peerId,
+            sourceMessageId: update.object.conversation_message_id == null
+              ? undefined
+              : `conversation:${update.object.conversation_message_id}`,
+            data,
+          });
+        } catch (error) {
+          request.log.warn({ error }, 'VK order callback failed');
+          actionResult = { text: 'Не удалось выполнить действие. Повторите позже.', alert: true };
+        }
+        await answerVkMessageEvent({
+          eventId: update.object.event_id,
+          userId,
+          peerId,
+          text: actionResult.text,
+        }).catch((error) => request.log.warn({ error }, 'VK callback answer failed'));
+      }
+
+      return reply.type('text/plain').send('ok');
+    },
+  );
+
+  app.post(
     '/v1/webhooks/max',
     { logLevel: 'warn', config: { rateLimit: false } },
     async (request, reply) => {
@@ -892,6 +1256,7 @@ export async function registerRoutes(
           result = await handleMessengerOrderAction({
             provider: 'max',
             externalUserId: String(update.callback.user.user_id),
+            sourceMessageId: update.message?.body?.mid,
             data: update.callback.payload,
           });
         } catch (error) {
@@ -1915,7 +2280,7 @@ export async function registerRoutes(
           pricingDistanceMeters,
           rules,
           pricingScope,
-          driverApproachRoute !== null,
+          driverApproachRoute !== null && pricingDistanceMeters > route.distanceMeters,
         ),
         currency: 'RUB',
       },
@@ -1951,7 +2316,7 @@ export async function registerRoutes(
             pricingDistanceMeters,
             rules,
             pricingScope,
-            driverApproachRoute !== null,
+            driverApproachRoute !== null && pricingDistanceMeters > route.distanceMeters,
           ),
           currency: 'RUB',
         },
@@ -2150,13 +2515,9 @@ export async function registerRoutes(
           ['Комментарий', result.order.comment],
         ],
       });
-      void notifyOnlineDrivers({
-        title: 'Новый заказ',
-        body: `${result.order.pickup.label} → ${result.order.destination.label}`,
-        data: { orderId: result.order.id, role: 'driver' },
-        sound: 'new_order.wav',
-        channelId: 'driver-orders-v2',
-      }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+      void notifyOnlineDrivers(driverOrderAvailablePush(result.order.id)).catch((error) =>
+        app.log.warn({ error }, 'push notification failed'),
+      );
       notifyMessengers(
         notifyUsersInMessengers([session.id], passengerRideNotification(result.order)),
         'order.created.passenger',
@@ -2222,7 +2583,12 @@ export async function registerRoutes(
       `${orderSelect}${clauses.length ? ` WHERE ${clauses.join(' AND ')}` : ''} ORDER BY o.created_at DESC LIMIT 100`,
       values,
     );
-    return { data: rows.map(presentOrder) };
+    return {
+      data: rows.map((row) => limitOrderRatings(
+        presentOrder(row),
+        ratingViewerForOrder(row, session, driver?.id),
+      )),
+    };
   });
 
   app.get('/v1/orders/:id', async (request) => {
@@ -2234,7 +2600,12 @@ export async function registerRoutes(
     if (!session.roles.includes('admin') && row.passenger_id !== session.id && row.driver_id !== driver?.id) {
       throw Object.assign(new Error('Нет доступа к заказу'), { statusCode: 403 });
     }
-    return { data: presentOrder(row) };
+    return {
+      data: limitOrderRatings(
+        presentOrder(row),
+        ratingViewerForOrder(row, session, driver?.id),
+      ),
+    };
   });
 
   app.post('/v1/orders/:id/search-price-increase', async (request) => {
@@ -2330,13 +2701,9 @@ export async function registerRoutes(
       });
       if (payload.status === 'searching' && !payload.driverId) {
         publish('drivers', 'order:available', payload);
-        void notifyOnlineDrivers({
-          title: 'Стоимость заказа повышена',
-          body: `${payload.pickup.label} → ${payload.destination.label} · ${formatMoney(payload.priceMinor)}`,
-          data: { orderId: id, role: 'driver' },
-          sound: 'new_order.wav',
-          channelId: 'driver-orders-v2',
-        }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+        void notifyOnlineDrivers(driverOrderAvailablePush(id, true)).catch((error) =>
+          app.log.warn({ error }, 'push notification failed'),
+        );
         notifyMessengers(
           notifyOnlineDriversInMessengers(driverRideNotification(payload, {
             icon: '💰',
@@ -2387,7 +2754,7 @@ export async function registerRoutes(
         const driver = session.roles.includes('driver')
           ? await getDriver(session.id, connection)
           : null;
-        const raterRole =
+        const raterRole: 'passenger' | 'driver' | null =
           order.passenger_id === session.id
             ? 'passenger'
             : order.driver_id === driver?.id
@@ -2445,8 +2812,14 @@ export async function registerRoutes(
       const updated = await getOrder(id);
       if (!updated) throw new Error('Order disappeared');
       const payload = presentOrder(updated);
-      publish(`user:${participants.passengerId}`, 'order:updated', payload);
-      publish(`driver:${participants.driverId}`, 'order:updated', payload);
+      const raterPayload = limitOrderRatings(payload, participants.raterRole);
+      publish(
+        participants.raterRole === 'passenger'
+          ? `user:${participants.passengerId}`
+          : `driver:${participants.driverId}`,
+        'order:updated',
+        raterPayload,
+      );
       const rater = participants.raterRole === 'passenger' ? payload.passenger : payload.driver;
       notifyAdmins({
         icon: score <= 2 ? '⚠️' : '⭐',
@@ -2464,24 +2837,7 @@ export async function registerRoutes(
           ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
         ],
       });
-      if (participants.raterRole === 'passenger') {
-        notifyMessengers(
-          notifyDriversInMessengers([participants.driverId], driverRideNotification(payload, {
-            icon: '⭐',
-            title: `Пассажир оценил поездку на ${score}/5`,
-          })),
-          'order.rated.driver',
-        );
-      } else {
-        notifyMessengers(
-          notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
-            icon: '⭐',
-            title: `Водитель оценил поездку на ${score}/5`,
-          })),
-          'order.rated.passenger',
-        );
-      }
-      return { data: payload };
+      return { data: raterPayload };
     },
   );
 
@@ -2598,6 +2954,21 @@ export async function registerRoutes(
         ['Назначенный водитель', payload.driver?.name],
       ],
     });
+    const cancelledPush = passengerRidePush(payload);
+    if (cancelledPush) {
+      void notifyUsers([participants.passengerId], cancelledPush).catch((error) =>
+        app.log.warn({ error }, 'push notification failed'),
+      );
+    }
+    if (participants.driverId) {
+      void notifyDrivers([participants.driverId], {
+        title: 'Заказ отменён',
+        body: 'Заказ больше не активен',
+        data: { orderId: id, role: 'driver' },
+        sound: 'ride_cancelled.wav',
+        channelId: 'ride-cancelled-v2',
+      }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+    }
     notifyMessengers(
       notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
         body: participants.initiatedBy === 'passenger'
@@ -3084,13 +3455,12 @@ export async function registerRoutes(
         ['Стоимость', formatMoney(payload.priceMinor)],
       ],
     });
-    void notifyUsers([updated.passengerId], {
-      title: 'Водитель найден',
-      body: `${payload.driver?.vehicle.color ?? ''} ${payload.driver?.vehicle.make ?? ''} · ${payload.driver?.vehicle.plate ?? ''}`.trim(),
-      data: { orderId: id },
-      sound: 'taxi_found.wav',
-      channelId: 'ride-taxi-found-v2',
-    }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+    const acceptedPush = passengerRidePush(payload);
+    if (acceptedPush) {
+      void notifyUsers([updated.passengerId], acceptedPush).catch((error) =>
+        app.log.warn({ error }, 'push notification failed'),
+      );
+    }
     notifyMessengers(
       notifyUsersInMessengers([updated.passengerId], passengerRideNotification(payload)),
       'order.accepted.passenger',
@@ -3098,6 +3468,10 @@ export async function registerRoutes(
     notifyMessengers(
       notifyDriversInMessengers([updated.driverId], driverRideNotification(payload)),
       'order.accepted.driver',
+    );
+    notifyMessengers(
+      closeUnassignedDriverOrderOffers(id, session.id),
+      'order.accepted.other_drivers',
     );
     return { data: payload };
   });
@@ -3334,24 +3708,9 @@ export async function registerRoutes(
           : null],
       ],
     });
-    const notification =
-      status === 'driver_waiting'
-        ? {
-            title: 'Водитель приехал',
-            body: 'Машина ожидает в месте подачи',
-            sound: 'driver_arrived.wav',
-            channelId: 'ride-driver-arrived-v2' as const,
-          }
-        : status === 'completed'
-          ? {
-              title: 'Поездка завершена',
-              body: 'Спасибо, что выбрали Такси Грахово',
-              sound: 'ride_complete.wav',
-              channelId: 'ride-complete-v2' as const,
-            }
-          : null;
-    if (notification) {
-      void notifyUsers([row.passenger_id], { ...notification, data: { orderId: id } }).catch((error) =>
+    const statusPush = passengerRidePush(payload);
+    if (statusPush) {
+      void notifyUsers([row.passenger_id], statusPush).catch((error) =>
         app.log.warn({ error }, 'push notification failed'),
       );
     }
@@ -4292,8 +4651,18 @@ export async function registerRoutes(
     const updatedOrder = await getOrder(removed.order_id);
     if (updatedOrder) {
       const payload = presentOrder(updatedOrder);
-      publish(`user:${removed.passenger_id}`, 'order:updated', payload);
-      if (removed.driver_id) publish(`driver:${removed.driver_id}`, 'order:updated', payload);
+      publish(
+        `user:${removed.passenger_id}`,
+        'order:updated',
+        limitOrderRatings(payload, 'passenger'),
+      );
+      if (removed.driver_id) {
+        publish(
+          `driver:${removed.driver_id}`,
+          'order:updated',
+          limitOrderRatings(payload, 'driver'),
+        );
+      }
     }
     return { data: { id, deleted: true } };
   });

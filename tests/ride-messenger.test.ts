@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { RideOrder } from '../src/domain/models';
 import { formatPersonalMessengerNotification } from '../server/messenger-notifications';
+import { limitOrderRatings } from '../server/presenters';
 import {
   driverRideNotification,
   parseRideMessengerActionData,
@@ -145,5 +146,21 @@ describe('ride messenger flow', () => {
       expect.objectContaining({ label: '🏁 Завершить поездку', intent: 'positive' }),
     ]));
     expect(completed.buttons?.[0]).toHaveLength(5);
+  });
+
+  it('only exposes the rating submitted by the current participant', () => {
+    const completed = ride({
+      status: 'completed',
+      driverId: 'driver-1',
+      driver: assignedDriver,
+      ratings: { byPassenger: 5, byDriver: 2 },
+    });
+
+    expect(limitOrderRatings(completed, 'passenger').ratings).toEqual({ byPassenger: 5 });
+    expect(limitOrderRatings(completed, 'driver').ratings).toEqual({ byDriver: 2 });
+    expect(limitOrderRatings(completed, 'admin').ratings).toEqual({
+      byPassenger: 5,
+      byDriver: 2,
+    });
   });
 });

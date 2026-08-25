@@ -13,12 +13,16 @@ type MaxApiError = {
   message?: string;
 };
 
-async function callMaxApi(path: string, body: Record<string, unknown>): Promise<void> {
+async function callMaxApi(
+  path: string,
+  body: Record<string, unknown>,
+  method: 'POST' | 'PUT' = 'POST',
+): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const response = await fetch(`https://platform-api2.max.ru/${path}`, {
-      method: 'POST',
+      method,
       headers: {
         Accept: 'application/json',
         Authorization: config.MAX_BOT_TOKEN,
@@ -94,7 +98,7 @@ async function waitForMaxSendSlot(userId: string): Promise<void> {
 export async function sendMaxMessage(
   userId: string,
   body: Record<string, unknown>,
-): Promise<void> {
+): Promise<string | null> {
   const previous = maxSendQueue;
   let releaseQueue: () => void = () => undefined;
   maxSendQueue = new Promise<void>((resolve) => {
@@ -122,8 +126,31 @@ export async function sendMaxMessage(
       const error = (await response.json().catch(() => ({}))) as MaxApiError;
       throw new Error(error.message ?? error.code ?? `MAX Bot API HTTP ${response.status}`);
     }
+    const result = await response.json().catch(() => ({})) as {
+      body?: { mid?: unknown };
+    };
+    return typeof result.body?.mid === 'string' ? result.body.mid : null;
   } finally {
     clearTimeout(timeout);
+    releaseQueue();
+  }
+}
+
+export async function editMaxMessage(
+  userId: string,
+  messageId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const previous = maxSendQueue;
+  let releaseQueue: () => void = () => undefined;
+  maxSendQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+  await previous;
+  await waitForMaxSendSlot(userId);
+  try {
+    await callMaxApi(`messages?message_id=${encodeURIComponent(messageId)}`, body, 'PUT');
+  } finally {
     releaseQueue();
   }
 }

@@ -1,4 +1,4 @@
-export const LEGAL_UPDATED_AT = '31 июля 2026 года';
+export const LEGAL_UPDATED_AT = '25 августа 2026 года';
 
 export const legalDocuments = {
   terms: {
@@ -15,13 +15,13 @@ export const legalDocuments = {
   },
   privacy: {
     type: 'privacy',
-    version: '2026-07-31',
+    version: '2026-08-25',
     title: 'Политика обработки персональных данных',
     path: '/privacy',
   },
   personalDataConsent: {
     type: 'personal_data_consent',
-    version: '2026-07-31',
+    version: '2026-08-25',
     title: 'Согласие на обработку персональных данных',
     path: '/personal-data-consent',
   },

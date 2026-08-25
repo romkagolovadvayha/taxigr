@@ -32,6 +32,13 @@ const schema = z.object({
   TELEGRAM_CRITICAL_CHAT_ID: z.string().regex(/^-?\d+$/u).default('-1004442605510'),
   TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[A-Za-z0-9_-]*$/u).default(''),
   TELEGRAM_UPDATE_MODE: z.enum(['webhook', 'polling']).default('webhook'),
+  VK_APP_ID: z.string().regex(/^\d*$/u).default(''),
+  VK_REDIRECT_URI: z.string().url().or(z.literal('')).default(''),
+  VK_COMMUNITY_ID: z.string().regex(/^\d*$/u).default(''),
+  VK_BOT_TOKEN: z.string().default(''),
+  VK_CALLBACK_SECRET: z.string().max(128).default(''),
+  VK_CALLBACK_CONFIRMATION: z.string().max(128).default(''),
+  VK_API_VERSION: z.string().regex(/^5\.\d+$/u).default('5.199'),
   TELEGRAM_PROXY_URL: z
     .string()
     .url()

@@ -32,6 +32,9 @@
 
 - [ ] `npm ci && npm run check`.
 - [ ] `docker compose config` и тест миграции на пустой базе.
+- [ ] В GitHub Environment `production` заданы `VK_APP_ID`, `VK_COMMUNITY_ID`, `VK_API_VERSION`.
+- [ ] В GitHub Environment `production` заданы секреты `VK_BOT_TOKEN`, `VK_CALLBACK_SECRET`, `VK_CALLBACK_CONFIRMATION`.
+- [ ] Callback API VK подтверждается по адресу `https://api.taxigr.ru/v1/webhooks/vk`; включены события `message_new` и `message_event`.
 - [ ] Реальный SMS-вход на web/iOS/Android.
 - [ ] Реальный маршрут в Грахово, в Можгу и обратный маршрут.
 - [ ] Гонка принятия одного заказа двумя водителями.

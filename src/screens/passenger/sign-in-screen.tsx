@@ -5,10 +5,12 @@ import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import {
   type MaxAuthChallenge,
   type TelegramAuthChallenge,
+  type VkAuthChallenge,
   useSession,
 } from '@/auth/session-provider';
 import { RussianPhoneInput } from '@/components/auth/russian-phone-input';
 import { TelegramLogo } from '@/components/auth/telegram-logo';
+import { VkLogo } from '@/components/auth/vk-logo';
 import { BrandMark } from '@/components/brand-mark';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { AppButton } from '@/components/ui/app-button';
@@ -30,10 +32,11 @@ import {
   russianPhoneE164,
 } from '@/utils/phone';
 
-type AuthAction = 'max' | 'telegram' | 'sms' | 'code' | null;
+type AuthAction = 'max' | 'telegram' | 'vk' | 'sms' | 'code' | null;
 
 const MAX_BRAND_COLOR = '#471AFF';
 const TELEGRAM_BRAND_COLOR = '#229ED9';
+const VK_BRAND_COLOR = '#0077FF';
 
 export function SignInScreen() {
   const { isPhone } = useResponsiveLayout();
@@ -47,6 +50,8 @@ export function SignInScreen() {
     checkMaxPhoneAuth,
     startTelegramPhoneAuth,
     checkTelegramPhoneAuth,
+    startVkPhoneAuth,
+    checkVkPhoneAuth,
     verifyPhoneAuth,
     continueDemo,
   } = useSession();
@@ -58,10 +63,12 @@ export function SignInScreen() {
   const [cooldown, setCooldown] = useState(0);
   const [maxChallenge, setMaxChallenge] = useState<MaxAuthChallenge | null>(null);
   const [telegramChallenge, setTelegramChallenge] = useState<TelegramAuthChallenge | null>(null);
+  const [vkChallenge, setVkChallenge] = useState<VkAuthChallenge | null>(null);
   const [authAction, setAuthAction] = useState<AuthAction>(null);
   const [externalWindowError, setExternalWindowError] = useState<string | null>(null);
   const checkingMax = useRef(false);
   const checkingTelegram = useRef(false);
+  const checkingVk = useRef(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -115,6 +122,28 @@ export function SignInScreen() {
     };
   }, [checkTelegramPhoneAuth, telegramChallenge]);
 
+  useEffect(() => {
+    if (!vkChallenge) return;
+    const check = async () => {
+      if (checkingVk.current) return;
+      checkingVk.current = true;
+      try {
+        const status = await checkVkPhoneAuth(vkChallenge);
+        if (status !== 'pending') setVkChallenge(null);
+      } catch {
+        // A later poll can recover from a temporary network error.
+      } finally {
+        checkingVk.current = false;
+      }
+    };
+    const initial = setTimeout(() => void check(), 1_000);
+    const timer = setInterval(() => void check(), 2_500);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
+  }, [checkVkPhoneAuth, vkChallenge]);
+
   const acceptance = legalAccepted ? currentInitialLegalAcceptance() : null;
   const phone = russianPhoneE164(phoneDigits);
   const canStart = Boolean(phone && acceptance && !authenticating);
@@ -128,6 +157,7 @@ export function SignInScreen() {
     setAuthAction('max');
     setMaskedPhone(null);
     setTelegramChallenge(null);
+    setVkChallenge(null);
     setCode('');
     setDebugCode(null);
     try {
@@ -152,6 +182,7 @@ export function SignInScreen() {
     setAuthAction('telegram');
     setMaskedPhone(null);
     setMaxChallenge(null);
+    setVkChallenge(null);
     setCode('');
     setDebugCode(null);
     try {
@@ -168,12 +199,38 @@ export function SignInScreen() {
     }
   };
 
+  const confirmWithVk = async () => {
+    if (!phone || !acceptance || authenticating) return;
+    const externalWindow = prepareExternalAuthWindow();
+    clearAuthError();
+    setExternalWindowError(null);
+    setAuthAction('vk');
+    setMaskedPhone(null);
+    setMaxChallenge(null);
+    setTelegramChallenge(null);
+    setCode('');
+    setDebugCode(null);
+    try {
+      const challenge = await startVkPhoneAuth(phone, acceptance);
+      setVkChallenge(challenge);
+      await openExternalAuthUrl(challenge.authorizationUrl, externalWindow);
+    } catch (error) {
+      closePreparedExternalAuthWindow(externalWindow);
+      if (error instanceof ExternalAuthWindowBlockedError) {
+        setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
+      }
+    } finally {
+      setAuthAction(null);
+    }
+  };
+
   const sendCode = async () => {
     if (!phone || !acceptance || authenticating || cooldown > 0) return;
     clearAuthError();
     setAuthAction('sms');
     setMaxChallenge(null);
     setTelegramChallenge(null);
+    setVkChallenge(null);
     try {
       const result = await startPhoneAuth(phone, acceptance);
       setMaskedPhone(result.phone);
@@ -244,6 +301,7 @@ export function SignInScreen() {
               setMaskedPhone(null);
               setMaxChallenge(null);
               setTelegramChallenge(null);
+              setVkChallenge(null);
               setCode('');
               setDebugCode(null);
               setExternalWindowError(null);
@@ -319,7 +377,7 @@ export function SignInScreen() {
         <View style={{ gap: spacing.x2 }}>
           <AppButton
             loading={authenticating && authAction === 'max'}
-            disabled={!canStart || Boolean(maxChallenge || telegramChallenge)}
+            disabled={!canStart || Boolean(maxChallenge || telegramChallenge || vkChallenge)}
             onPress={() => void confirmWithMax()}
             foregroundColor="#FFFFFF"
             icon={
@@ -343,7 +401,7 @@ export function SignInScreen() {
           )}
           <AppButton
             loading={authenticating && authAction === 'telegram'}
-            disabled={!canStart || Boolean(maxChallenge || telegramChallenge)}
+            disabled={!canStart || Boolean(maxChallenge || telegramChallenge || vkChallenge)}
             onPress={() => void confirmWithTelegram()}
             foregroundColor="#FFFFFF"
             icon={<TelegramLogo />}
@@ -392,10 +450,28 @@ export function SignInScreen() {
               </AnimatedPressable>
             </View>
           )}
+          <AppButton
+            loading={authenticating && authAction === 'vk'}
+            disabled={!canStart || Boolean(maxChallenge || telegramChallenge || vkChallenge)}
+            onPress={() => void confirmWithVk()}
+            foregroundColor="#FFFFFF"
+            icon={<VkLogo />}
+            style={{
+              backgroundColor: VK_BRAND_COLOR,
+              boxShadow: '0 8px 22px rgba(0, 119, 255, 0.24)',
+            }}
+          >
+            {vkChallenge ? 'Ждём подтверждения в VK…' : 'Продолжить с VK ID'}
+          </AppButton>
+          {vkChallenge && (
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
+              Разрешите VK передать номер телефона, затем вернитесь в приложение.
+            </Text>
+          )}
           <AnimatedPressable
             feedback="subtle"
             accessibilityRole="link"
-            accessibilityLabel={maskedPhone ? 'Отправить код по SMS снова' : 'Получить код по SMS без MAX и Telegram'}
+            accessibilityLabel={maskedPhone ? 'Отправить код по SMS снова' : 'Получить код по SMS без мессенджеров'}
             aria-disabled={!canStart || cooldown > 0}
             aria-busy={authAction === 'sms'}
             disabled={!canStart || cooldown > 0}
@@ -425,7 +501,7 @@ export function SignInScreen() {
                   ? cooldown > 0
                     ? `Отправить SMS снова через ${formatRetryAfter(cooldown)}`
                     : 'Отправить SMS снова'
-                  : 'У меня нет MAX и Telegram'}
+                  : 'Войти по SMS'}
               </Text>
             </View>
           </AnimatedPressable>

@@ -111,7 +111,16 @@ export function passengerRideButtons(ride: RideOrder): MessengerButton[][] {
       : [[1, 2, 3, 4, 5].map((score) =>
           callback(ride, `rate-${score as 1 | 2 | 3 | 4 | 5}`, `${score}⭐`),
         )];
-    return [...rating, [link('📋 Мои заказы', appUrl('/orders'))]];
+    return [
+      ...rating,
+      [link(
+        ride.ratings?.byPassenger ? '🏁 Поездка завершена' : '📋 Мои заказы',
+        appUrl('/orders'),
+      )],
+    ];
+  }
+  if (ride.status === 'cancelled') {
+    return [[link('❌ Заказ отменён', appUrl('/orders'))]];
   }
   return [[link('📋 Мои заказы', appUrl('/orders'))]];
 }
@@ -153,7 +162,16 @@ export function driverRideButtons(ride: RideOrder): MessengerButton[][] {
       : [[1, 2, 3, 4, 5].map((score) =>
           callback(ride, `rate-${score as 1 | 2 | 3 | 4 | 5}`, `${score}⭐`),
         )];
-    return [...rating, [link('📋 Мои поездки', appUrl('/driver/trips'))]];
+    return [
+      ...rating,
+      [link(
+        ride.ratings?.byDriver ? '🏁 Поездка завершена' : '📋 Мои поездки',
+        appUrl('/driver/trips'),
+      )],
+    ];
+  }
+  if (ride.status === 'cancelled') {
+    return [[link('❌ Заказ отменён', appUrl('/driver/trips'))]];
   }
   return [[link('🚕 Искать заказы', appUrl('/driver'))]];
 }
@@ -224,6 +242,8 @@ export function passengerRideNotification(
     ['⏱ Ожидание', ride.waitingPriceMinor ? formatMoney(ride.waitingPriceMinor) : null],
   ];
   return {
+    orderId: ride.id,
+    audience: 'passenger',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
     body: overrides.body ?? formatRouteLabel(ride.pickup, ride.destination),
@@ -268,6 +288,8 @@ export function driverRideNotification(
     ['💬 Комментарий', ride.comment],
   ];
   return {
+    orderId: ride.id,
+    audience: 'driver',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
     body: overrides.body ?? formatRouteLabel(ride.pickup, ride.destination),

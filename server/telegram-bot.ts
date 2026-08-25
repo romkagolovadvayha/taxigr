@@ -51,8 +51,24 @@ async function callTelegramApi<T>(
 export async function sendTelegramMessage(
   chatId: string,
   body: Record<string, unknown>,
+): Promise<string | null> {
+  const message = await callTelegramApi<{ message_id?: number | string }>(
+    'sendMessage',
+    { chat_id: chatId, ...body },
+  );
+  return message.message_id == null ? null : String(message.message_id);
+}
+
+export async function editTelegramMessage(
+  chatId: string,
+  messageId: string,
+  body: Record<string, unknown>,
 ): Promise<void> {
-  await callTelegramApi('sendMessage', { chat_id: chatId, ...body });
+  await callTelegramApi('editMessageText', {
+    chat_id: chatId,
+    message_id: Number(messageId),
+    ...body,
+  });
 }
 
 export async function sendTelegramVenue(

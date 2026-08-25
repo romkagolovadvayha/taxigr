@@ -83,7 +83,7 @@ describe('pricing route from the driver base', () => {
     coordinates: [],
   };
 
-  it('adds the route from Grahovo when pickup is in the district', async () => {
+  it('does not add the route from Grahovo when both points are in the district', async () => {
     const pickup = {
       id: 'porshur-pickup',
       label: 'д. Поршур, ул. Центральная, 1',
@@ -116,11 +116,75 @@ describe('pricing route from the driver base', () => {
 
     expect(result.tripRoute).toBe(tripRoute);
     expect(result.driverApproachRoute).toBe(driverApproachRoute);
-    expect(result.pricingDistanceMeters).toBe(20_000);
+    expect(result.pricingDistanceMeters).toBe(12_000);
     expect(calls).toEqual([
       { origin: pickup.coordinates, destination: destination.coordinates },
       { origin: GRAHOVO_DRIVER_BASE, destination: pickup.coordinates },
     ]);
+  });
+
+  it('keeps a district trip price symmetric in both directions', async () => {
+    const porshur = {
+      id: 'porshur',
+      label: 'д. Поршур, ул. Бабаева, 32',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 56.0248498, longitude: 51.839 },
+    };
+    const grahovoAddress = {
+      id: 'grahovo',
+      label: 'с. Грахово, ул. Ачинцева, 5',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: grahovo,
+    };
+    const approachRoute: RouteMetrics = {
+      ...tripRoute,
+      distanceMeters: 11_900,
+    };
+
+    const fromGrahovo = await getPricedRouteMetrics(
+      grahovoAddress,
+      porshur,
+      async () => tripRoute,
+    );
+    const routes = [tripRoute, approachRoute];
+    let call = 0;
+    const toGrahovo = await getPricedRouteMetrics(
+      porshur,
+      grahovoAddress,
+      async () => routes[call++]!,
+    );
+
+    expect(fromGrahovo.pricingDistanceMeters).toBe(12_000);
+    expect(toGrahovo.driverApproachRoute).toBe(approachRoute);
+    expect(toGrahovo.pricingDistanceMeters).toBe(12_000);
+  });
+
+  it('still adds the route from Grahovo for a pickup outside the district', async () => {
+    const pickup = {
+      id: 'mozhga-pickup',
+      label: 'г. Можга, Привокзальная ул., 6',
+      details: 'Можгинский район, Удмуртская Республика',
+      coordinates: mozhga,
+    };
+    const destination = {
+      id: 'izhevsk-destination',
+      label: 'г. Ижевск, Центральная площадь',
+      coordinates: { latitude: 56.8527, longitude: 53.2114 },
+    };
+    const approachRoute: RouteMetrics = {
+      ...tripRoute,
+      distanceMeters: 60_000,
+    };
+    const routes = [tripRoute, approachRoute];
+    let call = 0;
+
+    const result = await getPricedRouteMetrics(
+      pickup,
+      destination,
+      async () => routes[call++]!,
+    );
+
+    expect(result.pricingDistanceMeters).toBe(72_000);
   });
 
   it('does not add an approach route when pickup is in Grahovo', async () => {
