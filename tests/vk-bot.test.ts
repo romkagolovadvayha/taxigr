@@ -38,12 +38,11 @@ describe('VK community bot', () => {
       inline: true,
       buttons: [[
         {
-          action: { type: 'callback', label: 'Принять', payload: 'r:a:id' },
+          action: { type: 'callback', label: 'Принять', payload: '{"data":"r:a:id"}' },
           color: 'positive',
         },
         {
           action: { type: 'open_link', label: 'Открыть', link: 'https://taxigr.ru/' },
-          color: 'primary',
         },
       ]],
     });

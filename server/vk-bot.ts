@@ -100,15 +100,28 @@ export function vkInlineKeyboard(
 ) {
   return {
     inline: true,
-    buttons: rows.map((row) => row.map((button) => ({
-      action: button.type === 'callback'
-        ? { type: 'callback', label: button.label, payload: button.data ?? '' }
-        : { type: 'open_link', label: button.label, link: button.url ?? 'https://taxigr.ru/' },
-      color: button.intent === 'positive'
-        ? 'positive'
-        : button.intent === 'negative'
-          ? 'negative'
-          : 'primary',
-    }))),
+    buttons: rows.map((row) => row.map((button) => {
+      if (button.type === 'link') {
+        return {
+          action: {
+            type: 'open_link',
+            label: button.label,
+            link: button.url ?? 'https://taxigr.ru/',
+          },
+        };
+      }
+      return {
+        action: {
+          type: 'callback',
+          label: button.label,
+          payload: JSON.stringify({ data: button.data ?? '' }),
+        },
+        color: button.intent === 'positive'
+          ? 'positive'
+          : button.intent === 'negative'
+            ? 'negative'
+            : 'primary',
+      };
+    })),
   };
 }
