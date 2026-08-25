@@ -21,6 +21,13 @@
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "rustore": {
+      "channel": "production",
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
