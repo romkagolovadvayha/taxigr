@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Switch, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { AppButton } from '@/components/ui/app-button';
+import { AccessibleSwitch } from '@/components/ui/accessible-switch';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -204,7 +205,7 @@ export function DriverProfileScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Водитель</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Водитель</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
           Документы, автомобиль и доступ к заказам
         </Text>
@@ -356,7 +357,7 @@ export function DriverProfileScreen() {
                 После проверки станет доступен детский тариф
               </Text>
             </View>
-            <Switch
+            <AccessibleSwitch
               value={form.hasChildSeat}
               accessibilityLabel="Есть детское кресло"
               onValueChange={(value) => setForm((current) => ({ ...current, hasChildSeat: value }))}

@@ -17,6 +17,8 @@ type UserRow = RowDataPacket & {
   profile_completed_at: Date | string | null;
   avatar_url: string | null;
   avatar_mime: string | null;
+  blocked_at: Date | string | null;
+  block_reason: string | null;
   updated_at: Date | string;
 };
 
@@ -31,7 +33,7 @@ function storedAvatarUrl(user: UserRow): string | undefined {
 export async function findUserWithRoles(id: string): Promise<SessionUser | null> {
   const user = await firstRow<UserRow>(
     `SELECT id, name, gender, phone, profile_completed_at,
-      avatar_url, avatar_mime, updated_at
+      avatar_url, avatar_mime, blocked_at, block_reason, updated_at
      FROM users
      WHERE id = ? AND deleted_at IS NULL`,
     [id],
@@ -49,6 +51,8 @@ export async function findUserWithRoles(id: string): Promise<SessionUser | null>
     profileComplete: Boolean(user.profile_completed_at),
     avatarUrl: storedAvatarUrl(user),
     roles: roleRows.map((row) => row.role),
+    blockedAt: user.blocked_at ? new Date(user.blocked_at).toISOString() : undefined,
+    blockReason: user.block_reason ?? undefined,
   };
 }
 

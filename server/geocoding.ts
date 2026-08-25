@@ -1,5 +1,7 @@
 import type { RowDataPacket } from 'mysql2/promise';
 
+import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
+import { addressSearchScore } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import { config } from './config';
 import { db } from './db';
@@ -53,6 +55,7 @@ const localAddresses: GeocodedAddress[] = [
     houseNumber: '6',
     coordinates: { latitude: 56.445658, longitude: 52.1972249 },
   },
+  ...grahovoDirectoryAddresses,
 ];
 
 const memoryCache = new Map<string, MemoryEntry>();
@@ -140,17 +143,55 @@ export function filterExactHouseResults(
 
 function localMatches(query: string): GeocodedAddress[] {
   const normalized = normalizeForSearch(query);
+  const queryTokens = normalized
+    .split(' ')
+    .filter(
+      (token) =>
+        token.length > 1 &&
+        !['ул', 'улица', 'пер', 'переулок', 'дом', 'деревня', 'село', 'район'].includes(token),
+    );
+  const numericOnly = /^\d+$/u.test(normalized);
+  const matches = (address: GeocodedAddress) => {
+    const fullHaystack = normalizeForSearch(`${address.label} ${address.details ?? ''}`);
+    if (!queryTokens.length) return fullHaystack.includes(normalized) ? 1 : 0;
+    if (numericOnly && address.houseNumber) {
+      const streetLabel = normalizeForSearch(
+        address.label.replace(new RegExp(`(?:,\\s*|\\s+)${address.houseNumber}\\s*$`, 'iu'), ''),
+      );
+      return streetLabel.includes(normalized) ? addressSearchScore(address, query) : 0;
+    }
+    return addressSearchScore(address, query);
+  };
   const houses = localAddresses.filter((address) =>
-    normalizeForSearch(`${address.label} ${address.details ?? ''}`).includes(normalized),
-  );
+    address.houseNumber ? matches(address) > 0 : false,
+  ).sort((left, right) => matches(right) - matches(left));
   const parsed = trailingHouseNumber(query);
   const exactHouses = parsed?.streetPart ? filterExactHouseResults(query, houses) : houses;
-  if (parsed?.streetPart) return exactHouses;
+  if (parsed?.streetPart) {
+    const seenLabels = new Set<string>();
+    return exactHouses.filter((address) => {
+      const key = normalizeForSearch(address.label);
+      if (seenLabels.has(key)) return false;
+      seenLabels.add(key);
+      return true;
+    });
+  }
 
+  const directSuggestions = localAddresses.filter(
+    (address) => !address.houseNumber && matches(address) > 0,
+  ).sort((left, right) => matches(right) - matches(left));
   const streets = buildStreetSuggestions(localAddresses).filter((address) =>
-    normalizeForSearch(`${address.label} ${address.details ?? ''}`).includes(normalized),
-  );
-  return deduplicateAddresses([...streets, ...exactHouses]);
+    matches(address) > 0,
+  ).sort((left, right) => matches(right) - matches(left));
+  const seenLabels = new Set<string>();
+  return [...directSuggestions, ...streets, ...exactHouses]
+    .filter((address) => {
+      const key = normalizeForSearch(address.label);
+      if (seenLabels.has(key)) return false;
+      seenLabels.add(key);
+      return true;
+    })
+    .slice(0, 120);
 }
 
 function coordinateQuery(value: string): { latitude: number; longitude: number } | null {
@@ -181,11 +222,11 @@ export function buildNominatimQueries(query: string): string[] {
   const parsed = trailingHouseNumber(query);
   if (parsed?.streetPart) {
     return [
-      `${parsed.houseNumber}, ${parsed.streetPart}, Грахово, Удмуртская Республика`,
+      `${parsed.houseNumber}, ${parsed.streetPart}, Граховский район, Удмуртская Республика`,
       query,
     ];
   }
-  return [`${query}, Грахово, Удмуртская Республика`, query];
+  return [`${query}, Граховский район, Удмуртская Республика`, query];
 }
 
 async function readPersistentCache(key: string): Promise<GeocodedAddress[] | null> {
@@ -341,7 +382,7 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
   const local = localMatches(query);
   if (local.length) return prioritizeGrahovoDistrict(local);
 
-  const key = `v7:${normalize(query)}`;
+  const key = `v8:${normalize(query)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) return prioritizeGrahovoDistrict(memory.value);
   if (memory) memoryCache.delete(key);

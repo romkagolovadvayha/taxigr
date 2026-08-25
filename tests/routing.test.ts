@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { estimateRoute, haversineMeters, parseOsrmRoute } from '../server/routing';
+import {
+  estimateRoute,
+  GRAHOVO_DRIVER_BASE,
+  getPricedRouteMetrics,
+  haversineMeters,
+  parseOsrmRoute,
+  type RouteMetrics,
+} from '../server/routing';
 
 const grahovo = { latitude: 56.04758, longitude: 51.95842 };
 const mozhga = { latitude: 56.4439, longitude: 52.2274 };
@@ -65,5 +72,78 @@ describe('open routing fallback', () => {
         routes: [{ distance: 1_000, duration: 120 }],
       }),
     ).toThrow('OSRM route is unavailable');
+  });
+});
+
+describe('pricing route from the driver base', () => {
+  const tripRoute: RouteMetrics = {
+    distanceMeters: 12_000,
+    durationSeconds: 1_200,
+    source: 'osrm',
+    coordinates: [],
+  };
+
+  it('adds the route from Grahovo when pickup is in the district', async () => {
+    const pickup = {
+      id: 'porshur-pickup',
+      label: 'д. Поршур, ул. Центральная, 1',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 56.12, longitude: 51.82 },
+    };
+    const destination = {
+      id: 'district-destination',
+      label: 'д. Благодатное, ул. Центральная, 2',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 55.9995, longitude: 51.8684 },
+    };
+    const driverApproachRoute: RouteMetrics = {
+      distanceMeters: 8_000,
+      durationSeconds: 800,
+      source: 'osrm',
+      coordinates: [],
+    };
+    const calls: { origin: typeof grahovo; destination: typeof grahovo }[] = [];
+    const routes = [tripRoute, driverApproachRoute];
+
+    const result = await getPricedRouteMetrics(
+      pickup,
+      destination,
+      async (origin, routeDestination) => {
+        calls.push({ origin, destination: routeDestination });
+        return routes[calls.length - 1]!;
+      },
+    );
+
+    expect(result.tripRoute).toBe(tripRoute);
+    expect(result.driverApproachRoute).toBe(driverApproachRoute);
+    expect(result.pricingDistanceMeters).toBe(20_000);
+    expect(calls).toEqual([
+      { origin: pickup.coordinates, destination: destination.coordinates },
+      { origin: GRAHOVO_DRIVER_BASE, destination: pickup.coordinates },
+    ]);
+  });
+
+  it('does not add an approach route when pickup is in Grahovo', async () => {
+    const pickup = {
+      id: 'grahovo-pickup',
+      label: 'с. Грахово, ул. Ачинцева, 5',
+      coordinates: { latitude: 56.0477, longitude: 51.9586 },
+    };
+    const destination = {
+      id: 'mozhga-destination',
+      label: 'г. Можга, Привокзальная ул., 6',
+      coordinates: { latitude: 56.4456, longitude: 52.1972 },
+    };
+    let calls = 0;
+
+    const result = await getPricedRouteMetrics(pickup, destination, async () => {
+      calls += 1;
+      return tripRoute;
+    });
+
+    expect(result.tripRoute).toBe(tripRoute);
+    expect(result.driverApproachRoute).toBeNull();
+    expect(result.pricingDistanceMeters).toBe(tripRoute.distanceMeters);
+    expect(calls).toBe(1);
   });
 });

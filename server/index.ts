@@ -88,10 +88,10 @@ io.use(async (socket, next) => {
     if (typeof raw !== 'string') throw new Error('Missing token');
     const session = await verifySession(raw);
     const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
-      'SELECT id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT id, blocked_at FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [session.id],
     );
-    if (!rows[0]) throw new Error('Deleted or missing user');
+    if (!rows[0] || rows[0].blocked_at) throw new Error('Deleted, blocked or missing user');
     socket.data.session = session;
     next();
   } catch {

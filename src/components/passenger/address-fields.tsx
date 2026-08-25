@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { hasHouseNumber } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
@@ -33,7 +34,8 @@ function AddressRow({
   const needsHouseNumber = !!address && !hasHouseNumber(address);
   return (
     <View style={{ position: 'relative' }}>
-      <Pressable
+      <AnimatedPressable
+        feedback="subtle"
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${address?.label ?? 'не указано'}${needsHouseNumber ? ', требуется номер дома' : ''}`}
         onPress={() =>
@@ -84,21 +86,22 @@ function AddressRow({
         {!compactLocationAction && (
           <Text style={{ ...typography.sectionTitle, color: colors.inkMuted }}>›</Text>
         )}
-      </Pressable>
+      </AnimatedPressable>
       {compactLocationAction && (
-        <Pressable
+        <AnimatedPressable
           accessibilityRole="button"
           accessibilityLabel="Использовать моё местоположение"
-          accessibilityState={{ busy: locationLoading, disabled: locationLoading }}
+          aria-busy={locationLoading}
+          aria-disabled={locationLoading}
           disabled={locationLoading}
-          hitSlop={4}
+          hitSlop={2}
           onPress={onUseLocation}
           style={({ pressed }) => ({
             position: 'absolute',
-            right: 0,
-            top: 4,
-            width: 40,
-            height: 40,
+            right: -2,
+            top: 2,
+            width: 44,
+            height: 44,
             borderRadius: 999,
             alignItems: 'center',
             justifyContent: 'center',
@@ -107,7 +110,7 @@ function AddressRow({
           })}
         >
           <AppIcon name="recenter" size={20} color={colors.inkSecondary} />
-        </Pressable>
+        </AnimatedPressable>
       )}
     </View>
   );
@@ -131,12 +134,18 @@ export function AddressFields({
         locationLoading={locationLoading}
       />
       {!!onUseLocation && !compact && (
-        <Pressable
+        <AnimatedPressable
+          feedback="subtle"
           accessibilityRole="button"
+          accessibilityLabel="Использовать моё местоположение"
+          aria-busy={locationLoading}
+          aria-disabled={locationLoading}
           disabled={locationLoading}
           onPress={onUseLocation}
           style={({ pressed }) => ({
             alignSelf: 'flex-start',
+            minHeight: 44,
+            justifyContent: 'center',
             marginLeft: 26,
             marginBottom: compact ? spacing.x1 : spacing.x2,
             opacity: pressed || locationLoading ? 0.55 : 1,
@@ -145,7 +154,7 @@ export function AddressFields({
           <Text style={{ ...typography.caption, color: colors.info }}>
             {locationLoading ? 'Определяем геопозицию…' : 'Использовать моё местоположение'}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       )}
       <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 26 }} />
       <AddressRow kind="destination" label="Куда" address={destination} compact={compact} />

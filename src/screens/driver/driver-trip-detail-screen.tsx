@@ -1,4 +1,4 @@
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
@@ -13,6 +13,8 @@ import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
+import { formatRouteAddresses } from '@/domain/route-label';
+import { goBackOrReplace } from '@/navigation/back';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
@@ -56,7 +58,7 @@ export function DriverTripDetailScreen() {
   if (!order) {
     return (
       <Screen contentStyle={{ maxWidth: 760 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/driver/trips')} />
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
           Поездка не найдена
         </Text>
@@ -65,6 +67,7 @@ export function DriverTripDetailScreen() {
     );
   }
 
+  const routeAddresses = formatRouteAddresses(order.pickup, order.destination);
   const netMinor = order.priceMinor - order.serviceCommissionMinor;
   const rows = [
     ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
@@ -79,7 +82,7 @@ export function DriverTripDetailScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/driver/trips')} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Детали поездки
@@ -126,12 +129,12 @@ export function DriverTripDetailScreen() {
           <View style={{ flex: 1, gap: spacing.x3 }}>
             <View>
               <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>ПОДАЧА</Text>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{order.pickup.label}</Text>
+              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.pickup}</Text>
             </View>
             <View style={{ height: 1, backgroundColor: colors.border }} />
             <View>
               <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>НАЗНАЧЕНИЕ</Text>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{order.destination.label}</Text>
+              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.destination}</Text>
             </View>
           </View>
         </View>

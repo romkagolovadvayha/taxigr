@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { AppButton } from '@/components/ui/app-button';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -188,7 +189,7 @@ export function ApplicationsScreen() {
       }}
     >
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Заявки водителей</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Заявки водителей</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Проверка личности, документов и автомобиля</Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
@@ -203,10 +204,11 @@ export function ApplicationsScreen() {
           {applications.map((application) => {
             const active = application.id === selectedId;
             return (
-              <Pressable
+              <AnimatedPressable
+                feedback="subtle"
                 key={application.id}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                aria-pressed={active}
                 accessibilityLabel={`${application.applicantName}, ${statusLabels[application.status]}`}
                 onPress={() => setSelectedId(application.id)}
                 style={({ pressed }) => ({
@@ -230,7 +232,7 @@ export function ApplicationsScreen() {
                   {application.vehicleMake} {application.vehicleModel} · {application.plate}
                 </Text>
                 <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>{formatDateTime(application.createdAt)}</Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </View>
@@ -322,10 +324,11 @@ export function ApplicationsScreen() {
           {vehicleChanges.map((change) => {
             const active = change.id === selectedChangeId;
             return (
-              <Pressable
+              <AnimatedPressable
+                feedback="subtle"
                 key={change.id}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                aria-pressed={active}
                 accessibilityLabel={`${change.driverName ?? 'Водитель'}, ${statusLabels[change.status]}`}
                 onPress={() => setSelectedChangeId(change.id)}
                 style={({ pressed }) => ({
@@ -360,7 +363,7 @@ export function ApplicationsScreen() {
                 <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
                   {formatDateTime(change.createdAt)}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </View>

@@ -4,14 +4,16 @@ import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useSession } from '@/auth/session-provider';
 import { BrandGlyph } from '@/components/brand-mark';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { AppProviders } from '@/providers/app-providers';
 import { AppHead } from '@/seo/app-head';
+import { BlockedAccountScreen } from '@/screens/blocked-account-screen';
 import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -21,7 +23,6 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
     void reportCriticalClientError(error, {
       source: 'react-error-boundary',
-      route: typeof window !== 'undefined' ? window.location.pathname : undefined,
       fatal: true,
     });
   }, [error]);
@@ -44,7 +45,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       <Text style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
         Администраторы уже получили техническую информацию. Попробуйте открыть экран ещё раз.
       </Text>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         onPress={() => void retry()}
         style={{
@@ -55,7 +56,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         }}
       >
         <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Повторить</Text>
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }
@@ -117,6 +118,15 @@ function RootNavigator() {
           Загружаем приложение…
         </Text>
       </View>
+    );
+  }
+
+  if (user?.blockedAt) {
+    return (
+      <ThemeProvider key={colorScheme} value={navigationTheme}>
+        <StatusBar style="dark" />
+        <BlockedAccountScreen />
+      </ThemeProvider>
     );
   }
 

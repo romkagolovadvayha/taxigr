@@ -1,62 +1,80 @@
 import * as Haptics from 'expo-haptics';
-import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, View, type ViewStyle } from 'react-native';
+import { forwardRef, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Text,
+  View,
+  type GestureResponderEvent,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
-type Variant = 'primary' | 'secondary' | 'quiet' | 'danger';
+type Variant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'call';
 
-type Props = {
+type Props = Omit<PressableProps, 'children' | 'onPress' | 'style'> & {
   children: ReactNode;
-  onPress?: () => void;
+  onPress?: PressableProps['onPress'];
   variant?: Variant;
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
-  style?: ViewStyle;
-  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
   icon?: ReactNode;
   foregroundColor?: string;
 };
 
-export function AppButton({
-  children,
-  onPress,
-  variant = 'primary',
-  disabled = false,
-  loading = false,
-  fullWidth = true,
-  style,
-  accessibilityLabel,
-  icon,
-  foregroundColor,
-}: Props) {
+export const AppButton = forwardRef<View, Props>(function AppButton(
+  {
+    children,
+    onPress,
+    variant = 'primary',
+    disabled = false,
+    loading = false,
+    fullWidth = true,
+    style,
+    accessibilityLabel,
+    accessibilityRole = 'button',
+    icon,
+    foregroundColor,
+    ...pressableProps
+  },
+  ref,
+) {
   const backgrounds: Record<Variant, string> = {
     primary: colors.brand,
     secondary: colors.surfaceSecondary,
     quiet: colors.transparent,
     danger: colors.danger,
+    call: colors.call,
   };
   const foregrounds: Record<Variant, string> = {
     primary: colors.brandInk,
     secondary: colors.ink,
     quiet: colors.ink,
-    danger: '#FFFFFF',
+    danger: colors.dangerInk,
+    call: colors.callInk,
   };
   const resolvedForeground = foregroundColor ?? foregrounds[variant];
 
-  const handlePress = () => {
+  const handlePress = (event: GestureResponderEvent) => {
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    onPress?.();
+    onPress?.(event);
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <AnimatedPressable
+      {...pressableProps}
+      ref={ref}
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      aria-disabled={disabled || loading}
+      aria-busy={loading}
       disabled={disabled || loading}
       onPress={handlePress}
       style={({ pressed }) => [
@@ -69,8 +87,7 @@ export function AppButton({
           backgroundColor: backgrounds[variant],
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: disabled ? 0.42 : pressed ? 0.88 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
+          opacity: disabled || loading ? 0.42 : pressed ? 0.88 : 1,
         },
         style,
       ]}
@@ -85,6 +102,6 @@ export function AppButton({
       ) : (
         <Text style={{ ...typography.bodyStrong, color: resolvedForeground }}>{children}</Text>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
-}
+});

@@ -1,8 +1,9 @@
 import { Link, usePathname } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { isNavItemActive } from '@/domain/role-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -50,11 +51,12 @@ export function RoleNavigation({ items, title }: Props) {
             const active = isNavItemActive(pathname, item.href);
             return (
               <Link key={item.href} href={item.href as never} asChild>
-                <Pressable
+                <AnimatedPressable
+                  feedback="subtle"
                   accessibilityRole="tab"
                   accessibilityLabel={item.label}
-                  accessibilityState={{ selected: active }}
-                  style={({ pressed }) => ({
+                  aria-selected={active}
+                  contentStyle={({ pressed }) => ({
                     minWidth: 0,
                     flexBasis: 0,
                     flexGrow: 1,
@@ -97,7 +99,7 @@ export function RoleNavigation({ items, title }: Props) {
                   >
                     {item.label}
                   </Text>
-                </Pressable>
+                </AnimatedPressable>
               </Link>
             );
           })}
@@ -126,8 +128,11 @@ export function RoleNavigation({ items, title }: Props) {
           const active = isNavItemActive(pathname, item.href);
           return (
             <Link key={item.href} href={item.href as never} asChild>
-              <Pressable
-                style={({ pressed }) => ({
+              <AnimatedPressable
+                feedback="subtle"
+                accessibilityRole="link"
+                accessibilityLabel={active ? `${item.label}, текущий раздел` : item.label}
+                contentStyle={({ pressed }) => ({
                   minHeight: 52,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -140,7 +145,7 @@ export function RoleNavigation({ items, title }: Props) {
               >
                 <AppIcon name={item.icon} color={active ? colors.ink : colors.inkSecondary} />
                 <Text style={{ ...typography.bodyStrong, color: active ? colors.ink : colors.inkSecondary }}>{item.label}</Text>
-              </Pressable>
+              </AnimatedPressable>
             </Link>
           );
         })}

@@ -1,5 +1,6 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export type ProfileGender = 'male' | 'female';
@@ -63,10 +64,12 @@ export function ProfileFields({
           ] as const).map(([value, label]) => {
             const selected = gender === value;
             return (
-              <Pressable
+              <AnimatedPressable
                 key={value}
                 accessibilityRole="radio"
-                accessibilityState={{ checked: selected, disabled: !editable }}
+                accessibilityLabel={label}
+                aria-checked={selected}
+                aria-disabled={!editable}
                 disabled={!editable}
                 onPress={() => onGenderChange(value)}
                 style={({ pressed }) => ({
@@ -84,7 +87,7 @@ export function ProfileFields({
                 <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
                   {label}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </View>

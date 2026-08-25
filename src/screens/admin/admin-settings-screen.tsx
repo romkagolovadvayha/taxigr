@@ -20,7 +20,9 @@ type EditableKey =
   | 'intercityPerKilometerMinor'
   | 'childSurchargeMinor'
   | 'waitingFreeMinutes'
-  | 'waitingPerMinuteMinor';
+  | 'waitingPerMinuteMinor'
+  | 'searchPriceIncreaseIntervalMinutes'
+  | 'searchPriceIncreaseStepMinor';
 
 export function AdminSettingsScreen() {
   const { token, signOut } = useSession();
@@ -82,6 +84,7 @@ export function AdminSettingsScreen() {
     value: string,
     onChangeText: (value: string) => void,
     suffix: string,
+    accessibilityLabel = label,
   ) => (
     <View style={{ gap: spacing.x2, flex: 1, minWidth: 220 }}>
       <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
@@ -99,7 +102,7 @@ export function AdminSettingsScreen() {
       >
         <TextInput
           value={value}
-          accessibilityLabel={label}
+          accessibilityLabel={accessibilityLabel}
           onChangeText={onChangeText}
           keyboardType="number-pad"
           style={{ ...typography.bodyStrong, color: colors.ink, flex: 1, minHeight: 54 }}
@@ -116,7 +119,7 @@ export function AdminSettingsScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Тарифы и комиссия</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Тарифы и комиссия</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
           Новые значения применяются только к новым расчётам. Каждое изменение записывается в журнал аудита.
         </Text>
@@ -149,18 +152,21 @@ export function AdminSettingsScreen() {
             String(rules.grahovoFare07To22Minor / 100),
             (value) => changeRubles('grahovoFare07To22Minor', value),
             '₽',
+            'Грахово, с 07:00 до 22:00',
           )}
           {field(
             'С 22:00 до 02:00',
             String(rules.grahovoFare22To02Minor / 100),
             (value) => changeRubles('grahovoFare22To02Minor', value),
             '₽',
+            'Грахово, с 22:00 до 02:00',
           )}
           {field(
             'С 02:00 до 07:00',
             String(rules.grahovoFare02To07Minor / 100),
             (value) => changeRubles('grahovoFare02To07Minor', value),
             '₽',
+            'Грахово, с 02:00 до 07:00',
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
@@ -172,18 +178,21 @@ export function AdminSettingsScreen() {
             String(rules.districtPerKilometer07To22Minor / 100),
             (value) => changeRubles('districtPerKilometer07To22Minor', value),
             '₽/км',
+            'Граховский район, с 07:00 до 22:00',
           )}
           {field(
             'С 22:00 до 02:00',
             String(rules.districtPerKilometer22To02Minor / 100),
             (value) => changeRubles('districtPerKilometer22To02Minor', value),
             '₽/км',
+            'Граховский район, с 22:00 до 02:00',
           )}
           {field(
             'С 02:00 до 07:00',
             String(rules.districtPerKilometer02To07Minor / 100),
             (value) => changeRubles('districtPerKilometer02To07Minor', value),
             '₽/км',
+            'Граховский район, с 02:00 до 07:00',
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
@@ -216,6 +225,32 @@ export function AdminSettingsScreen() {
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           Детский тариф назначает любую машину с подтверждённым креслом — пассажир
           не выбирает тип кресла.
+        </Text>
+      </SurfaceCard>
+      <SurfaceCard>
+        <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Повышение цены при поиске
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
+          {field(
+            'Предлагать каждые',
+            String(rules.searchPriceIncreaseIntervalMinutes),
+            (value) => changeInteger('searchPriceIncreaseIntervalMinutes', value),
+            'мин',
+            'Интервал предложения повысить стоимость',
+          )}
+          {field(
+            'Повышать на',
+            String(rules.searchPriceIncreaseStepMinor / 100),
+            (value) => changeRubles('searchPriceIncreaseStepMinor', value),
+            '₽',
+            'Шаг повышения стоимости',
+          )}
+        </View>
+        <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
+          Пока водитель не найден, пассажир увидит попап через заданный интервал.
+          После подтверждения новая цена сразу отправится свободным водителям, а
+          следующий интервал продолжит считаться от момента создания заказа.
         </Text>
       </SurfaceCard>
       <SurfaceCard>

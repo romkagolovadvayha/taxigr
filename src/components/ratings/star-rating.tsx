@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -21,11 +22,12 @@ export function StarRating({ value, onChange, disabled = false, size = 31 }: Pro
       {[1, 2, 3, 4, 5].map((score) => {
         const selected = score <= value;
         return (
-          <Pressable
+          <AnimatedPressable
             key={score}
             accessibilityRole="radio"
             accessibilityLabel={`${score} ${score === 1 ? 'звезда' : score < 5 ? 'звезды' : 'звёзд'}`}
-            accessibilityState={{ checked: score === value, disabled }}
+            aria-checked={score === value}
+            aria-disabled={disabled}
             disabled={disabled}
             hitSlop={2}
             onPress={() => {
@@ -38,7 +40,6 @@ export function StarRating({ value, onChange, disabled = false, size = 31 }: Pro
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.72 : 1,
-              transform: [{ scale: pressed ? 0.92 : 1 }],
             })}
           >
             <AppIcon
@@ -48,7 +49,7 @@ export function StarRating({ value, onChange, disabled = false, size = 31 }: Pro
               strokeWidth={selected ? 1.6 : 1.8}
               filled={selected}
             />
-          </Pressable>
+          </AnimatedPressable>
         );
       })}
     </View>

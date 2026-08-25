@@ -238,7 +238,7 @@ export function OrderScreen() {
             <BrandMark size={44} />
             {!isDesktop && <PassengerNav />}
           </View>
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Куда поедем?
           </Text>
           <View style={{ flex: 1 }}>

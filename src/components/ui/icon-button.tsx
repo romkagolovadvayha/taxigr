@@ -1,6 +1,5 @@
-import { Pressable } from 'react-native';
-
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { colors, radius, shadows } from '@/theme/tokens';
 
 type Props = {
@@ -11,12 +10,12 @@ type Props = {
   size?: number;
 };
 
-export function IconButton({ icon, label, onPress, selected = false, size = 48 }: Props) {
+export function IconButton({ icon, label, onPress, selected, size = 48 }: Props) {
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ selected }}
+      aria-pressed={selected}
       onPress={onPress}
       style={({ pressed }) => ({
         width: size,
@@ -28,12 +27,10 @@ export function IconButton({ icon, label, onPress, selected = false, size = 48 }
         borderWidth: 1,
         borderColor: colors.border,
         opacity: pressed ? 0.82 : 1,
-        transform: [{ scale: pressed ? 0.97 : 1 }],
         ...shadows.subtle,
       })}
     >
       <AppIcon name={icon} color={colors.ink} size={22} />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
-

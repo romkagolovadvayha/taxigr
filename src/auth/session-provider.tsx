@@ -405,6 +405,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await applySession(refreshed);
   }, [applySession, token]);
 
+  useEffect(() => {
+    if (!user?.blockedAt || !token || token.startsWith('demo:')) return;
+    const timer = setInterval(() => {
+      void refreshSession().catch(() => undefined);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [refreshSession, token, user?.blockedAt]);
+
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
   const value = useMemo(

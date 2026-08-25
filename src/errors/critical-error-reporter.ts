@@ -56,6 +56,11 @@ function platformName(): 'android' | 'ios' | 'web' | 'windows' | 'macos' | 'unkn
     : 'unknown';
 }
 
+function currentWebRoute(): string | undefined {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+  return window.location?.pathname;
+}
+
 export async function reportCriticalClientError(
   error: unknown,
   options: ReportOptions,
@@ -97,7 +102,7 @@ export async function reportCriticalClientError(
         body: JSON.stringify({
           ...normalized,
           source: options.source,
-          route: options.route,
+          route: options.route ?? currentWebRoute(),
           platform: platformName(),
           appVersion: Constants.expoConfig?.version,
           fatal: options.fatal,

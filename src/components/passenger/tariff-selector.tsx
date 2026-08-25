@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { TariffIllustration } from '@/components/passenger/tariff-illustration';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { MoneyValue } from '@/components/ui/money-value';
 import { SkeletonBlock } from '@/components/ui/skeleton-block';
 import type { Tariff, TariffCode } from '@/domain/models';
@@ -22,14 +23,20 @@ export function TariffSelector({
   loading = false,
 }: Props) {
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
+    <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Тариф поездки"
+      style={{ flexDirection: 'row', gap: spacing.x3 }}
+    >
       {tariffs.map((tariff) => {
         const active = tariff.code === selected;
         return (
-          <Pressable
+          <AnimatedPressable
+            feedback="subtle"
             key={tariff.code}
             accessibilityRole="radio"
-            accessibilityState={{ selected: active, busy: loading }}
+            aria-checked={active}
+            aria-busy={loading}
             accessibilityLabel={
               loading
                 ? `${tariff.title}, рассчитываем стоимость и время подачи`
@@ -95,7 +102,7 @@ export function TariffSelector({
                 )}
               </>
             )}
-          </Pressable>
+          </AnimatedPressable>
         );
       })}
     </View>

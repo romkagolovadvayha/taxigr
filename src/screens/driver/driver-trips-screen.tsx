@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppButton } from '@/components/ui/app-button';
 import { MoneyValue } from '@/components/ui/money-value';
@@ -11,6 +12,7 @@ import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { demoDriver, demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
+import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
@@ -156,7 +158,8 @@ export function DriverTripsScreen() {
       ) : (
         <View style={{ gap: spacing.x3 }}>
           {orders.map((order) => (
-            <Pressable
+            <AnimatedPressable
+              feedback="subtle"
               key={order.id}
               accessibilityRole="button"
               accessibilityLabel={`Поездка ${formatDateTime(order.createdAt)}`}
@@ -194,7 +197,7 @@ export function DriverTripsScreen() {
                     {order.passenger?.name ?? 'Пассажир'} · {formatDateTime(order.createdAt)}
                   </Text>
                   <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
-                    {order.pickup.label} → {order.destination.label}
+                    {formatRouteLabel(order.pickup, order.destination)}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: spacing.x1 }}>
@@ -207,7 +210,7 @@ export function DriverTripsScreen() {
                 </View>
               </View>
               <StatusChip label={rideStatusLabel[order.status]} tone={statusTone(order.status)} />
-            </Pressable>
+            </AnimatedPressable>
           ))}
         </View>
       )}

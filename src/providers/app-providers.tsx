@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
-import { SessionProvider } from '@/auth/session-provider';
+import { SessionProvider, useSession } from '@/auth/session-provider';
+import { SearchPriceIncreaseModalHost } from '@/components/passenger/search-price-increase-card';
 import { CriticalErrorMonitor } from '@/errors/critical-error-monitor';
 import { RideFeedbackProvider } from '@/feedback/ride-feedback-provider';
 import { FeedbackPreferencesProvider } from '@/preferences/feedback-preferences-provider';
@@ -15,6 +16,21 @@ import { RideProvider } from '@/state/ride-provider';
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
 );
+
+function SessionScopedRideProviders({ children }: { children: ReactNode }) {
+  const { user } = useSession();
+  const sessionOwner = user?.id ?? 'signed-out';
+
+  return (
+    <RideProvider key={sessionOwner}>
+      <RideFeedbackProvider>
+        <PassengerLocationPublisher />
+        <SearchPriceIncreaseModalHost />
+        {children}
+      </RideFeedbackProvider>
+    </RideProvider>
+  );
+}
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -37,12 +53,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <PassengerPreferencesProvider>
           <FeedbackPreferencesProvider>
             <NotificationRegistrar />
-            <RideProvider>
-              <RideFeedbackProvider>
-                <PassengerLocationPublisher />
-                {children}
-              </RideFeedbackProvider>
-            </RideProvider>
+            <SessionScopedRideProviders>{children}</SessionScopedRideProviders>
           </FeedbackPreferencesProvider>
         </PassengerPreferencesProvider>
       </SessionProvider>

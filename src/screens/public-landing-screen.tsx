@@ -1,8 +1,10 @@
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Image } from 'expo-image';
 import { Text, View } from 'react-native';
 
+import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandGlyph, BrandMark } from '@/components/brand-mark';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
@@ -28,20 +30,152 @@ const features = [
   },
 ];
 
+const footerLinks = [
+  { href: '/legal', label: 'Все правовые документы' },
+  { href: '/privacy', label: 'Персональные данные' },
+  { href: '/terms', label: 'Пользовательское соглашение' },
+  { href: '/safety', label: 'Безопасность' },
+] as const;
+
+function CommissionVerification({ compact }: { compact: boolean }) {
+  const sealSize = compact ? 84 : 116;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel="Ноль процентов комиссии для пассажиров. Проверено Такси Грахово."
+      style={{
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.x4,
+        zIndex: 2,
+      }}
+    >
+      <View style={{ flexShrink: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <Text
+            selectable
+            style={{
+              color: colors.brandInk,
+              fontSize: compact ? 68 : 104,
+              lineHeight: compact ? 70 : 101,
+              fontWeight: '900',
+              letterSpacing: compact ? -3.2 : -5.4,
+            }}
+          >
+            0%
+          </Text>
+          <Text
+            selectable
+            style={{
+              color: colors.brandInk,
+              fontSize: compact ? 23 : 34,
+              lineHeight: compact ? 30 : 42,
+              fontWeight: '800',
+              letterSpacing: -0.8,
+              marginLeft: compact ? 0 : spacing.x2,
+              marginBottom: compact ? spacing.x2 : spacing.x3,
+            }}
+          >
+            комиссий
+          </Text>
+        </View>
+        <Text
+          selectable
+          style={{
+            ...typography.micro,
+            color: colors.brandInkSecondary,
+            textTransform: 'uppercase',
+            letterSpacing: 1.4,
+          }}
+        >
+          для пассажиров
+        </Text>
+      </View>
+
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          width: sealSize,
+          height: sealSize,
+          flexShrink: 0,
+          borderRadius: sealSize / 2,
+          borderWidth: 2,
+          borderStyle: 'dashed',
+          borderColor: colors.brandInk,
+          backgroundColor: colors.brand,
+          padding: compact ? 5 : 7,
+          opacity: 0.78,
+          transform: [{ rotate: '-9deg' }],
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            borderRadius: sealSize / 2,
+            borderWidth: 1.5,
+            borderColor: colors.brandInk,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: compact ? 0 : 2,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.brandInk,
+              fontSize: compact ? 9 : 12,
+              lineHeight: compact ? 11 : 15,
+              fontWeight: '900',
+              letterSpacing: compact ? 0.7 : 1.2,
+            }}
+          >
+            ПРОВЕРЕНО
+          </Text>
+          <AppIcon
+            name="check"
+            size={compact ? 28 : 39}
+            color={colors.brandInk}
+            strokeWidth={compact ? 3 : 3.2}
+          />
+          <Text
+            style={{
+              color: colors.brandInk,
+              fontSize: compact ? 7 : 9,
+              lineHeight: compact ? 9 : 11,
+              fontWeight: '800',
+              letterSpacing: compact ? 0.4 : 0.8,
+            }}
+          >
+            ТАКСИ ГРАХОВО
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function PublicLandingScreen() {
   const { isPhone, isDesktop } = useResponsiveLayout();
   return (
     <Screen contentStyle={{ maxWidth: 1180, gap: spacing.x10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x4 }}>
         <BrandMark size={48} />
-        <AppButton fullWidth={false} variant="secondary" onPress={() => router.push('/sign-in')}>
-          Войти по телефону
+        <AppButton
+          fullWidth={false}
+          variant="secondary"
+          accessibilityLabel="Войти по телефону"
+          onPress={() => router.push('/sign-in')}
+        >
+          {isPhone ? 'Войти' : 'Войти по телефону'}
         </AppButton>
       </View>
 
       <View
         style={{
-          minHeight: isPhone ? 432 : 520,
+          minHeight: isPhone ? 516 : 570,
           borderRadius: radius.sheet,
           backgroundColor: colors.brand,
           padding: isPhone ? spacing.x5 : spacing.x10,
@@ -106,6 +240,7 @@ export function PublicLandingScreen() {
               : 'Закажите машину через веб‑приложение, Android или iPhone. Сразу видны маршрут, фиксированная оценка стоимости и статус водителя.'}
           </Text>
         </View>
+        <CommissionVerification compact={isPhone} />
         <AppButton
           fullWidth={false}
           style={{
@@ -122,7 +257,7 @@ export function PublicLandingScreen() {
       </View>
 
       <View style={{ gap: spacing.x5 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
           Поездка начинается в приложении
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x4 }}>
@@ -131,7 +266,7 @@ export function PublicLandingScreen() {
               <View style={{ width: 52, height: 52, borderRadius: radius.md, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
                 <AppIcon name={feature.icon} color={colors.brandInk} />
               </View>
-              <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{feature.title}</Text>
+              <Text {...webHeadingLevel(3)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{feature.title}</Text>
               <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>{feature.text}</Text>
             </SurfaceCard>
           ))}
@@ -140,7 +275,7 @@ export function PublicLandingScreen() {
 
       <View style={{ flexDirection: isPhone ? 'column' : 'row', gap: spacing.x6 }}>
         <View style={{ flex: 1, gap: spacing.x3 }}>
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Как заказать такси в Грахово
           </Text>
           <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -151,7 +286,7 @@ export function PublicLandingScreen() {
           </Text>
         </View>
         <SurfaceCard style={{ flex: 0.72, alignSelf: 'stretch' }}>
-          <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Для местных водителей</Text>
+          <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Для местных водителей</Text>
           <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
             Житель Грахово может подать заявку прямо из профиля. Суперадмин проверяет водительское удостоверение и сведения об автомобиле, а затем открывает доступ к кабинету. Водитель самостоятельно включает статус «На линии», видит новые предложения и принимает подходящий заказ. Для детского тарифа допускаются только водители, подтвердившие наличие кресла.
           </Text>
@@ -163,7 +298,7 @@ export function PublicLandingScreen() {
       </View>
 
       <View style={{ gap: spacing.x3, paddingBottom: spacing.x8 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Почему сервис локальный</Text>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Почему сервис локальный</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
           Большие городские агрегаторы не всегда учитывают особенности небольших населённых пунктов. «Такси Грахово» сосредоточено на местных пассажирах и водителях: короткие адреса внутри села, поездки между деревнями, связь с районными и республиканскими центрами. При этом приложение использует привычный современный сценарий — карта, понятный выбор тарифа, история поездок и прозрачные статусы. Интерфейс одинаково работает на телефоне, планшете и компьютере, поэтому заказать машину можно с любого доступного устройства.
         </Text>
@@ -171,18 +306,23 @@ export function PublicLandingScreen() {
           Такси Грахово — цифровая платформа заказа поездок. Перевозку выполняет одобренный независимый водитель. Фактическое время подачи зависит от местоположения и доступности машин.
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
-          <Text accessibilityRole="link" onPress={() => router.push('/legal')} style={{ ...typography.caption, color: colors.info }}>
-            Все правовые документы
-          </Text>
-          <Text accessibilityRole="link" onPress={() => router.push('/privacy')} style={{ ...typography.caption, color: colors.info }}>
-            Персональные данные
-          </Text>
-          <Text accessibilityRole="link" onPress={() => router.push('/terms')} style={{ ...typography.caption, color: colors.info }}>
-            Пользовательское соглашение
-          </Text>
-          <Text accessibilityRole="link" onPress={() => router.push('/safety')} style={{ ...typography.caption, color: colors.info }}>
-            Безопасность
-          </Text>
+          {footerLinks.map((item) => (
+            <Link key={item.href} href={item.href} asChild>
+              <AnimatedPressable
+                feedback="subtle"
+                accessibilityRole="link"
+                contentStyle={({ pressed }) => ({
+                  minHeight: 44,
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.68 : 1,
+                })}
+              >
+                <Text style={{ ...typography.caption, color: colors.info }}>
+                  {item.label}
+                </Text>
+              </AnimatedPressable>
+            </Link>
+          ))}
         </View>
       </View>
     </Screen>

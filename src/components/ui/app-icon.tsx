@@ -4,6 +4,7 @@ import { colors } from '@/theme/tokens';
 
 export type AppIconName =
   | 'back'
+  | 'ban'
   | 'car'
   | 'child-seat'
   | 'chevron'
@@ -22,6 +23,8 @@ export type AppIconName =
   | 'settings'
   | 'shield'
   | 'star'
+  | 'trash'
+  | 'users'
   | 'volume'
   | 'wallet';
 
@@ -51,6 +54,12 @@ export function AppIcon({
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
       {name === 'back' && <Path d="M15 18l-6-6 6-6" {...common} />}
+      {name === 'ban' && (
+        <>
+          <Circle cx="12" cy="12" r="9" {...common} />
+          <Path d="M5.7 5.7l12.6 12.6" {...common} />
+        </>
+      )}
       {name === 'car' && (
         <>
           <Path d="M4 15l1.8-5.2A2 2 0 017.7 8h8.6a2 2 0 011.9 1.3L20 15" {...common} />
@@ -136,6 +145,17 @@ export function AppIcon({
           {...common}
           fill={filled ? color : 'none'}
         />
+      )}
+      {name === 'trash' && (
+        <>
+          <Path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" {...common} />
+        </>
+      )}
+      {name === 'users' && (
+        <>
+          <Circle cx="9" cy="8" r="3" {...common} />
+          <Path d="M3.5 20a5.5 5.5 0 0111 0M15 5.5a3 3 0 010 5.8M16 15a5 5 0 014.5 5" {...common} />
+        </>
       )}
       {name === 'volume' && (
         <>

@@ -31,6 +31,10 @@ export function rideWaitingPriceMinor(ride: RideOrder, now = Date.now()): number
 }
 
 export function rideLivePriceMinor(ride: RideOrder, now = Date.now()): number {
-  return (ride.basePriceMinor ?? ride.priceMinor - (ride.waitingPriceMinor ?? 0)) +
+  const searchPriceIncreaseMinor = ride.searchPriceIncreaseMinor ?? 0;
+  const basePriceMinor =
+    ride.basePriceMinor ??
+    ride.priceMinor - (ride.waitingPriceMinor ?? 0) - searchPriceIncreaseMinor;
+  return basePriceMinor + searchPriceIncreaseMinor +
     rideWaitingPriceMinor(ride, now);
 }

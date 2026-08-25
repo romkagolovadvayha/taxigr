@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { Link, type Href } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { AppIcon } from '@/components/ui/app-icon';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type ConsentLink = {
@@ -39,9 +40,9 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
         backgroundColor: colors.surfaceSecondary,
       }}
     >
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="checkbox"
-        accessibilityState={{ checked }}
+        aria-checked={checked}
         accessibilityLabel={label}
         accessibilityHint={checked ? 'Нажмите, чтобы снять согласие' : 'Нажмите, чтобы дать согласие'}
         hitSlop={4}
@@ -52,7 +53,6 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
           alignItems: 'flex-start',
           gap: spacing.x3,
           opacity: pressed ? 0.84 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
         })}
       >
         <View
@@ -86,12 +86,11 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
         <Text selectable style={{ ...typography.body, color: colors.ink, flex: 1 }}>
           {label}
         </Text>
-      </Pressable>
+      </AnimatedPressable>
       {compactLinks ? (
         <View
           accessibilityLabel="Правовые документы"
           style={{
-            minHeight: 32,
             flexDirection: 'row',
             flexWrap: 'wrap',
             alignItems: 'center',
@@ -107,17 +106,29 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
                   ·
                 </Text>
               ) : null}
-              <Link
-                href={link.href}
-                selectable
-                accessibilityLabel={`Открыть документ «${link.label}»`}
-                style={{
-                  ...typography.caption,
-                  color: colors.ink,
-                  textDecorationLine: 'underline',
-                }}
-              >
-                {link.label}
+              <Link href={link.href} asChild>
+                <AnimatedPressable
+                  feedback="subtle"
+                  accessibilityRole="link"
+                  accessibilityLabel={`Открыть документ «${link.label}»`}
+                  contentStyle={({ pressed }) => ({
+                    minHeight: 44,
+                    paddingHorizontal: spacing.x1,
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.68 : 1,
+                  })}
+                >
+                  <Text
+                    selectable
+                    style={{
+                      ...typography.caption,
+                      color: colors.ink,
+                      textDecorationLine: 'underline',
+                    }}
+                  >
+                    {link.label}
+                  </Text>
+                </AnimatedPressable>
               </Link>
             </View>
           ))}
@@ -126,9 +137,9 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
         <View style={{ gap: spacing.x2 }}>
           {links.map((link) => (
             <Link key={link.label} href={link.href} asChild>
-              <Pressable
+              <AnimatedPressable
                 accessibilityRole="link"
-                style={({ pressed }) => ({
+                contentStyle={({ pressed }) => ({
                   minHeight: 46,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -148,7 +159,7 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
                   {link.label}
                 </Text>
                 <AppIcon name="chevron" size={17} color={colors.inkMuted} />
-              </Pressable>
+              </AnimatedPressable>
             </Link>
           ))}
         </View>

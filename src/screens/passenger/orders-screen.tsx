@@ -1,12 +1,16 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
+import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
@@ -16,9 +20,9 @@ export function OrdersScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 900 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <View>
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Мои поездки
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -27,11 +31,38 @@ export function OrdersScreen() {
         </View>
       </View>
       <View style={{ gap: spacing.x3 }}>
+        {orders.length === 0 && (
+          <View
+            style={{
+              padding: spacing.x6,
+              gap: spacing.x4,
+              alignItems: 'center',
+              borderRadius: radius.card,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <AppIcon name="orders" size={28} color={colors.inkMuted} />
+            <View style={{ gap: spacing.x2, alignItems: 'center' }}>
+              <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+                Поездок пока нет
+              </Text>
+              <Text selectable style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
+                Здесь появятся активные и завершённые заказы.
+              </Text>
+            </View>
+            <AppButton fullWidth={false} onPress={() => router.replace('/')}>
+              Заказать такси
+            </AppButton>
+          </View>
+        )}
         {orders.map((order) => (
-          <Pressable
+          <AnimatedPressable
+            feedback="subtle"
             key={order.id}
             accessibilityRole="button"
-            accessibilityLabel={`Поездка ${formatDateTime(order.createdAt)}: ${order.pickup.label} → ${order.destination.label}`}
+            accessibilityLabel={`Поездка ${formatDateTime(order.createdAt)}: ${formatRouteLabel(order.pickup, order.destination)}`}
             onPress={() => router.push({ pathname: '/orders/[id]', params: { id: order.id } })}
             style={({ pressed }) => ({
               padding: spacing.x4,
@@ -63,7 +94,7 @@ export function OrdersScreen() {
                     {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {formatDateTime(order.createdAt)}
                   </Text>
                   <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
-                    {order.pickup.label} → {order.destination.label}
+                    {formatRouteLabel(order.pickup, order.destination)}
                   </Text>
                 </View>
               </View>
@@ -79,7 +110,7 @@ export function OrdersScreen() {
                     : 'info'
               }
             />
-          </Pressable>
+          </AnimatedPressable>
         ))}
       </View>
     </Screen>

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 
+import { webHeadingLevel } from '@/accessibility/heading';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
@@ -122,7 +123,7 @@ export function DriverSupportScreen() {
       </SurfaceCard>
 
       <View style={{ gap: spacing.x3 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Полезные разделы
         </Text>
         {[

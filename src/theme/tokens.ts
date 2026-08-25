@@ -20,17 +20,22 @@ export type ColorPalette = {
   success: string;
   successSoft: string;
   successText: string;
+  call: string;
+  callInk: string;
   warning: string;
   warningSoft: string;
   warningText: string;
   danger: string;
   dangerSoft: string;
   dangerText: string;
+  dangerInk: string;
+  dangerPanelInk: string;
   info: string;
   infoSoft: string;
   infoText: string;
   route: string;
   mapFallback: string;
+  overlay: string;
   transparent: string;
 };
 
@@ -52,17 +57,22 @@ export const lightColors: ColorPalette = {
   success: '#18A957',
   successSoft: '#E7F7EE',
   successText: '#107C41',
+  call: '#18A957',
+  callInk: '#181818',
   warning: '#F59E0B',
   warningSoft: '#FFF4D6',
   warningText: '#855700',
   danger: '#E5484D',
   dangerSoft: '#FDEBEC',
   dangerText: '#B3262B',
+  dangerInk: '#181818',
+  dangerPanelInk: '#F7F7F5',
   info: '#2684FF',
   infoSoft: '#E8F2FF',
   infoText: '#1E64B7',
   route: '#16B96B',
   mapFallback: '#E9EFE7',
+  overlay: 'rgba(0,0,0,0.48)',
   transparent: 'transparent',
 };
 
@@ -84,17 +94,22 @@ export const darkColors: ColorPalette = {
   success: '#35C878',
   successSoft: '#173B29',
   successText: '#7CE5AA',
+  call: '#35C878',
+  callInk: '#181818',
   warning: '#F7B84B',
   warningSoft: '#443412',
   warningText: '#FFD27A',
   danger: '#FF6B70',
   dangerSoft: '#4A2225',
   dangerText: '#FF9EA2',
+  dangerInk: '#181818',
+  dangerPanelInk: '#F7F7F5',
   info: '#65A7FF',
   infoSoft: '#173354',
   infoText: '#9AC6FF',
   route: '#31D17E',
   mapFallback: '#202522',
+  overlay: 'rgba(0,0,0,0.66)',
   transparent: 'transparent',
 };
 
@@ -129,6 +144,33 @@ export const radius = {
   card: 24,
   sheet: 30,
   pill: 999,
+} as const;
+
+export const motion = {
+  duration: {
+    pressIn: 120,
+    pressOut: 160,
+    quick: 140,
+    standard: 180,
+    sheet: 220,
+    tracking: 280,
+  },
+  easing: {
+    out: [0.23, 1, 0.32, 1] as const,
+    inOut: [0.77, 0, 0.175, 1] as const,
+    drawer: [0.32, 0.72, 0, 1] as const,
+  },
+  scale: {
+    press: 0.97,
+    subtlePress: 0.985,
+  },
+} as const;
+
+export const opacity = {
+  disabled: 0.42,
+  pressed: 0.72,
+  pressedSubtle: 0.76,
+  visible: 1,
 } as const;
 
 export const typography = {
@@ -190,4 +232,11 @@ export const breakpoints = {
   tablet: 768,
   desktop: 1100,
   adminTable: 900,
+} as const;
+
+export const layout = {
+  modalWidth: 560,
+  modalMaxHeight: '92%',
+  chartHeight: 144,
+  fullInset: 0,
 } as const;

@@ -1,19 +1,22 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
+import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
+import { AccessibleSwitch } from '@/components/ui/accessible-switch';
 import { AppIcon } from '@/components/ui/app-icon';
 import { MoneyValue } from '@/components/ui/money-value';
 import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
+import { formatRouteAddresses } from '@/domain/route-label';
 import {
   driverRouteTarget,
   driverTransitionLabel,
@@ -99,14 +102,14 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
   const [navigatorBusy, setNavigatorBusy] = useState(false);
   const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
   const {
-    currentRide,
-    createRide,
-    transitionRide,
+    driverRide: currentRide,
+    createDriverOffer: createRide,
+    transitionDriverRide: transitionRide,
     startWaiting,
     stopWaiting,
-    resetRide,
+    resetDriverRide: resetRide,
     refresh,
-    rateRide,
+    rateDriverRide: rateRide,
     busy,
     error,
   } = useRide();
@@ -137,6 +140,8 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
     );
   }
 
+  const routeAddresses = formatRouteAddresses(currentRide.pickup, currentRide.destination);
+
   if (currentRide.status === 'searching') {
     return (
       <View style={{ gap: spacing.x4 }}>
@@ -153,11 +158,11 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         </View>
         <View>
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>ПОДАЧА</Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{currentRide.pickup.label}</Text>
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.pickup}</Text>
         </View>
         <View>
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>КУДА</Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{currentRide.destination.label}</Text>
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.destination}</Text>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -247,18 +252,6 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
     }
   };
 
-  const callPassenger = async () => {
-    if (!passengerPhone) return;
-    const phoneUrl = `tel:${passengerPhone.replace(/[^\d+]/gu, '')}`;
-    try {
-      const supported = await Linking.canOpenURL(phoneUrl);
-      if (!supported) throw new Error('Phone calls are unavailable');
-      await Linking.openURL(phoneUrl);
-    } catch {
-      setNavigatorMessage('Не удалось открыть приложение для звонка.');
-    }
-  };
-
   return (
     <View style={{ gap: spacing.x4 }}>
       <View
@@ -295,10 +288,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             МАРШРУТ
           </Text>
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            {currentRide.pickup.label}
+            {routeAddresses.pickup}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {currentRide.destination.label}
+            → {routeAddresses.destination}
           </Text>
         </View>
       )}
@@ -349,15 +342,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           </View>
         </View>
       )}
-      {currentRide.status !== 'completed' && !!passengerPhone && (
-        <AppButton
-          variant="secondary"
-          accessibilityLabel={`Связаться с пассажиром по номеру ${passengerPhone}`}
-          onPress={() => void callPassenger()}
-        >
-          Связаться с пассажиром
-        </AppButton>
-      )}
+      {!['completed', 'cancelled'].includes(currentRide.status) &&
+        !!passengerPhone && (
+          <PhoneCallButton phone={passengerPhone} label="Позвонить клиенту" />
+        )}
       <WaitingBreakdown ride={currentRide} compact />
       {!!error && (
         <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
@@ -467,7 +455,7 @@ export function DriverHomeScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone } = useResponsiveLayout();
-  const { currentRide, refresh } = useRide();
+  const { driverRide: currentRide, refresh } = useRide();
   const navigationRequested = Boolean(
     currentRide && driverRouteTarget(currentRide.status),
   );
@@ -556,12 +544,12 @@ export function DriverHomeScreen() {
       {!activeTrip && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
-            <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Смена</Text>
+            <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Смена</Text>
             <Text selectable style={{ ...typography.caption, color: online ? colors.success : colors.inkSecondary }}>
               {online ? 'На линии' : 'Не на линии'}
             </Text>
           </View>
-          <Switch
+          <AccessibleSwitch
             value={online}
             accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'}
             onValueChange={(next) => void changeOnline(next)}

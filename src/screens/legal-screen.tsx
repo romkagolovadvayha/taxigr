@@ -1,10 +1,13 @@
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { Text, View } from 'react-native';
 
+import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandMark } from '@/components/brand-mark';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import type { LegalSection } from '@/legal/content';
+import { goBackOrReplace } from '@/navigation/back';
 import { operatorDetailsReady } from '@/legal/operator';
 import { colors, spacing, typography } from '@/theme/tokens';
 
@@ -20,7 +23,7 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
   return (
     <Screen contentStyle={{ maxWidth: 860 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/legal')} />
         <BrandMark compact size={40} />
       </View>
       <View style={{ gap: spacing.x2 }}>
@@ -49,7 +52,7 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
       )}
       {sections.map((section) => (
         <View key={section.title} style={{ gap: spacing.x2 }}>
-          <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{section.title}</Text>
+          <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{section.title}</Text>
           {section.paragraphs.map((paragraph) => (
             <Text key={paragraph} selectable style={{ ...typography.body, color: colors.inkSecondary }}>
               {paragraph}
@@ -65,8 +68,22 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
           ))}
         </View>
       ))}
-      <Link href="/legal" style={{ ...typography.bodyStrong, color: colors.ink, marginTop: spacing.x3 }}>
-        Все правовые документы
+      <Link href="/legal" asChild>
+        <AnimatedPressable
+          feedback="subtle"
+          accessibilityRole="link"
+          contentStyle={({ pressed }) => ({
+            minHeight: 44,
+            alignSelf: 'flex-start',
+            justifyContent: 'center',
+            marginTop: spacing.x3,
+            opacity: pressed ? 0.68 : 1,
+          })}
+        >
+          <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
+            Все правовые документы →
+          </Text>
+        </AnimatedPressable>
       </Link>
     </Screen>
   );

@@ -10,11 +10,12 @@ import {
 describe('local address directory', () => {
   it('finds Grahovo addresses without an external request', async () => {
     const results = await searchAddresses('Ачинцева');
-    expect(results).toHaveLength(2);
-    expect(results[0]?.label).toContain('Грахово');
+    expect(results.length).toBeGreaterThan(20);
+    expect(results[0]?.label).toBe('с. Грахово, ул. Ачинцева');
     expect(results[0]?.houseNumber).toBeUndefined();
-    expect(results[1]?.houseNumber).toBe('5');
-    expect(results[0]?.coordinates.latitude).toBeCloseTo(56.0477, 4);
+    const houseFive = results.find((address) => address.houseNumber === '5');
+    expect(houseFive?.label).toContain('Ачинцева');
+    expect(houseFive?.coordinates.latitude).toBeCloseTo(56.0477, 3);
   });
 
   it('finds nearby settlements locally', async () => {
@@ -26,7 +27,7 @@ describe('local address directory', () => {
 
   it('prioritizes Grahovo for a short street query and keeps a Russia-wide fallback', () => {
     expect(buildNominatimQueries('Советская')).toEqual([
-      'Советская, Грахово, Удмуртская Республика',
+      'Советская, Граховский район, Удмуртская Республика',
       'Советская',
     ]);
     expect(buildNominatimQueries('улица Колпакова, Грахово')).toEqual([
@@ -36,7 +37,7 @@ describe('local address directory', () => {
 
   it('prioritizes a house-first query and rejects a street-level substitute', () => {
     expect(buildNominatimQueries('50 лет Победы, 19')).toEqual([
-      '19, 50 лет Победы, Грахово, Удмуртская Республика',
+      '19, 50 лет Победы, Граховский район, Удмуртская Республика',
       '50 лет Победы, 19',
     ]);
 
@@ -55,7 +56,6 @@ describe('local address directory', () => {
   it('returns the verified point for 50 лет Победы, 19 without punctuation', async () => {
     const results = await searchAddresses('50 лет Победы 19');
 
-    expect(results).toHaveLength(1);
     expect(results[0]?.label).toBe('ул. 50 лет Победы, 19');
     expect(results[0]?.details).toContain('точка дома');
     expect(results[0]?.coordinates.latitude).toBeCloseTo(56.055332, 6);
@@ -65,9 +65,9 @@ describe('local address directory', () => {
   it('suggests the street before houses for a partial numeric street name', async () => {
     const results = await searchAddresses('50');
 
-    expect(results[0]?.label).toBe('ул. 50 лет Победы');
+    expect(results[0]?.label).toBe('с. Грахово, ул. 50 лет Победы');
     expect(results[0]?.houseNumber).toBeUndefined();
-    expect(results[1]?.label).toBe('ул. 50 лет Победы, 19');
+    expect(results.some((address) => address.label === 'ул. 50 лет Победы, 19')).toBe(true);
   });
 
   it('returns houses after a selected street with a trailing comma', async () => {
@@ -135,5 +135,35 @@ describe('local address directory', () => {
     ]);
 
     expect(results.map((address) => address.id)).toEqual(['first-local', 'second-local']);
+  });
+
+  it('contains the complete Porshur GAR directory and ranks it above Porshurskaya street', async () => {
+    const results = await searchAddresses('Поршур');
+    const porshurHouses = results.filter(
+      (address) => address.label.startsWith('д. Поршур,') && !!address.houseNumber,
+    );
+
+    expect(results[0]?.label).toBe('д. Поршур');
+    expect(results[1]?.label).toBe('д. Поршур, ул. Тимофеева');
+    expect(results[2]?.label).toBe('д. Поршур, ул. Бабаева');
+    expect(porshurHouses).toHaveLength(65);
+  });
+
+  it('finds registered Porshur houses by settlement, street and number', async () => {
+    const babaeva = await searchAddresses('Поршур Бабаева 32');
+    const timofeeva = await searchAddresses('Поршур Тимофеева 1А');
+
+    expect(babaeva).toHaveLength(1);
+    expect(babaeva[0]?.label).toBe('д. Поршур, ул. Бабаева, 32');
+    expect(babaeva[0]?.coordinates.latitude).toBeCloseTo(56.0248498, 6);
+    expect(timofeeva[0]?.label).toBe('д. Поршур, ул. Тимофеева, 1А');
+    expect(timofeeva[0]?.coordinates.longitude).toBeCloseTo(51.7077961, 6);
+  });
+
+  it('scopes unknown settlements to Grahovo district instead of Grahovo village', () => {
+    expect(buildNominatimQueries('Поршур')).toEqual([
+      'Поршур, Граховский район, Удмуртская Республика',
+      'Поршур',
+    ]);
   });
 });

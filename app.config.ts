@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: config.name ?? 'Такси Грахово',
   slug: config.slug ?? 'taxi-grahovo',
+  plugins: [...(config.plugins ?? []), 'expo-image'],
   extra: {
     ...config.extra,
     eas: {

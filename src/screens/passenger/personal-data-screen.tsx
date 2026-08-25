@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -10,6 +9,7 @@ import {
 import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
+import { goBackOrReplace } from '@/navigation/back';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function PersonalDataScreen() {
@@ -40,8 +40,8 @@ export function PersonalDataScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/profile')} />
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
           Личные данные
         </Text>
       </View>

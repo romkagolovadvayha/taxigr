@@ -1,7 +1,9 @@
 import { Link, router } from 'expo-router';
 import { Linking, Text, View } from 'react-native';
 
+import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandMark } from '@/components/brand-mark';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
@@ -106,7 +108,7 @@ export function AccountDeletionScreen() {
       </View>
 
       <View style={{ gap: spacing.x3 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Как запросить удаление
         </Text>
         {requestSteps.map((step, index) => (
@@ -158,7 +160,7 @@ export function AccountDeletionScreen() {
           borderColor: colors.borderStrong,
         }}
       >
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Отправить запрос
         </Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -177,7 +179,7 @@ export function AccountDeletionScreen() {
       </View>
 
       <View style={{ gap: spacing.x3 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Какие данные будут удалены
         </Text>
         <View
@@ -197,7 +199,7 @@ export function AccountDeletionScreen() {
       </View>
 
       <View style={{ gap: spacing.x3 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Какие данные могут быть сохранены
         </Text>
         <View
@@ -231,8 +233,21 @@ export function AccountDeletionScreen() {
           идёт активная поездка или рассматривается спор, выполнение запроса может начаться после их
           завершения.
         </Text>
-        <Link href="/privacy" style={{ ...typography.bodyStrong, color: colors.ink }}>
-          Политика обработки персональных данных →
+        <Link href="/privacy" asChild>
+          <AnimatedPressable
+            feedback="subtle"
+            accessibilityRole="link"
+            contentStyle={({ pressed }) => ({
+              minHeight: 44,
+              alignSelf: 'flex-start',
+              justifyContent: 'center',
+              opacity: pressed ? 0.68 : 1,
+            })}
+          >
+            <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
+              Политика обработки персональных данных →
+            </Text>
+          </AnimatedPressable>
         </Link>
       </View>
     </Screen>

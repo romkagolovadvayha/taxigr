@@ -28,9 +28,13 @@ export function hasHouseNumber(address: AddressLike | null | undefined): boolean
 }
 
 export function queryHasHouseNumber(query: string): boolean {
+  return extractQueryHouseNumber(query) !== null;
+}
+
+export function extractQueryHouseNumber(query: string): string | null {
   const normalized = query.trim().replace(/\s+/g, ' ');
   const match = normalized.match(new RegExp(String.raw`(?:,\s*|\s+)(${HOUSE_NUMBER})\s*$`, 'iu'));
-  if (!match?.[1] || match.index == null || ROAD_CODE.test(match[1])) return false;
+  if (!match?.[1] || match.index == null || ROAD_CODE.test(match[1])) return null;
 
   const streetPart = normalized
     .slice(0, match.index)
@@ -39,5 +43,5 @@ export function queryHasHouseNumber(query: string): boolean {
       ' ',
     )
     .replace(/[^\p{L}]+/gu, '');
-  return streetPart.length >= 2;
+  return streetPart.length >= 2 ? match[1] : null;
 }

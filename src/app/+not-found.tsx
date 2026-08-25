@@ -7,9 +7,12 @@ import { colors, spacing, typography } from '@/theme/tokens';
 export default function NotFoundRoute() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x4, backgroundColor: colors.canvas }}>
-      <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Страница не найдена</Text>
-      <Link href="/" asChild><AppButton fullWidth={false}>На главную</AppButton></Link>
+      <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+        Страница не найдена
+      </Text>
+      <Link href="/" asChild>
+        <AppButton accessibilityRole="link" fullWidth={false}>На главную</AppButton>
+      </Link>
     </View>
   );
 }
-

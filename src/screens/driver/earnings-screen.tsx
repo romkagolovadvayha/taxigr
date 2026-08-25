@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { AppButton } from '@/components/ui/app-button';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { SurfaceCard } from '@/components/ui/surface-card';
@@ -79,7 +80,7 @@ export function EarningsScreen() {
   return (
     <Screen>
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
           Расчёты с сервисом
         </Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -99,10 +100,11 @@ export function EarningsScreen() {
         {periods.map((item) => {
           const selected = item.value === period;
           return (
-            <Pressable
+            <AnimatedPressable
+              feedback="subtle"
               key={item.value}
               accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              aria-selected={selected}
               onPress={() => setPeriod(item.value)}
               style={({ pressed }) => ({
                 flex: 1,
@@ -117,7 +119,7 @@ export function EarningsScreen() {
               <Text style={{ ...typography.caption, color: selected ? colors.ink : colors.inkSecondary }}>
                 {item.label}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           );
         })}
       </View>

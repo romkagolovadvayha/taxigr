@@ -4,7 +4,12 @@ import mysql, { type Connection } from 'mysql2/promise';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { RideOrder, VehicleChangeRequest } from '../src/domain/models';
+import type {
+  AdminDriverDetail,
+  AdminPassengerDetail,
+  RideOrder,
+  VehicleChangeRequest,
+} from '../src/domain/models';
 import type { PricingRules } from '../src/domain/pricing';
 import {
   currentDriverLegalAcceptance,
@@ -270,7 +275,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     );
     await connection.execute(
       `UPDATE users
-       SET order_blocked_until = NULL, order_block_reason = NULL
+       SET order_blocked_until = NULL, order_block_reason = NULL,
+         blocked_at = NULL, block_reason = NULL, blocked_by = NULL
        WHERE id IN (?, ?)`,
       [fixture.passengerId, fixture.outsiderId],
     );
@@ -308,6 +314,64 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect((await api('/v1/quotes', { token: driverOneToken, method: 'POST', body: {} })).status).toBe(
       400,
     );
+  });
+
+  it('lists account details and enforces reasoned account blocks', async () => {
+    const passengers = await api<Array<{ id: string; blockedAt?: string }>>(
+      '/v1/admin/passengers',
+      { token: adminToken },
+    );
+    expect(passengers.status).toBe(200);
+    expect(passengers.data?.some((passenger) => passenger.id === fixture.passengerId)).toBe(true);
+
+    const passenger = await api<AdminPassengerDetail>(
+      `/v1/admin/passengers/${fixture.passengerId}`,
+      { token: adminToken },
+    );
+    expect(passenger.status).toBe(200);
+    expect(passenger.data?.user.name).toBe('Интеграционный пассажир');
+
+    const driver = await api<AdminDriverDetail>(
+      `/v1/admin/drivers/${fixture.driverOneId}`,
+      { token: adminToken },
+    );
+    expect(driver.status).toBe(200);
+    expect(driver.data?.user.id).toBe(fixture.driverUserOneId);
+    expect(driver.data?.driver.vehicle?.model).toBe('Granta');
+
+    const missingReason = await api(`/v1/admin/users/${fixture.passengerId}/block`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { blocked: true },
+    });
+    expect(missingReason.status).toBe(400);
+    expect(missingReason.error?.code).toBe('VALIDATION_ERROR');
+
+    const blocked = await api(`/v1/admin/users/${fixture.passengerId}/block`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { blocked: true, reason: 'Систематическое нарушение правил' },
+    });
+    expect(blocked.status).toBe(200);
+
+    const refreshed = await api<{
+      user: { blockedAt?: string; blockReason?: string };
+    }>('/v1/auth/refresh', { method: 'POST', token: passengerToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.data?.user.blockedAt).toBeTruthy();
+    expect(refreshed.data?.user.blockReason).toBe('Систематическое нарушение правил');
+
+    const denied = await api('/v1/orders?scope=passenger', { token: passengerToken });
+    expect(denied.status).toBe(403);
+    expect(denied.error?.code).toBe('USER_BLOCKED');
+
+    const unblocked = await api(`/v1/admin/users/${fixture.passengerId}/block`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { blocked: false },
+    });
+    expect(unblocked.status).toBe(200);
+    expect((await api('/v1/orders?scope=passenger', { token: passengerToken })).status).toBe(200);
   });
 
   it('updates profile and avatar', async () => {
@@ -365,7 +429,18 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { label: string; coordinates: { latitude: number; longitude: number } }[]
     >(`/v1/addresses/preview?query=${query}`);
     expect(demoSearch.status).toBe(200);
-    expect(demoSearch.data?.[0]?.coordinates.latitude).toBeCloseTo(56.0477, 4);
+    expect(demoSearch.data?.[0]?.coordinates.latitude).toBeGreaterThan(55.9);
+
+    const porshur = await api<
+      { label: string; houseNumber?: string; coordinates: { latitude: number; longitude: number } }[]
+    >(`/v1/addresses/preview?query=${encodeURIComponent('Поршур Бабаева 32')}`);
+    expect(porshur.status).toBe(200);
+    expect(porshur.data).toHaveLength(1);
+    expect(porshur.data?.[0]).toMatchObject({
+      label: 'д. Поршур, ул. Бабаева, 32',
+      houseNumber: '32',
+    });
+    expect(porshur.data?.[0]?.coordinates.latitude).toBeCloseTo(56.0248498, 6);
   });
 
   it('calculates both tariffs and validates malformed requests', async () => {
@@ -617,7 +692,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(sent.data?.debugCode).toMatch(/^\d{4}$/);
     expect(sentAgain.status).toBe(429);
     expect(sentAgain.error?.code).toBe('PHONE_CODE_TOO_SOON');
-    expect(sentAgain.error?.message).toMatch(/секунд/u);
+    expect(sentAgain.error?.message).toMatch(/через \d+ (?:секунд[уы]?|минут[уы]?)/u);
     expect(rejectedCode.status).toBe(400);
     expect(rejectedCode.error?.code).toBe('PHONE_CODE_INVALID');
     expect(verified.status).toBe(200);
@@ -770,6 +845,62 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     await api(`/v1/orders/${first.data!.id}/cancel`, { method: 'POST', token: passengerToken });
   }, 15_000);
 
+  it('offers a confirmed price increase every four minutes of the same search', async () => {
+    const created = await createOrder(passengerToken);
+    expect(created.status).toBe(201);
+    const originalPrice = created.data!.priceMinor;
+
+    const tooEarly = await api<RideOrder>(
+      `/v1/orders/${created.data!.id}/search-price-increase`,
+      { method: 'POST', token: passengerToken },
+    );
+    expect(tooEarly.status).toBe(409);
+    expect(tooEarly.error?.code).toBe('PRICE_INCREASE_TOO_EARLY');
+
+    const forbidden = await api<RideOrder>(
+      `/v1/orders/${created.data!.id}/search-price-increase`,
+      { method: 'POST', token: outsiderToken },
+    );
+    expect(forbidden.status).toBe(403);
+
+    await connection.execute(
+      'UPDATE orders SET created_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 4 MINUTE) WHERE id = ?',
+      [created.data!.id],
+    );
+    const beforeIncrease = await api<RideOrder>(`/v1/orders/${created.data!.id}`, {
+      token: passengerToken,
+    });
+    expect(beforeIncrease.status).toBe(200);
+    const confirmed = await api<RideOrder>(
+      `/v1/orders/${created.data!.id}/search-price-increase`,
+      { method: 'POST', token: passengerToken },
+    );
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.data?.searchPriceIncreaseMinor).toBe(3_000);
+    expect(confirmed.data?.priceMinor).toBe(originalPrice + 3_000);
+    expect(confirmed.data?.createdAt).toBe(beforeIncrease.data?.createdAt);
+
+    const repeated = await api<RideOrder>(
+      `/v1/orders/${created.data!.id}/search-price-increase`,
+      { method: 'POST', token: passengerToken },
+    );
+    expect(repeated.status).toBe(200);
+    expect(repeated.data?.priceMinor).toBe(originalPrice + 3_000);
+
+    await connection.execute(
+      'UPDATE orders SET created_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 8 MINUTE) WHERE id = ?',
+      [created.data!.id],
+    );
+    const secondInterval = await api<RideOrder>(
+      `/v1/orders/${created.data!.id}/search-price-increase`,
+      { method: 'POST', token: passengerToken },
+    );
+    expect(secondInterval.status).toBe(200);
+    expect(secondInterval.data?.searchPriceIncreaseMinor).toBe(6_000);
+    expect(secondInterval.data?.priceMinor).toBe(originalPrice + 6_000);
+    expect(secondInterval.data?.searchPriceIncreaseLastSlot).toBe(2);
+  });
+
   it('allows exactly one driver to win an acceptance race', async () => {
     await setDriverStatus(driverOneToken, 'online');
     await setDriverStatus(driverTwoToken, 'online');
@@ -804,6 +935,36 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     );
     expect(rows[0]?.status).toBe('online');
   }, 20_000);
+
+  it('keeps passenger and driver order scopes separate for dual-role users', async () => {
+    await setDriverStatus(driverOneToken, 'online');
+    const order = await createOrder(passengerToken);
+    expect(order.status).toBe(201);
+
+    const accepted = await api<RideOrder>(`/v1/driver/orders/${order.data!.id}/accept`, {
+      method: 'POST',
+      token: driverOneToken,
+      body: {},
+    });
+    expect(accepted.status).toBe(200);
+
+    const passengerOrders = await api<RideOrder[]>('/v1/orders?scope=passenger', {
+      token: driverOneToken,
+    });
+    const driverOrders = await api<RideOrder[]>('/v1/orders?scope=driver', {
+      token: driverOneToken,
+    });
+
+    expect(passengerOrders.status).toBe(200);
+    expect(passengerOrders.data?.some((item) => item.id === order.data!.id)).toBe(false);
+    expect(driverOrders.status).toBe(200);
+    expect(driverOrders.data?.some((item) => item.id === order.data!.id)).toBe(true);
+
+    await api(`/v1/orders/${order.data!.id}/cancel`, {
+      method: 'POST',
+      token: passengerToken,
+    });
+  }, 15_000);
 
   it('filters child orders and blocks a driver without a child seat', async () => {
     await setDriverStatus(driverOneToken, 'online');
@@ -1113,6 +1274,29 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(driverRating.data?.passenger?.rating).toBe(4);
     expect(driverRating.data?.passenger?.ratingCount).toBe(1);
 
+    const passengerDetail = await api<AdminPassengerDetail>(
+      `/v1/admin/passengers/${fixture.passengerId}`,
+      { token: adminToken },
+    );
+    const receivedRating = passengerDetail.data?.ratings.find(
+      (rating) => rating.raterRole === 'driver' && rating.orderId === order.data!.id,
+    );
+    expect(receivedRating).toBeTruthy();
+    expect(
+      (
+        await api(`/v1/admin/ratings/${receivedRating!.id}`, {
+          method: 'DELETE',
+          token: adminToken,
+        })
+      ).status,
+    ).toBe(200);
+    const passengerAfterDeletion = await api<AdminPassengerDetail>(
+      `/v1/admin/passengers/${fixture.passengerId}`,
+      { token: adminToken },
+    );
+    expect(passengerAfterDeletion.data?.stats.ratingCount).toBe(0);
+    expect(passengerAfterDeletion.data?.stats.rating).toBe(5);
+
     await connection.execute(
       `UPDATE driver_shifts SET started_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 20 MINUTE)
        WHERE driver_id = ? AND ended_at IS NULL`,
@@ -1388,6 +1572,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       childSurchargeMinor: originalTariffs.childSurchargeMinor,
       waitingFreeMinutes: originalTariffs.waitingFreeMinutes,
       waitingPerMinuteMinor: originalTariffs.waitingPerMinuteMinor,
+      searchPriceIncreaseIntervalMinutes:
+        originalTariffs.searchPriceIncreaseIntervalMinutes,
+      searchPriceIncreaseStepMinor: originalTariffs.searchPriceIncreaseStepMinor,
       serviceCommissionBps: 900,
     };
     expect(

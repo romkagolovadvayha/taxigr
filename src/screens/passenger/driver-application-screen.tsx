@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Switch, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { AppButton } from '@/components/ui/app-button';
+import { AccessibleSwitch } from '@/components/ui/accessible-switch';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { VehicleColorPicker } from '@/components/vehicle/vehicle-color-picker';
 import type { DriverApplication } from '@/domain/models';
 import { currentDriverLegalAcceptance, legalDocuments } from '@/legal/documents';
+import { goBackOrReplace } from '@/navigation/back';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type Form = {
@@ -119,7 +121,7 @@ export function DriverApplicationScreen() {
     return (
       <Screen contentStyle={{ maxWidth: 760, justifyContent: 'center' }}>
         <StatusChip label="На проверке" tone="warning" />
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Заявка отправлена</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Заявка отправлена</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
           Суперадмин проверит данные автомобиля и водительского удостоверения. После одобрения в профиле появится кабинет водителя.
         </Text>
@@ -131,9 +133,9 @@ export function DriverApplicationScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/profile')} />
         <View>
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Стать водителем</Text>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Стать водителем</Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Проверка обычно занимает до одного рабочего дня</Text>
         </View>
       </View>
@@ -190,7 +192,7 @@ export function DriverApplicationScreen() {
             <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Есть детское кресло</Text>
             <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Сможете брать детский тариф</Text>
           </View>
-          <Switch
+          <AccessibleSwitch
             value={childSeat}
             accessibilityLabel="Есть детское кресло"
             onValueChange={setChildSeat}

@@ -11,6 +11,7 @@ import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useRide } from '@/state/ride-provider';
 import { hasHouseNumber } from '@/domain/address-precision';
+import { goBackOrReplace } from '@/navigation/back';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function OrderConfirmationScreen() {
@@ -60,9 +61,9 @@ export function OrderConfirmationScreen() {
     >
       <Screen contentStyle={{ maxWidth: 560, alignSelf: 'center' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-          <IconButton icon="back" label="Назад к заказу" onPress={() => router.back()} />
+          <IconButton icon="back" label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
           <View style={{ flex: 1 }}>
-            <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+            <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
               Подтверждение
             </Text>
             <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>

@@ -20,11 +20,15 @@ import {
 } from '@/components/map/yandex-map-loader';
 import { grahovoCenter } from '@/data/demo';
 import { useAppTheme } from '@/theme/theme-provider';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, motion, spacing, typography } from '@/theme/tokens';
 
 type MapMargin = [number, number, number, number];
 
 const ROUTE_PADDING = 18;
+const ROUTE_POINT_BASE_SIZE = 18;
+const reduceMotion =
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function mapMargin(insets?: MapViewportInsets, hasPreviewCallouts = false): MapMargin {
   const horizontalPadding = hasPreviewCallouts ? 86 : ROUTE_PADDING;
@@ -41,8 +45,7 @@ function setRoutePointZoom(element: HTMLDivElement, zoom: number): void {
   const dot = element.querySelector<HTMLDivElement>('[data-route-dot]');
   const callout = element.querySelector<HTMLDivElement>('[data-route-callout]');
   if (dot) {
-    dot.style.width = `${size}px`;
-    dot.style.height = `${size}px`;
+    dot.style.transform = `translate(-50%, -50%) scale(${size / ROUTE_POINT_BASE_SIZE})`;
   }
   if (callout) callout.style.bottom = `${Math.round(size / 2) + 8}px`;
 }
@@ -65,13 +68,17 @@ function routePointElement(
   dot.style.position = 'absolute';
   dot.style.left = '0';
   dot.style.top = '0';
+  dot.style.width = `${ROUTE_POINT_BASE_SIZE}px`;
+  dot.style.height = `${ROUTE_POINT_BASE_SIZE}px`;
   dot.style.borderRadius = '999px';
   dot.style.background = colors.brandInk;
   dot.style.border = '2px solid white';
   dot.style.boxSizing = 'border-box';
   dot.style.boxShadow = '0 1px 5px rgba(0,0,0,.24)';
   dot.style.transform = 'translate(-50%, -50%)';
-  dot.style.transition = 'width 140ms ease, height 140ms ease';
+  dot.style.transition = reduceMotion
+    ? 'none'
+    : `transform ${motion.duration.quick}ms cubic-bezier(${motion.easing.out.join(', ')})`;
   element.appendChild(dot);
 
   if (calloutLabel) {
@@ -132,7 +139,9 @@ function markerElement(
     element.innerHTML = driverMarkerSvgMarkup(colors.brand, colors.brandInk);
     const rotation = navigationMode ? 0 : (heading ?? 0);
     element.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-    element.style.transition = 'transform 280ms linear';
+    element.style.transition = reduceMotion
+      ? 'none'
+      : `transform ${motion.duration.tracking}ms linear`;
   } else {
     element.style.borderRadius = '999px';
     element.style.background = colors.info;
@@ -333,7 +342,12 @@ export const TaxiMap = memo(function TaxiMap({
               margin,
             )
           : null;
-        if (location) map.update({ margin, location: { ...location, duration: 500 } });
+        if (location) {
+          map.update({
+            margin,
+            location: { ...location, duration: reduceMotion ? 0 : motion.duration.tracking },
+          });
+        }
       }
     }
   }, [
@@ -382,17 +396,21 @@ export const TaxiMap = memo(function TaxiMap({
           location: {
             center: coordinates,
             zoom: followZoom ?? (navigationMode ? 17 : 16),
-            duration: 350,
+            duration: reduceMotion ? 0 : motion.duration.tracking,
             easing: 'linear',
           },
           camera: navigationMode
             ? {
                 tilt: (35 * Math.PI) / 180,
                 azimuth: ((driverHeading ?? 0) * Math.PI) / 180,
-                duration: 350,
+                duration: reduceMotion ? 0 : motion.duration.tracking,
                 easing: 'linear',
               }
-            : { tilt: 0, azimuth: 0, duration: 350 },
+            : {
+                tilt: 0,
+                azimuth: 0,
+                duration: reduceMotion ? 0 : motion.duration.tracking,
+              },
         });
       }
     } else if (driverMarkerRef.current) {

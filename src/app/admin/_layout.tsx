@@ -8,8 +8,10 @@ import { colors } from '@/theme/tokens';
 const items: NavItem[] = [
   { href: '/admin', label: 'Сводка', icon: 'earnings' },
   { href: '/admin/applications', label: 'Заявки', icon: 'document' },
+  { href: '/admin/passengers', label: 'Пассажиры', icon: 'users' },
   { href: '/admin/drivers', label: 'Водители', icon: 'car' },
   { href: '/admin/orders', label: 'Заказы', icon: 'orders' },
+  { href: '/admin/places', label: 'Места', icon: 'location' },
   { href: '/admin/settings', label: 'Настройки', icon: 'settings' },
 ];
 
@@ -23,4 +25,3 @@ export default function AdminLayout() {
     </View>
   );
 }
-

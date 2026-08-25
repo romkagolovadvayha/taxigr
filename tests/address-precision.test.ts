@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  extractQueryHouseNumber,
   extractHouseNumber,
   hasHouseNumber,
   queryHasHouseNumber,
@@ -27,5 +28,6 @@ describe('address precision', () => {
   it('requires both a street name and a trailing house number', () => {
     expect(queryHasHouseNumber('ул. 50 лет Победы, 19')).toBe(true);
     expect(queryHasHouseNumber('Ачинцева 5')).toBe(true);
+    expect(extractQueryHouseNumber('Поршур, Бабаева, 99А')).toBe('99А');
   });
 });

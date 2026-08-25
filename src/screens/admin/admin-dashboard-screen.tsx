@@ -7,13 +7,14 @@ import { KpiCard } from '@/components/admin/kpi-card';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import { demoAdminMetrics } from '@/data/demo';
 import type { AdminMetrics } from '@/domain/models';
+import { formatRouteLabel } from '@/domain/route-label';
 import { useRide } from '@/state/ride-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 
 export function AdminDashboardScreen() {
   const { token } = useSession();
-  const { orders } = useRide();
+  const { adminOrders: orders } = useRide();
   const [metrics, setMetrics] = useState<AdminMetrics>({
     activeOrders: 0,
     onlineDrivers: 0,
@@ -46,7 +47,7 @@ export function AdminDashboardScreen() {
       contentContainerStyle={{ padding: spacing.x6, gap: spacing.x6 }}
     >
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Операционная сводка</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Операционная сводка</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Такси Грахово · сегодня</Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
@@ -72,7 +73,7 @@ export function AdminDashboardScreen() {
           >
             <Text selectable style={{ ...typography.caption, color: colors.inkMuted, width: 110 }}>{order.id.slice(0, 14)}</Text>
             <Text selectable numberOfLines={1} style={{ ...typography.body, color: colors.ink, flex: 1 }}>
-              {order.pickup.label} → {order.destination.label}
+              {formatRouteLabel(order.pickup, order.destination)}
             </Text>
             <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{formatMoney(order.priceMinor)}</Text>
           </View>

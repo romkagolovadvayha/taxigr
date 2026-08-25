@@ -2,7 +2,6 @@ import * as Haptics from 'expo-haptics';
 import type { ReactNode } from 'react';
 import { useCallback } from 'react';
 import {
-  Pressable,
   Text,
   type LayoutChangeEvent,
   type StyleProp,
@@ -11,8 +10,9 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   clamp,
+  Easing,
   interpolate,
-  LinearTransition,
+  ReduceMotion,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -20,7 +20,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   children: ReactNode;
@@ -81,14 +82,23 @@ export function DraggableSheet({
         translationY.value = withSpring(0, {
           damping: 20,
           stiffness: 240,
+          reduceMotion: ReduceMotion.System,
         });
         return;
       }
       const target = expanded ? MAX_PULL_DISTANCE : -MAX_PULL_DISTANCE;
-      translationY.value = withTiming(target, { duration: 140 }, (finished) => {
+      translationY.value = withTiming(target, {
+        duration: motion.duration.quick,
+        easing: Easing.bezier(...motion.easing.out),
+        reduceMotion: ReduceMotion.System,
+      }, (finished) => {
         if (!finished) return;
         runOnJS(toggle)();
-        translationY.value = 0;
+        translationY.value = withTiming(0, {
+          duration: motion.duration.pressOut,
+          easing: Easing.bezier(...motion.easing.out),
+          reduceMotion: ReduceMotion.System,
+        });
       });
     });
 
@@ -105,16 +115,14 @@ export function DraggableSheet({
   }));
 
   return (
-    <Animated.View
-      layout={LinearTransition.duration(180)}
-      onLayout={onLayout}
-      style={[style, sheetStyle]}
-    >
+    <Animated.View onLayout={onLayout} style={[style, sheetStyle]}>
       <GestureDetector gesture={pan}>
-        <Pressable
+        <AnimatedPressable
+          feedback="subtle"
           accessible
           accessibilityRole="button"
-          accessibilityState={{ disabled: !canToggle, expanded }}
+          aria-disabled={!canToggle}
+          aria-expanded={expanded}
           accessibilityLabel={expanded ? (collapseHint ?? hint) : hint}
           accessibilityHint={expanded ? 'Потяните вниз или коснитесь' : 'Потяните вверх или коснитесь'}
           disabled={!canToggle}
@@ -143,7 +151,7 @@ export function DraggableSheet({
               {expanded ? 'Потяните вниз' : 'Потяните вверх'}
             </Text>
           )}
-        </Pressable>
+        </AnimatedPressable>
       </GestureDetector>
       {children}
     </Animated.View>

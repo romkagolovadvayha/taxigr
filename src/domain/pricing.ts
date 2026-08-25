@@ -16,6 +16,8 @@ export type PricingRules = {
   childSurchargeMinor: number;
   waitingFreeMinutes: number;
   waitingPerMinuteMinor: number;
+  searchPriceIncreaseIntervalMinutes: number;
+  searchPriceIncreaseStepMinor: number;
   serviceCommissionBps: number;
 };
 
@@ -31,6 +33,8 @@ export const defaultPricingRules: PricingRules = {
   childSurchargeMinor: 7_000,
   waitingFreeMinutes: 3,
   waitingPerMinuteMinor: 400,
+  searchPriceIncreaseIntervalMinutes: 4,
+  searchPriceIncreaseStepMinor: 3_000,
   serviceCommissionBps: 1_200,
 };
 

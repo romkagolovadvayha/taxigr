@@ -44,11 +44,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
               }
               html[data-session-booting="true"] #session-boot,
               html[data-theme-booting="true"] #session-boot { display: flex; }
-              input,
-              textarea,
-              select {
-                outline: none !important;
-              }
               .session-boot-title { font-size: 28px; line-height: 34px; font-weight: 800; }
               .session-boot-caption { color: #6F706F; font-size: 14px; line-height: 20px; }
               .session-boot-spinner {

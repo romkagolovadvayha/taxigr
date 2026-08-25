@@ -29,6 +29,10 @@ export type OrderRow = RowDataPacket & {
   duration_seconds: number;
   route_geometry: unknown;
   base_price_minor: number;
+  search_price_increase_minor: number;
+  search_price_increase_interval_minutes: number;
+  search_price_increase_step_minor: number;
+  search_price_increase_last_slot: number;
   price_minor: number;
   commission_minor: number;
   commission_bps: number;
@@ -124,6 +128,10 @@ export function presentOrder(row: OrderRow): RideOrder {
     status: row.status,
     pricingScope: row.pricing_scope,
     basePriceMinor: row.base_price_minor,
+    searchPriceIncreaseMinor: row.search_price_increase_minor,
+    searchPriceIncreaseIntervalMinutes: row.search_price_increase_interval_minutes,
+    searchPriceIncreaseStepMinor: row.search_price_increase_step_minor,
+    searchPriceIncreaseLastSlot: row.search_price_increase_last_slot,
     priceMinor: row.price_minor,
     serviceCommissionMinor: row.commission_minor,
     waitingSeconds: row.waiting_seconds,

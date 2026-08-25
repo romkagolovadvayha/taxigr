@@ -2,19 +2,20 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { MoneyValue } from '@/components/ui/money-value';
 import { StatusChip } from '@/components/ui/status-chip';
+import { formatRouteAddresses } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function AdminOrdersScreen() {
-  const { orders } = useRide();
+  const { adminOrders: orders } = useRide();
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{ padding: spacing.x6, gap: spacing.x5 }}
     >
       <View>
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Все заказы</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Все заказы</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Онлайн-монитор и история поездок</Text>
       </View>
       <View
@@ -43,10 +44,10 @@ export function AdminOrdersScreen() {
             <Text selectable style={{ ...typography.caption, color: colors.inkMuted, width: 120 }}>{order.id.slice(0, 16)}</Text>
             <View style={{ flex: 1, minWidth: 240 }}>
               <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>
-                {order.pickup.label}
+                {formatRouteAddresses(order.pickup, order.destination).pickup}
               </Text>
               <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
-                → {order.destination.label}
+                → {formatRouteAddresses(order.pickup, order.destination).destination}
               </Text>
             </View>
             <StatusChip label={rideStatusLabel[order.status]} tone={order.status === 'completed' ? 'success' : 'info'} />

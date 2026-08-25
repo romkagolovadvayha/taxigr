@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { MoneyValue } from '@/components/ui/money-value';
 import { SkeletonBlock } from '@/components/ui/skeleton-block';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
@@ -22,14 +23,15 @@ export function BookingSubmitButton({
   const unavailable = disabled || loading;
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={
         loading
           ? 'Рассчитываем стоимость и время подачи'
           : `Перейти к подтверждению заказа за ${priceMinor / 100} рублей`
       }
-      accessibilityState={{ disabled: unavailable, busy: loading }}
+      aria-disabled={unavailable}
+      aria-busy={loading}
       disabled={unavailable}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -41,7 +43,6 @@ export function BookingSubmitButton({
         borderCurve: 'continuous',
         backgroundColor: colors.brand,
         opacity: loading ? 0.78 : disabled ? 0.42 : pressed ? 0.88 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
       })}
     >
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: spacing.x2 }}>
@@ -60,6 +61,6 @@ export function BookingSubmitButton({
         )}
       </View>
       <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Заказать</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }

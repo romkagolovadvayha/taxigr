@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
 import {
   type MaxAuthChallenge,
@@ -12,6 +12,7 @@ import { TelegramLogo } from '@/components/auth/telegram-logo';
 import { BrandMark } from '@/components/brand-mark';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { AppButton } from '@/components/ui/app-button';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { Screen } from '@/components/ui/screen';
 import type { DemoPersona } from '@/domain/models';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -232,7 +233,7 @@ export function SignInScreen() {
             borderColor: colors.border,
           }}
         >
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Подтверждение телефона
           </Text>
 
@@ -360,7 +361,8 @@ export function SignInScreen() {
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
                 В Telegram нажмите «Запустить» (Start), затем «Поделиться номером» и вернитесь в приложение.
               </Text>
-              <Pressable
+              <AnimatedPressable
+                feedback="subtle"
                 accessibilityRole="link"
                 onPress={() => {
                   const externalWindow = prepareExternalAuthWindow();
@@ -369,6 +371,13 @@ export function SignInScreen() {
                     setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
                   });
                 }}
+                style={({ pressed }) => ({
+                  minHeight: 44,
+                  paddingHorizontal: spacing.x2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.68 : 1,
+                })}
               >
                 <Text
                   style={{
@@ -380,17 +389,19 @@ export function SignInScreen() {
                 >
                   Telegram не открылся? Открыть в браузере
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           )}
-          <Pressable
+          <AnimatedPressable
+            feedback="subtle"
             accessibilityRole="link"
             accessibilityLabel={maskedPhone ? 'Отправить код по SMS снова' : 'Получить код по SMS без MAX и Telegram'}
-            accessibilityState={{ disabled: !canStart || cooldown > 0, busy: authAction === 'sms' }}
+            aria-disabled={!canStart || cooldown > 0}
+            aria-busy={authAction === 'sms'}
             disabled={!canStart || cooldown > 0}
             onPress={() => void sendCode()}
             style={({ pressed }) => ({
-              minHeight: 36,
+              minHeight: 44,
               alignSelf: 'center',
               paddingHorizontal: spacing.x2,
               alignItems: 'center',
@@ -417,7 +428,7 @@ export function SignInScreen() {
                   : 'У меня нет MAX и Telegram'}
               </Text>
             </View>
-          </Pressable>
+          </AnimatedPressable>
         </View>
 
         {visibleAuthError && (

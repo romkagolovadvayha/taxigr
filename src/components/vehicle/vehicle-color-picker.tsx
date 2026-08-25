@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import {
   inferVehicleColorHex,
@@ -39,10 +40,10 @@ export function VehicleColorPicker({
       <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
         {label}
       </Text>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${name || 'не выбран'}`}
-        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
         onPress={() => setExpanded((current) => !current)}
         style={({ pressed }) => ({
           minHeight: 56,
@@ -81,11 +82,12 @@ export function VehicleColorPicker({
         <View style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}>
           <AppIcon name="chevron" size={20} color={colors.inkMuted} />
         </View>
-      </Pressable>
+      </AnimatedPressable>
 
       {expanded && (
         <View
           accessibilityRole="radiogroup"
+          accessibilityLabel={label}
           style={{
             padding: spacing.x3,
             borderRadius: radius.lg,
@@ -102,10 +104,10 @@ export function VehicleColorPicker({
             const selected =
               option.name.toLocaleLowerCase('ru-RU') === name.trim().toLocaleLowerCase('ru-RU');
             return (
-              <Pressable
+              <AnimatedPressable
                 key={option.key}
                 accessibilityRole="radio"
-                accessibilityState={{ selected }}
+                aria-checked={selected}
                 accessibilityLabel={option.name}
                 onPress={() => {
                   onChange({ name: option.name, hex: option.hex });
@@ -140,12 +142,12 @@ export function VehicleColorPicker({
                 <Text selectable style={{ ...typography.caption, color: colors.ink, flex: 1 }}>
                   {option.name}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="radio"
-            accessibilityState={{ selected: customSelected || customMode }}
+            aria-checked={customSelected || customMode}
             accessibilityLabel="Другой цвет"
             onPress={() => {
               setCustomMode(true);
@@ -178,7 +180,7 @@ export function VehicleColorPicker({
             <Text selectable style={{ ...typography.caption, color: colors.ink }}>
               Другой цвет
             </Text>
-          </Pressable>
+          </AnimatedPressable>
           {customMode && (
             <View style={{ width: '100%', gap: spacing.x2 }}>
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>

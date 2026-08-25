@@ -1,30 +1,39 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
+import { StatusChip } from '@/components/ui/status-chip';
 import { demoAddresses } from '@/data/demo';
+import { grahovoDirectoryAddresses } from '@/data/grahovo-address-directory';
 import type { DestinationHistoryItem } from '@/domain/address-history';
-import { hasHouseNumber, queryHasHouseNumber } from '@/domain/address-precision';
+import { addressSearchScore } from '@/domain/address-search';
+import {
+  extractHouseNumber,
+  extractQueryHouseNumber,
+  hasHouseNumber,
+  queryHasHouseNumber,
+} from '@/domain/address-precision';
 import { buildStreetSuggestions } from '@/domain/address-suggestions';
+import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address } from '@/domain/models';
+import { getPlaceOpenStatus, placeCategoryLabels } from '@/domain/place-directory';
+import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 function addressKey(address: Address): string {
-  return `${address.coordinates.latitude.toFixed(5)}:${address.coordinates.longitude.toFixed(5)}:${address.houseNumber?.toLocaleLowerCase('ru') ?? 'street'}`;
+  return `${address.placeId ?? address.label.toLocaleLowerCase('ru')}:${address.houseNumber?.toLocaleLowerCase('ru') ?? 'place'}:${address.coordinates.latitude.toFixed(5)}:${address.coordinates.longitude.toFixed(5)}`;
 }
 
 function matchesAddress(address: Address, normalizedQuery: string): boolean {
-  return (
-    !normalizedQuery ||
-    address.label.toLocaleLowerCase('ru').includes(normalizedQuery) ||
-    !!address.details?.toLocaleLowerCase('ru').includes(normalizedQuery)
-  );
+  return !normalizedQuery || addressSearchScore(address, normalizedQuery) > 0;
 }
 
 function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
@@ -35,6 +44,24 @@ function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
     seen.add(key);
     return true;
   });
+}
+
+const localAddressDirectory = [
+  ...demoAddresses,
+  ...grahovoDirectoryAddresses,
+  ...buildStreetSuggestions(grahovoDirectoryAddresses),
+].filter((address, index, addresses) => {
+  const label = address.label.toLocaleLowerCase('ru');
+  return addresses.findIndex((candidate) => candidate.label.toLocaleLowerCase('ru') === label) === index;
+});
+
+function searchTokens(value: string): string[] {
+  return value
+    .toLocaleLowerCase('ru')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(' ')
+    .filter((token) => token.length > 1);
 }
 
 function relativeDate(value: string): string {
@@ -81,29 +108,36 @@ function SectionTitle({ children }: { children: string }) {
 function AddressResult({
   address,
   history,
+  manual = false,
+  now,
   onPress,
 }: {
   address: Address;
   history?: DestinationHistoryItem;
+  manual?: boolean;
+  now: Date;
   onPress: () => void;
 }) {
-  const precise = hasHouseNumber(address);
+  const place = address.place;
+  const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
+  const precise = hasHouseNumber(address) || Boolean(place);
   const refinement = !precise && !history;
   return (
-    <Pressable
+    <AnimatedPressable
+      feedback="subtle"
       accessibilityRole="button"
       accessibilityLabel={`${address.label}${history ? `, ${historyMeta(history)}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 72,
+        minHeight: place ? 104 : 72,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.x4,
         padding: spacing.x4,
         borderRadius: radius.lg,
-        backgroundColor: precise || refinement ? colors.surface : colors.warningSoft,
+        backgroundColor: manual ? colors.warningSoft : precise || refinement ? colors.surface : colors.warningSoft,
         borderWidth: 1,
-        borderColor: precise || refinement ? colors.border : colors.warning,
+        borderColor: manual ? colors.warning : precise || refinement ? colors.border : colors.warning,
         opacity: pressed ? 0.72 : 1,
       })}
     >
@@ -117,23 +151,41 @@ function AddressResult({
           backgroundColor: colors.surfaceSecondary,
         }}
       >
-        <AppIcon
-          name={history?.isLastDestination ? 'clock' : 'location'}
-          color={
-            precise || refinement
-              ? history?.isLastDestination
-                ? colors.ink
-                : colors.inkSecondary
-              : colors.warningText
-          }
-          size={21}
-        />
+        {place?.photoUrls[0] ? (
+          <Image
+            source={{ uri: place.photoUrls[0] }}
+            contentFit="cover"
+            accessibilityLabel={`Фото: ${place.name}`}
+            style={{ width: 42, height: 42, borderRadius: radius.md }}
+          />
+        ) : (
+          <AppIcon
+            name={history?.isLastDestination ? 'clock' : 'location'}
+            color={
+              precise || refinement
+                ? history?.isLastDestination
+                  ? colors.ink
+                  : colors.inkSecondary
+                : colors.warningText
+            }
+            size={21}
+          />
+        )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>
-          {address.label}
+          {place?.name ?? address.label}
         </Text>
-        {!!address.details && (
+        {!!place && (
+          <Text
+            selectable
+            numberOfLines={1}
+            style={{ ...typography.caption, color: colors.inkSecondary }}
+          >
+            {placeCategoryLabels[place.category]} · {place.addressLabel}
+          </Text>
+        )}
+        {!!address.details && !place && (
           <Text
             selectable
             numberOfLines={1}
@@ -142,8 +194,34 @@ function AddressResult({
             {address.details}
           </Text>
         )}
+        {!!place?.description && (
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkMuted }}>
+            {place.description}
+          </Text>
+        )}
+        {!!placeStatus && (
+          <View style={{ marginTop: spacing.x2 }}>
+            <StatusChip
+              label={placeStatus.label}
+              tone={placeStatus.kind === 'open' ? 'success' : placeStatus.kind === 'closed' ? 'neutral' : 'warning'}
+            />
+          </View>
+        )}
       </View>
-      {refinement ? (
+      {manual ? (
+        <Text
+          selectable
+          numberOfLines={2}
+          style={{
+            ...typography.caption,
+            color: colors.warningText,
+            maxWidth: 94,
+            textAlign: 'right',
+          }}
+        >
+          Использовать
+        </Text>
+      ) : refinement ? (
         <AppIcon name="chevron" color={colors.inkMuted} size={20} />
       ) : !precise ? (
         <Text
@@ -174,7 +252,7 @@ function AddressResult({
       ) : (
         <AppIcon name="chevron" color={colors.inkMuted} size={20} />
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -187,9 +265,10 @@ export function AddressSearchScreen() {
   const [query, setQuery] = useState(initialQueryValue);
   const [edited, setEdited] = useState(false);
   const [selectedStreet, setSelectedStreet] = useState<Address | null>(null);
-  const [remoteResults, setRemoteResults] = useState<typeof demoAddresses>([]);
+  const [remoteResults, setRemoteResults] = useState<Address[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const searchRequestId = useRef(0);
   const searchAbortController = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -197,9 +276,14 @@ export function AddressSearchScreen() {
   const { setPickup, setDestination, destinationHistory } = useRide();
   const normalizedQuery = query.trim().toLocaleLowerCase('ru');
   const localResults = useMemo(() => {
-    return mergeAddresses(buildStreetSuggestions(demoAddresses), demoAddresses).filter((address) =>
-      matchesAddress(address, normalizedQuery),
-    );
+    if (!normalizedQuery) return mergeAddresses(buildStreetSuggestions(demoAddresses), demoAddresses);
+    return localAddressDirectory
+      .filter((address) => matchesAddress(address, normalizedQuery))
+      .sort(
+        (left, right) =>
+          addressSearchScore(right, normalizedQuery) - addressSearchScore(left, normalizedQuery),
+      )
+      .slice(0, 120);
   }, [normalizedQuery]);
   const matchingHistory = useMemo(
     () =>
@@ -217,10 +301,42 @@ export function AddressSearchScreen() {
   const showPersonalSuggestions =
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
   const baseResults = canSearchRemote && edited && remoteResults.length ? remoteResults : localResults;
+  const queryTokens = searchTokens(query);
+  const queryMatchesKnownStreetName = localAddressDirectory.some((address) => {
+    if (hasHouseNumber(address) || !address.details?.includes('улица')) return false;
+    const streetPart = address.label.split(',').at(-1) ?? address.label;
+    const streetTokens = searchTokens(streetPart).filter(
+      (token) => !['ул', 'улица', 'пер', 'переулок'].includes(token),
+    );
+    return queryTokens.some((token) => streetTokens.includes(token));
+  });
+  const showHouseSuggestions =
+    !!selectedStreet || queryHasHouseNumber(query) || queryMatchesKnownStreetName;
   const results = mergeAddresses(
     matchingHistory.map((item) => item.address),
     baseResults,
-  ).filter((address) => !selectedStreet || hasHouseNumber(address));
+  ).filter(
+    (address) =>
+      (!selectedStreet || hasHouseNumber(address)) &&
+      (Boolean(address.place) || showHouseSuggestions || !hasHouseNumber(address)),
+  );
+  const hasPlaceResults = results.some((address) => Boolean(address.place));
+  const requestedHouseNumber = extractQueryHouseNumber(query);
+  const hasExactHouseResult =
+    !!requestedHouseNumber &&
+    results.some(
+      (address) =>
+        extractHouseNumber(address)?.toLocaleLowerCase('ru') ===
+        requestedHouseNumber.toLocaleLowerCase('ru'),
+    );
+  const manualAnchor = useMemo(
+    () =>
+      selectedStreet ??
+      findBestAddressAnchor(query, mergeAddresses(remoteResults, localAddressDirectory)) ??
+      demoAddresses[0]!,
+    [query, remoteResults, selectedStreet],
+  );
+  const manualAddress = hasExactHouseResult ? null : buildManualAddress(query, manualAnchor);
 
   const runRemoteSearch = useCallback(() => {
     const normalized = query.trim();
@@ -232,14 +348,14 @@ export function AddressSearchScreen() {
     searchAbortController.current = controller;
     setSearching(true);
     const endpoint = demoSession ? '/v1/addresses/preview' : '/v1/addresses/search';
-    void apiRequest<typeof demoAddresses>(
+    void apiRequest<Address[]>(
       `${endpoint}?query=${encodeURIComponent(normalized)}`,
       { token: demoSession ? undefined : token, signal: controller.signal },
     )
       .then((items) => {
         if (requestId !== searchRequestId.current) return;
         setRemoteResults(items);
-        setSearchError(items.length ? null : 'Ничего не найдено');
+        setSearchError(items.length ? null : 'Точного совпадения нет');
       })
       .catch((reason: unknown) => {
         if (requestId !== searchRequestId.current) return;
@@ -268,8 +384,13 @@ export function AddressSearchScreen() {
     [],
   );
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const selectAddress = (address: Address) => {
-    if (!hasHouseNumber(address)) {
+    if (!hasHouseNumber(address) && !address.placeId) {
       const street = { ...address, label: address.label.replace(/[,\s]+$/u, '') };
       const refinedQuery = `${street.label}, `;
       searchAbortController.current?.abort();
@@ -290,15 +411,15 @@ export function AddressSearchScreen() {
     }
     if (field === 'pickup') setPickup(address);
     else setDestination(address);
-    router.back();
+    goBackOrReplace('/');
   };
 
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <View>
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             {field === 'pickup' ? 'Место подачи' : 'Куда поедем?'}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -339,17 +460,17 @@ export function AddressSearchScreen() {
             setSearchError(null);
             setSearching(false);
           }}
-          placeholder="Адрес или место"
+          placeholder="Адрес, магазин, кафе или место"
           placeholderTextColor={colors.inkMuted}
           style={{ ...typography.body, color: colors.ink, flex: 1, minHeight: 56 }}
           returnKeyType="search"
           onSubmitEditing={runRemoteSearch}
-          accessibilityLabel="Поиск адреса"
+          accessibilityLabel="Поиск адреса или места"
         />
         {searching ? (
           <ActivityIndicator color={colors.ink} />
         ) : (
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Найти адрес"
             disabled={!canSearchRemote}
@@ -366,10 +487,10 @@ export function AddressSearchScreen() {
             })}
           >
             <AppIcon name="search" color={canSearchRemote ? colors.ink : colors.inkMuted} />
-          </Pressable>
+          </AnimatedPressable>
         )}
       </View>
-      {edited && query.trim().length >= 2 && !queryHasHouseNumber(query) && (
+      {edited && query.trim().length >= 2 && !queryHasHouseNumber(query) && !hasPlaceResults && (
         <View
           accessibilityRole="alert"
           style={{
@@ -383,14 +504,25 @@ export function AddressSearchScreen() {
           <Text selectable style={{ ...typography.caption, color: colors.warningText, flex: 1 }}>
             {selectedStreet
               ? 'Теперь укажите номер дома'
-              : 'Выберите улицу, затем укажите номер дома'}
+              : 'Выберите улицу или введите полный адрес с номером дома'}
           </Text>
         </View>
       )}
       {!!searchError && (
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.warning }}>
-          {searchError}. Можно выбрать адрес из списка ниже.
+          {searchError}. Полный адрес с номером дома можно использовать вручную.
         </Text>
+      )}
+      {!!manualAddress && (
+        <View style={{ gap: spacing.x3 }}>
+          <SectionTitle>Ввести вручную</SectionTitle>
+          <AddressResult
+            address={manualAddress}
+            manual
+            now={now}
+            onPress={() => selectAddress(manualAddress)}
+          />
+        </View>
       )}
       {showPersonalSuggestions ? (
         <View style={{ gap: spacing.x6 }}>
@@ -402,6 +534,7 @@ export function AddressSearchScreen() {
                   key={addressKey(item.address)}
                   address={item.address}
                   history={item}
+                  now={now}
                   onPress={() => selectAddress(item.address)}
                 />
               ))}
@@ -416,6 +549,7 @@ export function AddressSearchScreen() {
                   <AddressResult
                     key={address.id}
                     address={address}
+                    now={now}
                     onPress={() => selectAddress(address)}
                   />
                 ))}
@@ -433,6 +567,7 @@ export function AddressSearchScreen() {
                 key={addressKey(address)}
                 address={address}
                 history={historyByKey.get(addressKey(address))}
+                now={now}
                 onPress={() => selectAddress(address)}
               />
             ))}
@@ -441,7 +576,12 @@ export function AddressSearchScreen() {
       )}
       {!!remoteResults.length && (
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted, textAlign: 'center' }}>
-          Адресные данные © участники OpenStreetMap
+          Места из справочника сервиса · адресные данные © участники OpenStreetMap
+        </Text>
+      )}
+      {!remoteResults.length && edited && !!results.length && (
+        <Text selectable style={{ ...typography.caption, color: colors.inkMuted, textAlign: 'center' }}>
+          Адресный справочник ГАР/ФИАС · координаты OpenStreetMap
         </Text>
       )}
     </Screen>

@@ -10,6 +10,8 @@ describe('role navigation active item', () => {
 
   it('keeps a section active on its detail routes', () => {
     expect(isNavItemActive('/driver/trips/ride-1', '/driver/trips')).toBe(true);
+    expect(isNavItemActive('/admin/passengers/user-1', '/admin/passengers')).toBe(true);
+    expect(isNavItemActive('/admin/drivers/driver-1', '/admin/drivers')).toBe(true);
   });
 
   it('matches exact role roots', () => {

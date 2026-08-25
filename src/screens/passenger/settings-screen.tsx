@@ -1,7 +1,9 @@
 import { router, type Href } from 'expo-router';
-import { type ComponentProps, useEffect, useState } from 'react';
-import { Linking, Platform, Pressable, Switch, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Linking, Platform, Text, View } from 'react-native';
 
+import { AccessibleSwitch } from '@/components/ui/accessible-switch';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
@@ -10,6 +12,7 @@ import {
   hasNotificationPermission,
   requestNotificationPermission,
 } from '@/notifications/permissions';
+import { goBackOrReplace } from '@/navigation/back';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -28,19 +31,13 @@ function SettingToggle({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
-  const webThumbProps =
-    Platform.OS === 'web'
-      ? ({ activeThumbColor: '#FFFFFF' } as unknown as Partial<ComponentProps<typeof Switch>>)
-      : {};
-
   return (
     <View style={{ minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.x4 }}>
       <View style={{ flex: 1 }}>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{title}</Text>
         <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{subtitle}</Text>
       </View>
-      <Switch
-        {...webThumbProps}
+      <AccessibleSwitch
         value={value}
         disabled={disabled}
         accessibilityLabel={title}
@@ -84,8 +81,8 @@ export function SettingsScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Настройки</Text>
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/profile')} />
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Настройки</Text>
       </View>
       <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Оформление</Text>
       <View
@@ -143,10 +140,10 @@ export function SettingsScreen() {
           onValueChange={setVibrationEnabled}
         />
         <View style={{ height: 1, backgroundColor: colors.border }} />
-        <Pressable
+        <AnimatedPressable feedback="subtle"
           accessibilityRole="button"
           accessibilityLabel="Проверить звук и вибрацию"
-          accessibilityState={{ disabled: !soundEnabled && !vibrationEnabled }}
+          aria-disabled={!soundEnabled && !vibrationEnabled}
           disabled={!soundEnabled && !vibrationEnabled}
           onPress={() => void previewFeedback()}
           style={({ pressed }) => ({
@@ -162,7 +159,7 @@ export function SettingsScreen() {
             Проверить оповещение
           </Text>
           <AppIcon name="chevron" size={20} color={colors.inkMuted} />
-        </Pressable>
+        </AnimatedPressable>
       </View>
       <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
         Местоположение передаётся водителю только при активном заказе и включённой
@@ -179,7 +176,7 @@ export function SettingsScreen() {
           borderColor: colors.border,
         }}
       >
-        <Pressable
+        <AnimatedPressable feedback="subtle"
           accessibilityRole="button"
           accessibilityLabel="Запросить удаление аккаунта и данных"
           onPress={() => router.push('/account-deletion' as Href)}
@@ -201,7 +198,7 @@ export function SettingsScreen() {
             </Text>
           </View>
           <AppIcon name="chevron" size={20} color={colors.inkMuted} />
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </Screen>
   );

@@ -2,15 +2,17 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useSession } from '@/auth/session-provider';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { resolveApiUrl } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { goBackOrReplace } from '@/navigation/back';
+import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
 import { formatRussianPhone } from '@/utils/phone';
 import { detectAvatarMimeType } from '@/utils/avatar';
 
@@ -26,8 +28,10 @@ function MenuRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <AnimatedPressable
+      feedback="subtle"
       accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${label}. ${subtitle}` : label}
       onPress={onPress}
       style={({ pressed }) => ({
         minHeight: 68,
@@ -54,7 +58,7 @@ function MenuRow({
         {!!subtitle && <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{subtitle}</Text>}
       </View>
       <AppIcon name="chevron" color={colors.inkMuted} size={20} />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -122,8 +126,8 @@ export function ProfileScreen() {
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <IconButton icon="back" label="Назад" onPress={() => router.back()} />
-        <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>Профиль</Text>
+        <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Профиль</Text>
       </View>
 
       <View style={{ alignItems: 'center', gap: spacing.x3, paddingVertical: spacing.x3 }}>
@@ -142,7 +146,7 @@ export function ProfileScreen() {
             <Image
               source={resolveApiUrl(user.avatarUrl)}
               contentFit="cover"
-              transition={180}
+              transition={motion.duration.standard}
               style={{ width: 112, height: 112 }}
               accessibilityLabel="Аватар пользователя"
             />

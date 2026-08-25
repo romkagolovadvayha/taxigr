@@ -56,7 +56,7 @@ export function ProfileSetupScreen() {
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
             ПЕРВЫЙ ВХОД
           </Text>
-          <Text selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Расскажите, как к вам обращаться
           </Text>
           <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>

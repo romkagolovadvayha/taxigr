@@ -49,13 +49,14 @@ const soundSources: Record<NonNullable<RideFeedback['sound']>, number> = {
 };
 
 function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
-  const { currentRide } = useRide();
+  const { currentRide, driverRide } = useRide();
   const { user } = useSession();
   const {
     soundEnabled,
     vibrationEnabled,
   } = useFeedbackPreferences();
   const previousRide = useRef(currentRide);
+  const previousDriverRide = useRef(driverRide);
   const player = useAudioPlayer(null);
   const playerRef = useRef(player);
 
@@ -110,6 +111,20 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
     );
     if (feedback) void performFeedback(feedback);
   }, [currentRide, performFeedback, user]);
+
+  useEffect(() => {
+    const previous = previousDriverRide.current;
+    previousDriverRide.current = driverRide;
+    if (AppState.currentState !== 'active') return;
+
+    const feedback = feedbackForRideChange(
+      previous,
+      driverRide,
+      user?.id ?? null,
+      true,
+    );
+    if (feedback) void performFeedback(feedback);
+  }, [driverRide, performFeedback, user?.id]);
 
   const previewFeedback = useCallback(
     () =>

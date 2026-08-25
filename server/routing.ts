@@ -1,3 +1,5 @@
+import type { Address } from '../src/domain/models';
+import { isGrahovoAddress } from '../src/domain/pricing';
 import { config } from './config';
 
 export type Point = { latitude: number; longitude: number };
@@ -8,6 +10,22 @@ export type RouteMetrics = {
   source: 'osrm' | 'estimate';
   coordinates: Point[];
 };
+
+export type PricedRouteMetrics = {
+  tripRoute: RouteMetrics;
+  driverApproachRoute: RouteMetrics | null;
+  pricingDistanceMeters: number;
+};
+
+export const GRAHOVO_DRIVER_BASE: Point = {
+  latitude: 56.04758,
+  longitude: 51.95842,
+};
+
+type RouteMetricsResolver = (
+  origin: Point,
+  destination: Point,
+) => Promise<RouteMetrics>;
 
 type CacheEntry = {
   expiresAt: number;
@@ -140,4 +158,26 @@ export async function getRouteMetrics(origin: Point, destination: Point): Promis
     routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
     return remember(key, estimateRoute(origin, destination));
   }
+}
+
+export async function getPricedRouteMetrics(
+  pickup: Address,
+  destination: Address,
+  resolveRoute: RouteMetricsResolver = getRouteMetrics,
+): Promise<PricedRouteMetrics> {
+  const tripRoutePromise = resolveRoute(pickup.coordinates, destination.coordinates);
+  const driverApproachRoutePromise = isGrahovoAddress(pickup)
+    ? Promise.resolve<RouteMetrics | null>(null)
+    : resolveRoute(GRAHOVO_DRIVER_BASE, pickup.coordinates);
+  const [tripRoute, driverApproachRoute] = await Promise.all([
+    tripRoutePromise,
+    driverApproachRoutePromise,
+  ]);
+
+  return {
+    tripRoute,
+    driverApproachRoute,
+    pricingDistanceMeters:
+      tripRoute.distanceMeters + (driverApproachRoute?.distanceMeters ?? 0),
+  };
 }

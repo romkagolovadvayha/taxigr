@@ -1,7 +1,7 @@
 import type { Address, Coordinates } from '@/domain/models';
 import type { DriverRouteTarget } from '@/domain/ride-state';
 import type { MapViewportInsets } from '@/components/map/types';
-import type { AppColorScheme } from '@/theme/tokens';
+import { motion, type AppColorScheme } from '../../theme/tokens';
 
 import { driverMarkerSvgMarkup } from './driver-marker';
 
@@ -33,15 +33,16 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
     html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:${initialMapBackground}}
     .marker{width:18px;height:18px;border-radius:999px;border:4px solid white;box-shadow:0 3px 12px rgba(0,0,0,.25);transform:translate(-50%,-50%);background:#181818}
     .marker.route-point{position:relative;width:1px;height:1px;border:0;box-shadow:none;transform:none;background:transparent;pointer-events:none}
-    .route-dot{position:absolute;left:0;top:0;width:14px;height:14px;box-sizing:border-box;border:2px solid white;border-radius:999px;background:#181818;box-shadow:0 1px 5px rgba(0,0,0,.24);transform:translate(-50%,-50%);transition:width 140ms ease,height 140ms ease}
+    .route-dot{position:absolute;left:0;top:0;width:18px;height:18px;box-sizing:border-box;border:2px solid white;border-radius:999px;background:#181818;box-shadow:0 1px 5px rgba(0,0,0,.24);transform:translate(-50%,-50%) scale(.7778);transition:transform ${motion.duration.quick}ms cubic-bezier(${motion.easing.out.join(',')})}
     .route-callout{position:absolute;left:0;bottom:15px;transform:translateX(-50%);white-space:nowrap;padding:5px 11px;border-radius:12px;background:white;color:#181818;box-shadow:0 2px 10px rgba(0,0,0,.16);font:650 15px/20px system-ui,-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-.15px}
     .route-callout.pickup{background:#FFD600}
     .route-callout-pointer{position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid white}
     .route-callout.pickup .route-callout-pointer{border-top-color:#FFD600}
-    html.close-route-zoom .route-dot{width:18px;height:18px}
+    html.close-route-zoom .route-dot{transform:translate(-50%,-50%) scale(1)}
     html.close-route-zoom .route-callout{bottom:17px}
     .marker.passenger{background:#2684FF}
     .marker.driver{width:28px;height:40px;border:0;border-radius:0;box-shadow:none;background:transparent}
+    @media (prefers-reduced-motion:reduce){.route-dot,.marker.driver{transition:none!important}}
   </style>
   <script src="https://api-maps.yandex.ru/v3/?apikey=${encodeURIComponent(apiKey)}&lang=ru_RU"></script>
 </head>
@@ -50,6 +51,7 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
   <script>
     let map;
     let entities = [];
+    const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const apiReady = async () => {
       await ymaps3.ready;
       const {YMap,YMapDefaultSchemeLayer,YMapDefaultFeaturesLayer,YMapListener} = ymaps3;
@@ -89,7 +91,7 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
         el.innerHTML=${JSON.stringify(driverMarkerSvgMarkup())};
         const rotation=navigationMode?0:(Number.isFinite(heading)?heading:0);
         el.style.transform='translate(-50%,-50%) rotate('+rotation+'deg)';
-        el.style.transition='transform 280ms linear';
+        el.style.transition='transform ${motion.duration.tracking}ms linear';
       }
       return el;
     };
@@ -177,7 +179,7 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
         }));
         if(!state.followDriver){
           const location=fitRouteLocation(visibleCoordinates,margin);
-          if(location) map.update({margin,location:{...location,duration:500}});
+          if(location) map.update({margin,location:{...location,duration:reduceMotion?0:${motion.duration.tracking}}});
         }
       }
       if(state.driver){
@@ -192,15 +194,15 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
             zoom:Number.isFinite(state.followZoom)
               ?Math.max(6,Math.min(17,state.followZoom))
               :state.navigationMode?17:16,
-            duration:350,
+            duration:reduceMotion?0:${motion.duration.tracking},
             easing:'linear'
           },
           camera:state.navigationMode?{
             tilt:35*Math.PI/180,
             azimuth:Number.isFinite(state.driverHeading)?state.driverHeading*Math.PI/180:0,
-            duration:350,
+            duration:reduceMotion?0:${motion.duration.tracking},
             easing:'linear'
-          }:{tilt:0,azimuth:0,duration:350}
+          }:{tilt:0,azimuth:0,duration:reduceMotion?0:${motion.duration.tracking}}
         });
       }
       if(state.passenger) add(new YMapMarker({coordinates:[state.passenger.longitude,state.passenger.latitude],zIndex:32},marker('passenger')));
