@@ -26,6 +26,7 @@ import {
   ExternalAuthWindowBlockedError,
   openExternalAuthUrl,
   prepareExternalAuthWindow,
+  type PreparedExternalAuthWindow,
 } from '@/utils/open-external-auth';
 import {
   isCompleteRussianMobilePhone,
@@ -69,6 +70,24 @@ export function SignInScreen() {
   const checkingMax = useRef(false);
   const checkingTelegram = useRef(false);
   const checkingVk = useRef(false);
+  const externalAuthWindow = useRef<PreparedExternalAuthWindow>(null);
+
+  const closeExternalAuthWindow = () => {
+    closePreparedExternalAuthWindow(externalAuthWindow.current);
+    externalAuthWindow.current = null;
+  };
+
+  const prepareManagedExternalAuthWindow = () => {
+    closeExternalAuthWindow();
+    const preparedWindow = prepareExternalAuthWindow();
+    externalAuthWindow.current = preparedWindow;
+    return preparedWindow;
+  };
+
+  useEffect(() => () => {
+    closePreparedExternalAuthWindow(externalAuthWindow.current);
+    externalAuthWindow.current = null;
+  }, []);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -85,7 +104,10 @@ export function SignInScreen() {
       checkingMax.current = true;
       try {
         const status = await checkMaxPhoneAuth(maxChallenge);
-        if (status !== 'pending') setMaxChallenge(null);
+        if (status !== 'pending') {
+          closeExternalAuthWindow();
+          setMaxChallenge(null);
+        }
       } catch {
         // A later poll can recover from a temporary network error.
       } finally {
@@ -107,7 +129,10 @@ export function SignInScreen() {
       checkingTelegram.current = true;
       try {
         const status = await checkTelegramPhoneAuth(telegramChallenge);
-        if (status !== 'pending') setTelegramChallenge(null);
+        if (status !== 'pending') {
+          closeExternalAuthWindow();
+          setTelegramChallenge(null);
+        }
       } catch {
         // A later poll can recover from a temporary network error.
       } finally {
@@ -129,7 +154,10 @@ export function SignInScreen() {
       checkingVk.current = true;
       try {
         const status = await checkVkPhoneAuth(vkChallenge);
-        if (status !== 'pending') setVkChallenge(null);
+        if (status !== 'pending') {
+          closeExternalAuthWindow();
+          setVkChallenge(null);
+        }
       } catch {
         // A later poll can recover from a temporary network error.
       } finally {
@@ -151,7 +179,7 @@ export function SignInScreen() {
 
   const confirmWithMax = async () => {
     if (!phone || !acceptance || authenticating) return;
-    const externalWindow = prepareExternalAuthWindow();
+    const externalWindow = prepareManagedExternalAuthWindow();
     clearAuthError();
     setExternalWindowError(null);
     setAuthAction('max');
@@ -165,7 +193,7 @@ export function SignInScreen() {
       setMaxChallenge(challenge);
       await openExternalAuthUrl(challenge.botUrl, externalWindow);
     } catch (error) {
-      closePreparedExternalAuthWindow(externalWindow);
+      closeExternalAuthWindow();
       if (error instanceof ExternalAuthWindowBlockedError) {
         setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
       }
@@ -176,7 +204,7 @@ export function SignInScreen() {
 
   const confirmWithTelegram = async () => {
     if (!phone || !acceptance || authenticating) return;
-    const externalWindow = prepareExternalAuthWindow();
+    const externalWindow = prepareManagedExternalAuthWindow();
     clearAuthError();
     setExternalWindowError(null);
     setAuthAction('telegram');
@@ -190,7 +218,7 @@ export function SignInScreen() {
       setTelegramChallenge(challenge);
       await openExternalAuthUrl(challenge.appUrl, externalWindow, challenge.botUrl);
     } catch (error) {
-      closePreparedExternalAuthWindow(externalWindow);
+      closeExternalAuthWindow();
       if (error instanceof ExternalAuthWindowBlockedError) {
         setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
       }
@@ -201,7 +229,7 @@ export function SignInScreen() {
 
   const confirmWithVk = async () => {
     if (!phone || !acceptance || authenticating) return;
-    const externalWindow = prepareExternalAuthWindow();
+    const externalWindow = prepareManagedExternalAuthWindow();
     clearAuthError();
     setExternalWindowError(null);
     setAuthAction('vk');
@@ -215,7 +243,7 @@ export function SignInScreen() {
       setVkChallenge(challenge);
       await openExternalAuthUrl(challenge.authorizationUrl, externalWindow);
     } catch (error) {
-      closePreparedExternalAuthWindow(externalWindow);
+      closeExternalAuthWindow();
       if (error instanceof ExternalAuthWindowBlockedError) {
         setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
       }
@@ -228,6 +256,7 @@ export function SignInScreen() {
     if (!phone || !acceptance || authenticating || cooldown > 0) return;
     clearAuthError();
     setAuthAction('sms');
+    closeExternalAuthWindow();
     setMaxChallenge(null);
     setTelegramChallenge(null);
     setVkChallenge(null);
@@ -419,9 +448,9 @@ export function SignInScreen() {
                 feedback="subtle"
                 accessibilityRole="link"
                 onPress={() => {
-                  const externalWindow = prepareExternalAuthWindow();
+                  const externalWindow = prepareManagedExternalAuthWindow();
                   void openExternalAuthUrl(telegramChallenge.botUrl, externalWindow).catch(() => {
-                    closePreparedExternalAuthWindow(externalWindow);
+                    closeExternalAuthWindow();
                     setExternalWindowError('Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.');
                   });
                 }}

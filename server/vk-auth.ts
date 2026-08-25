@@ -144,7 +144,10 @@ export async function exchangeVkAuthorizationCode(input: {
 export function vkCallbackHtml(success: boolean): string {
   const title = success ? 'Вход подтверждён' : 'Не удалось подтвердить вход';
   const message = success
-    ? 'Номер подтверждён. Вернитесь в приложение — вход завершится автоматически.'
+    ? 'Номер подтверждён. Возвращаем вас в «Такси Грахово»…'
     : 'Закройте это окно и попробуйте войти через VK ещё раз.';
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;background:#f4f4f2;color:#181818;font-family:Arial,sans-serif;display:grid;min-height:100vh;place-items:center}.card{width:min(520px,calc(100% - 48px));box-sizing:border-box;margin:24px;padding:32px;border:1px solid #ddd;border-radius:28px;background:white;text-align:center}h1{margin:0 0 16px}p{line-height:1.5}.mark{width:64px;height:64px;border-radius:18px;background:#0077ff;color:white;display:grid;place-items:center;margin:0 auto 20px;font-size:30px;font-weight:800}</style></head><body><main class="card"><div class="mark">VK</div><h1>${title}</h1><p>${message}</p></main></body></html>`;
+  const closeScript = success
+    ? '<script>window.setTimeout(function(){window.close()},150)</script>'
+    : '';
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;background:#f4f4f2;color:#181818;font-family:Arial,sans-serif;display:grid;min-height:100vh;place-items:center}.card{width:min(520px,calc(100% - 48px));box-sizing:border-box;margin:24px;padding:32px;border:1px solid #ddd;border-radius:28px;background:white;text-align:center}h1{margin:0 0 16px}p{line-height:1.5}.mark{width:64px;height:64px;border-radius:18px;background:#0077ff;color:white;display:grid;place-items:center;margin:0 auto 20px;font-size:30px;font-weight:800}</style></head><body><main class="card"><div class="mark">VK</div><h1>${title}</h1><p>${message}</p></main>${closeScript}</body></html>`;
 }

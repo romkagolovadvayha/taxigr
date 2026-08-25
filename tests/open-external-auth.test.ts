@@ -50,6 +50,19 @@ describe('external messenger authorization window', () => {
     );
   });
 
+  it('closes the authorization tab and focuses the original web app', async () => {
+    vi.stubEnv('EXPO_OS', 'web');
+    const close = vi.fn();
+    const focus = vi.fn();
+    vi.stubGlobal('window', { focus });
+
+    const { closePreparedExternalAuthWindow } = await import('../src/utils/open-external-auth');
+    closePreparedExternalAuthWindow({ closed: false, close } as unknown as Window);
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
   it('uses the HTTPS fallback instead of a custom Telegram scheme on web', async () => {
     vi.stubEnv('EXPO_OS', 'web');
     const replace = vi.fn();

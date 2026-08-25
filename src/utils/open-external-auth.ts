@@ -52,4 +52,5 @@ export function closePreparedExternalAuthWindow(
   preparedWindow: PreparedExternalAuthWindow,
 ): void {
   if (preparedWindow && !preparedWindow.closed) preparedWindow.close();
+  if (process.env.EXPO_OS === 'web' && typeof window !== 'undefined') window.focus();
 }

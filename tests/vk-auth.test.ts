@@ -79,7 +79,8 @@ describe('VK ID authorization', () => {
   it('finishes VK phone confirmation without blocking on community messages', () => {
     const html = vkCallbackHtml(true);
     expect(html).toContain('Вход подтверждён');
-    expect(html).toContain('вход завершится автоматически');
+    expect(html).toContain('window.close()');
+    expect(html).toContain('Возвращаем вас в «Такси Грахово»');
     expect(html).not.toContain('AllowMessagesFromCommunity');
     expect(html).not.toContain('Открыть чат сообщества');
   });

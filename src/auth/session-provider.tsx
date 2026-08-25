@@ -1,4 +1,4 @@
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
@@ -234,8 +234,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           );
         } else if (result.status === 'verified') {
           await applySession(result);
-          const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
-          router.replace(destination);
+          if (!result.user.profileComplete) router.replace('/profile-setup');
         }
         return result.status;
       } catch (error) {
@@ -296,8 +295,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           );
         } else if (result.status === 'verified') {
           await applySession(result);
-          const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
-          router.replace(destination);
+          if (!result.user.profileComplete) router.replace('/profile-setup');
         }
         return result.status;
       } catch (error) {
@@ -360,8 +358,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } else if (result.status === 'verified') {
           await applySession(result);
           setVkCommunityPromptUrl(result.communityPrompt?.url ?? null);
-          const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
-          router.replace(destination);
+          if (!result.user.profileComplete) router.replace('/profile-setup');
         }
         return result.status;
       } catch (error) {
@@ -389,8 +386,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           },
         );
         await applySession(result);
-        const destination = (result.user.profileComplete ? '/' : '/profile-setup') as Href;
-        router.replace(destination);
+        if (!result.user.profileComplete) router.replace('/profile-setup');
       } catch (error) {
         const message =
           error instanceof ApiError
