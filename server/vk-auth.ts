@@ -1,9 +1,19 @@
+import { randomInt } from 'node:crypto';
+
 import { config } from './config';
 import { normalizeRussianPhone } from './phone-verification';
 
 // Keep server-generated authorization links compatible with the current
 // official @vkid/sdk URL contract.
 const VK_ID_SDK_VERSION = '2.6.1';
+const VK_ID_SESSION_ALPHABET = 'qazwsxedcrfvtgbyhnujmikol';
+
+function vkIdSessionId(): string {
+  return Array.from(
+    { length: 6 },
+    () => VK_ID_SESSION_ALPHABET[randomInt(VK_ID_SESSION_ALPHABET.length)],
+  ).join('');
+}
 
 type VkTokenResponse = {
   access_token?: unknown;
@@ -53,7 +63,11 @@ export function vkAuthorizationUrl(input: {
   url.searchParams.set('code_challenge', input.codeChallenge);
   url.searchParams.set('code_challenge_method', 's256');
   url.searchParams.set('scope', 'phone');
-  url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('prompt', '');
+  url.searchParams.set('stats_info', Buffer.from(JSON.stringify({
+    flow_source: 'from_custom_auth',
+    session_id: vkIdSessionId(),
+  }), 'utf8').toString('base64'));
   url.searchParams.set('sdk_type', 'vkid');
   url.searchParams.set('v', VK_ID_SDK_VERSION);
   return url.toString();

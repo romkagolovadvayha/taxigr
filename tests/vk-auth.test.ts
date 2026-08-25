@@ -22,7 +22,8 @@ describe('VK ID authorization', () => {
       codeChallenge: 'pkce-challenge',
     }));
     expect(url.origin + url.pathname).toBe('https://id.vk.ru/authorize');
-    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+    const params = Object.fromEntries(url.searchParams);
+    expect(params).toMatchObject({
       response_type: 'code',
       client_id: '123456',
       app_id: '123456',
@@ -31,9 +32,15 @@ describe('VK ID authorization', () => {
       code_challenge: 'pkce-challenge',
       code_challenge_method: 's256',
       scope: 'phone',
-      prompt: 'consent',
+      prompt: '',
       sdk_type: 'vkid',
       v: '2.6.1',
+    });
+    expect(params.stats_info).toBeDefined();
+    if (!params.stats_info) throw new Error('stats_info is missing');
+    expect(JSON.parse(Buffer.from(params.stats_info, 'base64').toString('utf8'))).toEqual({
+      flow_source: 'from_custom_auth',
+      session_id: expect.stringMatching(/^[qazwsxedcrfvtgbyhnujmikol]{6}$/u),
     });
   });
 
