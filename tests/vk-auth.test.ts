@@ -11,6 +11,7 @@ import {
   exchangeVkAuthorizationCode,
   vkAuthorizationUrl,
   vkCallbackHtml,
+  vkCommunityMessageUrl,
 } from '../server/vk-auth';
 
 describe('VK ID authorization', () => {
@@ -81,5 +82,9 @@ describe('VK ID authorization', () => {
     expect(html).toContain('вход завершится автоматически');
     expect(html).not.toContain('AllowMessagesFromCommunity');
     expect(html).not.toContain('Открыть чат сообщества');
+  });
+
+  it('builds a direct community message link instead of the conversations list', () => {
+    expect(vkCommunityMessageUrl('193790756')).toBe('https://vk.me/club193790756');
   });
 });

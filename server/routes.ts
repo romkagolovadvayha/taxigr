@@ -108,7 +108,12 @@ import {
 } from './security';
 import { sendPhoneVerificationCode, verifyPhoneVerificationCode } from './sms';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
-import { exchangeVkAuthorizationCode, vkAuthorizationUrl, vkCallbackHtml } from './vk-auth';
+import {
+  exchangeVkAuthorizationCode,
+  vkAuthorizationUrl,
+  vkCallbackHtml,
+  vkCommunityMessageUrl,
+} from './vk-auth';
 import { answerVkMessageEvent, isVkMessagesAllowed, sendVkMessage } from './vk-bot';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
@@ -1002,7 +1007,7 @@ export async function registerRoutes(
             challengeId,
             exchangeToken,
             authorizationUrl: vkAuthorizationUrl({ state: stateToken, codeChallenge }),
-            communityUrl: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}`,
+            communityUrl: vkCommunityMessageUrl(config.VK_COMMUNITY_ID),
             expiresInSeconds: config.PHONE_CODE_TTL_MINUTES * 60,
           },
         };
@@ -1183,7 +1188,7 @@ export async function registerRoutes(
         user,
         communityPrompt: messagesAllowed
           ? undefined
-          : { url: `https://vk.ru/im/convo/-${config.VK_COMMUNITY_ID}` },
+          : { url: vkCommunityMessageUrl(config.VK_COMMUNITY_ID) },
       },
     };
   });

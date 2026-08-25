@@ -73,6 +73,10 @@ export function vkAuthorizationUrl(input: {
   return url.toString();
 }
 
+export function vkCommunityMessageUrl(communityId: string): string {
+  return `https://vk.me/club${encodeURIComponent(communityId)}`;
+}
+
 export async function exchangeVkAuthorizationCode(input: {
   code: string;
   codeVerifier: string;
