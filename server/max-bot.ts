@@ -11,12 +11,13 @@ type MaxContactPayload = {
 type MaxApiError = {
   code?: string;
   message?: string;
+  success?: boolean;
 };
 
 async function callMaxApi(
   path: string,
-  body: Record<string, unknown>,
-  method: 'POST' | 'PUT' = 'POST',
+  body: Record<string, unknown> | undefined,
+  method: 'POST' | 'PUT' | 'DELETE' = 'POST',
 ): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -26,14 +27,14 @@ async function callMaxApi(
       headers: {
         Accept: 'application/json',
         Authorization: config.MAX_BOT_TOKEN,
-        'Content-Type': 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
-      body: JSON.stringify(body),
+      body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    if (!response.ok) {
-      const error = (await response.json().catch(() => ({}))) as MaxApiError;
-      throw new Error(error.message ?? error.code ?? `MAX Bot API HTTP ${response.status}`);
+    const result = (await response.json().catch(() => ({}))) as MaxApiError;
+    if (!response.ok || result.success === false) {
+      throw new Error(result.message ?? result.code ?? `MAX Bot API HTTP ${response.status}`);
     }
   } finally {
     clearTimeout(timeout);
@@ -150,6 +151,25 @@ export async function editMaxMessage(
   await waitForMaxSendSlot(userId);
   try {
     await callMaxApi(`messages?message_id=${encodeURIComponent(messageId)}`, body, 'PUT');
+  } finally {
+    releaseQueue();
+  }
+}
+
+export async function deleteMaxMessage(userId: string, messageId: string): Promise<void> {
+  const previous = maxSendQueue;
+  let releaseQueue: () => void = () => undefined;
+  maxSendQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+  await previous;
+  await waitForMaxSendSlot(userId);
+  try {
+    await callMaxApi(
+      `messages?message_id=${encodeURIComponent(messageId)}`,
+      undefined,
+      'DELETE',
+    );
   } finally {
     releaseQueue();
   }

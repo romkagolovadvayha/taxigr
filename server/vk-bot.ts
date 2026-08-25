@@ -75,6 +75,19 @@ export async function editVkMessage(
   });
 }
 
+export async function deleteVkMessage(
+  peerId: string,
+  trackedMessageId: string,
+): Promise<void> {
+  const [kind, messageId] = trackedMessageId.split(':', 2);
+  if (!messageId || !kind || !['conversation', 'message'].includes(kind)) return;
+  await callVkApi('messages.delete', {
+    peer_id: peerId,
+    [kind === 'conversation' ? 'cmids' : 'message_ids']: messageId,
+    delete_for_all: '1',
+  });
+}
+
 export async function answerVkMessageEvent(input: {
   eventId: string;
   userId: string;

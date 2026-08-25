@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   execute: vi.fn(),
+  deleteMaxMessage: vi.fn(),
+  deleteTelegramMessage: vi.fn(),
   editMaxMessage: vi.fn(),
   editTelegramMessage: vi.fn(),
   sendMaxLocation: vi.fn(),
@@ -25,12 +27,14 @@ vi.mock('../server/db', () => ({
 }));
 
 vi.mock('../server/max-bot', () => ({
+  deleteMaxMessage: mocks.deleteMaxMessage,
   editMaxMessage: mocks.editMaxMessage,
   sendMaxLocation: mocks.sendMaxLocation,
   sendMaxMessage: mocks.sendMaxMessage,
 }));
 
 vi.mock('../server/telegram-bot', () => ({
+  deleteTelegramMessage: mocks.deleteTelegramMessage,
   editTelegramMessage: mocks.editTelegramMessage,
   sendTelegramMessage: mocks.sendTelegramMessage,
   sendTelegramVenue: mocks.sendTelegramVenue,
@@ -108,7 +112,7 @@ describe('messenger platform delivery', () => {
     );
   });
 
-  it('updates every earlier order card before sending the next status', async () => {
+  it('sends the new status and removes every earlier order card', async () => {
     mocks.query
       .mockResolvedValueOnce([[
         {
@@ -137,21 +141,40 @@ describe('messenger platform delivery', () => {
       }]],
     });
 
-    expect(mocks.editTelegramMessage).toHaveBeenCalledTimes(2);
-    expect(mocks.editTelegramMessage).toHaveBeenCalledWith(
-      'tg-chat',
-      '10',
-      expect.objectContaining({
-        reply_markup: {
-          inline_keyboard: [[expect.objectContaining({
-            text: '🏁 Поездка завершена',
-          })]],
-        },
-      }),
-    );
+    expect(mocks.sendTelegramMessage).toHaveBeenCalledBefore(mocks.deleteTelegramMessage);
+    expect(mocks.deleteTelegramMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.deleteTelegramMessage).toHaveBeenCalledWith('tg-chat', '10');
+    expect(mocks.deleteTelegramMessage).toHaveBeenCalledWith('tg-chat', '11');
     expect(mocks.execute).toHaveBeenCalledWith(
       expect.stringContaining('INSERT IGNORE INTO messenger_order_messages'),
       expect.arrayContaining(['12']),
     );
+    expect(mocks.execute).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM messenger_order_messages'),
+      expect.arrayContaining(['10', '11']),
+    );
+  });
+
+  it('does not track a temporary confirmation card as the current ride status', async () => {
+    mocks.query.mockResolvedValueOnce([[
+      {
+        id: 7,
+        user_id: 'user-1',
+        provider: 'telegram',
+        external_user_id: 'tg-user',
+        chat_id: 'tg-chat',
+      },
+    ]]);
+    mocks.sendTelegramMessage.mockResolvedValueOnce('13');
+
+    await notifyUsersInMessengers(['user-1'], {
+      ...notification,
+      orderId: '123e4567-e89b-12d3-a456-426614174000',
+      audience: 'passenger',
+      syncExistingOrderMessages: false,
+      title: 'Отменить заказ?',
+    });
+
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
 });

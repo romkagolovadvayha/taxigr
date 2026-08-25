@@ -8,7 +8,12 @@ vi.mock('../server/config', () => ({
   },
 }));
 
-import { isVkMessagesAllowed, sendVkMessage, vkInlineKeyboard } from '../server/vk-bot';
+import {
+  deleteVkMessage,
+  isVkMessagesAllowed,
+  sendVkMessage,
+  vkInlineKeyboard,
+} from '../server/vk-bot';
 
 describe('VK community bot', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -59,5 +64,21 @@ describe('VK community bot', () => {
     const body = new URLSearchParams(String(request.body));
     expect(body.get('group_id')).toBe('193790756');
     expect(body.get('user_id')).toBe('42');
+  });
+
+  it('deletes a tracked conversation message for everyone', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      response: [{ conversation_message_id: 17, response: 1 }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await deleteVkMessage('42', 'conversation:17');
+
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(request.body));
+    expect(url).toBe('https://api.vk.com/method/messages.delete');
+    expect(body.get('peer_id')).toBe('42');
+    expect(body.get('cmids')).toBe('17');
+    expect(body.get('delete_for_all')).toBe('1');
   });
 });

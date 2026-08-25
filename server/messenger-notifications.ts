@@ -2,13 +2,24 @@ import type { RowDataPacket } from 'mysql2/promise';
 
 import { config } from './config';
 import { db, firstRow } from './db';
-import { editMaxMessage, sendMaxLocation, sendMaxMessage } from './max-bot';
 import {
+  deleteMaxMessage,
+  editMaxMessage,
+  sendMaxLocation,
+  sendMaxMessage,
+} from './max-bot';
+import {
+  deleteTelegramMessage,
   editTelegramMessage,
   sendTelegramMessage,
   sendTelegramVenue,
 } from './telegram-bot';
-import { editVkMessage, sendVkMessage, vkInlineKeyboard } from './vk-bot';
+import {
+  deleteVkMessage,
+  editVkMessage,
+  sendVkMessage,
+  vkInlineKeyboard,
+} from './vk-bot';
 
 export type MessengerButton =
   | {
@@ -197,12 +208,70 @@ async function trackOrderMessage(
   notification: PersonalMessengerNotification,
   messageId: string,
 ): Promise<void> {
-  if (!notification.orderId || !notification.audience) return;
+  if (
+    !notification.orderId ||
+    !notification.audience ||
+    notification.syncExistingOrderMessages === false
+  ) return;
   await db.execute(
     `INSERT IGNORE INTO messenger_order_messages
       (order_id, messenger_account_id, audience, message_id)
      VALUES (?, ?, ?, ?)`,
     [notification.orderId, account.id, notification.audience, messageId],
+  );
+}
+
+async function trackedOrderMessageIds(
+  account: MessengerAccountRow,
+  notification: PersonalMessengerNotification,
+): Promise<string[]> {
+  if (!notification.orderId || notification.syncExistingOrderMessages === false) return [];
+  const [rows] = await db.query<TrackedOrderMessageRow[]>(
+    `SELECT message_id FROM messenger_order_messages
+     WHERE order_id = ? AND messenger_account_id = ?`,
+    [notification.orderId, account.id],
+  );
+  return [...new Set(rows.map((row) => row.message_id))];
+}
+
+async function deleteOrderMessage(
+  account: MessengerAccountRow,
+  messageId: string,
+): Promise<void> {
+  if (account.provider === 'max') {
+    if (config.MAX_BOT_TOKEN) {
+      await deleteMaxMessage(account.external_user_id, messageId);
+    }
+    return;
+  }
+  if (account.provider === 'telegram') {
+    if (config.TELEGRAM_BOT_TOKEN) {
+      await deleteTelegramMessage(account.chat_id, messageId);
+    }
+    return;
+  }
+  if (config.VK_BOT_TOKEN) await deleteVkMessage(account.chat_id, messageId);
+}
+
+async function removePreviousOrderMessages(
+  account: MessengerAccountRow,
+  notification: PersonalMessengerNotification,
+  previousMessageIds: string[],
+): Promise<void> {
+  if (!notification.orderId || !previousMessageIds.length) return;
+  const results = await Promise.allSettled(
+    previousMessageIds.map((messageId) => deleteOrderMessage(account, messageId)),
+  );
+  const removedMessageIds = previousMessageIds.filter(
+    (_messageId, index) => results[index]?.status === 'fulfilled',
+  );
+  if (!removedMessageIds.length) return;
+  const placeholders = removedMessageIds.map(() => '?').join(',');
+  await db.execute(
+    `DELETE FROM messenger_order_messages
+     WHERE order_id = ? AND messenger_account_id = ?
+       AND message_id IN (${placeholders})`,
+    [notification.orderId, account.id, ...removedMessageIds],
   );
 }
 
@@ -231,13 +300,14 @@ async function deliver(
   account: MessengerAccountRow,
   notification: PersonalMessengerNotification,
 ): Promise<void> {
-  if (notification.syncExistingOrderMessages !== false) {
-    await syncTrackedOrderMessages(account, notification);
-  }
+  const previousMessageIds = await trackedOrderMessageIds(account, notification);
   if (account.provider === 'max') {
     if (!config.MAX_BOT_TOKEN) return;
     const messageId = await sendMaxMessage(account.external_user_id, maxMessageBody(notification));
-    if (messageId) await trackOrderMessage(account, notification, messageId);
+    if (messageId) {
+      await trackOrderMessage(account, notification, messageId);
+      await removePreviousOrderMessages(account, notification, previousMessageIds);
+    }
     for (const location of notification.locations ?? []) {
       await sendMaxLocation(account.external_user_id, location);
     }
@@ -247,13 +317,19 @@ async function deliver(
   if (account.provider === 'vk') {
     if (!config.VK_BOT_TOKEN) return;
     const messageId = await sendVkMessage(account.chat_id, vkMessageBody(notification));
-    if (messageId) await trackOrderMessage(account, notification, messageId);
+    if (messageId) {
+      await trackOrderMessage(account, notification, messageId);
+      await removePreviousOrderMessages(account, notification, previousMessageIds);
+    }
     return;
   }
 
   if (!config.TELEGRAM_BOT_TOKEN) return;
   const messageId = await sendTelegramMessage(account.chat_id, telegramMessageBody(notification));
-  if (messageId) await trackOrderMessage(account, notification, messageId);
+  if (messageId) {
+    await trackOrderMessage(account, notification, messageId);
+    await removePreviousOrderMessages(account, notification, previousMessageIds);
+  }
   for (const location of notification.locations ?? []) {
     await sendTelegramVenue(account.chat_id, location);
   }
