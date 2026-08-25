@@ -25,6 +25,11 @@ const environment = {
     production.YANDEX_MAPS_API_KEY ||
     '',
   EXPO_PUBLIC_DEMO_MODE: 'false',
+  EXPO_PUBLIC_VK_COMMUNITY_ID:
+    process.env.EXPO_PUBLIC_VK_COMMUNITY_ID ||
+    process.env.VK_COMMUNITY_ID ||
+    production.VK_COMMUNITY_ID ||
+    '',
 };
 
 const expoCli = resolve(process.cwd(), 'node_modules', 'expo', 'bin', 'cli');

@@ -33,6 +33,21 @@ export type VkAuthChallenge = Omit<MaxAuthChallenge, 'botUrl'> & {
   communityUrl: string;
 };
 
+export type VkMiniAppAuthInput = {
+  launchParams: string;
+  phoneNumber: string;
+  phoneSign: string;
+  phoneVerified: true;
+  messagesPermissionGranted: boolean;
+  profile: {
+    id: number;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  };
+  legalAcceptance: InitialLegalAcceptance;
+};
+
 type MaxAuthStatus =
   | { status: 'pending' | 'expired' }
   | { status: 'failed'; errorCode: string }
@@ -75,6 +90,9 @@ type SessionContextValue = {
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<VkAuthChallenge>;
   checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<VkAuthStatus['status']>;
+  signInWithVkMiniApp: (input: VkMiniAppAuthInput) => Promise<void>;
+  verifyVkMiniAppSession: (launchParams: string) => Promise<boolean>;
+  resetSessionForEmbeddedAuth: () => Promise<void>;
   verifyPhoneAuth: (phone: string, code: string) => Promise<void>;
   continueDemo: (
     persona: DemoPersona | undefined,
@@ -374,6 +392,56 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const signInWithVkMiniApp = useCallback(async (input: VkMiniAppAuthInput) => {
+    setAuthenticating(true);
+    setAuthError(null);
+    try {
+      const installationId = await getInstallationId();
+      const result = await apiRequest<{
+        token: string;
+        user: SessionUser;
+        messagesAllowed: boolean;
+        communityId: number;
+      }>('/v1/auth/vk-mini', {
+        method: 'POST',
+        body: JSON.stringify({ ...input, installationId }),
+      });
+      await applySession(result);
+      if (!result.user.profileComplete) router.replace('/profile-setup');
+    } catch (error) {
+      const message = error instanceof ApiError
+        ? error.code === 'VK_MINI_APP_UNAUTHORIZED'
+          ? 'Сессия VK недействительна. Закройте и заново откройте мини-приложение.'
+          : error.code === 'VK_MINI_APP_PHONE_INVALID'
+            ? 'VK не подтвердил номер телефона. Попробуйте поделиться номером ещё раз.'
+            : error.message
+        : 'Не удалось выполнить вход через VK Mini Apps.';
+      setAuthError(message);
+      throw error;
+    } finally {
+      setAuthenticating(false);
+    }
+  }, [applySession]);
+
+  const resetSessionForEmbeddedAuth = useCallback(async () => {
+    await syncDriverBackgroundLocation(false).catch(() => undefined);
+    await clearSessionToken();
+    setToken(null);
+    setUser(null);
+    setAuthError(null);
+    setVkCommunityPromptUrl(null);
+  }, []);
+
+  const verifyVkMiniAppSession = useCallback(async (launchParams: string) => {
+    if (!token || token.startsWith('demo:')) return false;
+    const result = await apiRequest<{ verified: boolean }>('/v1/auth/vk-mini/session', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ launchParams }),
+    });
+    return result.verified;
+  }, [token]);
+
   const verifyPhoneAuth = useCallback(
     async (phone: string, code: string) => {
       setAuthenticating(true);
@@ -518,6 +586,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkTelegramPhoneAuth,
       startVkPhoneAuth,
       checkVkPhoneAuth,
+      signInWithVkMiniApp,
+      verifyVkMiniAppSession,
+      resetSessionForEmbeddedAuth,
       verifyPhoneAuth,
       continueDemo,
       updateProfile,
@@ -534,6 +605,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkMaxPhoneAuth,
       checkTelegramPhoneAuth,
       checkVkPhoneAuth,
+      signInWithVkMiniApp,
+      verifyVkMiniAppSession,
+      resetSessionForEmbeddedAuth,
       clearAuthError,
       continueDemo,
       dismissVkCommunityPrompt,

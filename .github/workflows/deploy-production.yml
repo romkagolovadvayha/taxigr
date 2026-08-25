@@ -29,6 +29,7 @@ jobs:
       EXPO_PUBLIC_SOCKET_URL: https://${{ vars.API_DOMAIN }}
       EXPO_PUBLIC_SITE_URL: https://${{ vars.WEB_DOMAIN }}
       EXPO_PUBLIC_DEMO_MODE: "false"
+      EXPO_PUBLIC_VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
       EXPO_PUBLIC_YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
       EXPO_PUBLIC_OPERATOR_LEGAL_NAME: ${{ vars.EXPO_PUBLIC_OPERATOR_LEGAL_NAME }}
       EXPO_PUBLIC_OPERATOR_STATUS: ${{ vars.EXPO_PUBLIC_OPERATOR_STATUS }}
@@ -39,6 +40,7 @@ jobs:
       EXPO_PUBLIC_OPERATOR_PHONE: ${{ vars.EXPO_PUBLIC_OPERATOR_PHONE }}
       EXPO_PUBLIC_TAXI_REGISTRY_NUMBER: ${{ vars.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER }}
       VK_APP_ID: ${{ vars.VK_APP_ID }}
+      VK_MINI_APP_ID: ${{ vars.VK_MINI_APP_ID }}
       VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
       VK_API_VERSION: ${{ vars.VK_API_VERSION || '5.199' }}
 
@@ -50,13 +52,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER VK_APP_ID VK_COMMUNITY_ID; do
+          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER VK_APP_ID VK_MINI_APP_ID VK_COMMUNITY_ID; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment variable: $name" >&2
               exit 1
             fi
           done
-          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION; do
+          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION VK_MINI_APP_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment secret: $name" >&2
               exit 1
@@ -72,6 +74,7 @@ jobs:
           VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
+          VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -106,6 +109,7 @@ jobs:
           VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
+          VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
         run: |
           python3 - <<'PY'
           import os, shlex
@@ -145,6 +149,9 @@ jobs:
               'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
               'VK_APP_ID': os.environ['VK_APP_ID'],
               'VK_REDIRECT_URI': f"https://{os.environ['API_DOMAIN']}/v1/auth/vk/callback",
+              'VK_MINI_APP_ID': os.environ['VK_MINI_APP_ID'],
+              'VK_MINI_APP_SECRET': os.environ['VK_MINI_APP_SECRET'],
+              'VK_MINI_APP_MAX_AGE_SECONDS': '900',
               'VK_COMMUNITY_ID': os.environ['VK_COMMUNITY_ID'],
               'VK_BOT_TOKEN': os.environ['VK_BOT_TOKEN'],
               'VK_CALLBACK_SECRET': os.environ['VK_CALLBACK_SECRET'],
@@ -225,7 +232,13 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk" | grep -q 'Такси Грахово'
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
+          vk_mini_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data-binary '{"launchParams":"probe"}' \
+            "https://${API_DOMAIN}/v1/auth/vk-mini/session")"
+          test "$vk_mini_session_status" = "401"
           max_ca="$RUNNER_TEMP/russian-trusted-root-ca.pem"
           curl --fail --silent --show-error --location \
             'https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt' \

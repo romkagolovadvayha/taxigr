@@ -124,6 +124,10 @@ import {
   vkCommunityMessageUrl,
 } from './vk-auth';
 import { answerVkMessageEvent, isVkMessagesAllowed, sendVkMessage } from './vk-bot';
+import {
+  verifyVkMiniAppLaunchParams,
+  verifyVkMiniAppPhone,
+} from './vk-mini-app-auth';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
 type RealtimeControls = {
@@ -236,6 +240,24 @@ const vkCallbackSchema = z.object({
   code: z.string().min(1).max(4096),
   state: z.string().min(20).max(128),
   device_id: z.string().min(1).max(256),
+});
+const vkMiniAppAuthSchema = z.object({
+  launchParams: z.string().min(1).max(8_192),
+  phoneNumber: z.string().trim().min(10).max(32),
+  phoneSign: z.string().min(16).max(256),
+  phoneVerified: z.literal(true),
+  messagesPermissionGranted: z.boolean(),
+  installationId: z.string().trim().min(16).max(128),
+  profile: z.object({
+    id: z.number().int().positive(),
+    firstName: z.string().trim().max(80).nullable().optional(),
+    lastName: z.string().trim().max(80).nullable().optional(),
+    avatarUrl: z.string().url().max(2_000).nullable().optional(),
+  }),
+  legalAcceptance: initialLegalAcceptanceSchema,
+});
+const vkMiniAppSessionSchema = z.object({
+  launchParams: z.string().min(1).max(8_192),
 });
 const vkCallbackUpdateSchema = z.object({
   type: z.string(),
@@ -949,6 +971,32 @@ function requireVkConfiguration(): void {
   }
 }
 
+function requireVkMiniAppConfiguration(): void {
+  if (
+    !config.VK_MINI_APP_ID ||
+    !config.VK_MINI_APP_SECRET ||
+    !config.VK_COMMUNITY_ID ||
+    !config.VK_BOT_TOKEN
+  ) {
+    throw Object.assign(new Error('VK Mini App пока не настроено'), {
+      statusCode: 503,
+      code: 'VK_MINI_APP_NOT_CONFIGURED',
+    });
+  }
+}
+
+async function checkVkMiniAppMessagesPermission(
+  vkUserId: string,
+  retryAfterGrant: boolean,
+): Promise<boolean> {
+  const delays = retryAfterGrant ? [0, 250, 750] : [0];
+  for (const delay of delays) {
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    if (await isVkMessagesAllowed(vkUserId)) return true;
+  }
+  return false;
+}
+
 export type RegisteredRouteHandlers = {
   handleMessengerOrderAction: (
     request: MessengerOrderActionRequest,
@@ -1087,6 +1135,121 @@ export async function registerRoutes(
       });
       reply.code(202);
       return { data: { accepted: true } };
+    },
+  );
+
+  app.post(
+    '/v1/auth/vk-mini/session',
+    {
+      logLevel: 'warn',
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      void reply.header('Cache-Control', 'no-store');
+      requireVkMiniAppConfiguration();
+      const session = await auth(request);
+      const input = parse(vkMiniAppSessionSchema, request.body);
+      const launch = verifyVkMiniAppLaunchParams({
+        launchParams: input.launchParams,
+        appId: config.VK_MINI_APP_ID,
+        secret: config.VK_MINI_APP_SECRET,
+        maxAgeSeconds: config.VK_MINI_APP_MAX_AGE_SECONDS,
+      });
+      const linked = await firstRow<RowDataPacket & { id: number }>(
+        `SELECT id FROM user_messenger_accounts
+         WHERE user_id = ? AND provider = 'vk' AND external_user_id = ? AND active = TRUE
+         LIMIT 1`,
+        [session.id, launch.userId],
+      );
+      return { data: { verified: Boolean(linked) } };
+    },
+  );
+
+  app.post(
+    '/v1/auth/vk-mini',
+    {
+      logLevel: 'warn',
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      void reply.header('Cache-Control', 'no-store');
+      requireVkMiniAppConfiguration();
+      const input = parse(vkMiniAppAuthSchema, request.body);
+      const launch = verifyVkMiniAppLaunchParams({
+        launchParams: input.launchParams,
+        appId: config.VK_MINI_APP_ID,
+        secret: config.VK_MINI_APP_SECRET,
+        maxAgeSeconds: config.VK_MINI_APP_MAX_AGE_SECONDS,
+      });
+      if (String(input.profile.id) !== launch.userId) {
+        throw Object.assign(new Error('Профиль VK не совпадает с параметрами запуска'), {
+          statusCode: 401,
+          code: 'VK_MINI_APP_PROFILE_MISMATCH',
+        });
+      }
+      if (!verifyVkMiniAppPhone({
+        appId: launch.appId,
+        secret: config.VK_MINI_APP_SECRET,
+        userId: launch.userId,
+        phoneNumber: input.phoneNumber,
+        sign: input.phoneSign,
+      })) {
+        throw Object.assign(new Error('VK не подтвердил переданный номер телефона'), {
+          statusCode: 401,
+          code: 'VK_MINI_APP_PHONE_INVALID',
+        });
+      }
+      const phone = normalizeRussianPhone(input.phoneNumber);
+      if (!phone) {
+        throw Object.assign(new Error('VK передал неподдерживаемый номер телефона'), {
+          statusCode: 400,
+          code: 'PHONE_INVALID',
+        });
+      }
+
+      const messagesAllowed = await checkVkMiniAppMessagesPermission(
+        launch.userId,
+        input.messagesPermissionGranted,
+      ).catch((error) => {
+        request.log.warn({ error }, 'VK Mini App message permission check failed');
+        return false;
+      });
+      const userId = await withTransaction(async (connection) => {
+        const id = await findOrCreatePhoneUser(connection, phone);
+        await linkMessengerIdentity(connection, id, {
+          provider: 'vk',
+          externalUserId: launch.userId,
+          chatId: launch.userId,
+          firstName: input.profile.firstName,
+          lastName: input.profile.lastName,
+          botContactAvailable: messagesAllowed,
+        });
+        await recordInitialConsents(connection, id, input.legalAcceptance, {
+          source: 'phone_auth',
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
+        return id;
+      });
+
+      await syncUserAvatarFromRemoteUrlIfEmpty(userId, input.profile.avatarUrl).catch((error) =>
+        request.log.warn({ error }, 'VK Mini App profile avatar sync failed'),
+      );
+      const user = await findUserWithRoles(userId);
+      if (!user) {
+        throw Object.assign(new Error('Пользователь не найден'), {
+          statusCode: 404,
+          code: 'USER_NOT_FOUND',
+        });
+      }
+      return {
+        data: {
+          token: await signSession({ id: user.id, roles: user.roles }),
+          user,
+          messagesAllowed,
+          communityId: Number(config.VK_COMMUNITY_ID),
+        },
+      };
     },
   );
 

@@ -92,7 +92,13 @@ function RootNavigator() {
   }, [sessionReady, themeReady]);
 
   useEffect(() => {
-    if (!sessionReady || !user || user.profileComplete || pathname === '/profile-setup') return;
+    if (
+      !sessionReady ||
+      !user ||
+      user.profileComplete ||
+      pathname === '/profile-setup' ||
+      pathname === '/vk'
+    ) return;
     router.replace('/profile-setup' as Href);
   }, [pathname, sessionReady, user]);
 
@@ -123,7 +129,7 @@ function RootNavigator() {
     );
   }
 
-  if (user?.blockedAt) {
+  if (user?.blockedAt && pathname !== '/vk') {
     return (
       <ThemeProvider key={colorScheme} value={navigationTheme}>
         <StatusBar style="dark" />
@@ -152,6 +158,7 @@ function RootNavigator() {
         <Stack.Screen name="driver-terms" />
         <Stack.Screen name="driver-data-consent" />
         <Stack.Screen name="safety" />
+        <Stack.Screen name="vk" />
         <Stack.Protected guard={!user}>
           <Stack.Screen name="sign-in" />
         </Stack.Protected>
