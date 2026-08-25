@@ -226,12 +226,18 @@ jobs:
           set -euo pipefail
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
+          max_ca="$RUNNER_TEMP/russian-trusted-root-ca.pem"
+          curl --fail --silent --show-error --location \
+            'https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt' \
+            --output "$max_ca"
+          test "$(openssl x509 -in "$max_ca" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')" = \
+            'D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31'
           max_subscription_payload="$(jq -cn \
             --arg url "https://${API_DOMAIN}/v1/webhooks/max" \
             --arg secret "$MAX_WEBHOOK_SECRET" \
             '{url:$url, update_types:["message_callback","bot_started","message_created"], secret:$secret}')"
           curl --fail --silent --show-error \
-            --cacert certs/russian-trusted-root-ca.pem \
+            --cacert "$max_ca" \
             -H "Authorization: ${MAX_BOT_TOKEN}" \
             -H 'Content-Type: application/json' \
             --data-binary "$max_subscription_payload" \
