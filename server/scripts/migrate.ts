@@ -10,6 +10,14 @@ const migrationFiles = (await readdir(migrationsDirectory))
   .filter((fileName) => /^\d+_.+\.sql$/u.test(fileName))
   .sort((left, right) => left.localeCompare(right, 'en'));
 
+const compatiblePreviousChecksums: Readonly<Record<string, readonly string[]>> = {
+  '027_order_invariants.sql': [
+    // The original generated-column implementation is schema-equivalent, but some
+    // production MySQL installations cannot rebuild its existing foreign keys.
+    '2f6848474d1caf8ea0f7a7f023a2d09e80a0d94e576582abbe50ee09257027a7',
+  ],
+};
+
 const connection = await mysql.createConnection({
   uri: config.MYSQL_URL,
   multipleStatements: true,
@@ -43,7 +51,8 @@ try {
     const checksum = createHash('sha256').update(sql).digest('hex');
     const existingChecksum = applied.get(migrationFile);
     if (existingChecksum) {
-      if (existingChecksum !== checksum) {
+      const compatibleChecksums = compatiblePreviousChecksums[migrationFile] ?? [];
+      if (existingChecksum !== checksum && !compatibleChecksums.includes(existingChecksum)) {
         throw new Error(`Applied migration was modified: ${migrationFile}`);
       }
       continue;
