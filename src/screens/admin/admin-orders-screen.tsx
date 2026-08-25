@@ -1,14 +1,45 @@
-import { ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 
+import { apiRequest } from '@/api/client';
+import { useSession } from '@/auth/session-provider';
+import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { MoneyValue } from '@/components/ui/money-value';
 import { StatusChip } from '@/components/ui/status-chip';
+import type { RideOrder } from '@/domain/models';
 import { formatRouteAddresses } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function AdminOrdersScreen() {
-  const { adminOrders: orders } = useRide();
+  const { token } = useSession();
+  const { adminOrders: orders, adminOrdersHasMore, loadMoreAdminOrders, refresh } = useRide();
+  const [selectedOrder, setSelectedOrder] = useState<RideOrder | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cancelSelectedOrder = async () => {
+    if (!selectedOrder || !token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest(`/v1/orders/${selectedOrder.id}/cancel`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ reason: cancellationReason.trim() }),
+      });
+      setSelectedOrder(null);
+      setCancellationReason('');
+      await refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось отменить заказ');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
@@ -52,9 +83,76 @@ export function AdminOrdersScreen() {
             </View>
             <StatusChip label={rideStatusLabel[order.status]} tone={order.status === 'completed' ? 'success' : 'info'} />
             <MoneyValue valueMinor={order.priceMinor} compact />
+            {!['completed', 'cancelled'].includes(order.status) && (
+              <AppButton
+                variant="quiet"
+                fullWidth={false}
+                onPress={() => {
+                  setCancellationReason('');
+                  setSelectedOrder(order);
+                }}
+              >
+                Отменить
+              </AppButton>
+            )}
           </View>
         ))}
       </View>
+      {adminOrdersHasMore && (
+        <AppButton
+          variant="secondary"
+          loading={loadingMore}
+          onPress={() => {
+            setLoadingMore(true);
+            void loadMoreAdminOrders().finally(() => setLoadingMore(false));
+          }}
+        >
+          Показать более ранние заказы
+        </AppButton>
+      )}
+      {!!error && (
+        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+          {error}
+        </Text>
+      )}
+      <AppModal
+        visible={!!selectedOrder}
+        title="Отменить активный заказ?"
+        description="Пассажир и назначенный водитель сразу получат уведомление. Используйте это действие только для поддержки или аварийной ситуации."
+        onClose={() => setSelectedOrder(null)}
+      >
+        <TextInput
+          value={cancellationReason}
+          onChangeText={(value) => setCancellationReason(value.slice(0, 500))}
+          placeholder="Причина для журнала и поддержки"
+          placeholderTextColor={colors.inkMuted}
+          multiline
+          maxLength={500}
+          accessibilityLabel="Причина отмены заказа"
+          style={{
+            ...typography.body,
+            minHeight: 88,
+            padding: spacing.x3,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            color: colors.ink,
+            backgroundColor: colors.surface,
+            textAlignVertical: 'top',
+          }}
+        />
+        <AppButton
+          variant="danger"
+          loading={busy}
+          disabled={cancellationReason.trim().length < 3}
+          onPress={() => void cancelSelectedOrder()}
+        >
+          Отменить заказ
+        </AppButton>
+        <AppButton variant="secondary" disabled={busy} onPress={() => setSelectedOrder(null)}>
+          Оставить без изменений
+        </AppButton>
+      </AppModal>
     </ScrollView>
   );
 }

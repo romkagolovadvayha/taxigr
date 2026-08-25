@@ -15,7 +15,7 @@ import type { RideOrder } from '@/domain/models';
 import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
-import { formatDateTime } from '@/utils/format';
+import { formatDateTime, formatMoney } from '@/utils/format';
 
 function statusTone(status: RideOrder['status']): 'success' | 'danger' | 'info' {
   if (status === 'completed') return 'success';
@@ -27,6 +27,8 @@ export function DriverTripsScreen() {
   const { token } = useSession();
   const [orders, setOrders] = useState<RideOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -35,12 +37,11 @@ export function DriverTripsScreen() {
     try {
       if (token.startsWith('demo:')) {
         setOrders(demoOrders.filter((order) => order.driverId === demoDriver.id));
+        setHasMore(false);
       } else {
-        const [profile, fetched] = await Promise.all([
-          apiRequest<{ id: string }>('/v1/driver/profile', { token }),
-          apiRequest<RideOrder[]>('/v1/orders', { token }),
-        ]);
-        setOrders(fetched.filter((order) => order.driverId === profile.id));
+        const fetched = await apiRequest<RideOrder[]>('/v1/orders?scope=driver&limit=50', { token });
+        setOrders(fetched);
+        setHasMore(fetched.length === 50);
       }
       setError(null);
     } catch (reason) {
@@ -49,6 +50,26 @@ export function DriverTripsScreen() {
       setLoading(false);
     }
   }, [token]);
+
+  const loadMore = useCallback(async () => {
+    if (!token || token.startsWith('demo:') || !hasMore) return;
+    const cursor = orders.at(-1);
+    if (!cursor) return;
+    setLoadingMore(true);
+    try {
+      const fetched = await apiRequest<RideOrder[]>(
+        `/v1/orders?scope=driver&limit=50&before=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
+        { token },
+      );
+      const existingIds = new Set(orders.map((order) => order.id));
+      setOrders((current) => [...current, ...fetched.filter((order) => !existingIds.has(order.id))]);
+      setHasMore(fetched.length === 50);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось загрузить ранние поездки');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, orders, token]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -125,6 +146,11 @@ export function DriverTripsScreen() {
           <MoneyValue valueMinor={netMinor} compact color={colors.success} />
         </View>
       </View>
+      {hasMore && (
+        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+          Итоги рассчитаны по {orders.length} загруженным поездкам. После загрузки ранних поездок они обновятся.
+        </Text>
+      )}
 
       {!!error && (
         <View style={{ gap: spacing.x3 }}>
@@ -204,7 +230,7 @@ export function DriverTripsScreen() {
                   <MoneyValue valueMinor={order.priceMinor} compact />
                   {order.status === 'completed' && (
                     <Text selectable style={{ ...typography.micro, color: colors.successText }}>
-                      вам {Math.round((order.priceMinor - order.serviceCommissionMinor) / 100)} ₽
+                      вам {formatMoney(order.priceMinor - order.serviceCommissionMinor)}
                     </Text>
                   )}
                 </View>
@@ -212,6 +238,11 @@ export function DriverTripsScreen() {
               <StatusChip label={rideStatusLabel[order.status]} tone={statusTone(order.status)} />
             </AnimatedPressable>
           ))}
+          {hasMore && (
+            <AppButton variant="secondary" loading={loadingMore} onPress={() => void loadMore()}>
+              Показать более ранние поездки
+            </AppButton>
+          )}
         </View>
       )}
     </Screen>

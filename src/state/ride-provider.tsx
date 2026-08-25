@@ -11,10 +11,11 @@ import {
   type DestinationHistoryItem,
 } from '@/domain/address-history';
 import { hasHouseNumber } from '@/domain/address-precision';
-import { buildDemoDriverOffer, placeDemoDriverNearPickup } from '@/domain/demo-flow';
+import { buildDemoDriverOffer, buildDemoRoute, placeDemoDriverNearPickup } from '@/domain/demo-flow';
 import type {
   Address,
   Coordinates,
+  PaymentMethod,
   RideOrder,
   RideStatus,
   RouteSummary,
@@ -43,10 +44,13 @@ type RideContextValue = {
   routeSummary: RouteSummary | null;
   tariffs: Tariff[];
   selectedTariff: TariffCode;
+  selectedPaymentMethod: PaymentMethod;
   currentRide: RideOrder | null;
   driverRide: RideOrder | null;
   orders: RideOrder[];
   adminOrders: RideOrder[];
+  passengerOrdersHasMore: boolean;
+  adminOrdersHasMore: boolean;
   destinationHistory: DestinationHistoryItem[];
   quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
   busy: boolean;
@@ -54,19 +58,23 @@ type RideContextValue = {
   setPickup: (address: Address) => void;
   setDestination: (address: Address) => void;
   setSelectedTariff: (tariff: TariffCode) => void;
+  setSelectedPaymentMethod: (method: PaymentMethod) => void;
   createRide: (comment?: string) => Promise<RideOrder | null>;
   createDriverOffer: () => Promise<RideOrder | null>;
   confirmSearchPriceIncrease: () => Promise<void>;
   transitionRide: (status: RideStatus) => Promise<void>;
-  transitionDriverRide: (status: RideStatus) => Promise<void>;
+  transitionDriverRide: (status: RideStatus) => Promise<boolean>;
   startWaiting: () => Promise<void>;
   stopWaiting: () => Promise<void>;
+  releaseDriverRide: (reason: string) => Promise<boolean>;
   cancelRide: () => Promise<void>;
   rateRide: (score: number) => Promise<void>;
   rateDriverRide: (score: number) => Promise<void>;
   resetRide: () => void;
   resetDriverRide: () => void;
   refresh: () => Promise<void>;
+  loadMorePassengerOrders: () => Promise<void>;
+  loadMoreAdminOrders: () => Promise<void>;
 };
 
 const RideContext = createContext<RideContextValue | null>(null);
@@ -80,6 +88,11 @@ function upsertOrder(orders: RideOrder[], ride: RideOrder): RideOrder[] {
   return exists
     ? orders.map((item) => (item.id === ride.id ? ride : item))
     : [ride, ...orders];
+}
+
+function appendUniqueOrders(current: RideOrder[], next: RideOrder[]): RideOrder[] {
+  const existingIds = new Set(current.map((order) => order.id));
+  return [...current, ...next.filter((order) => !existingIds.has(order.id))];
 }
 
 function idempotencyKey(): string {
@@ -97,14 +110,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
   const [selectedTariff, setSelectedTariff] = useState<TariffCode>('economy');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [currentRide, setCurrentRide] = useState<RideOrder | null>(null);
   const [driverRide, setDriverRide] = useState<RideOrder | null>(null);
   const [orders, setOrders] = useState<RideOrder[]>([]);
   const [adminOrders, setAdminOrders] = useState<RideOrder[]>([]);
+  const [passengerOrdersHasMore, setPassengerOrdersHasMore] = useState(false);
+  const [adminOrdersHasMore, setAdminOrdersHasMore] = useState(false);
   const [tariffs, setTariffs] = useState<Tariff[]>(() =>
     buildTariffs(11_600, 'district'),
   );
   const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const destinationDefaultToken = useRef<string | null>(null);
@@ -119,6 +136,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const selectPickup = useCallback((address: Address) => {
     setRouteCoordinates([]);
     setRouteSummary(null);
+    setQuoteToken(null);
     setQuoteStatus(hasHouseNumber(address) && hasHouseNumber(destination) ? 'loading' : 'idle');
     setPickup(address);
   }, [destination]);
@@ -126,6 +144,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const selectDestination = useCallback((address: Address) => {
     setRouteCoordinates([]);
     setRouteSummary(null);
+    setQuoteToken(null);
     setQuoteStatus(hasHouseNumber(pickup) && hasHouseNumber(address) ? 'loading' : 'idle');
     setDestination(address);
   }, [pickup]);
@@ -151,6 +170,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDestination((current) => current ?? demoHistory.lastDestination);
         setOrders(passengerOrders);
         setAdminOrders(isAdmin ? demoOrders : []);
+        setPassengerOrdersHasMore(false);
+        setAdminOrdersHasMore(false);
         setCurrentRide(passengerOrders.find(isActive) ?? null);
         setDriverRide(null);
         destinationDefaultToken.current = token;
@@ -169,6 +190,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDestination(null);
         setOrders([]);
         setAdminOrders([]);
+        setPassengerOrdersHasMore(false);
+        setAdminOrdersHasMore(false);
         setCurrentRide(null);
         setDriverRide(null);
         destinationDefaultToken.current = null;
@@ -182,22 +205,24 @@ export function RideProvider({ children }: { children: ReactNode }) {
     const sessionUserId = userId;
     try {
       const [passengerOrders, driverOrders, offers, allOrders] = await Promise.all([
-        apiRequest<RideOrder[]>('/v1/orders?scope=passenger', { token }),
+        apiRequest<RideOrder[]>('/v1/orders?scope=passenger&limit=50', { token }),
         isDriver
-          ? apiRequest<RideOrder[]>('/v1/orders?scope=driver', { token })
+          ? apiRequest<RideOrder[]>('/v1/orders?scope=driver&limit=50', { token })
           : Promise.resolve([]),
         isDriver
           ? apiRequest<RideOrder[]>('/v1/driver/offers', { token })
           : Promise.resolve([]),
         isAdmin
-          ? apiRequest<RideOrder[]>('/v1/orders', { token })
+          ? apiRequest<RideOrder[]>('/v1/orders?limit=50', { token })
           : Promise.resolve([]),
       ]);
       if (sessionUserIdRef.current !== sessionUserId) return;
       setOrders(passengerOrders);
+      setPassengerOrdersHasMore(passengerOrders.length === 50);
       setCurrentRide(passengerOrders.find(isActive) ?? null);
       setDriverRide(driverOrders.find(isActive) ?? offers[0] ?? null);
       setAdminOrders(allOrders);
+      setAdminOrdersHasMore(allOrders.length === 50);
       if (destinationDefaultToken.current !== token) {
         const history = buildDestinationHistory(passengerOrders, userId);
         setDestination((current) => current ?? history.lastDestination);
@@ -208,6 +233,30 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setError(reason instanceof Error ? reason.message : 'Не удалось обновить заказы');
     }
   }, [demoSession, isAdmin, isDriver, token, userId]);
+
+  const loadMorePassengerOrders = useCallback(async () => {
+    if (!token || demoSession || !passengerOrdersHasMore) return;
+    const cursor = orders.at(-1);
+    if (!cursor) return;
+    const next = await apiRequest<RideOrder[]>(
+      `/v1/orders?scope=passenger&limit=50&before=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
+      { token },
+    );
+    setOrders((current) => appendUniqueOrders(current, next));
+    setPassengerOrdersHasMore(next.length === 50);
+  }, [demoSession, orders, passengerOrdersHasMore, token]);
+
+  const loadMoreAdminOrders = useCallback(async () => {
+    if (!token || demoSession || !isAdmin || !adminOrdersHasMore) return;
+    const cursor = adminOrders.at(-1);
+    if (!cursor) return;
+    const next = await apiRequest<RideOrder[]>(
+      `/v1/orders?limit=50&before=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
+      { token },
+    );
+    setAdminOrders((current) => appendUniqueOrders(current, next));
+    setAdminOrdersHasMore(next.length === 50);
+  }, [adminOrders, adminOrdersHasMore, demoSession, isAdmin, token]);
 
   useEffect(() => {
     if (!token || demoSession) return;
@@ -223,8 +272,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     const handleReconnect = () => void refresh();
     socket.io.on('reconnect', handleReconnect);
     socket.on('order:updated', (order: RideOrder) => {
+      if (isAdmin) setAdminOrders((previous) => upsertOrder(previous, order));
       if (order.passengerId === userId) applyPassengerOrder(order);
-      else if (isDriver) applyDriverOrder(order);
+      else if (isDriver && !isAdmin) applyDriverOrder(order);
+      else if (isDriver) {
+        setDriverRide((current) => (current?.id === order.id ? order : current));
+      }
     });
     socket.on('driver:location', (coordinates: Coordinates) => {
       setCurrentRide((current) => {
@@ -275,6 +328,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     applyDriverOrder,
     applyPassengerOrder,
     demoSession,
+    isAdmin,
     isDriver,
     refresh,
     refreshSession,
@@ -321,22 +375,35 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setError(null);
     }, 0);
     const timer = setTimeout(() => {
-      const endpoint = demoSession ? '/v1/routes/preview' : '/v1/quotes';
-      void apiRequest<{ tariffs?: Tariff[]; route?: RouteSummary } | RouteSummary>(endpoint, {
+      if (demoSession) {
+        const route = buildDemoRoute(pickup, destination);
+        setTariffs(buildTariffs(route.distanceMeters, classifyPricingScope(pickup, destination)));
+        setRouteCoordinates(route.coordinates);
+        setRouteSummary(route);
+        setQuoteStatus('ready');
+        setError(null);
+        return;
+      }
+      void apiRequest<{
+        quoteToken: string;
+        tariffs: Tariff[];
+        route: RouteSummary;
+      }>('/v1/quotes', {
         method: 'POST',
-        token: demoSession ? undefined : token,
+        token,
         body: JSON.stringify({ pickup, destination }),
         signal: controller.signal,
       })
         .then((response) => {
           if (!active) return;
-          const route = 'coordinates' in response ? response : response.route;
+          const route = response.route;
           if (!route) {
             setQuoteStatus('error');
             setError('Не удалось рассчитать маршрут');
             return;
           }
-          if ('tariffs' in response && response.tariffs) setTariffs(response.tariffs);
+          setTariffs(response.tariffs);
+          setQuoteToken(response.quoteToken);
           setRouteCoordinates(route.coordinates);
           setRouteSummary(route);
           setQuoteStatus('ready');
@@ -361,17 +428,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      const response = await apiRequest<RouteSummary | { route: RouteSummary }>(
-        '/v1/routes/preview',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            pickup: demoAddresses[0]!,
-            destination: demoAddresses[2]!,
-          }),
-        },
-      );
-      const route = 'coordinates' in response ? response : response.route;
+      const route = buildDemoRoute(demoAddresses[0]!, demoAddresses[2]!);
       const ride = buildDemoDriverOffer({
         route,
         pickup: demoAddresses[0]!,
@@ -424,7 +481,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           distanceMeters: routeSummary?.distanceMeters ?? 800,
           durationSeconds: routeSummary?.durationSeconds ?? 300,
           routeCoordinates,
-          paymentMethod: 'direct',
+          paymentMethod: selectedPaymentMethod,
           comment,
           createdAt: now,
           updatedAt: now,
@@ -440,12 +497,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
         applyPassengerOrder(ride);
         return ride;
       }
-      if (!token) return null;
+      if (!token || !quoteToken) {
+        setError('Расчёт стоимости устарел. Обновите маршрут');
+        return null;
+      }
       const creationFingerprint = JSON.stringify({
         pickup,
         destination,
         tariff: selectedTariff,
-        paymentMethod: 'direct',
+        paymentMethod: selectedPaymentMethod,
         comment: comment ?? null,
       });
       const creationAttempt =
@@ -464,7 +524,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
             pickup,
             destination,
             tariff: selectedTariff,
-            paymentMethod: 'direct',
+            quoteToken,
+            paymentMethod: selectedPaymentMethod,
             comment,
             idempotencyKey: creationAttempt.key,
             deviceId,
@@ -518,9 +579,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
       destination,
       pickup,
       quoteStatus,
+      quoteToken,
       routeCoordinates,
       routeSummary,
       selectedTariff,
+      selectedPaymentMethod,
       tariffs,
       token,
       user,
@@ -550,11 +613,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const transitionDriverRide = useCallback(
     async (status: RideStatus) => {
-      if (transitionInFlight.current) return;
+      if (transitionInFlight.current) return false;
       const current = driverRide;
-      if (!current || !canTransitionRide(current.status, status)) return;
+      if (!current || !canTransitionRide(current.status, status)) return false;
       if (demoSession) {
-        const next: RideOrder = {
+        let next: RideOrder = {
           ...current,
           status,
           updatedAt: new Date().toISOString(),
@@ -565,10 +628,31 @@ export function RideProvider({ children }: { children: ReactNode }) {
               }
             : {}),
         };
+        if (status === 'in_progress' && current.waitingStartedAt) {
+          const waitingSeconds =
+            (current.waitingSeconds ?? 0) + activeWaitingSeconds(current.waitingStartedAt);
+          const waitingPriceMinor = calculateWaitingChargeMinor(
+            waitingSeconds,
+            current.waitingFreeMinutes,
+            current.waitingPerMinuteMinor,
+          );
+          const priceMinor =
+            (current.basePriceMinor ?? current.priceMinor) +
+            (current.searchPriceIncreaseMinor ?? 0) +
+            waitingPriceMinor;
+          next = {
+            ...next,
+            waitingSeconds,
+            waitingPriceMinor,
+            waitingStartedAt: undefined,
+            priceMinor,
+            serviceCommissionMinor: calculateCommissionMinor(priceMinor),
+          };
+        }
         applyDriverOrder(next);
-        return;
+        return true;
       }
-      if (!token) return;
+      if (!token) return false;
       transitionInFlight.current = true;
       setBusy(true);
       setError(null);
@@ -580,13 +664,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
         const ride = await apiRequest<RideOrder>(endpoint, {
           method: 'POST',
           token,
-          body: JSON.stringify(status === 'accepted' ? {} : { status }),
+          body: JSON.stringify(
+            status === 'accepted'
+              ? {}
+              : { status, ...(status === 'completed' ? { paymentReceived: true } : {}) },
+          ),
         });
         applyDriverOrder(ride);
         setError(null);
+        return true;
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Не удалось изменить статус');
         await refresh();
+        return false;
       } finally {
         transitionInFlight.current = false;
         setBusy(false);
@@ -638,7 +728,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const startWaiting = useCallback(async () => {
     const current = driverRide;
-    if (!current || current.status !== 'in_progress' || current.waitingStartedAt) return;
+    if (!current || current.status !== 'driver_waiting' || current.waitingStartedAt) return;
     if (demoSession) {
       applyDriverOrder({
         ...current,
@@ -665,7 +755,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const stopWaiting = useCallback(async () => {
     const current = driverRide;
-    if (!current || current.status !== 'in_progress' || !current.waitingStartedAt) return;
+    if (!current || current.status !== 'driver_waiting' || !current.waitingStartedAt) return;
     if (demoSession) {
       const waitingSeconds =
         (current.waitingSeconds ?? 0) +
@@ -705,6 +795,35 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setBusy(false);
     }
   }, [applyDriverOrder, demoSession, driverRide, token]);
+
+  const releaseDriverRide = useCallback(async (reason: string) => {
+    const current = driverRide;
+    if (!current || !['accepted', 'driver_arriving', 'driver_waiting'].includes(current.status)) {
+      return false;
+    }
+    if (demoSession) {
+      setDriverRide(null);
+      return true;
+    }
+    if (!token) return false;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest(`/v1/driver/orders/${current.id}/release`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ reason }),
+      });
+      setDriverRide(null);
+      await refresh();
+      return true;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось отказаться от заказа');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [demoSession, driverRide, refresh, token]);
 
   const cancelRide = useCallback(async () => {
     const current = currentRide;
@@ -815,10 +934,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
       routeSummary,
       tariffs,
       selectedTariff,
+      selectedPaymentMethod,
       currentRide,
       driverRide,
       orders,
       adminOrders,
+      passengerOrdersHasMore,
+      adminOrdersHasMore,
       destinationHistory,
       quoteStatus,
       busy,
@@ -826,6 +948,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setPickup: selectPickup,
       setDestination: selectDestination,
       setSelectedTariff,
+      setSelectedPaymentMethod,
       createRide,
       createDriverOffer,
       confirmSearchPriceIncrease,
@@ -833,12 +956,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
       transitionDriverRide,
       startWaiting,
       stopWaiting,
+      releaseDriverRide,
       cancelRide,
       rateRide,
       rateDriverRide,
       resetRide,
       resetDriverRide,
       refresh,
+      loadMorePassengerOrders,
+      loadMoreAdminOrders,
     }),
     [
       busy,
@@ -857,16 +983,22 @@ export function RideProvider({ children }: { children: ReactNode }) {
       selectPickup,
       error,
       adminOrders,
+      passengerOrdersHasMore,
+      adminOrdersHasMore,
       orders,
       pickup,
       refresh,
+      loadMorePassengerOrders,
+      loadMoreAdminOrders,
       rateRide,
       rateDriverRide,
       resetRide,
       resetDriverRide,
       selectedTariff,
+      selectedPaymentMethod,
       startWaiting,
       stopWaiting,
+      releaseDriverRide,
       tariffs,
       transitionDriverRide,
       transitionRide,

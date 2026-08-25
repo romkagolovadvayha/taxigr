@@ -7,6 +7,8 @@ import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import '@/location/driver-background-location';
+
 import { useSession } from '@/auth/session-provider';
 import { BrandGlyph } from '@/components/brand-mark';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';

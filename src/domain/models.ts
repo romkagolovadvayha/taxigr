@@ -70,6 +70,7 @@ export type Address = {
 };
 
 export type TariffCode = 'economy' | 'child';
+export type PaymentMethod = 'direct' | 'cash' | 'transfer';
 
 export type Tariff = {
   code: TariffCode;
@@ -121,8 +122,11 @@ export type RideOrder = {
   distanceMeters: number;
   durationSeconds: number;
   routeCoordinates?: Coordinates[];
-  paymentMethod: 'direct' | 'cash' | 'transfer';
+  paymentMethod: PaymentMethod;
+  paymentConfirmedAt?: string;
   comment?: string;
+  cancellationCode?: 'passenger' | 'admin' | 'search_timeout';
+  cancellationReason?: string;
   createdAt: string;
   updatedAt: string;
   driver?: DriverSummary;

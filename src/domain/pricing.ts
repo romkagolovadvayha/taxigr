@@ -41,18 +41,34 @@ export const defaultPricingRules: PricingRules = {
 const grahovoPattern = /(?:^|[\s,])(?:село|с\.)?\s*грахово(?:[\s,]|$)/iu;
 const grahovoDistrictPattern =
   /граховск(?:ий|ого|ом).{0,40}(?:район|муниципальн\w*\s+округ)/iu;
+const GRAHOVO_CENTER = { latitude: 56.04758, longitude: 51.95842 } as const;
+const GRAHOVO_RADIUS_METERS = 6_000;
+const GRAHOVO_DISTRICT_RADIUS_METERS = 40_000;
 
 function addressContext(address: Address): string {
   return `${address.label} ${address.details ?? ''}`.trim();
 }
 
+function distanceFromGrahovo(address: Address): number {
+  const latitudeDelta = (address.coordinates.latitude - GRAHOVO_CENTER.latitude) * Math.PI / 180;
+  const longitudeDelta = (address.coordinates.longitude - GRAHOVO_CENTER.longitude) * Math.PI / 180;
+  const latitude1 = GRAHOVO_CENTER.latitude * Math.PI / 180;
+  const latitude2 = address.coordinates.latitude * Math.PI / 180;
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(haversine));
+}
+
 export function isGrahovoAddress(address: Address): boolean {
-  return grahovoPattern.test(addressContext(address));
+  return grahovoPattern.test(addressContext(address)) &&
+    distanceFromGrahovo(address) <= GRAHOVO_RADIUS_METERS;
 }
 
 export function isGrahovoDistrictAddress(address: Address): boolean {
   const context = addressContext(address);
-  return grahovoPattern.test(context) || grahovoDistrictPattern.test(context);
+  return (grahovoPattern.test(context) || grahovoDistrictPattern.test(context)) &&
+    distanceFromGrahovo(address) <= GRAHOVO_DISTRICT_RADIUS_METERS;
 }
 
 export function classifyPricingScope(

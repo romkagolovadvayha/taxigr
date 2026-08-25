@@ -156,6 +156,41 @@ describe('messenger order actions', () => {
     );
   });
 
+  it('confirms payment when a driver completes a ride from a messenger', async () => {
+    const inProgress = order({ status: 'in_progress', driverId: 'driver-1' });
+    const completed = order({
+      status: 'completed',
+      driverId: 'driver-1',
+      paymentConfirmedAt: '2026-08-25T10:10:00.000Z',
+    });
+    mocks.firstRow
+      .mockResolvedValueOnce({ user_id: 'driver-user', chat_id: 'tg-chat' })
+      .mockResolvedValueOnce({ id: 'driver-1' });
+    mocks.findUserWithRoles.mockResolvedValue({
+      id: 'driver-user',
+      roles: ['driver'],
+      blockedAt: undefined,
+    });
+    const inject = vi.fn()
+      .mockResolvedValueOnce(response(inProgress))
+      .mockResolvedValueOnce(response(completed));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+
+    const result = await handle({
+      provider: 'telegram',
+      externalUserId: '42',
+      chatId: 'tg-chat',
+      data: `r:done-ok:${orderId}`,
+    });
+
+    expect(result).toEqual({ text: 'Поездка завершена 🏁' });
+    expect(inject).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      method: 'POST',
+      url: `/v1/driver/orders/${orderId}/transition`,
+      payload: { status: 'completed', paymentReceived: true },
+    }));
+  });
+
   it('refreshes existing buttons instead of sending another card after rating', async () => {
     const completed = order({ status: 'completed', ratings: {} });
     const rated = order({ status: 'completed', ratings: { byPassenger: 5 } });

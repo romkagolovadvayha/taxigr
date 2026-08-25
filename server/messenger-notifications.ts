@@ -372,7 +372,8 @@ export async function refreshMessengerAccountOrderMessages(
 
 export async function closeUnassignedDriverOrderOffers(
   orderId: string,
-  assignedDriverUserId: string,
+  assignedDriverUserId = '',
+  reason: 'accepted' | 'expired' = 'accepted',
 ): Promise<void> {
   const [rows] = await db.query<(MessengerAccountRow & TrackedOrderMessageRow)[]>(
     `SELECT uma.id, uma.user_id, uma.provider, uma.external_user_id, uma.chat_id,
@@ -387,8 +388,10 @@ export async function closeUnassignedDriverOrderOffers(
     orderId,
     audience: 'driver',
     icon: '🚕',
-    title: 'Заказ уже принят',
-    body: 'Этот заказ принял другой водитель.',
+    title: reason === 'expired' ? 'Поиск по заказу завершён' : 'Заказ уже принят',
+    body: reason === 'expired'
+      ? 'Пассажир больше не ожидает водителя по этому заказу.'
+      : 'Этот заказ принял другой водитель.',
     buttons: [[{
       type: 'link',
       label: '🚕 К доступным заказам',

@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { ApiError, apiRequest } from '@/api/client';
 import type { DemoPersona, SessionUser, UserRole } from '@/domain/models';
 import type { InitialLegalAcceptance } from '@/legal/documents';
+import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { clearSessionToken, readSessionToken, writeSessionToken } from '@/storage/auth-storage';
 import { getInstallationId } from '@/storage/device-id';
 
@@ -153,6 +154,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await applySession(refreshed);
     } catch {
       await clearSessionToken();
+      await syncDriverBackgroundLocation(false).catch(() => undefined);
     } finally {
       setLoading(false);
       setSessionReady(true);
@@ -470,6 +472,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const signOut = useCallback(async () => {
+    await syncDriverBackgroundLocation(false).catch(() => undefined);
     await clearSessionToken();
     setToken(null);
     setUser(null);

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -11,6 +11,7 @@ import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppIcon } from '@/components/ui/app-icon';
 import { MoneyValue } from '@/components/ui/money-value';
 import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
@@ -27,6 +28,7 @@ import { useDriverNavigation } from '@/hooks/use-driver-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { formatMoney } from '@/utils/format';
 import { openYandexNavigatorRoute } from '@/utils/open-yandex-navigator';
 
 function DriverNavigationBanner({
@@ -101,12 +103,16 @@ function DriverNavigationBanner({
 function DriverOrderCard({ demo }: { demo: boolean }) {
   const [navigatorBusy, setNavigatorBusy] = useState(false);
   const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
+  const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
+  const [releaseReason, setReleaseReason] = useState('');
+  const [completionConfirmVisible, setCompletionConfirmVisible] = useState(false);
   const {
     driverRide: currentRide,
     createDriverOffer: createRide,
     transitionDriverRide: transitionRide,
     startWaiting,
     stopWaiting,
+    releaseDriverRide,
     resetDriverRide: resetRide,
     refresh,
     rateDriverRide: rateRide,
@@ -393,7 +399,7 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             void refresh();
           }}
         />
-      ) : currentRide.status === 'in_progress' ? (
+      ) : currentRide.status === 'driver_waiting' ? (
         <View style={{ gap: spacing.x3 }}>
           <AppButton
             variant={currentRide.waitingStartedAt ? 'danger' : 'secondary'}
@@ -407,15 +413,52 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
               : 'Начать ожидание'}
           </AppButton>
           <AppButton
-            loading={busy && !currentRide.waitingStartedAt}
-            disabled={busy || Boolean(currentRide.waitingStartedAt)}
-            onPress={() => void transitionRide('completed')}
+            loading={busy}
+            disabled={busy}
+            onPress={() => void transitionRide('in_progress')}
           >
             {currentRide.waitingStartedAt
-              ? 'Сначала завершите ожидание'
-              : 'Завершить поездку'}
+              ? 'Начать поездку и завершить ожидание'
+              : 'Начать поездку'}
           </AppButton>
         </View>
+      ) : currentRide.status === 'in_progress' ? (
+        <>
+          <AppButton
+            loading={busy}
+            disabled={busy}
+            onPress={() => setCompletionConfirmVisible(true)}
+          >
+            Завершить поездку
+          </AppButton>
+          <AppModal
+            visible={completionConfirmVisible}
+            title="Оплата получена?"
+            description={`Подтвердите получение ${paymentLabel.toLowerCase()} на сумму ${formatMoney(currentRide.priceMinor)}. После этого поездка будет завершена.`}
+            onClose={() => setCompletionConfirmVisible(false)}
+          >
+            <AppButton
+              loading={busy}
+              onPress={() => {
+                void transitionRide('completed').then((completed) => {
+                  if (completed) setCompletionConfirmVisible(false);
+                });
+              }}
+            >
+              Оплата получена, завершить
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              disabled={busy}
+              onPress={() => {
+                setCompletionConfirmVisible(false);
+                router.push('/driver/support');
+              }}
+            >
+              Есть проблема с оплатой
+            </AppButton>
+          </AppModal>
+        </>
       ) : nextStatus ? (
         <AppButton
           loading={busy}
@@ -443,6 +486,66 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             Расчёты с сервисом
           </AppButton>
         </View>
+      )}
+      {['accepted', 'driver_arriving', 'driver_waiting'].includes(currentRide.status) && (
+        <>
+          <AppButton
+            variant="quiet"
+            disabled={busy}
+            onPress={() => {
+              setReleaseReason('');
+              setReleaseConfirmVisible(true);
+            }}
+          >
+            Не могу выполнить заказ
+          </AppButton>
+          <AppModal
+            visible={releaseConfirmVisible}
+            title="Отказаться от заказа?"
+            description="Пассажиру сразу будет найден другой водитель. Вернуться к этому заказу уже не получится."
+            onClose={() => setReleaseConfirmVisible(false)}
+          >
+            <TextInput
+              value={releaseReason}
+              onChangeText={(value) => setReleaseReason(value.slice(0, 500))}
+              placeholder="Кратко укажите причину"
+              placeholderTextColor={colors.inkMuted}
+              multiline
+              maxLength={500}
+              accessibilityLabel="Причина отказа от заказа"
+              style={{
+                ...typography.body,
+                minHeight: 88,
+                padding: spacing.x3,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.lg,
+                color: colors.ink,
+                backgroundColor: colors.surface,
+                textAlignVertical: 'top',
+              }}
+            />
+            <AppButton
+              variant="danger"
+              loading={busy}
+              disabled={releaseReason.trim().length < 3}
+              onPress={() => {
+                void releaseDriverRide(releaseReason.trim()).then((released) => {
+                  if (released) setReleaseConfirmVisible(false);
+                });
+              }}
+            >
+              Отказаться и продолжить поиск
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              disabled={busy}
+              onPress={() => setReleaseConfirmVisible(false)}
+            >
+              Остаться на заказе
+            </AppButton>
+          </AppModal>
+        </>
       )}
     </View>
   );

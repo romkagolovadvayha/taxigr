@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
@@ -21,6 +22,28 @@ Notifications.setNotificationHandler({
 
 export function NotificationRegistrar() {
   const { token } = useSession();
+  const router = useRouter();
+  const initialResponseHandled = useRef(false);
+
+  useEffect(() => {
+    if (!token || token.startsWith('demo:')) return;
+    const openOrder = (response: Notifications.NotificationResponse | null) => {
+      const data = response?.notification.request.content.data;
+      const orderId = typeof data?.orderId === 'string' ? data.orderId : null;
+      if (!orderId) return;
+      const role = data?.role === 'driver' ? 'driver' : 'passenger';
+      router.push({
+        pathname: role === 'driver' ? '/driver/trips/[id]' : '/orders/[id]',
+        params: { id: orderId },
+      } as never);
+    };
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(openOrder);
+    if (!initialResponseHandled.current) {
+      initialResponseHandled.current = true;
+      void Notifications.getLastNotificationResponseAsync().then(openOrder).catch(() => undefined);
+    }
+    return () => responseSubscription.remove();
+  }, [router, token]);
 
   useEffect(() => {
     if (!Device.isDevice || !token || token.startsWith('demo:')) return;

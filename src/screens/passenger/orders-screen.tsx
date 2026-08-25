@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -16,7 +17,8 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
 
 export function OrdersScreen() {
-  const { orders } = useRide();
+  const { orders, passengerOrdersHasMore, loadMorePassengerOrders } = useRide();
+  const [loadingMore, setLoadingMore] = useState(false);
   return (
     <Screen contentStyle={{ maxWidth: 900 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -112,6 +114,18 @@ export function OrdersScreen() {
             />
           </AnimatedPressable>
         ))}
+        {passengerOrdersHasMore && (
+          <AppButton
+            variant="secondary"
+            loading={loadingMore}
+            onPress={() => {
+              setLoadingMore(true);
+              void loadMorePassengerOrders().finally(() => setLoadingMore(false));
+            }}
+          >
+            Показать более ранние поездки
+          </AppButton>
+        )}
       </View>
     </Screen>
   );

@@ -42,7 +42,10 @@ export type OrderRow = RowDataPacket & {
   waiting_free_minutes: number;
   waiting_per_minute_minor: number;
   payment_method: 'direct' | 'cash' | 'transfer';
+  payment_confirmed_at: Date | string | null;
   comment: string | null;
+  cancellation_code: 'passenger' | 'admin' | 'search_timeout' | null;
+  cancellation_reason: string | null;
   created_at: Date | string;
   updated_at: Date | string;
   driver_name?: string | null;
@@ -145,7 +148,12 @@ export function presentOrder(row: OrderRow): RideOrder {
     durationSeconds: row.duration_seconds,
     routeCoordinates: routeCoordinates(row.route_geometry),
     paymentMethod: row.payment_method,
+    paymentConfirmedAt: row.payment_confirmed_at
+      ? new Date(row.payment_confirmed_at).toISOString()
+      : undefined,
     comment: row.comment ?? undefined,
+    cancellationCode: row.cancellation_code ?? undefined,
+    cancellationReason: row.cancellation_reason ?? undefined,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
     driver:

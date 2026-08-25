@@ -6,6 +6,7 @@ import {
   calculateWaitingChargeMinor,
   defaultPricingRules,
   farePeriodAt,
+  classifyPricingScope,
 } from '../src/domain/pricing';
 
 describe('route pricing', () => {
@@ -55,6 +56,25 @@ describe('route pricing', () => {
     const economy = calculateFareMinor(9_500, 'economy', 'district', rules, daytime);
     const child = calculateFareMinor(9_500, 'child', 'district', rules, daytime);
     expect(child - economy).toBe(defaultPricingRules.childSurchargeMinor);
+  });
+});
+
+describe('pricing scope validation', () => {
+  it('does not trust a Grahovo label when coordinates point to another city', () => {
+    const spoofed = {
+      id: 'spoofed',
+      label: 'с. Грахово, ул. Ачинцева, 5',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 56.4439, longitude: 52.2274 },
+    };
+    const grahovo = {
+      id: 'grahovo',
+      label: 'с. Грахово, ул. Советская, 10',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 56.04758, longitude: 51.95842 },
+    };
+
+    expect(classifyPricingScope(spoofed, grahovo)).toBe('intercity');
   });
 });
 

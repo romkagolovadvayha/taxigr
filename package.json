@@ -30,6 +30,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.2",
+    "expo-task-manager": "~57.0.13",
     "fastify": "^5.10.0",
     "jose": "^6.2.4",
     "mysql2": "^3.23.2",

@@ -8,6 +8,7 @@ import {
   liveLocationUpdateDelay,
 } from '@/domain/live-location';
 import type { Coordinates } from '@/domain/models';
+import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 
 type DriverLocationState = {
   coordinates: Coordinates | null;
@@ -42,6 +43,11 @@ export function useDriverLocation({
   const lastPublishedRef = useRef<{ token: string; at: number } | null>(null);
 
   useEffect(() => {
+    if (demo || enabled) return;
+    void syncDriverBackgroundLocation(false).catch(() => undefined);
+  }, [demo, enabled]);
+
+  useEffect(() => {
     if (!enabled || !demo) return;
     const timer = setTimeout(() => {
       setState((current) => ({
@@ -61,6 +67,7 @@ export function useDriverLocation({
     let pendingPosition: Location.LocationObject | null = null;
     let trailingTimer: ReturnType<typeof setTimeout> | undefined;
     let publishInFlight = false;
+    let backgroundWarning: string | null = null;
     let queuedPublish: {
       latitude: number;
       longitude: number;
@@ -115,7 +122,7 @@ export function useDriverLocation({
             ? position.coords.speed
             : current.speedMetersPerSecond,
         accuracyMeters: position.coords.accuracy,
-        error: null,
+        error: backgroundWarning,
       }));
       const lastPublished = lastPublishedRef.current;
       if (
@@ -161,6 +168,15 @@ export function useDriverLocation({
           error: 'Разрешите геолокацию — без неё навигация водителя не работает',
         }));
         return;
+      }
+
+      const backgroundEnabled = await syncDriverBackgroundLocation(true);
+      if (!backgroundEnabled) {
+        backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы заказы и маршрут работали при свёрнутом приложении';
+        setState((current) => ({
+          ...current,
+          error: backgroundWarning,
+        }));
       }
 
       const lastKnown = await Location.getLastKnownPositionAsync({

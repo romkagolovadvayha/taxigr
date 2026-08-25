@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 import { jwtVerify, SignJWT } from 'jose';
 
-import type { UserRole } from '../src/domain/models';
+import type { Address, RouteSummary, TariffCode, UserRole } from '../src/domain/models';
+import type { PricingScope } from '../src/domain/pricing';
 import { config } from './config';
 import { firstRow } from './db';
 
@@ -11,6 +12,18 @@ const jwtKey = new TextEncoder().encode(config.JWT_SECRET);
 export type AuthUser = {
   id: string;
   roles: UserRole[];
+};
+
+export type OrderQuoteClaims = {
+  passengerId: string;
+  pickup: Address;
+  destination: Address;
+  pricingScope: PricingScope;
+  route: Omit<RouteSummary, 'coordinates'>;
+  pricingDistanceMeters: number;
+  driverApproachDistanceMeters: number;
+  prices: Record<TariffCode, number>;
+  pricedAt: string;
 };
 
 export function randomToken(bytes = 32): string {
@@ -34,6 +47,31 @@ export async function signSession(user: AuthUser): Promise<string> {
     .setIssuedAt()
     .setExpirationTime('30d')
     .sign(jwtKey);
+}
+
+export async function signOrderQuote(claims: OrderQuoteClaims): Promise<string> {
+  return new SignJWT({ quote: claims })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setSubject(claims.passengerId)
+    .setIssuer('taxi-grahovo-api')
+    .setAudience('taxi-grahovo-order-quote')
+    .setIssuedAt()
+    .setExpirationTime('5m')
+    .sign(jwtKey);
+}
+
+export async function verifyOrderQuote(
+  token: string,
+  passengerId: string,
+): Promise<OrderQuoteClaims> {
+  const { payload } = await jwtVerify(token, jwtKey, {
+    issuer: 'taxi-grahovo-api',
+    audience: 'taxi-grahovo-order-quote',
+    subject: passengerId,
+  });
+  const quote = payload.quote as OrderQuoteClaims | undefined;
+  if (!quote || quote.passengerId !== passengerId) throw new Error('Invalid quote payload');
+  return quote;
 }
 
 export async function verifySession(token: string): Promise<AuthUser> {

@@ -88,33 +88,31 @@ io.use(async (socket, next) => {
     if (typeof raw !== 'string') throw new Error('Missing token');
     const session = await verifySession(raw);
     const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
-      'SELECT id, blocked_at FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      `SELECT u.id, u.blocked_at, d.id AS driver_id
+       FROM users u LEFT JOIN drivers d ON d.user_id = u.id
+       WHERE u.id = ? AND u.deleted_at IS NULL LIMIT 1`,
       [session.id],
     );
     if (!rows[0] || rows[0].blocked_at) throw new Error('Deleted, blocked or missing user');
     socket.data.session = session;
+    socket.data.driverId = rows[0].driver_id ? String(rows[0].driver_id) : null;
+    await socket.join(`user:${session.id}`);
+    if (session.roles.includes('driver') && socket.data.driverId) {
+      await socket.join(`driver:${String(socket.data.driverId)}`);
+    }
+    if (session.roles.includes('admin')) await socket.join('admins');
     next();
   } catch {
     next(new Error('unauthorized'));
   }
 });
 
-io.on('connection', async (socket) => {
-  const session = socket.data.session as Awaited<ReturnType<typeof verifySession>>;
-  void socket.join(`user:${session.id}`);
-  if (session.roles.includes('driver')) {
-    void socket.join('drivers');
-    const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
-      'SELECT id FROM drivers WHERE user_id = ? LIMIT 1',
-      [session.id],
-    );
-    if (rows[0]?.id) void socket.join(`driver:${String(rows[0].id)}`);
-  }
-  if (session.roles.includes('admin')) void socket.join('admins');
-});
-
 const routeHandlers = await registerRoutes(app, (room, event, payload) => {
   io.to(room).emit(event, payload);
+}, {
+  disconnectUser(userId) {
+    setTimeout(() => io.in(`user:${userId}`).disconnectSockets(true), 0);
+  },
 });
 
 const authAbusePruneTimer = setInterval(() => {
@@ -135,6 +133,21 @@ void pruneAuthAbuseData().catch((error) => {
     error,
     context: [['Задача', 'initial auth abuse data pruning']],
   });
+});
+
+const staleOrderTimer = setInterval(() => {
+  void routeHandlers.expireStaleSearchingOrders().catch((error) => {
+    app.log.error(error, 'stale order expiration failed');
+    reportCritical({
+      source: 'server-process',
+      error,
+      context: [['Задача', 'stale order expiration']],
+    });
+  });
+}, 60_000);
+(staleOrderTimer as unknown as { unref?: () => void }).unref?.();
+void routeHandlers.expireStaleSearchingOrders().catch((error) => {
+  app.log.error(error, 'initial stale order expiration failed');
 });
 
 app.setErrorHandler((error, request, reply) => {
@@ -199,6 +212,7 @@ let stopTelegramPolling: (() => Promise<void>) | null = null;
 
 app.addHook('onClose', async () => {
   clearInterval(authAbusePruneTimer);
+  clearInterval(staleOrderTimer);
   await stopTelegramPolling?.();
   io.close();
   await db.end();

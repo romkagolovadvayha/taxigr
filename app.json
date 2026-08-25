@@ -14,6 +14,7 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Для водителя геолокация продолжает работать в фоне только во время смены и активных заказов.",
         "NSUserNotificationsUsageDescription": "Уведомления сообщают о назначении и прибытии водителя."
       }
     },
@@ -29,7 +30,10 @@
       "predictiveBackGestureEnabled": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -74,7 +78,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке."
+          "locationWhenInUsePermission": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке.",
+          "locationAlwaysAndWhenInUsePermission": "Для водителя геолокация продолжает работать в фоне только во время смены и активных заказов.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

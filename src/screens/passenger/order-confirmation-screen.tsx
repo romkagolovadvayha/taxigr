@@ -6,6 +6,7 @@ import { AddressFields } from '@/components/passenger/address-fields';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
@@ -21,6 +22,8 @@ export function OrderConfirmationScreen() {
     tariffs,
     selectedTariff,
     setSelectedTariff,
+    selectedPaymentMethod,
+    setSelectedPaymentMethod,
     quoteStatus,
     createRide,
     busy,
@@ -90,19 +93,44 @@ export function OrderConfirmationScreen() {
           />
         </View>
 
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: spacing.x3,
-            padding: spacing.x3,
-            borderRadius: radius.md,
-            backgroundColor: colors.brandSoft,
-          }}
-        >
-          <AppIcon name="wallet" size={21} />
-          <Text selectable style={{ ...typography.caption, color: colors.ink, flex: 1 }}>
-            Оплата наличными или переводом водителю.
+        <View style={{ gap: spacing.x2 }} accessibilityRole="radiogroup">
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+            Способ оплаты
           </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
+            {([
+              ['cash', 'Наличными'],
+              ['transfer', 'Переводом'],
+              ['direct', 'Уточнить у водителя'],
+            ] as const).map(([method, label]) => {
+              const selectedMethod = selectedPaymentMethod === method;
+              return (
+                <AnimatedPressable
+                  key={method}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selectedMethod }}
+                  onPress={() => setSelectedPaymentMethod(method)}
+                  style={{
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    paddingHorizontal: spacing.x3,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: selectedMethod ? colors.ink : colors.border,
+                    backgroundColor: selectedMethod ? colors.brandSoft : colors.surface,
+                  }}
+                >
+                  <Text style={{ ...typography.caption, color: colors.ink }}>{label}</Text>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', gap: spacing.x2, alignItems: 'center' }}>
+            <AppIcon name="wallet" size={18} />
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, flex: 1 }}>
+              Оплата производится напрямую водителю после поездки.
+            </Text>
+          </View>
         </View>
 
         {!!routeGuidance && (

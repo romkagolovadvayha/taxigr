@@ -107,6 +107,12 @@ async function createOrder(
   deviceId = `integration-device-${token.slice(-24)}`,
   paymentMethod: 'direct' | 'cash' | 'transfer' = 'direct',
 ): Promise<ApiResult<RideOrder>> {
+  const quote = await api<{ quoteToken: string }>('/v1/quotes', {
+    method: 'POST',
+    token,
+    body: { pickup, destination },
+  });
+  if (!quote.data?.quoteToken) return { status: quote.status, error: quote.error };
   return api<RideOrder>('/v1/orders', {
     method: 'POST',
     token,
@@ -114,6 +120,7 @@ async function createOrder(
       pickup,
       destination,
       tariff,
+      quoteToken: quote.data.quoteToken,
       paymentMethod,
       idempotencyKey: key,
       deviceId,
@@ -487,6 +494,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
 
   it('calculates both tariffs and validates malformed requests', async () => {
     const quote = await api<{
+      quoteToken: string;
       pricingScope: string;
       route: {
         distanceMeters: number;
@@ -500,6 +508,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       body: { pickup, destination },
     });
     expect(quote.status).toBe(200);
+    expect(quote.data?.quoteToken.length).toBeGreaterThan(100);
     expect(quote.data?.pricingScope).toBe('grahovo');
     expect(quote.data?.route.distanceMeters).toBeGreaterThan(0);
     expect(quote.data?.route.durationSeconds).toBeGreaterThan(0);
@@ -510,6 +519,25 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       quote.data?.tariffs[0]?.priceMinor ?? 0,
     );
     expect(quote.data?.tariffs[0]?.priceMinor).toBe(15_000);
+
+    const tamperedOrder = await api('/v1/orders', {
+      method: 'POST',
+      token: passengerToken,
+      body: {
+        pickup,
+        destination: {
+          ...destination,
+          coordinates: { latitude: 56.4439, longitude: 52.2274 },
+        },
+        tariff: 'economy',
+        quoteToken: quote.data!.quoteToken,
+        paymentMethod: 'cash',
+        idempotencyKey: `integration-tampered-${randomUUID()}`,
+        deviceId: `integration-tampered-device-${randomUUID()}`,
+      },
+    });
+    expect(tamperedOrder.status).toBe(409);
+    expect(tamperedOrder.error?.code).toBe('QUOTE_ADDRESS_MISMATCH');
 
     const demoNearQuote = await api<{
       route: { distanceMeters: number; durationSeconds: number };
@@ -978,6 +1006,93 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(rows[0]?.status).toBe('online');
   }, 20_000);
 
+  it('prevents one driver from accepting two orders concurrently', async () => {
+    await setDriverStatus(driverOneToken, 'online');
+    const [firstOrder, secondOrder] = await Promise.all([
+      createOrder(passengerToken),
+      createOrder(outsiderToken),
+    ]);
+    expect(firstOrder.status, JSON.stringify(firstOrder.error)).toBe(201);
+    expect(secondOrder.status, JSON.stringify(secondOrder.error)).toBe(201);
+
+    const results = await Promise.all([
+      api(`/v1/driver/orders/${firstOrder.data!.id}/accept`, {
+        method: 'POST', token: driverOneToken, body: {},
+      }),
+      api(`/v1/driver/orders/${secondOrder.data!.id}/accept`, {
+        method: 'POST', token: driverOneToken, body: {},
+      }),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+
+    await api(`/v1/orders/${firstOrder.data!.id}/cancel`, {
+      method: 'POST', token: passengerToken,
+    });
+    await api(`/v1/orders/${secondOrder.data!.id}/cancel`, {
+      method: 'POST', token: outsiderToken,
+    });
+  }, 20_000);
+
+  it('reopens a released order without offering it to the same driver again', async () => {
+    await setDriverStatus(driverOneToken, 'online');
+    await setDriverStatus(driverTwoToken, 'online');
+    const order = await createOrder(passengerToken);
+    expect(order.status).toBe(201);
+    expect((await api(`/v1/driver/orders/${order.data!.id}/accept`, {
+      method: 'POST', token: driverOneToken, body: {},
+    })).status).toBe(200);
+    await api('/v1/driver/location', {
+      method: 'PUT',
+      token: driverOneToken,
+      body: {
+        latitude: pickup.coordinates.latitude,
+        longitude: pickup.coordinates.longitude,
+        accuracyMeters: 8,
+      },
+    });
+    for (const status of ['driver_arriving', 'driver_waiting'] as const) {
+      expect((await api(`/v1/driver/orders/${order.data!.id}/transition`, {
+        method: 'POST',
+        token: driverOneToken,
+        body: { status },
+      })).status).toBe(200);
+    }
+    expect((await api(`/v1/driver/orders/${order.data!.id}/waiting/start`, {
+      method: 'POST', token: driverOneToken,
+    })).status).toBe(200);
+    await connection.execute(
+      `UPDATE orders
+       SET waiting_started_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 270 SECOND)
+       WHERE id = ?`,
+      [order.data!.id],
+    );
+    const waitingStopped = await api<RideOrder>(
+      `/v1/driver/orders/${order.data!.id}/waiting/stop`,
+      { method: 'POST', token: driverOneToken },
+    );
+    expect(waitingStopped.data?.waitingPriceMinor).toBeGreaterThan(0);
+
+    const released = await api<RideOrder>(`/v1/driver/orders/${order.data!.id}/release`, {
+      method: 'POST',
+      token: driverOneToken,
+      body: { reason: 'Неисправность автомобиля' },
+    });
+    expect(released.status).toBe(200);
+    expect(released.data?.status).toBe('searching');
+    expect(released.data?.driverId).toBeUndefined();
+    expect(released.data?.waitingSeconds).toBe(0);
+    expect(released.data?.waitingPriceMinor).toBe(0);
+    expect(released.data?.priceMinor).toBe(released.data?.basePriceMinor);
+
+    const [sameDriverOffers, otherDriverOffers] = await Promise.all([
+      api<RideOrder[]>('/v1/driver/offers', { token: driverOneToken }),
+      api<RideOrder[]>('/v1/driver/offers', { token: driverTwoToken }),
+    ]);
+    expect(sameDriverOffers.data?.some((item) => item.id === order.data!.id)).toBe(false);
+    expect(otherDriverOffers.data?.some((item) => item.id === order.data!.id)).toBe(true);
+    await api(`/v1/orders/${order.data!.id}/cancel`, { method: 'POST', token: passengerToken });
+  }, 20_000);
+
   it('does not let a dual-role driver accept their own passenger order', async () => {
     await setDriverStatus(driverOneToken, 'online');
     const order = await createOrder(driverOneToken);
@@ -1048,6 +1163,40 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     ).toBe(409);
     await api(`/v1/orders/${order.data!.id}/cancel`, { method: 'POST', token: passengerToken });
   }, 15_000);
+
+  it('sends new-order socket offers only while a driver is online', async () => {
+    expect((await setDriverStatus(driverOneToken, 'offline')).status).toBe(200);
+    const driverSocket = io(apiUrl, {
+      auth: { token: driverOneToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    let offersReceived = 0;
+    driverSocket.on('order:available', () => {
+      offersReceived += 1;
+    });
+    try {
+      await socketEvent(driverSocket, 'connect');
+      const hiddenOrder = await createOrder(passengerToken);
+      expect(hiddenOrder.status).toBe(201);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(offersReceived).toBe(0);
+      await api(`/v1/orders/${hiddenOrder.data!.id}/cancel`, {
+        method: 'POST', token: passengerToken,
+      });
+
+      expect((await setDriverStatus(driverOneToken, 'online')).status).toBe(200);
+      const availableEvent = socketEvent<RideOrder>(driverSocket, 'order:available');
+      const visibleOrder = await createOrder(passengerToken);
+      expect(visibleOrder.status).toBe(201);
+      expect((await availableEvent).id).toBe(visibleOrder.data!.id);
+      await api(`/v1/orders/${visibleOrder.data!.id}/cancel`, {
+        method: 'POST', token: passengerToken,
+      });
+    } finally {
+      driverSocket.disconnect();
+    }
+  }, 20_000);
 
   it('delivers order and location updates through authenticated sockets', async () => {
     await setDriverStatus(driverOneToken, 'online');
@@ -1245,34 +1394,29 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(invalid.error?.code).toBe('INVALID_STATUS_TRANSITION');
 
     for (const status of ['driver_arriving', 'driver_waiting', 'in_progress', 'completed'] as const) {
+      if (status === 'completed') {
+        const withoutPaymentConfirmation = await api(
+          `/v1/driver/orders/${order.data!.id}/transition`,
+          {
+            method: 'POST',
+            token: driverOneToken,
+            body: { status },
+          },
+        );
+        expect(withoutPaymentConfirmation.status).toBe(409);
+        expect(withoutPaymentConfirmation.error?.code).toBe('PAYMENT_CONFIRMATION_REQUIRED');
+      }
       const transitioned = await api<RideOrder>(
         `/v1/driver/orders/${order.data!.id}/transition`,
         {
           method: 'POST',
           token: driverOneToken,
-          body: { status },
+          body: { status, ...(status === 'completed' ? { paymentReceived: true } : {}) },
         },
       );
       expect(transitioned.status).toBe(200);
       expect(transitioned.data?.status).toBe(status);
-      if (status === 'in_progress') {
-        const destinationRoute = await api<{
-          target: 'pickup' | 'destination';
-        }>(`/v1/driver/orders/${order.data!.id}/route`, {
-          method: 'POST',
-          token: driverOneToken,
-          body: { latitude: 56.0475, longitude: 51.9584 },
-        });
-        expect(destinationRoute.status).toBe(200);
-        expect(destinationRoute.data?.target).toBe('destination');
-        expect(
-          (
-            await api(`/v1/orders/${order.data!.id}/cancel`, {
-              method: 'POST',
-              token: passengerToken,
-            })
-          ).status,
-        ).toBe(409);
+      if (status === 'driver_waiting') {
         const waitingStarted = await api<RideOrder>(
           `/v1/driver/orders/${order.data!.id}/waiting/start`,
           { method: 'POST', token: driverOneToken },
@@ -1296,6 +1440,25 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         expect(waitingStopped.data?.priceMinor).toBe(
           (waitingStopped.data?.basePriceMinor ?? 0) + 800,
         );
+      }
+      if (status === 'in_progress') {
+        const destinationRoute = await api<{
+          target: 'pickup' | 'destination';
+        }>(`/v1/driver/orders/${order.data!.id}/route`, {
+          method: 'POST',
+          token: driverOneToken,
+          body: { latitude: 56.0475, longitude: 51.9584 },
+        });
+        expect(destinationRoute.status).toBe(200);
+        expect(destinationRoute.data?.target).toBe('destination');
+        expect(
+          (
+            await api(`/v1/orders/${order.data!.id}/cancel`, {
+              method: 'POST',
+              token: passengerToken,
+            })
+          ).status,
+        ).toBe(409);
       }
     }
 
@@ -1415,7 +1578,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
   }, 15_000);
 
-  it('keeps an administrative suspension after an active ride completes', async () => {
+  it('blocks administrative suspension until the active ride completes', async () => {
     await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
       method: 'PATCH',
       token: adminToken,
@@ -1431,6 +1594,29 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         })
       ).status,
     ).toBe(200);
+    const activeSuspension = await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { status: 'suspended' },
+    });
+    expect(activeSuspension.status).toBe(409);
+    expect(activeSuspension.error?.code).toBe('ACTIVE_RIDE_IN_PROGRESS');
+    await api('/v1/driver/location', {
+      method: 'PUT',
+      token: driverOneToken,
+      body: { latitude: pickup.coordinates.latitude, longitude: pickup.coordinates.longitude, accuracyMeters: 8 },
+    });
+    for (const status of ['driver_arriving', 'driver_waiting', 'in_progress', 'completed'] as const) {
+      expect(
+        (
+          await api(`/v1/driver/orders/${order.data!.id}/transition`, {
+            method: 'POST',
+            token: driverOneToken,
+            body: { status, ...(status === 'completed' ? { paymentReceived: true } : {}) },
+          })
+        ).status,
+      ).toBe(200);
+    }
     expect(
       (
         await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
@@ -1440,17 +1626,6 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         })
       ).status,
     ).toBe(200);
-    for (const status of ['driver_arriving', 'driver_waiting', 'in_progress', 'completed'] as const) {
-      expect(
-        (
-          await api(`/v1/driver/orders/${order.data!.id}/transition`, {
-            method: 'POST',
-            token: driverOneToken,
-            body: { status },
-          })
-        ).status,
-      ).toBe(200);
-    }
     const [drivers] = await connection.query<mysql.RowDataPacket[]>(
       'SELECT status FROM drivers WHERE id = ?',
       [fixture.driverOneId],

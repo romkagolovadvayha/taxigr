@@ -53,6 +53,7 @@ const schema = z.object({
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(4).default(1),
   AUTH_ATTEMPT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   GLOBAL_RATE_LIMIT_MAX: z.coerce.number().int().min(60).max(50_000).default(10_000),
+  ORDER_SEARCH_TTL_MINUTES: z.coerce.number().int().min(10).max(240).default(60),
 });
 
 const parsed = schema.safeParse(process.env);

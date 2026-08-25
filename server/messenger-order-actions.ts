@@ -260,13 +260,13 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         audience,
         syncExistingOrderMessages: false,
         icon: '🏁',
-        title: 'Завершить поездку?',
-        body: 'Убедитесь, что пассажир доставлен в место назначения.',
+        title: 'Оплата получена?',
+        body: 'Подтвердите, что пассажир доставлен в место назначения и оплата получена.',
         details: [['💳 Итого', formatMoney(ride.priceMinor)]],
         buttons: [
           [{
             type: 'callback',
-            label: 'Да, завершить',
+            label: 'Оплата получена, завершить',
             data: rideMessengerActionData(ride.id, 'complete-confirm'),
             intent: 'positive',
           }],
@@ -289,7 +289,11 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         case 'start-trip':
           return ['POST', `/v1/driver/orders/${ride.id}/transition`, { status: 'in_progress' }] as const;
         case 'complete-confirm':
-          return ['POST', `/v1/driver/orders/${ride.id}/transition`, { status: 'completed' }] as const;
+          return [
+            'POST',
+            `/v1/driver/orders/${ride.id}/transition`,
+            { status: 'completed', paymentReceived: true },
+          ] as const;
         case 'waiting-start':
           return ['POST', `/v1/driver/orders/${ride.id}/waiting/start`] as const;
         case 'waiting-stop':
