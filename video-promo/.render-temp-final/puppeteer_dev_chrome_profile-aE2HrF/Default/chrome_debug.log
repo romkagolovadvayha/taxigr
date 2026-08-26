@@ -1,0 +1,1 @@
+[0826/151317.305:INFO:CONSOLE:62867] "Remotion: The audio with src /public/audio/bgm/bgm-tech-house.mp3 has changed it's volume. Prefer the callback syntax for setting volume to get better timeline display: https://www.remotion.dev/docs/audio/volume", source: http://localhost:3001/bundle.js (62867)

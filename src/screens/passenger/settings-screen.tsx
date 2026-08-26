@@ -2,9 +2,12 @@ import { router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
 
+import { apiRequest } from '@/api/client';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
+import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
+import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { useRideFeedback } from '@/feedback/ride-feedback-provider';
@@ -12,6 +15,7 @@ import {
   hasNotificationPermission,
   requestNotificationPermission,
 } from '@/notifications/permissions';
+import { syncPushRegistration } from '@/notifications/push-registration';
 import { goBackOrReplace } from '@/navigation/back';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
@@ -51,6 +55,10 @@ function SettingToggle({
 
 export function SettingsScreen() {
   const [push, setPush] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushInfo, setPushInfo] = useState<string | null>(null);
+  const [pushTesting, setPushTesting] = useState(false);
+  const { token } = useSession();
   const { dark, setDark } = useAppTheme();
   const { previewFeedback } = useRideFeedback();
   const {
@@ -62,19 +70,45 @@ export function SettingsScreen() {
   const { shareLocationWithDriver, setShareLocationWithDriver } = usePassengerPreferences();
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
     void hasNotificationPermission().then(setPush);
   }, []);
 
   const changePush = async (enabled: boolean) => {
-    if (Platform.OS === 'web') {
-      setPush(enabled);
-      return;
-    }
+    setPushError(null);
+    setPushInfo(null);
     if (enabled) {
-      setPush(await requestNotificationPermission());
+      try {
+        const granted = await requestNotificationPermission();
+        const registered = granted && token
+          ? await syncPushRegistration(token)
+          : false;
+        setPush(registered);
+        if (granted && !registered) setPushError('Не удалось зарегистрировать устройство для push.');
+      } catch (error) {
+        setPush(false);
+        setPushError(error instanceof Error ? error.message : 'Не удалось подключить push.');
+      }
     } else {
-      await Linking.openSettings();
+      if (Platform.OS === 'web') {
+        setPushError('Отключите уведомления в настройках сайта браузера.');
+      } else {
+        await Linking.openSettings();
+      }
+    }
+  };
+
+  const testPush = async () => {
+    if (!token) return;
+    setPushTesting(true);
+    setPushError(null);
+    setPushInfo(null);
+    try {
+      await apiRequest('/v1/push/test', { method: 'POST', token });
+      setPushInfo('Тестовое уведомление отправлено.');
+    } catch (error) {
+      setPushError(error instanceof Error ? error.message : 'Не удалось отправить тестовый push.');
+    } finally {
+      setPushTesting(false);
     }
   };
 
@@ -120,11 +154,28 @@ export function SettingsScreen() {
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <SettingToggle
           title="Уведомления"
-          subtitle={Platform.OS === 'web' ? 'Доступны в мобильном приложении' : 'Назначение и прибытие водителя'}
+          subtitle="Новые заказы, назначение и прибытие водителя"
           value={push}
-          disabled={Platform.OS === 'web'}
           onValueChange={(value) => void changePush(value)}
         />
+        {!!pushError && (
+          <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+            {pushError}
+          </Text>
+        )}
+        {!!pushInfo && (
+          <Text accessibilityLiveRegion="polite" selectable style={{ ...typography.caption, color: colors.success }}>
+            {pushInfo}
+          </Text>
+        )}
+        <AppButton
+          variant="secondary"
+          disabled={!push}
+          loading={pushTesting}
+          onPress={() => void testPush()}
+        >
+          Отправить тестовое уведомление
+        </AppButton>
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <SettingToggle
           title="Звуки событий"

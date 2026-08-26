@@ -35,8 +35,10 @@ describe('API client request bodies', () => {
       expect.objectContaining({
         method: 'POST',
         body: '{}',
+        cache: 'no-store',
         headers: expect.objectContaining({
           Authorization: 'Bearer session-token',
+          'Cache-Control': 'no-cache',
           'Content-Type': 'application/json',
         }),
       }),

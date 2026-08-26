@@ -76,6 +76,16 @@ await app.register(rateLimit, {
   },
 });
 
+app.addHook('onSend', async (request, reply, payload) => {
+  if (request.headers.authorization?.startsWith('Bearer ')) {
+    void reply
+      .header('Cache-Control', 'private, no-store, max-age=0')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0');
+  }
+  return payload;
+});
+
 const io = new SocketServer(app.server, {
   path: '/socket.io',
   cors: { origin: config.corsOrigins },

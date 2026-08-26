@@ -32,7 +32,7 @@ export function useDriverLocation({
   token,
   demoCoordinates,
 }: {
-  enabled: boolean;
+  enabled: boolean | null;
   navigationActive: boolean;
   token: string | null;
   demoCoordinates?: Coordinates | null;
@@ -43,12 +43,14 @@ export function useDriverLocation({
   const lastPublishedRef = useRef<{ token: string; at: number } | null>(null);
 
   useEffect(() => {
-    if (demo || enabled) return;
+    // `null` means that the server status is still loading. Do not stop an
+    // already running background task just because the screen remounted.
+    if (demo || enabled !== false) return;
     void syncDriverBackgroundLocation(false).catch(() => undefined);
   }, [demo, enabled]);
 
   useEffect(() => {
-    if (!enabled || !demo) return;
+    if (enabled !== true || !demo) return;
     const timer = setTimeout(() => {
       setState((current) => ({
         ...current,
@@ -60,7 +62,7 @@ export function useDriverLocation({
   }, [demo, demoCoordinates, enabled]);
 
   useEffect(() => {
-    if (!enabled || demo || !token) return;
+    if (enabled !== true || demo || !token) return;
 
     let subscription: Location.LocationSubscription | undefined;
     let cancelled = false;

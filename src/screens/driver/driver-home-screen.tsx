@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -554,7 +554,8 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
 export function DriverHomeScreen() {
   const { token } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
-  const [online, setOnline] = useState(false);
+  const [online, setOnline] = useState<boolean | null>(demo ? true : null);
+  const statusRequestRef = useRef(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone } = useResponsiveLayout();
@@ -580,31 +581,47 @@ export function DriverHomeScreen() {
     token,
   });
 
-  useEffect(() => {
+  const loadStatus = useCallback(async () => {
+    const requestId = ++statusRequestRef.current;
     if (demo) {
-      const timer = setTimeout(() => setOnline(true), 0);
-      return () => clearTimeout(timer);
+      setOnline(true);
+      setStatusError(null);
+      return;
     }
     if (!token) {
-      const timer = setTimeout(() => setOnline(false), 0);
-      return () => clearTimeout(timer);
+      setOnline(false);
+      return;
     }
-    const controller = new AbortController();
-    void apiRequest<{ status: string }>('/v1/driver/profile', {
-      token,
-      signal: controller.signal,
-    })
-      .then((profile) => {
-        setOnline(profile.status === 'online' || profile.status === 'busy');
-        setStatusError(null);
-      })
-      .catch((reason: unknown) => {
-        if (!controller.signal.aborted) {
-          setStatusError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус водителя');
-        }
-      });
-    return () => controller.abort();
+    try {
+      const profile = await apiRequest<{ status: string }>('/v1/driver/profile', { token });
+      if (statusRequestRef.current !== requestId) return;
+      setOnline(profile.status === 'online' || profile.status === 'busy');
+      setStatusError(null);
+    } catch (reason) {
+      if (statusRequestRef.current !== requestId) return;
+      setStatusError(reason instanceof Error ? reason.message : 'Не удалось загрузить статус водителя');
+    }
   }, [demo, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadStatus().catch(() => undefined);
+      return () => {
+        statusRequestRef.current += 1;
+      };
+    }, [loadStatus]),
+  );
+
+  useEffect(() => {
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && previousState !== 'active') {
+        void loadStatus();
+      }
+      previousState = nextState;
+    });
+    return () => subscription.remove();
+  }, [loadStatus]);
 
   const changeOnline = async (next: boolean) => {
     setOnline(next);
@@ -649,11 +666,12 @@ export function DriverHomeScreen() {
           <View>
             <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Смена</Text>
             <Text selectable style={{ ...typography.caption, color: online ? colors.success : colors.inkSecondary }}>
-              {online ? 'На линии' : 'Не на линии'}
+              {online === null ? 'Проверяем статус…' : online ? 'На линии' : 'Не на линии'}
             </Text>
           </View>
           <AccessibleSwitch
-            value={online}
+            value={online === true}
+            disabled={online === null}
             accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'}
             onValueChange={(next) => void changeOnline(next)}
             trackColor={{ true: colors.brand }}

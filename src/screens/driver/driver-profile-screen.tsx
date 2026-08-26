@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -18,6 +18,7 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type DriverProfile = {
   id: string;
+  userId: string;
   name: string;
   phone: string | null;
   status: string;
@@ -43,6 +44,7 @@ type VehicleForm = {
 
 const demoProfile: DriverProfile = {
   id: demoDriver.id,
+  userId: 'demo-driver',
   name: demoDriver.name,
   phone: demoDriver.phone,
   status: 'online',
@@ -69,9 +71,10 @@ function formFromProfile(profile: DriverProfile): VehicleForm {
 }
 
 export function DriverProfileScreen() {
-  const { token, signOut } = useSession();
+  const { token, user, signOut } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
-  const [profile, setProfile] = useState<DriverProfile>(demoProfile);
+  const [profile, setProfile] = useState<DriverProfile | null>(demo ? demoProfile : null);
+  const loadRequestRef = useRef(0);
   const [requests, setRequests] = useState<VehicleChangeRequest[]>([]);
   const [form, setForm] = useState<VehicleForm>(() => formFromProfile(demoProfile));
   const [editing, setEditing] = useState(false);
@@ -79,25 +82,59 @@ export function DriverProfileScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!token || demo) return;
+    const requestId = ++loadRequestRef.current;
+    if (demo) {
+      setProfile(demoProfile);
+      setForm(formFromProfile(demoProfile));
+      setRequests([]);
+      setError(null);
+      return;
+    }
+    if (!token || !user) {
+      setProfile(null);
+      setRequests([]);
+      return;
+    }
     try {
       const [nextProfile, nextRequests] = await Promise.all([
         apiRequest<DriverProfile>('/v1/driver/profile', { token }),
         apiRequest<VehicleChangeRequest[]>('/v1/driver/vehicle-change-requests/me', { token }),
       ]);
+      if (loadRequestRef.current !== requestId) return;
+      if (nextProfile.userId !== user.id) {
+        throw new Error('Получен профиль другой учётной записи. Выполните вход заново.');
+      }
       setProfile(nextProfile);
       setForm(formFromProfile(nextProfile));
       setRequests(nextRequests);
       setError(null);
     } catch (reason) {
+      if (loadRequestRef.current !== requestId) return;
+      setProfile(null);
+      setRequests([]);
       setError(reason instanceof Error ? reason.message : 'Не удалось загрузить профиль');
     }
-  }, [demo, token]);
+  }, [demo, token, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      return () => {
+        loadRequestRef.current += 1;
+      };
+    }, [load]),
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(), 0);
-    return () => clearTimeout(timer);
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && previousState !== 'active') void load();
+      previousState = nextState;
+    });
+    return () => subscription.remove();
   }, [load]);
+
+  const activeProfile = profile ?? demoProfile;
 
   const pendingRequest = useMemo(
     () => requests.find((request) => request.status === 'pending'),
@@ -128,14 +165,14 @@ export function DriverProfileScreen() {
       if (demo || !token) {
         const request: VehicleChangeRequest = {
           id: `demo-change-${Date.now()}`,
-          driverId: profile.id,
+          driverId: activeProfile.id,
           currentVehicle: {
-            make: profile.make ?? '',
-            model: profile.model ?? '',
-            year: profile.year ?? year,
-            color: profile.color ?? '',
-            colorHex: profile.colorHex ?? '#777C84',
-            plate: profile.plate ?? '',
+            make: activeProfile.make ?? '',
+            model: activeProfile.model ?? '',
+            year: activeProfile.year ?? year,
+            color: activeProfile.color ?? '',
+            colorHex: activeProfile.colorHex ?? '#777C84',
+            plate: activeProfile.plate ?? '',
           },
           proposedVehicle: {
             make: payload.vehicleMake,
@@ -145,7 +182,7 @@ export function DriverProfileScreen() {
             colorHex: payload.vehicleColorHex,
             plate: payload.plate,
           },
-          currentHasChildSeat: profile.hasChildSeat,
+          currentHasChildSeat: activeProfile.hasChildSeat,
           hasChildSeat: payload.hasChildSeat,
           status: 'pending',
           createdAt: new Date().toISOString(),
@@ -202,6 +239,33 @@ export function DriverProfileScreen() {
     </View>
   );
 
+  if (!profile) {
+    return (
+      <Screen contentStyle={{ maxWidth: 760, alignItems: 'center', justifyContent: 'center' }}>
+        {!!error ? (
+          <>
+            <Text accessibilityRole="alert" selectable style={{ color: colors.danger, textAlign: 'center' }}>
+              {error}
+            </Text>
+            <AppButton variant="secondary" onPress={() => void load()}>
+              Повторить
+            </AppButton>
+            <AppButton variant="quiet" onPress={() => void signOut()}>
+              Выйти и войти заново
+            </AppButton>
+          </>
+        ) : (
+          <>
+            <ActivityIndicator color={colors.inkSecondary} />
+            <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
+              Загружаем ваш профиль…
+            </Text>
+          </>
+        )}
+      </Screen>
+    );
+  }
+
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
       <View>
@@ -231,43 +295,43 @@ export function DriverProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
-              {profile.name}
+              {activeProfile.name}
             </Text>
             <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-              {profile.phone} · рейтинг ★ {Number(profile.rating).toFixed(2)}
+              {activeProfile.phone} · рейтинг ★ {Number(activeProfile.rating).toFixed(2)}
             </Text>
           </View>
           <StatusChip
-            label={profile.status === 'suspended' ? 'Доступ приостановлен' : 'Допущен'}
-            tone={profile.status === 'suspended' ? 'danger' : 'success'}
+            label={activeProfile.status === 'suspended' ? 'Доступ приостановлен' : 'Допущен'}
+            tone={activeProfile.status === 'suspended' ? 'danger' : 'success'}
           />
         </View>
       </SurfaceCard>
 
       <SurfaceCard>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x4, flexWrap: 'wrap' }}>
-          <VehicleIllustration colorHex={profile.colorHex} width={84} height={44} framed />
+          <VehicleIllustration colorHex={activeProfile.colorHex} width={84} height={44} framed />
           <View style={{ flex: 1, minWidth: 190, gap: spacing.x1 }}>
             <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
               Автомобиль
             </Text>
             <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-              {[profile.color, profile.make, profile.model].filter(Boolean).join(' ')}
+              {[activeProfile.color, activeProfile.make, activeProfile.model].filter(Boolean).join(' ')}
             </Text>
             <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-              {[profile.year, profile.plate].filter(Boolean).join(' · ')}
+              {[activeProfile.year, activeProfile.plate].filter(Boolean).join(' · ')}
             </Text>
           </View>
         </View>
         <StatusChip
-          label={profile.hasChildSeat ? 'Детское кресло подтверждено' : 'Детский тариф недоступен'}
-          tone={profile.hasChildSeat ? 'info' : 'neutral'}
+          label={activeProfile.hasChildSeat ? 'Детское кресло подтверждено' : 'Детский тариф недоступен'}
+          tone={activeProfile.hasChildSeat ? 'info' : 'neutral'}
         />
         {!pendingRequest && (
           <AppButton
             variant={editing ? 'quiet' : 'secondary'}
             onPress={() => {
-              setForm(formFromProfile(profile));
+              setForm(formFromProfile(activeProfile));
               setEditing((current) => !current);
             }}
           >
@@ -378,6 +442,9 @@ export function DriverProfileScreen() {
         </SurfaceCard>
       )}
 
+      <AppButton variant="secondary" onPress={() => router.push('/settings')}>
+        Настройки уведомлений
+      </AppButton>
       <AppButton variant="secondary" onPress={() => router.replace('/')}>
         Режим пассажира
       </AppButton>

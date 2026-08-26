@@ -62,8 +62,10 @@ export async function apiRequest<T>(
       ...requestOptions,
       body,
       signal: controller.signal,
+      cache: token ? 'no-store' : requestOptions.cache,
       headers: {
         Accept: 'application/json',
+        ...(token ? { 'Cache-Control': 'no-cache' } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,

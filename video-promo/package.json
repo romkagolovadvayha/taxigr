@@ -1,0 +1,32 @@
+{
+  "name": "taxi-grahovo-promo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts --no-open",
+    "still": "remotion still src/index.ts TaxiGrahovoPromo",
+    "render": "remotion render src/index.ts TaxiGrahovoPromo out/taxi-grahovo-promo.mp4",
+    "render:location-demo": "remotion render src/index.ts LocationPermissionDemo out/location-permission-demo.mp4",
+    "render:no-bgm": "remotion render src/index.ts TaxiGrahovoPromo out/taxi-grahovo-promo-no-bgm.mp4 --props=props-nobgm.json",
+    "render:fast-portrait": "remotion render src/index.ts TaxiGrahovoFastPortrait out/taxi-grahovo-fast-portrait.mp4",
+    "render:fast-portrait:no-bgm": "remotion render src/index.ts TaxiGrahovoFastPortrait out/taxi-grahovo-fast-portrait-no-bgm.mp4 --props=props-nobgm.json",
+    "render:fast-portrait:voice": "remotion render src/index.ts TaxiGrahovoFastPortrait out/taxi-grahovo-fast-portrait-voice.mp4",
+    "render:fast-portrait:voice-no-bgm": "remotion render src/index.ts TaxiGrahovoFastPortrait out/taxi-grahovo-fast-portrait-voice-no-bgm.mp4 --props=props-nobgm.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.506",
+    "@remotion/media": "4.0.506",
+    "@remotion/transitions": "4.0.506",
+    "remotion": "4.0.506",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.3"
+  }
+}

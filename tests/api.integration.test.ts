@@ -368,6 +368,62 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     );
   });
 
+  it('isolates driver profiles by session and forbids private response caching', async () => {
+    const first = await fetch(`${apiUrl}/v1/driver/profile`, {
+      headers: { Authorization: `Bearer ${driverOneToken}` },
+    });
+    const second = await fetch(`${apiUrl}/v1/driver/profile`, {
+      headers: { Authorization: `Bearer ${driverTwoToken}` },
+    });
+    const firstPayload = (await first.json()) as { data?: { userId: string; id: string } };
+    const secondPayload = (await second.json()) as { data?: { userId: string; id: string } };
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(firstPayload.data).toMatchObject({
+      userId: fixture.driverUserOneId,
+      id: fixture.driverOneId,
+    });
+    expect(secondPayload.data).toMatchObject({
+      userId: fixture.driverUserTwoId,
+      id: fixture.driverTwoId,
+    });
+    expect(secondPayload.data?.userId).not.toBe(firstPayload.data?.userId);
+    expect(first.headers.get('cache-control')).toContain('no-store');
+    expect(second.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('registers an authenticated browser push subscription', async () => {
+    const configResponse = await api<{ supported: boolean; vapidPublicKey: string | null }>(
+      '/v1/push/config',
+      { token: passengerToken },
+    );
+    expect(configResponse.status).toBe(200);
+    expect(configResponse.data?.supported).toBe(true);
+    expect(configResponse.data?.vapidPublicKey).toBeTruthy();
+
+    const endpoint = `https://push.example.test/${fixture.passengerId}`;
+    const registration = await api('/v1/web-push-subscriptions', {
+      method: 'PUT',
+      token: passengerToken,
+      body: {
+        endpoint,
+        expirationTime: null,
+        keys: {
+          p256dh: 'test-browser-public-key-1234567890',
+          auth: 'test-auth-secret-12345',
+        },
+      },
+    });
+    expect(registration.status).toBe(200);
+    const [rows] = await connection.query<mysql.RowDataPacket[]>(
+      'SELECT user_id, endpoint FROM web_push_subscriptions WHERE user_id = ?',
+      [fixture.passengerId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ user_id: fixture.passengerId, endpoint });
+  });
+
   it('defers legal consent until the first order and enforces it server-side', async () => {
     await connection.execute(
       'UPDATE user_consents SET revoked_at = UTC_TIMESTAMP(3) WHERE user_id = ?',
@@ -1864,13 +1920,19 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     ).toBe(409);
 
     const [drivers] = await connection.query<mysql.RowDataPacket[]>(
-      `SELECT d.id, d.has_child_seat, v.plate
+      `SELECT d.id, d.status, d.has_child_seat, v.plate
        FROM drivers d JOIN vehicles v ON v.driver_id = d.id AND v.active = TRUE
        WHERE d.user_id = ?`,
       [fixture.applicantId],
     );
     expect(drivers).toHaveLength(1);
+    expect(drivers[0]?.status).toBe('online');
     expect(Boolean(drivers[0]?.has_child_seat)).toBe(true);
+    const [openShifts] = await connection.query<mysql.RowDataPacket[]>(
+      'SELECT id FROM driver_shifts WHERE driver_id = ? AND ended_at IS NULL',
+      [drivers[0]!.id],
+    );
+    expect(openShifts).toHaveLength(1);
     const [roles] = await connection.query<mysql.RowDataPacket[]>(
       "SELECT role FROM user_roles WHERE user_id = ? AND role = 'driver'",
       [fixture.applicantId],

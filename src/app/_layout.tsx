@@ -145,7 +145,7 @@ function RootNavigator() {
     <ThemeProvider key={colorScheme} value={navigationTheme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
-        key={colorScheme}
+        key={`${colorScheme}:${user?.id ?? 'signed-out'}`}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
       >
         <Stack.Screen name="index" />

@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
+import webpush from 'web-push';
 
 import { config } from './config';
 import { db } from './db';
+import { getVapidConfig } from './vapid';
 
 export type PushMessage = {
   title: string;
@@ -23,6 +26,10 @@ type ExpoPushTicket =
 
 const expoPushBatchSize = 100;
 
+function endpointHash(endpoint: string): string {
+  return createHash('sha256').update(endpoint).digest('hex');
+}
+
 function chunks<T>(items: T[], size: number): T[][] {
   return Array.from(
     { length: Math.ceil(items.length / size) },
@@ -30,15 +37,17 @@ function chunks<T>(items: T[], size: number): T[][] {
   );
 }
 
-export async function notifyUsers(userIds: string[], message: PushMessage): Promise<void> {
+export async function notifyUsers(
+  userIds: string[],
+  message: PushMessage,
+): Promise<{ nativeSubscriptions: number; webSubscriptions: number }> {
   const uniqueUserIds = [...new Set(userIds)];
-  if (!uniqueUserIds.length) return;
+  if (!uniqueUserIds.length) return { nativeSubscriptions: 0, webSubscriptions: 0 };
   const placeholders = uniqueUserIds.map(() => '?').join(',');
   const [rows] = await db.query<(RowDataPacket & { token: string })[]>(
     `SELECT token FROM push_tokens WHERE user_id IN (${placeholders})`,
     uniqueUserIds,
   );
-  if (!rows.length) return;
   const errors: Error[] = [];
   for (const batch of chunks(rows, expoPushBatchSize)) {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -62,7 +71,7 @@ export async function notifyUsers(userIds: string[], message: PushMessage): Prom
     });
     const payload = await response.json().catch(() => ({})) as {
       data?: ExpoPushTicket[];
-      errors?: Array<{ message?: string }>;
+      errors?: { message?: string }[];
     };
     if (!response.ok) {
       throw new Error(
@@ -80,9 +89,48 @@ export async function notifyUsers(userIds: string[], message: PushMessage): Prom
       errors.push(new Error(ticket.message ?? ticket.details?.error ?? 'Expo push ticket error'));
     }
   }
-  if (errors.length) {
-    throw new AggregateError(errors, `Expo rejected ${errors.length} push notification(s)`);
+  const [webRows] = await db.query<(
+    RowDataPacket & { endpoint: string; p256dh: string; auth_secret: string }
+  )[]>(
+    `SELECT endpoint, p256dh, auth_secret
+     FROM web_push_subscriptions WHERE user_id IN (${placeholders})`,
+    uniqueUserIds,
+  );
+  if (webRows.length) {
+    const vapid = getVapidConfig();
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+    const url = message.data?.orderId
+      ? message.data.role === 'driver'
+        ? `/driver/trips/${message.data.orderId}`
+        : `/orders/${message.data.orderId}`
+      : '/';
+    for (const subscription of webRows) {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: subscription.endpoint,
+            keys: { p256dh: subscription.p256dh, auth: subscription.auth_secret },
+          },
+          JSON.stringify({ title: message.title, body: message.body, url }),
+          { TTL: 86_400, urgency: 'high' },
+        );
+      } catch (error) {
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          await db.execute(
+            'DELETE FROM web_push_subscriptions WHERE endpoint_hash = ?',
+            [endpointHash(subscription.endpoint)],
+          );
+        } else {
+          errors.push(error instanceof Error ? error : new Error('Web Push delivery failed'));
+        }
+      }
+    }
   }
+  if (errors.length) {
+    throw new AggregateError(errors, `Failed to deliver ${errors.length} push notification(s)`);
+  }
+  return { nativeSubscriptions: rows.length, webSubscriptions: webRows.length };
 }
 
 export async function notifyOnlineDrivers(message: PushMessage): Promise<void> {

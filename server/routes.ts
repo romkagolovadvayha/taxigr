@@ -134,6 +134,7 @@ import {
   verifyVkMiniAppLaunchParams,
   verifyVkMiniAppPhone,
 } from './vk-mini-app-auth';
+import { getVapidConfig } from './vapid';
 
 type EventPublisher = (room: string, event: string, payload: unknown) => void;
 type RealtimeControls = {
@@ -2794,6 +2795,69 @@ export async function registerRoutes(
     return { data: { registered: true } };
   });
 
+  app.get('/v1/push/config', async (request) => {
+    await auth(request);
+    const vapid = getVapidConfig();
+    return {
+      data: {
+        supported: true,
+        vapidPublicKey: vapid.publicKey,
+      },
+    };
+  });
+
+  app.put('/v1/web-push-subscriptions', async (request) => {
+    const session = await auth(request);
+    const input = parse(
+      z.object({
+        endpoint: z.string().url().max(2048),
+        expirationTime: z.number().int().nonnegative().nullable().optional(),
+        keys: z.object({
+          p256dh: z.string().min(20).max(255),
+          auth: z.string().min(10).max(255),
+        }),
+      }),
+      request.body,
+    );
+    await db.execute(
+      `INSERT INTO web_push_subscriptions
+        (endpoint_hash, user_id, endpoint, p256dh, auth_secret, expiration_time, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), endpoint = VALUES(endpoint),
+         p256dh = VALUES(p256dh), auth_secret = VALUES(auth_secret),
+         expiration_time = VALUES(expiration_time), user_agent = VALUES(user_agent)`,
+      [
+        sha256(input.endpoint),
+        session.id,
+        input.endpoint,
+        input.keys.p256dh,
+        input.keys.auth,
+        input.expirationTime ?? null,
+        request.headers['user-agent']?.slice(0, 512) ?? null,
+      ],
+    );
+    return { data: { registered: true } };
+  });
+
+  app.post(
+    '/v1/push/test',
+    { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } },
+    async (request) => {
+      const session = await auth(request);
+      const delivered = await notifyUsers([session.id], {
+        title: 'Тест push-уведомлений',
+        body: 'Уведомления «Такси Грахово» подключены и работают.',
+      });
+      if (delivered.nativeSubscriptions + delivered.webSubscriptions === 0) {
+        throw Object.assign(new Error('Для аккаунта ещё не зарегистрировано ни одного устройства'), {
+          statusCode: 409,
+          code: 'PUSH_NOT_REGISTERED',
+        });
+      }
+      return { data: { sent: true, ...delivered } };
+    },
+  );
+
   app.get('/v1/addresses/search', async (request) => {
     await auth(request, 'passenger');
     const { query } = parse(z.object({ query: z.string().trim().min(2).max(180) }), request.query);
@@ -3814,6 +3878,7 @@ export async function registerRoutes(
     const row = await firstRow<
       RowDataPacket & {
         id: string;
+        userId: string;
         name: string;
         phone: string | null;
         status: string;
@@ -3827,7 +3892,7 @@ export async function registerRoutes(
         plate: string | null;
       }
     >(
-      `SELECT d.id, u.name, u.phone, d.status, d.rating,
+      `SELECT d.id, d.user_id AS userId, u.name, u.phone, d.status, d.rating,
         d.has_child_seat AS hasChildSeat, v.make, v.model, v.year, v.color,
         v.color_hex AS colorHex, v.plate
        FROM drivers d JOIN users u ON u.id = d.user_id
@@ -5024,15 +5089,19 @@ export async function registerRoutes(
         }
         const driverId = randomUUID();
         await connection.execute(
-          `INSERT INTO drivers (id, user_id, has_child_seat)
-           VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE has_child_seat = VALUES(has_child_seat)`,
+          `INSERT INTO drivers (id, user_id, status, has_child_seat)
+           VALUES (?, ?, 'online', ?)
+           ON DUPLICATE KEY UPDATE has_child_seat = VALUES(has_child_seat)`,
           [driverId, application.user_id, application.has_child_seat],
         );
-        const [drivers] = await connection.query<(RowDataPacket & { id: string })[]>(
-          'SELECT id FROM drivers WHERE user_id = ?',
+        const [drivers] = await connection.query<(RowDataPacket & { id: string; status: string })[]>(
+          'SELECT id, status FROM drivers WHERE user_id = ?',
           [application.user_id],
         );
         const actualDriverId = drivers[0]!.id;
+        if (drivers[0]!.status === 'online') {
+          await openDriverShift(actualDriverId, connection);
+        }
         await connection.execute(
           `INSERT INTO vehicles (id, driver_id, make, model, year, color, color_hex, plate)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
