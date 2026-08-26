@@ -215,7 +215,7 @@ const quoteSchema = z.object({ pickup: addressSchema, destination: addressSchema
 const createOrderSchema = quoteSchema.extend({
   tariff: tariffSchema,
   quoteToken: z.string().min(32).max(32_000),
-  paymentMethod: z.enum(['direct', 'cash', 'transfer']).default('direct'),
+  paymentMethod: z.enum(['cash', 'transfer']).default('cash'),
   comment: z.string().trim().max(500).optional(),
   idempotencyKey: z.string().min(12).max(128),
   deviceId: z.string().min(16).max(128),

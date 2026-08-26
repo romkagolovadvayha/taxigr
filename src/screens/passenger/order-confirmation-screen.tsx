@@ -123,7 +123,6 @@ export function OrderConfirmationScreen() {
             {([
               ['cash', 'Наличными'],
               ['transfer', 'Переводом'],
-              ['direct', 'Уточнить у водителя'],
             ] as const).map(([method, label]) => {
               const selectedMethod = selectedPaymentMethod === method;
               return (

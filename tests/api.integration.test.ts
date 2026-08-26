@@ -106,7 +106,7 @@ async function createOrder(
   tariff: 'economy' | 'child' = 'economy',
   key = `integration-${randomUUID()}`,
   deviceId = `integration-device-${token.slice(-24)}`,
-  paymentMethod: 'direct' | 'cash' | 'transfer' = 'direct',
+  paymentMethod: 'direct' | 'cash' | 'transfer' = 'cash',
   legalAcceptance?: InitialLegalAcceptance,
 ): Promise<ApiResult<RideOrder>> {
   const quote = await api<{ quoteToken: string }>('/v1/quotes', {
@@ -390,7 +390,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       'economy',
       `integration-consent-${randomUUID()}`,
       `integration-consent-device-${randomUUID()}`,
-      'direct',
+      'cash',
       currentInitialLegalAcceptance(),
     );
     expect(accepted.status, JSON.stringify(accepted.error)).toBe(201);
@@ -406,6 +406,18 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       method: 'POST',
       token: outsiderToken,
     });
+  });
+
+  it('accepts only cash or transfer for new orders', async () => {
+    const rejected = await createOrder(
+      passengerToken,
+      'economy',
+      `integration-direct-payment-${randomUUID()}`,
+      `integration-direct-payment-device-${randomUUID()}`,
+      'direct',
+    );
+    expect(rejected.status).toBe(400);
+    expect(rejected.error?.code).toBe('VALIDATION_ERROR');
   });
 
   it('lists account details and enforces reasoned account blocks', async () => {
@@ -769,7 +781,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       'economy',
       `integration-identity-${randomUUID()}`,
       sharedDevice,
-      'direct',
+      'cash',
     );
     const available = await api<RideOrder[]>('/v1/driver/orders/available', {
       token: driverOneToken,
@@ -823,7 +835,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       'subnet',
     ]);
     expect(order.status).toBe(201);
-    expect(order.data?.paymentMethod).toBe('direct');
+    expect(order.data?.paymentMethod).toBe('cash');
     expect(
       available.data?.find((ride) => ride.id === order.data?.id)?.passenger?.phone,
     ).toBeUndefined();
