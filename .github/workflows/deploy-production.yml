@@ -232,8 +232,10 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk" | grep -q 'Такси Грахово'
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live" | grep -q '"status":"ok"'
+          vk_page="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk")"
+          grep -q 'Такси Грахово' <<<"$vk_page"
+          health_response="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live")"
+          test "$(jq -r '.data.status' <<<"$health_response")" = "ok"
           vk_mini_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
             -H 'Content-Type: application/json' \
             --data-binary '{"launchParams":"probe"}' \

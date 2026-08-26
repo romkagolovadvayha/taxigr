@@ -68,6 +68,19 @@ try {
     );
     console.log(`Applied database migration: ${migrationFile}`);
   }
+
+  const superadminPhones = [...config.superadminPhones];
+  if (superadminPhones.length > 0) {
+    const placeholders = superadminPhones.map(() => '?').join(', ');
+    const [result] = await connection.execute<mysql.ResultSetHeader>(
+      `INSERT IGNORE INTO user_roles (user_id, role)
+       SELECT id, 'admin' FROM users
+       WHERE phone IN (${placeholders}) AND deleted_at IS NULL`,
+      superadminPhones,
+    );
+    console.log(`Synchronized configured superadmins (${result.affectedRows} added).`);
+  }
+
   console.log(`Database migrations completed (${migrationFiles.length} known).`);
 } finally {
   await connection.query("SELECT RELEASE_LOCK('taxi_grahovo_schema_migrations')").catch(() => undefined);
