@@ -320,6 +320,38 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
     }
   };
 
+  const clearOrderBlock = async () => {
+    if (!detail || detail.kind !== 'passenger' || (!demo && !token)) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      if (!demo) {
+        await apiRequest(`/v1/admin/passengers/${detail.user.id}/order-block`, {
+          method: 'DELETE',
+          token: token ?? undefined,
+        });
+        await load();
+      } else {
+        setDetail((current) =>
+          current?.kind === 'passenger'
+            ? {
+                ...current,
+                user: {
+                  ...current.user,
+                  orderBlockedUntil: undefined,
+                  orderBlockReason: undefined,
+                },
+              }
+            : current,
+        );
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось снять ограничение');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteRating = async () => {
     if (!selectedRating || (!demo && !token)) return;
     setBusy(true);
@@ -395,6 +427,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
   }
 
   const blocked = !!detail.user.blockedAt;
+  const orderBlocked = !!detail.user.orderBlockedUntil;
   const status = blocked
     ? { label: 'Заблокирован', tone: 'danger' as const }
     : detail.kind === 'driver'
@@ -484,6 +517,41 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
             </AppButton>
           </View>
         </SurfaceCard>
+
+        {detail.kind === 'passenger' && orderBlocked && (
+          <SurfaceCard
+            style={{
+              backgroundColor: colors.warningSoft,
+              borderColor: colors.warning,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: isDesktop ? 'row' : 'column',
+                alignItems: isDesktop ? 'center' : 'stretch',
+                gap: spacing.x4,
+              }}
+            >
+              <View style={{ flex: 1, gap: spacing.x1 }}>
+                <Text style={{ ...typography.sectionTitle, color: colors.warningText }}>
+                  Заказы временно заблокированы
+                </Text>
+                <Text style={{ ...typography.body, color: colors.inkSecondary }}>
+                  {detail.user.orderBlockReason ?? 'Частые отмены заказов'} · до{' '}
+                  {formatDateTime(detail.user.orderBlockedUntil!)}
+                </Text>
+              </View>
+              <AppButton
+                fullWidth={!isDesktop}
+                loading={busy}
+                icon={<AppIcon name="check" color={colors.brandInk} />}
+                onPress={() => void clearOrderBlock()}
+              >
+                Разблокировать заказы
+              </AppButton>
+            </View>
+          </SurfaceCard>
+        )}
 
         <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
           {sectionTabs.map(([value, label]) => {

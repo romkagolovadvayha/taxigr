@@ -476,6 +476,31 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
     expect(unblocked.status).toBe(200);
     expect((await api('/v1/orders?scope=passenger', { token: passengerToken })).status).toBe(200);
+
+    await connection.execute(
+      `UPDATE users
+       SET order_blocked_until = TIMESTAMPADD(HOUR, 24, UTC_TIMESTAMP(3)),
+         order_block_reason = 'Частые отмены'
+       WHERE id = ?`,
+      [fixture.passengerId],
+    );
+    const temporarilyBlocked = await api<AdminPassengerDetail>(
+      `/v1/admin/passengers/${fixture.passengerId}`,
+      { token: adminToken },
+    );
+    expect(temporarilyBlocked.status).toBe(200);
+    expect(temporarilyBlocked.data?.user.orderBlockedUntil).toBeTruthy();
+    const orderUnblocked = await api(
+      `/v1/admin/passengers/${fixture.passengerId}/order-block`,
+      { method: 'DELETE', token: adminToken },
+    );
+    expect(orderUnblocked.status).toBe(200);
+    const [orderBlockRows] = await connection.query<mysql.RowDataPacket[]>(
+      'SELECT order_blocked_until, order_block_reason FROM users WHERE id = ?',
+      [fixture.passengerId],
+    );
+    expect(orderBlockRows[0]?.order_blocked_until).toBeNull();
+    expect(orderBlockRows[0]?.order_block_reason).toBeNull();
   });
 
   it('updates profile and avatar', async () => {
@@ -1878,6 +1903,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         originalTariffs.searchPriceIncreaseIntervalMinutes,
       searchPriceIncreaseStepMinor: originalTariffs.searchPriceIncreaseStepMinor,
       serviceCommissionBps: 900,
+      passengerCancellationLimit: 4,
+      passengerCancellationWindowHours: 48,
+      passengerCancellationBlockHours: 12,
     };
     expect(
       (
@@ -1892,6 +1920,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       token: adminToken,
     });
     expect(readBack.data?.serviceCommissionBps).toBe(900);
+    expect(readBack.data?.passengerCancellationLimit).toBe(4);
+    expect(readBack.data?.passengerCancellationWindowHours).toBe(48);
+    expect(readBack.data?.passengerCancellationBlockHours).toBe(12);
     expect((await api('/v1/admin/metrics', { token: adminToken })).status).toBe(200);
     expect((await api('/v1/admin/drivers', { token: adminToken })).status).toBe(200);
     expect((await api('/v1/orders', { token: adminToken })).status).toBe(200);

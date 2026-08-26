@@ -22,7 +22,10 @@ type EditableKey =
   | 'waitingFreeMinutes'
   | 'waitingPerMinuteMinor'
   | 'searchPriceIncreaseIntervalMinutes'
-  | 'searchPriceIncreaseStepMinor';
+  | 'searchPriceIncreaseStepMinor'
+  | 'passengerCancellationLimit'
+  | 'passengerCancellationWindowHours'
+  | 'passengerCancellationBlockHours';
 
 export function AdminSettingsScreen() {
   const { token, signOut } = useSession();
@@ -119,9 +122,9 @@ export function AdminSettingsScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View>
-        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Тарифы и комиссия</Text>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Настройки сервиса</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-          Новые значения применяются только к новым расчётам. Каждое изменение записывается в журнал аудита.
+          Изменения тарифов и правил применяются к новым заказам. Каждое изменение записывается в журнал аудита.
         </Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
@@ -137,6 +140,40 @@ export function AdminSettingsScreen() {
         </View>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           Для конкретного водителя можно установить персональную комиссию в его карточке.
+        </Text>
+      </SurfaceCard>
+      <SurfaceCard>
+        <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Защита от частых отмен
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
+          {field(
+            'Блокировать после',
+            String(rules.passengerCancellationLimit),
+            (value) => changeInteger('passengerCancellationLimit', value),
+            'отмен',
+            'Число отмен для блокировки',
+          )}
+          {field(
+            'Считать отмены за',
+            String(rules.passengerCancellationWindowHours),
+            (value) => changeInteger('passengerCancellationWindowHours', value),
+            'ч',
+            'Окно подсчёта отмен в часах',
+          )}
+          {field(
+            'Блокировать на',
+            String(rules.passengerCancellationBlockHours),
+            (value) => changeInteger('passengerCancellationBlockHours', value),
+            'ч',
+            'Срок блокировки заказов в часах',
+          )}
+        </View>
+        <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
+          Сейчас: после {rules.passengerCancellationLimit} отмен за{' '}
+          {rules.passengerCancellationWindowHours} часов заказы блокируются на{' '}
+          {rules.passengerCancellationBlockHours} часов. Администратор может снять ограничение в
+          карточке пассажира.
         </Text>
       </SurfaceCard>
       <SurfaceCard>

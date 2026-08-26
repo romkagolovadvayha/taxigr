@@ -19,6 +19,9 @@ export type PricingRules = {
   searchPriceIncreaseIntervalMinutes: number;
   searchPriceIncreaseStepMinor: number;
   serviceCommissionBps: number;
+  passengerCancellationLimit: number;
+  passengerCancellationWindowHours: number;
+  passengerCancellationBlockHours: number;
 };
 
 export const defaultPricingRules: PricingRules = {
@@ -36,6 +39,9 @@ export const defaultPricingRules: PricingRules = {
   searchPriceIncreaseIntervalMinutes: 4,
   searchPriceIncreaseStepMinor: 3_000,
   serviceCommissionBps: 1_200,
+  passengerCancellationLimit: 3,
+  passengerCancellationWindowHours: 24,
+  passengerCancellationBlockHours: 24,
 };
 
 const grahovoPattern = /(?:^|[\s,])(?:село|с\.)?\s*грахово(?:[\s,]|$)/iu;

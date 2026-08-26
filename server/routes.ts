@@ -14,7 +14,6 @@ import {
   type PricingScope,
 } from '../src/domain/pricing';
 import { hasHouseNumber } from '../src/domain/address-precision';
-import { passengerCancellationPolicy } from '../src/domain/abuse-policy';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
   liveLocationUpdateDelay,
@@ -495,6 +494,9 @@ type PricingRow = RowDataPacket & {
   search_price_increase_interval_minutes: number;
   search_price_increase_step_minor: number;
   service_commission_bps: number;
+  passenger_cancellation_limit: number;
+  passenger_cancellation_window_hours: number;
+  passenger_cancellation_block_hours: number;
 };
 
 async function pricingRules(connection?: PoolConnection): Promise<PricingRules> {
@@ -517,6 +519,9 @@ async function pricingRules(connection?: PoolConnection): Promise<PricingRules> 
     searchPriceIncreaseIntervalMinutes: row.search_price_increase_interval_minutes,
     searchPriceIncreaseStepMinor: row.search_price_increase_step_minor,
     serviceCommissionBps: row.service_commission_bps,
+    passengerCancellationLimit: row.passenger_cancellation_limit,
+    passengerCancellationWindowHours: row.passenger_cancellation_window_hours,
+    passengerCancellationBlockHours: row.passenger_cancellation_block_hours,
   };
 }
 
@@ -774,7 +779,6 @@ async function loadAdminAccountProfile(userId: string) {
       name: string;
       gender: 'male' | 'female' | null;
       phone: string | null;
-      email: string | null;
       avatar_url: string | null;
       avatar_mime: string | null;
       profile_completed_at: Date | string | null;
@@ -787,7 +791,7 @@ async function loadAdminAccountProfile(userId: string) {
       order_block_reason: string | null;
     }
   >(
-    `SELECT u.id, u.name, u.gender, u.phone, u.email, u.avatar_url, u.avatar_mime,
+    `SELECT u.id, u.name, u.gender, u.phone, u.avatar_url, u.avatar_mime,
       u.profile_completed_at, u.created_at, u.updated_at, u.blocked_at, u.block_reason,
       blocker.name AS blocked_by_name, u.order_blocked_until, u.order_block_reason
      FROM users u
@@ -808,7 +812,6 @@ async function loadAdminAccountProfile(userId: string) {
     name: user.name,
     gender: user.gender ?? undefined,
     phone: user.phone ?? undefined,
-    email: user.email ?? undefined,
     avatarUrl,
     profileComplete: Boolean(user.profile_completed_at),
     roles: roles.map((row) => row.role),
@@ -817,10 +820,14 @@ async function loadAdminAccountProfile(userId: string) {
     blockedAt: user.blocked_at ? new Date(user.blocked_at).toISOString() : undefined,
     blockReason: user.block_reason ?? undefined,
     blockedByName: user.blocked_by_name ?? undefined,
-    orderBlockedUntil: user.order_blocked_until
-      ? new Date(user.order_blocked_until).toISOString()
-      : undefined,
-    orderBlockReason: user.order_block_reason ?? undefined,
+    orderBlockedUntil:
+      user.order_blocked_until && new Date(user.order_blocked_until).getTime() > Date.now()
+        ? new Date(user.order_blocked_until).toISOString()
+        : undefined,
+    orderBlockReason:
+      user.order_blocked_until && new Date(user.order_blocked_until).getTime() > Date.now()
+        ? user.order_block_reason ?? undefined
+        : undefined,
   };
 }
 
@@ -3442,7 +3449,9 @@ export async function registerRoutes(
       );
 
       let passengerBlocked = false;
+      let passengerBlockHours: number | null = null;
       if (row.passenger_id === session.id) {
+        const cancellationPolicy = await pricingRules(connection);
         const [countRows] = await connection.query<
           (RowDataPacket & { cancellation_count: number })[]
         >(
@@ -3458,22 +3467,23 @@ export async function registerRoutes(
           [
             session.id,
             session.id,
-            passengerCancellationPolicy.windowHours,
+            cancellationPolicy.passengerCancellationWindowHours,
           ],
         );
         if (
           Number(countRows[0]?.cancellation_count ?? 0) >=
-          passengerCancellationPolicy.limit
+          cancellationPolicy.passengerCancellationLimit
         ) {
           passengerBlocked = true;
+          passengerBlockHours = cancellationPolicy.passengerCancellationBlockHours;
           await connection.execute(
             `UPDATE users
              SET order_blocked_until = TIMESTAMPADD(HOUR, ?, UTC_TIMESTAMP(3)),
                order_block_reason = ?
              WHERE id = ?`,
             [
-              passengerCancellationPolicy.blockHours,
-              `Частые отмены: ${passengerCancellationPolicy.limit} за ${passengerCancellationPolicy.windowHours} ч.`,
+              cancellationPolicy.passengerCancellationBlockHours,
+              `Частые отмены: ${cancellationPolicy.passengerCancellationLimit} за ${cancellationPolicy.passengerCancellationWindowHours} ч.`,
               session.id,
             ],
           );
@@ -3486,6 +3496,7 @@ export async function registerRoutes(
         fromStatus: row.status,
         initiatedBy: row.passenger_id === session.id ? 'passenger' as const : 'admin' as const,
         passengerBlocked,
+        passengerBlockHours,
       };
     });
     const updated = await getOrder(id);
@@ -3537,7 +3548,7 @@ export async function registerRoutes(
         details: [
           ['Статус до отмены', rideStatusLabels[participants.fromStatus]],
           ['Ограничение', participants.passengerBlocked
-            ? `${passengerCancellationPolicy.blockHours} ч. из-за частых отмен`
+            ? `${participants.passengerBlockHours} ч. из-за частых отмен`
             : null],
         ],
       })),
@@ -5443,6 +5454,51 @@ export async function registerRoutes(
     return { data: { id, ...after } };
   });
 
+  app.delete('/v1/admin/passengers/:id/order-block', async (request) => {
+    const session = await auth(request, 'admin');
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const before = await firstRow<
+      RowDataPacket & {
+        order_blocked_until: Date | string | null;
+        order_block_reason: string | null;
+        is_passenger: number;
+      }
+    >(
+      `SELECT u.order_blocked_until, u.order_block_reason,
+        EXISTS(
+          SELECT 1 FROM user_roles role
+          WHERE role.user_id = u.id AND role.role = 'passenger'
+        ) AS is_passenger
+       FROM users u
+       WHERE u.id = ? AND u.deleted_at IS NULL`,
+      [id],
+    );
+    if (!before || !before.is_passenger) {
+      throw Object.assign(new Error('Пассажир не найден'), {
+        statusCode: 404,
+        code: 'PASSENGER_NOT_FOUND',
+      });
+    }
+    await db.execute(
+      `UPDATE users
+       SET order_blocked_until = NULL, order_block_reason = NULL
+       WHERE id = ?`,
+      [id],
+    );
+    const after = { orderBlockedUntil: null, orderBlockReason: null };
+    await audit(
+      session.id,
+      'passenger.order-unblock',
+      'user',
+      id,
+      before,
+      after,
+      request.ip,
+    );
+    publish(`user:${id}`, 'account:order-access-changed', after);
+    return { data: { id, ...after } };
+  });
+
   app.delete('/v1/admin/ratings/:id', async (request) => {
     const session = await auth(request, 'admin');
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
@@ -5526,6 +5582,9 @@ export async function registerRoutes(
         searchPriceIncreaseIntervalMinutes: z.number().int().min(1).max(120),
         searchPriceIncreaseStepMinor: z.number().int().min(100).max(1_000_000),
         serviceCommissionBps: z.number().int().min(0).max(5000),
+        passengerCancellationLimit: z.number().int().min(1).max(20),
+        passengerCancellationWindowHours: z.number().int().min(1).max(720),
+        passengerCancellationBlockHours: z.number().int().min(1).max(720),
       }),
       request.body,
     );
@@ -5540,6 +5599,8 @@ export async function registerRoutes(
        child_surcharge_minor = ?, waiting_free_minutes = ?,
        waiting_per_minute_minor = ?, search_price_increase_interval_minutes = ?,
        search_price_increase_step_minor = ?, service_commission_bps = ?,
+       passenger_cancellation_limit = ?, passenger_cancellation_window_hours = ?,
+       passenger_cancellation_block_hours = ?,
        updated_by = ? WHERE id = 1`,
       [
         input.grahovoFare07To22Minor,
@@ -5555,6 +5616,9 @@ export async function registerRoutes(
         input.searchPriceIncreaseIntervalMinutes,
         input.searchPriceIncreaseStepMinor,
         input.serviceCommissionBps,
+        input.passengerCancellationLimit,
+        input.passengerCancellationWindowHours,
+        input.passengerCancellationBlockHours,
         session.id,
       ],
     );
