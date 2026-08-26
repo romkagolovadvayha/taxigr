@@ -84,8 +84,15 @@ export function verifyVkMiniAppPhone(input: {
   sign: string;
 }): boolean {
   if (!input.phoneNumber || !input.sign || input.sign.length > 256) return false;
-  const expected = createHash('sha256')
+  const digest = createHash('sha256')
     .update(`${input.appId}${input.secret}${input.userId}phone_number${input.phoneNumber}`)
-    .digest('hex');
-  return constantTimeEqual(expected, input.sign.toLowerCase());
+    .digest();
+  const expectedSigns = [
+    digest.toString('hex'),
+    digest.toString('hex').toUpperCase(),
+    digest.toString('base64'),
+    digest.toString('base64').replace(/=+$/u, ''),
+    digest.toString('base64url'),
+  ];
+  return expectedSigns.some((expected) => constantTimeEqual(expected, input.sign));
 }

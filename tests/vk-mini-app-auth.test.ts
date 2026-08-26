@@ -86,9 +86,10 @@ describe('VK Mini Apps authentication', () => {
 
   it('validates the VK-signed phone for the same app and user', () => {
     const phoneNumber = '79998887766';
-    const sign = createHash('sha256')
+    const digest = createHash('sha256')
       .update(`${appId}${secret}1234567phone_number${phoneNumber}`)
-      .digest('hex');
+      .digest();
+    const sign = digest.toString('hex');
     expect(verifyVkMiniAppPhone({
       appId,
       secret,
@@ -96,6 +97,19 @@ describe('VK Mini Apps authentication', () => {
       phoneNumber,
       sign,
     })).toBe(true);
+    for (const encodedSign of [
+      digest.toString('base64'),
+      digest.toString('base64').replace(/=+$/u, ''),
+      digest.toString('base64url'),
+    ]) {
+      expect(verifyVkMiniAppPhone({
+        appId,
+        secret,
+        userId: '1234567',
+        phoneNumber,
+        sign: encodedSign,
+      })).toBe(true);
+    }
     expect(verifyVkMiniAppPhone({
       appId,
       secret,
