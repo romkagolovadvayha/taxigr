@@ -863,8 +863,8 @@ async function loadAdminAccountData(
       COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.price_minor ELSE 0 END), 0) AS grossMinor
      FROM orders o
      WHERE ${orderFilter} AND o.created_at >= DATE_SUB(UTC_DATE(), INTERVAL 29 DAY)
-     GROUP BY DATE(o.created_at)
-     ORDER BY DATE(o.created_at)`,
+     GROUP BY DATE_FORMAT(o.created_at, '%Y-%m-%d')
+     ORDER BY DATE_FORMAT(o.created_at, '%Y-%m-%d')`,
     [orderIdentity],
   );
   const [orderRows] = await db.query<OrderRow[]>(
