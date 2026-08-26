@@ -214,6 +214,7 @@ export function AdminAccountsList({ kind, title, subtitle, items, loading, error
                   padding: spacing.x4,
                   flexDirection: 'row',
                   alignItems: 'center',
+                  alignContent: 'center',
                   flexWrap: 'wrap',
                   gap: spacing.x4,
                   borderTopWidth: index ? 1 : 0,

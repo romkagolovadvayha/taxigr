@@ -440,59 +440,114 @@ export function PlacesScreen() {
             <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
               {placeCategoryLabels[group.category]} · {group.places.length}
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x3 }}>
-              {group.places.map((place) => {
+            <View
+              style={{
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.card,
+                backgroundColor: colors.surface,
+              }}
+            >
+              {group.places.map((place, placeIndex) => {
                 const status = getPlaceOpenStatus(place.schedule, now);
                 return (
-                  <SurfaceCard key={place.id} style={{ flexGrow: 1, flexBasis: 340, maxWidth: 680, minWidth: 280 }}>
-                    <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
-                      {place.photoUrls[0] ? (
-                        <Image
-                          source={{ uri: place.photoUrls[0] }}
-                          contentFit="cover"
-                          accessibilityLabel={`Фото: ${place.name}`}
-                          style={{ width: 72, height: 72, borderRadius: radius.lg, backgroundColor: colors.surfaceSecondary }}
-                        />
-                      ) : (
-                        <View style={{ width: 72, height: 72, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSecondary }}>
-                          <AppIcon name="location" color={colors.inkSecondary} />
-                        </View>
-                      )}
-                      <View style={{ flex: 1, minWidth: 0, gap: spacing.x2 }}>
-                        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{place.name}</Text>
-                        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{place.addressLabel}</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
-                          <StatusChip
-                            label={status.label}
-                            tone={status.kind === 'open' ? 'success' : status.kind === 'closed' ? 'neutral' : 'warning'}
-                          />
-                          {!place.active && <StatusChip label="Скрыто из поиска" tone="danger" />}
-                        </View>
+                  <View
+                    key={place.id}
+                    style={{
+                      minHeight: 76,
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      alignContent: 'center',
+                      gap: spacing.x3,
+                      paddingHorizontal: spacing.x3,
+                      paddingVertical: spacing.x2,
+                      borderTopWidth: placeIndex ? 1 : 0,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    {place.photoUrls[0] ? (
+                      <Image
+                        source={{ uri: place.photoUrls[0] }}
+                        contentFit="cover"
+                        accessibilityLabel={`Фото: ${place.name}`}
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: radius.md,
+                          backgroundColor: colors.surfaceSecondary,
+                        }}
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: radius.md,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: colors.surfaceSecondary,
+                        }}
+                      >
+                        <AppIcon name="location" color={colors.inkSecondary} />
                       </View>
-                    </View>
-                    {!!place.description && <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>{place.description}</Text>}
-                    {!!place.phone && <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Телефон: {place.phone}</Text>}
-                    {!!place.sourceName && (
-                      <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
-                        Источник: {place.sourceName}{place.sourceCheckedAt ? ` · проверено ${place.sourceCheckedAt.slice(0, 10)}` : ''}
-                      </Text>
                     )}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
-                      <AppButton fullWidth={false} variant="secondary" style={{ minWidth: 130, minHeight: 46 }} onPress={() => openEdit(place)}>
+                    <View style={{ flex: 1, minWidth: 220, gap: spacing.x1 }}>
+                      <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>
+                        {place.name}
+                      </Text>
+                      <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
+                        {place.addressLabel}
+                        {place.phone ? ` · ${place.phone}` : ''}
+                      </Text>
+                      {(place.description || place.sourceName) && (
+                        <Text selectable numberOfLines={1} style={{ ...typography.micro, color: colors.inkMuted }}>
+                          {place.description || `Источник: ${place.sourceName}`}
+                        </Text>
+                      )}
+                    </View>
+                    <View
+                      style={{
+                        minWidth: 150,
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        alignContent: 'center',
+                        gap: spacing.x2,
+                      }}
+                    >
+                      <StatusChip
+                        label={status.label}
+                        tone={status.kind === 'open' ? 'success' : status.kind === 'closed' ? 'neutral' : 'warning'}
+                      />
+                      {!place.active && <StatusChip label="Скрыто" tone="danger" />}
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        alignContent: 'center',
+                        justifyContent: 'flex-end',
+                        gap: spacing.x2,
+                      }}
+                    >
+                      <AppButton fullWidth={false} variant="secondary" style={{ minWidth: 104, minHeight: 40 }} onPress={() => openEdit(place)}>
                         Изменить
                       </AppButton>
                       {!!place.website && (
-                        <AppButton fullWidth={false} variant="quiet" style={{ minWidth: 110, minHeight: 46 }} onPress={() => void Linking.openURL(place.website!)}>
+                        <AppButton fullWidth={false} variant="quiet" style={{ minWidth: 78, minHeight: 40 }} onPress={() => void Linking.openURL(place.website!)}>
                           Сайт
                         </AppButton>
                       )}
                       {place.active && (
-                        <AppButton fullWidth={false} variant="danger" style={{ minWidth: 110, minHeight: 46 }} onPress={() => setDeleting(place)}>
+                        <AppButton fullWidth={false} variant="danger" style={{ minWidth: 82, minHeight: 40 }} onPress={() => setDeleting(place)}>
                           Скрыть
                         </AppButton>
                       )}
                     </View>
-                  </SurfaceCard>
+                  </View>
                 );
               })}
             </View>

@@ -65,9 +65,11 @@ export function AdminOrdersScreen() {
               minHeight: 76,
               flexDirection: 'row',
               alignItems: 'center',
+              alignContent: 'center',
               flexWrap: 'wrap',
               gap: spacing.x4,
               paddingHorizontal: spacing.x4,
+              paddingVertical: spacing.x3,
               borderTopWidth: index ? 1 : 0,
               borderColor: colors.border,
             }}
