@@ -219,6 +219,7 @@ const createOrderSchema = quoteSchema.extend({
   comment: z.string().trim().max(500).optional(),
   idempotencyKey: z.string().min(12).max(128),
   deviceId: z.string().min(16).max(128),
+  legalAcceptance: initialLegalAcceptanceSchema.optional(),
 });
 const requestPhoneCodeSchema = z.object({
   phone: z.string().trim().min(10).max(32),
@@ -254,7 +255,6 @@ const vkMiniAppAuthSchema = z.object({
     lastName: z.string().trim().max(80).nullable().optional(),
     avatarUrl: z.string().url().max(2_000).nullable().optional(),
   }),
-  legalAcceptance: initialLegalAcceptanceSchema,
 });
 const vkMiniAppSessionSchema = z.object({
   launchParams: z.string().min(1).max(8_192),
@@ -1224,11 +1224,11 @@ export async function registerRoutes(
           lastName: input.profile.lastName,
           botContactAvailable: messagesAllowed,
         });
-        await recordInitialConsents(connection, id, input.legalAcceptance, {
-          source: 'phone_auth',
-          ip: request.ip,
-          userAgent: request.headers['user-agent'],
-        });
+        await connection.execute(
+          `UPDATE users SET profile_completed_at = COALESCE(profile_completed_at, UTC_TIMESTAMP(3))
+           WHERE id = ? AND TRIM(name) <> ''`,
+          [id],
+        );
         return id;
       });
 
@@ -1246,6 +1246,8 @@ export async function registerRoutes(
         data: {
           token: await signSession({ id: user.id, roles: user.roles }),
           user,
+          legalConsentRequired: !(await withTransaction((connection) =>
+            hasCurrentInitialConsents(connection, user.id))),
           messagesAllowed,
           communityId: Number(config.VK_COMMUNITY_ID),
         },
@@ -2559,19 +2561,13 @@ export async function registerRoutes(
         code: 'USER_NOT_FOUND',
       });
     }
-    if (
-      !user.blockedAt &&
-      !(await withTransaction((connection) => hasCurrentInitialConsents(connection, session.id)))
-    ) {
-      throw Object.assign(new Error('Примите актуальные правила и согласие на обработку данных'), {
-        statusCode: 403,
-        code: 'LEGAL_CONSENT_REQUIRED',
-      });
-    }
+    const legalConsentRequired = !user.blockedAt &&
+      !(await withTransaction((connection) => hasCurrentInitialConsents(connection, session.id)));
     return {
       data: {
         token: await signSession({ id: user.id, roles: user.roles }),
         user,
+        legalConsentRequired,
       },
     };
   });
@@ -2881,7 +2877,20 @@ export async function registerRoutes(
           code: 'ACTIVE_ORDER_EXISTS',
         });
       }
-       const rules = await pricingRules(connection);
+      if (!(await hasCurrentInitialConsents(connection, session.id))) {
+        if (!input.legalAcceptance) {
+          throw Object.assign(new Error('Примите условия сервиса перед первым заказом'), {
+            statusCode: 403,
+            code: 'LEGAL_CONSENT_REQUIRED',
+          });
+        }
+        await recordInitialConsents(connection, session.id, input.legalAcceptance, {
+          source: 'order_confirmation',
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
+      }
+      const rules = await pricingRules(connection);
       const commission = calculateCommissionMinor(price, rules.serviceCommissionBps);
       await connection.execute(
         `INSERT INTO orders (

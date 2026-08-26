@@ -33,7 +33,7 @@ export const driverLegalAcceptanceSchema = z.object({
 });
 
 type ConsentMeta = {
-  source: 'phone_auth' | 'driver_application';
+  source: 'phone_auth' | 'order_confirmation' | 'driver_application';
   ip?: string;
   userAgent?: string;
 };

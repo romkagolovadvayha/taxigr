@@ -11,6 +11,7 @@ import {
   type DestinationHistoryItem,
 } from '@/domain/address-history';
 import { hasHouseNumber } from '@/domain/address-precision';
+import type { InitialLegalAcceptance } from '@/legal/documents';
 import { buildDemoDriverOffer, buildDemoRoute, placeDemoDriverNearPickup } from '@/domain/demo-flow';
 import type {
   Address,
@@ -59,7 +60,10 @@ type RideContextValue = {
   setDestination: (address: Address) => void;
   setSelectedTariff: (tariff: TariffCode) => void;
   setSelectedPaymentMethod: (method: PaymentMethod) => void;
-  createRide: (comment?: string) => Promise<RideOrder | null>;
+  createRide: (
+    comment?: string,
+    legalAcceptance?: InitialLegalAcceptance,
+  ) => Promise<RideOrder | null>;
   createDriverOffer: () => Promise<RideOrder | null>;
   confirmSearchPriceIncrease: () => Promise<void>;
   transitionRide: (status: RideStatus) => Promise<void>;
@@ -100,7 +104,7 @@ function idempotencyKey(): string {
 }
 
 export function RideProvider({ children }: { children: ReactNode }) {
-  const { token, user, refreshSession } = useSession();
+  const { token, user, refreshSession, markInitialLegalConsentAccepted } = useSession();
   const demoSession = token?.startsWith('demo:') ?? false;
   const userId = user?.id;
   const isDriver = user?.roles.includes('driver') ?? false;
@@ -450,7 +454,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   }, [applyDriverOrder, demoSession, isDriver]);
 
   const createRide = useCallback(
-    async (comment?: string) => {
+    async (comment?: string, legalAcceptance?: InitialLegalAcceptance) => {
       if (!pickup || !destination || !hasHouseNumber(pickup) || !hasHouseNumber(destination)) {
         setError('Укажите номер дома для места подачи и назначения');
         return null;
@@ -529,11 +533,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
             comment,
             idempotencyKey: creationAttempt.key,
             deviceId,
+            legalAcceptance,
           }),
           timeoutMs: 20_000,
         });
         pendingOrderCreation.current = null;
         applyPassengerOrder(ride);
+        if (legalAcceptance) markInitialLegalConsentAccepted();
         return ride;
       } catch (reason) {
         const uncertainFailure =
@@ -577,6 +583,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       applyPassengerOrder,
       demoSession,
       destination,
+      markInitialLegalConsentAccepted,
       pickup,
       quoteStatus,
       quoteToken,

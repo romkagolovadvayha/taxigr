@@ -15,6 +15,7 @@ import {
   currentDriverLegalAcceptance,
   currentInitialLegalAcceptance,
   legalDocuments,
+  type InitialLegalAcceptance,
 } from '../src/legal/documents';
 import { signSession } from '../server/security';
 import { buildAuthIdentity, consumeAuthRateLimits } from '../server/auth-abuse';
@@ -106,6 +107,7 @@ async function createOrder(
   key = `integration-${randomUUID()}`,
   deviceId = `integration-device-${token.slice(-24)}`,
   paymentMethod: 'direct' | 'cash' | 'transfer' = 'direct',
+  legalAcceptance?: InitialLegalAcceptance,
 ): Promise<ApiResult<RideOrder>> {
   const quote = await api<{ quoteToken: string }>('/v1/quotes', {
     method: 'POST',
@@ -124,6 +126,7 @@ async function createOrder(
       paymentMethod,
       idempotencyKey: key,
       deviceId,
+      legalAcceptance,
     },
   });
 }
@@ -363,6 +366,46 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect((await api('/v1/quotes', { token: driverOneToken, method: 'POST', body: {} })).status).toBe(
       400,
     );
+  });
+
+  it('defers legal consent until the first order and enforces it server-side', async () => {
+    await connection.execute(
+      'UPDATE user_consents SET revoked_at = UTC_TIMESTAMP(3) WHERE user_id = ?',
+      [fixture.outsiderId],
+    );
+
+    const before = await api<{ legalConsentRequired: boolean }>('/v1/auth/refresh', {
+      method: 'POST',
+      token: outsiderToken,
+    });
+    expect(before.status).toBe(200);
+    expect(before.data?.legalConsentRequired).toBe(true);
+
+    const denied = await createOrder(outsiderToken);
+    expect(denied.status).toBe(403);
+    expect(denied.error?.code).toBe('LEGAL_CONSENT_REQUIRED');
+
+    const accepted = await createOrder(
+      outsiderToken,
+      'economy',
+      `integration-consent-${randomUUID()}`,
+      `integration-consent-device-${randomUUID()}`,
+      'direct',
+      currentInitialLegalAcceptance(),
+    );
+    expect(accepted.status, JSON.stringify(accepted.error)).toBe(201);
+
+    const after = await api<{ legalConsentRequired: boolean }>('/v1/auth/refresh', {
+      method: 'POST',
+      token: outsiderToken,
+    });
+    expect(after.status).toBe(200);
+    expect(after.data?.legalConsentRequired).toBe(false);
+
+    await api(`/v1/orders/${accepted.data!.id}/cancel`, {
+      method: 'POST',
+      token: outsiderToken,
+    });
   });
 
   it('lists account details and enforces reasoned account blocks', async () => {

@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
 
 import { AddressFields } from '@/components/passenger/address-fields';
+import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
@@ -12,6 +14,8 @@ import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useRide } from '@/state/ride-provider';
 import { hasHouseNumber } from '@/domain/address-precision';
+import { useSession } from '@/auth/session-provider';
+import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -30,7 +34,10 @@ export function OrderConfirmationScreen() {
     error,
   } = useRide();
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
+  const { initialLegalConsentRequired } = useSession();
   const [comment, setComment] = useState('');
+  const [consentVisible, setConsentVisible] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
   const addressesArePrecise = hasHouseNumber(pickup) && hasHouseNumber(destination);
   const routeReady = addressesArePrecise && quoteStatus === 'ready';
@@ -53,8 +60,23 @@ export function OrderConfirmationScreen() {
 
   const confirm = async () => {
     if (!canSubmit) return;
+    if (initialLegalConsentRequired) {
+      setConsentVisible(true);
+      return;
+    }
     const ride = await createRide(comment.trim() || undefined);
     if (ride) router.replace('/');
+  };
+
+  const acceptAndConfirm = async () => {
+    if (!canSubmit || !legalAccepted) return;
+    const ride = await createRide(
+      comment.trim() || undefined,
+      currentInitialLegalAcceptance(),
+    );
+    if (!ride) return;
+    setConsentVisible(false);
+    router.replace('/');
   };
 
   return (
@@ -230,6 +252,42 @@ export function OrderConfirmationScreen() {
           </>
         )}
       </Screen>
+      <AppModal
+        visible={consentVisible}
+        title="Перед первым заказом"
+        description="Подтвердите условия сервиса и согласие на обработку данных. Повторно спрашивать не будем, пока документы не изменятся."
+        onClose={() => setConsentVisible(false)}
+      >
+        <View style={{ gap: spacing.x3 }}>
+          <ConsentCheckbox
+            checked={legalAccepted}
+            onChange={setLegalAccepted}
+            compactLinks
+            label="Принимаю условия сервиса и даю согласие на обработку данных."
+            links={[
+              { label: 'Условия', href: legalDocuments.terms.path },
+              { label: 'Правила', href: legalDocuments.passengerRules.path },
+              { label: 'Согласие', href: legalDocuments.personalDataConsent.path },
+              { label: 'Политика', href: legalDocuments.privacy.path },
+            ]}
+          />
+          {!!error && (
+            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.danger }}>
+              {error}
+            </Text>
+          )}
+          <AppButton
+            disabled={!legalAccepted || !canSubmit}
+            loading={busy}
+            onPress={() => void acceptAndConfirm()}
+          >
+            Согласен и заказать
+          </AppButton>
+          <AppButton variant="quiet" onPress={() => setConsentVisible(false)}>
+            Отмена
+          </AppButton>
+        </View>
+      </AppModal>
     </KeyboardAvoidingView>
   );
 }

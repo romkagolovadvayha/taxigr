@@ -45,7 +45,6 @@ export type VkMiniAppAuthInput = {
     lastName: string | null;
     avatarUrl: string | null;
   };
-  legalAcceptance: InitialLegalAcceptance;
 };
 
 type MaxAuthStatus =
@@ -70,6 +69,7 @@ type SessionContextValue = {
   authenticating: boolean;
   authError: string | null;
   vkCommunityPromptUrl: string | null;
+  initialLegalConsentRequired: boolean;
   demoMode: boolean;
   startPhoneAuth: (
     phone: string,
@@ -93,6 +93,7 @@ type SessionContextValue = {
   signInWithVkMiniApp: (input: VkMiniAppAuthInput) => Promise<void>;
   verifyVkMiniAppSession: (launchParams: string) => Promise<boolean>;
   resetSessionForEmbeddedAuth: () => Promise<void>;
+  markInitialLegalConsentAccepted: () => void;
   verifyPhoneAuth: (phone: string, code: string) => Promise<void>;
   continueDemo: (
     persona: DemoPersona | undefined,
@@ -144,11 +145,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [authenticating, setAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [vkCommunityPromptUrl, setVkCommunityPromptUrl] = useState<string | null>(null);
+  const [initialLegalConsentRequired, setInitialLegalConsentRequired] = useState(false);
 
-  const applySession = useCallback(async (result: { token: string; user: SessionUser }) => {
+  const applySession = useCallback(async (result: {
+    token: string;
+    user: SessionUser;
+    legalConsentRequired?: boolean;
+  }) => {
     await writeSessionToken(result.token);
     setToken(result.token);
     setUser(result.user);
+    setInitialLegalConsentRequired(Boolean(result.legalConsentRequired));
     setAuthError(null);
   }, []);
 
@@ -165,7 +172,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(demoUser(persona));
         return;
       }
-      const refreshed = await apiRequest<{ token: string; user: SessionUser }>(
+      const refreshed = await apiRequest<{
+        token: string;
+        user: SessionUser;
+        legalConsentRequired: boolean;
+      }>(
         '/v1/auth/refresh',
         { method: 'POST', token: stored },
       );
@@ -400,6 +411,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const result = await apiRequest<{
         token: string;
         user: SessionUser;
+        legalConsentRequired: boolean;
         messagesAllowed: boolean;
         communityId: number;
       }>('/v1/auth/vk-mini', {
@@ -407,7 +419,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ ...input, installationId }),
       });
       await applySession(result);
-      if (!result.user.profileComplete) router.replace('/profile-setup');
     } catch (error) {
       const message = error instanceof ApiError
         ? error.code === 'VK_MINI_APP_UNAUTHORIZED'
@@ -430,6 +441,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthError(null);
     setVkCommunityPromptUrl(null);
+    setInitialLegalConsentRequired(false);
+  }, []);
+
+  const markInitialLegalConsentAccepted = useCallback(() => {
+    setInitialLegalConsentRequired(false);
   }, []);
 
   const verifyVkMiniAppSession = useCallback(async (launchParams: string) => {
@@ -546,12 +562,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthError(null);
     setVkCommunityPromptUrl(null);
+    setInitialLegalConsentRequired(false);
     router.replace('/sign-in');
   }, []);
 
   const refreshSession = useCallback(async () => {
     if (!token || token.startsWith('demo:')) return;
-    const refreshed = await apiRequest<{ token: string; user: SessionUser }>(
+    const refreshed = await apiRequest<{
+      token: string;
+      user: SessionUser;
+      legalConsentRequired: boolean;
+    }>(
       '/v1/auth/refresh',
       { method: 'POST', token },
     );
@@ -578,6 +599,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       authenticating,
       authError,
       vkCommunityPromptUrl,
+      initialLegalConsentRequired,
       demoMode: demoEnabled,
       startPhoneAuth,
       startMaxPhoneAuth,
@@ -589,6 +611,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signInWithVkMiniApp,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,
+      markInitialLegalConsentAccepted,
       verifyPhoneAuth,
       continueDemo,
       updateProfile,
@@ -608,9 +631,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signInWithVkMiniApp,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,
+      markInitialLegalConsentAccepted,
       clearAuthError,
       continueDemo,
       dismissVkCommunityPrompt,
+      initialLegalConsentRequired,
       loading,
       refreshSession,
       removeAvatar,
