@@ -1,5 +1,7 @@
 import bridge from '@vkontakte/vk-bridge';
 
+import { extractSignedVkPhone } from '@/vk-mini-app/phone';
+
 export type VkMiniAppIdentity = {
   launchParams: string;
   phoneNumber: string;
@@ -54,7 +56,8 @@ export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
       bridge.send('VKWebAppGetUserInfo'),
     ]);
     const phone = await bridge.send('VKWebAppGetPhoneNumber');
-    if (!phone.phone_number || !phone.sign || !phone.is_verified) {
+    const signedPhone = extractSignedVkPhone(phone);
+    if (!signedPhone) {
       throw new VkMiniAppBridgeError(
         'Подтвердите передачу номера телефона в окне VK.',
         'PHONE_NOT_SHARED',
@@ -69,8 +72,8 @@ export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
     }
     return {
       launchParams,
-      phoneNumber: phone.phone_number,
-      phoneSign: phone.sign,
+      phoneNumber: signedPhone.phoneNumber,
+      phoneSign: signedPhone.sign,
       phoneVerified: true,
       profile: {
         id: profile.id,
