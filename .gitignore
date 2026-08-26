@@ -38,6 +38,8 @@ tmp/
 .env.local
 .env.production
 google-service-account.json
+credentials.json
+/credentials/
 AuthKey_*.p8
 *.keystore
 *.jks
