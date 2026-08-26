@@ -1,11 +1,27 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { readSessionToken } from '@/storage/auth-storage';
 
 const DRIVER_LOCATION_TASK = 'taxi-grahovo-driver-location';
+
+function confirmBackgroundLocationDisclosure(): Promise<boolean> {
+  if (Platform.OS !== 'android') return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Геолокация водителя',
+      '«Такси Грахово» собирает данные о местоположении, чтобы передавать диспетчеру и пассажиру позицию водителя и поддерживать навигацию, даже когда приложение закрыто или не используется. Данные передаются только пока водитель находится на линии или выполняет поездку.',
+      [
+        { text: 'Не сейчас', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Продолжить', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
 
 TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data) return;
@@ -49,6 +65,10 @@ export async function syncDriverBackgroundLocation(enabled: boolean): Promise<bo
   const foreground = await Location.getForegroundPermissionsAsync();
   if (!foreground.granted) return false;
   const currentBackground = await Location.getBackgroundPermissionsAsync();
+  if (!currentBackground.granted) {
+    const accepted = await confirmBackgroundLocationDisclosure();
+    if (!accepted) return false;
+  }
   const background = currentBackground.granted
     ? currentBackground
     : await Location.requestBackgroundPermissionsAsync();
