@@ -244,9 +244,9 @@ const vkCallbackSchema = z.object({
 });
 const vkMiniAppAuthSchema = z.object({
   launchParams: z.string().min(1).max(8_192),
-  phoneNumber: z.string().trim().min(10).max(32),
-  phoneSign: z.string().min(16).max(256),
-  phoneVerified: z.literal(true),
+  phoneNumber: z.string().trim().min(10).max(32).optional(),
+  phoneSign: z.string().min(16).max(256).optional(),
+  phoneVerified: z.literal(true).optional(),
   messagesPermissionGranted: z.boolean(),
   installationId: z.string().trim().min(16).max(128),
   profile: z.object({
@@ -255,6 +255,17 @@ const vkMiniAppAuthSchema = z.object({
     lastName: z.string().trim().max(80).nullable().optional(),
     avatarUrl: z.string().url().max(2_000).nullable().optional(),
   }),
+}).superRefine((input, context) => {
+  const phoneFields = [input.phoneNumber, input.phoneSign, input.phoneVerified];
+  if (
+    phoneFields.some((value) => value !== undefined)
+    && phoneFields.some((value) => value === undefined)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Данные номера VK переданы не полностью',
+    });
+  }
 });
 const vkMiniAppSessionSchema = z.object({
   launchParams: z.string().min(1).max(8_192),
@@ -1187,24 +1198,45 @@ export async function registerRoutes(
           code: 'VK_MINI_APP_PROFILE_MISMATCH',
         });
       }
-      if (!verifyVkMiniAppPhone({
-        appId: launch.appId,
-        secret: config.VK_MINI_APP_SECRET,
-        userId: launch.userId,
-        phoneNumber: input.phoneNumber,
-        sign: input.phoneSign,
-      })) {
-        throw Object.assign(new Error('VK не подтвердил переданный номер телефона'), {
-          statusCode: 401,
-          code: 'VK_MINI_APP_PHONE_INVALID',
-        });
-      }
-      const phone = normalizeRussianPhone(input.phoneNumber);
-      if (!phone) {
-        throw Object.assign(new Error('VK передал неподдерживаемый номер телефона'), {
-          statusCode: 400,
-          code: 'PHONE_INVALID',
-        });
+      const linkedAccount = await firstRow<RowDataPacket & {
+        user_id: string;
+        bot_contact_available: number | boolean;
+      }>(
+        `SELECT account.user_id, account.bot_contact_available
+         FROM user_messenger_accounts account
+         JOIN users user ON user.id = account.user_id AND user.deleted_at IS NULL
+         WHERE account.provider = 'vk' AND account.external_user_id = ? AND account.active = TRUE
+         LIMIT 1`,
+        [launch.userId],
+      );
+
+      let phone: string | null = null;
+      if (!linkedAccount) {
+        if (!input.phoneNumber || !input.phoneSign || input.phoneVerified !== true) {
+          throw Object.assign(
+            new Error('Для первого входа разрешите VK передать номер телефона'),
+            { statusCode: 409, code: 'VK_MINI_APP_PHONE_REQUIRED' },
+          );
+        }
+        if (!verifyVkMiniAppPhone({
+          appId: launch.appId,
+          secret: config.VK_MINI_APP_SECRET,
+          userId: launch.userId,
+          phoneNumber: input.phoneNumber,
+          sign: input.phoneSign,
+        })) {
+          throw Object.assign(new Error('VK не подтвердил переданный номер телефона'), {
+            statusCode: 401,
+            code: 'VK_MINI_APP_PHONE_INVALID',
+          });
+        }
+        phone = normalizeRussianPhone(input.phoneNumber);
+        if (!phone) {
+          throw Object.assign(new Error('VK передал неподдерживаемый номер телефона'), {
+            statusCode: 400,
+            code: 'PHONE_INVALID',
+          });
+        }
       }
 
       const messagesAllowed = await checkVkMiniAppMessagesPermission(
@@ -1212,10 +1244,11 @@ export async function registerRoutes(
         input.messagesPermissionGranted,
       ).catch((error) => {
         request.log.warn({ error }, 'VK Mini App message permission check failed');
-        return false;
+        return Boolean(linkedAccount?.bot_contact_available);
       });
       const userId = await withTransaction(async (connection) => {
-        const id = await findOrCreatePhoneUser(connection, phone);
+        const id = linkedAccount?.user_id
+          ?? await findOrCreatePhoneUser(connection, phone!);
         await linkMessengerIdentity(connection, id, {
           provider: 'vk',
           externalUserId: launch.userId,

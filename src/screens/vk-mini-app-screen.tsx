@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
+import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { BrandMark } from '@/components/brand-mark';
 import { AppButton } from '@/components/ui/app-button';
@@ -12,7 +13,8 @@ import {
   allowVkCommunityMessages,
   getVkMiniAppLaunchParams,
   initializeVkMiniApp,
-  requestVkMiniAppIdentity,
+  requestVkMiniAppPhone,
+  requestVkMiniAppProfile,
 } from '@/vk-mini-app/bridge';
 
 export function VkMiniAppScreen() {
@@ -50,9 +52,17 @@ export function VkMiniAppScreen() {
         await resetSessionForEmbeddedAuth();
       }
 
-      const identity = await requestVkMiniAppIdentity();
-      const messagesPermissionGranted = await allowVkCommunityMessages();
-      await signInWithVkMiniApp({ ...identity, messagesPermissionGranted });
+      const identity = await requestVkMiniAppProfile();
+      try {
+        await signInWithVkMiniApp({ ...identity, messagesPermissionGranted: false });
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.code !== 'VK_MINI_APP_PHONE_REQUIRED') {
+          throw error;
+        }
+        const phone = await requestVkMiniAppPhone();
+        const messagesPermissionGranted = await allowVkCommunityMessages();
+        await signInWithVkMiniApp({ ...identity, ...phone, messagesPermissionGranted });
+      }
       setSessionVerified(true);
     } catch (error) {
       setBridgeError(error instanceof Error ? error.message : 'Не удалось выполнить вход через VK.');

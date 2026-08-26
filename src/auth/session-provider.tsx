@@ -35,9 +35,9 @@ export type VkAuthChallenge = Omit<MaxAuthChallenge, 'botUrl'> & {
 
 export type VkMiniAppAuthInput = {
   launchParams: string;
-  phoneNumber: string;
-  phoneSign: string;
-  phoneVerified: true;
+  phoneNumber?: string;
+  phoneSign?: string;
+  phoneVerified?: true;
   messagesPermissionGranted: boolean;
   profile: {
     id: number;

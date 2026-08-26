@@ -2,11 +2,8 @@ import bridge from '@vkontakte/vk-bridge';
 
 import { extractSignedVkPhone } from '@/vk-mini-app/phone';
 
-export type VkMiniAppIdentity = {
+export type VkMiniAppProfileIdentity = {
   launchParams: string;
-  phoneNumber: string;
-  phoneSign: string;
-  phoneVerified: true;
   profile: {
     id: number;
     firstName: string | null;
@@ -14,6 +11,14 @@ export type VkMiniAppIdentity = {
     avatarUrl: string | null;
   };
 };
+
+export type VkMiniAppPhoneIdentity = {
+  phoneNumber: string;
+  phoneSign: string;
+  phoneVerified: true;
+};
+
+export type VkMiniAppIdentity = VkMiniAppProfileIdentity & VkMiniAppPhoneIdentity;
 
 export class VkMiniAppBridgeError extends Error {
   constructor(
@@ -49,20 +54,12 @@ export async function initializeVkMiniApp(): Promise<void> {
   }
 }
 
-export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
+export async function requestVkMiniAppProfile(): Promise<VkMiniAppProfileIdentity> {
   try {
     const [launch, profile] = await Promise.all([
       bridge.send('VKWebAppGetLaunchParams'),
       bridge.send('VKWebAppGetUserInfo'),
     ]);
-    const phone = await bridge.send('VKWebAppGetPhoneNumber');
-    const signedPhone = extractSignedVkPhone(phone);
-    if (!signedPhone) {
-      throw new VkMiniAppBridgeError(
-        'Подтвердите передачу номера телефона в окне VK.',
-        'PHONE_NOT_SHARED',
-      );
-    }
     if (launch.vk_user_id !== profile.id) {
       throw new VkMiniAppBridgeError('VK вернул разные профили пользователя.', 'BRIDGE_FAILED');
     }
@@ -72,9 +69,6 @@ export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
     }
     return {
       launchParams,
-      phoneNumber: signedPhone.phoneNumber,
-      phoneSign: signedPhone.sign,
-      phoneVerified: true,
       profile: {
         id: profile.id,
         firstName: profile.first_name?.trim() || null,
@@ -85,10 +79,35 @@ export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
   } catch (error) {
     if (error instanceof VkMiniAppBridgeError) throw error;
     throw new VkMiniAppBridgeError(
-      'VK не передал данные для входа. Попробуйте ещё раз.',
+      'VK не передал данные профиля. Попробуйте ещё раз.',
+      'BRIDGE_FAILED',
+    );
+  }
+}
+
+export async function requestVkMiniAppPhone(): Promise<VkMiniAppPhoneIdentity> {
+  try {
+    const signedPhone = extractSignedVkPhone(await bridge.send('VKWebAppGetPhoneNumber'));
+    if (!signedPhone) throw new Error('VK phone is not signed');
+    return {
+      phoneNumber: signedPhone.phoneNumber,
+      phoneSign: signedPhone.sign,
+      phoneVerified: true,
+    };
+  } catch {
+    throw new VkMiniAppBridgeError(
+      'Подтвердите передачу номера телефона в окне VK.',
       'PHONE_NOT_SHARED',
     );
   }
+}
+
+export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
+  const [profile, phone] = await Promise.all([
+    requestVkMiniAppProfile(),
+    requestVkMiniAppPhone(),
+  ]);
+  return { ...profile, ...phone };
 }
 
 export async function allowVkCommunityMessages(): Promise<boolean> {

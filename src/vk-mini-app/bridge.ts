@@ -1,8 +1,5 @@
-export type VkMiniAppIdentity = {
+export type VkMiniAppProfileIdentity = {
   launchParams: string;
-  phoneNumber: string;
-  phoneSign: string;
-  phoneVerified: true;
   profile: {
     id: number;
     firstName: string | null;
@@ -10,6 +7,14 @@ export type VkMiniAppIdentity = {
     avatarUrl: string | null;
   };
 };
+
+export type VkMiniAppPhoneIdentity = {
+  phoneNumber: string;
+  phoneSign: string;
+  phoneVerified: true;
+};
+
+export type VkMiniAppIdentity = VkMiniAppProfileIdentity & VkMiniAppPhoneIdentity;
 
 export class VkMiniAppBridgeError extends Error {
   constructor(
@@ -33,6 +38,20 @@ export function getVkMiniAppLaunchParams(): string {
 }
 
 export async function requestVkMiniAppIdentity(): Promise<VkMiniAppIdentity> {
+  throw new VkMiniAppBridgeError(
+    'VK Mini Apps доступно только в веб-версии ВКонтакте.',
+    'NOT_EMBEDDED',
+  );
+}
+
+export async function requestVkMiniAppProfile(): Promise<VkMiniAppProfileIdentity> {
+  throw new VkMiniAppBridgeError(
+    'VK Mini Apps доступно только в веб-версии ВКонтакте.',
+    'NOT_EMBEDDED',
+  );
+}
+
+export async function requestVkMiniAppPhone(): Promise<VkMiniAppPhoneIdentity> {
   throw new VkMiniAppBridgeError(
     'VK Mini Apps доступно только в веб-версии ВКонтакте.',
     'NOT_EMBEDDED',
