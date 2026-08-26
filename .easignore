@@ -1,0 +1,46 @@
+.git
+.github
+.expo
+node_modules
+server/node_modules
+dist
+web-build
+tmp
+
+# Local configuration and credentials
+.env
+.env.local
+.env.production
+.env*.local
+google-service-account.json
+credentials.json
+credentials
+AuthKey_*.p8
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Non-mobile projects and deployment files
+video-promo
+deploy
+server
+tests
+store-listing
+assets/store
+
+# Previously generated store artifacts
+*.apk
+*.aab
+rustore-pepk-out.zip
+
+# Local tooling output
+.cloudflared
+.superdesign/tmp
+*.tsbuildinfo
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store

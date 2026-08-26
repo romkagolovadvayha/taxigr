@@ -21,5 +21,8 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "server/**/*.ts"
+  ],
+  "exclude": [
+    "video-promo"
   ]
 }
