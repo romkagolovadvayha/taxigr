@@ -1,6 +1,8 @@
 .git
 .github
 .expo
+android
+ios
 node_modules
 server/node_modules
 dist
