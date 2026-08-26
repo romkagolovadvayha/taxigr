@@ -6,6 +6,10 @@ import { useSession } from '@/auth/session-provider';
 import { AppButton } from '@/components/ui/app-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import {
+  defaultDriverDispatchSettings,
+  type DriverDispatchSettings,
+} from '@/domain/driver-priority';
 import { defaultPricingRules, type PricingRules } from '@/domain/pricing';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -31,6 +35,9 @@ export function AdminSettingsScreen() {
   const { token, signOut } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [rules, setRules] = useState<PricingRules>(defaultPricingRules);
+  const [dispatchSettings, setDispatchSettings] = useState<DriverDispatchSettings>(
+    defaultDriverDispatchSettings,
+  );
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +45,20 @@ export function AdminSettingsScreen() {
   useEffect(() => {
     if (demo || !token) return;
     const controller = new AbortController();
-    void apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal: controller.signal })
-      .then(setRules)
+    void Promise.all([
+      apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal: controller.signal }),
+      apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', {
+        token,
+        signal: controller.signal,
+      }),
+    ])
+      .then(([nextRules, nextDispatchSettings]) => {
+        setRules(nextRules);
+        setDispatchSettings(nextDispatchSettings);
+      })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) {
-          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить тарифы');
+          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить настройки');
         }
       });
     return () => controller.abort();
@@ -67,12 +83,20 @@ export function AdminSettingsScreen() {
     }
     setBusy(true);
     try {
-      const updated = await apiRequest<PricingRules>('/v1/admin/tariffs', {
-        method: 'PUT',
-        token,
-        body: JSON.stringify(rules),
-      });
-      setRules(updated);
+      const [updatedRules, updatedDispatchSettings] = await Promise.all([
+        apiRequest<PricingRules>('/v1/admin/tariffs', {
+          method: 'PUT',
+          token,
+          body: JSON.stringify(rules),
+        }),
+        apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', {
+          method: 'PUT',
+          token,
+          body: JSON.stringify(dispatchSettings),
+        }),
+      ]);
+      setRules(updatedRules);
+      setDispatchSettings(updatedDispatchSettings);
       setSaved(true);
       setError(null);
     } catch (reason) {
@@ -128,6 +152,60 @@ export function AdminSettingsScreen() {
         </Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
+      <SurfaceCard>
+        <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Приоритетная раздача заказов
+        </Text>
+        <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
+          Приоритетные водители получают заказ сразу. Остальным он станет доступен через
+          указанное время, если его никто не принял.
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
+          {field(
+            'По Грахово',
+            String(dispatchSettings.grahovo),
+            (value) => {
+              setDispatchSettings((current) => ({
+                ...current,
+                grahovo: Math.min(120, Number(value.replace(/[^\d]/g, '')) || 0),
+              }));
+              setSaved(false);
+            },
+            'мин',
+            'Задержка для обычных водителей по Грахово',
+          )}
+          {field(
+            'По Граховскому району',
+            String(dispatchSettings.district),
+            (value) => {
+              setDispatchSettings((current) => ({
+                ...current,
+                district: Math.min(120, Number(value.replace(/[^\d]/g, '')) || 0),
+              }));
+              setSaved(false);
+            },
+            'мин',
+            'Задержка для обычных водителей по району',
+          )}
+          {field(
+            'Межгород',
+            String(dispatchSettings.intercity),
+            (value) => {
+              setDispatchSettings((current) => ({
+                ...current,
+                intercity: Math.min(120, Number(value.replace(/[^\d]/g, '')) || 0),
+              }));
+              setSaved(false);
+            },
+            'мин',
+            'Задержка для обычных водителей по межгороду',
+          )}
+        </View>
+        <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
+          Значение 0 отключает задержку для выбранной зоны. Если среди свободных водителей
+          нет приоритетных, заказ сразу увидят все подходящие водители.
+        </Text>
+      </SurfaceCard>
       <SurfaceCard>
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Комиссия сервиса</Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>

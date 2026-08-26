@@ -97,7 +97,7 @@ export function DriversScreen() {
     <AdminAccountsList
       kind="drivers"
       title="Водители"
-      subtitle="Список водителей, их доступ, рейтинг и результаты поездок"
+      subtitle="Список водителей, доступ и приоритет получения заказов по зонам"
       items={drivers}
       loading={loading}
       error={error}

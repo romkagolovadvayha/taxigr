@@ -1887,6 +1887,82 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     ).toBe(200);
   });
 
+  it('configures independent driver priorities and notification delays by zone', async () => {
+    const settings = { grahovo: 2, district: 3, intercity: 4 };
+    const updatedSettings = await api<Record<string, number>>(
+      '/v1/admin/driver-dispatch-settings',
+      { method: 'PUT', token: adminToken, body: settings },
+    );
+    expect(updatedSettings.status).toBe(200);
+    expect(updatedSettings.data).toEqual(settings);
+    expect(
+      (await api('/v1/admin/driver-dispatch-settings', { token: passengerToken })).status,
+    ).toBe(403);
+
+    const priorities = { grahovo: true, district: false, intercity: true };
+    const updatedDriver = await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { priorities },
+    });
+    expect(updatedDriver.status).toBe(200);
+    const detail = await api<AdminDriverDetail>(
+      `/v1/admin/drivers/${fixture.driverOneId}`,
+      { token: adminToken },
+    );
+    expect(detail.data?.driver.priorities).toEqual(priorities);
+    const [assignments] = await connection.query<mysql.RowDataPacket[]>(
+      `SELECT scope FROM driver_priority_assignments
+       WHERE driver_id = ? ORDER BY scope`,
+      [fixture.driverOneId],
+    );
+    expect(assignments.map((row) => row.scope)).toEqual(['grahovo', 'intercity']);
+
+    await setDriverStatus(driverOneToken, 'online');
+    await setDriverStatus(driverTwoToken, 'online');
+    const order = await createOrder(passengerToken);
+    expect(order.status, JSON.stringify(order.error)).toBe(201);
+    const priorityOffers = await api<RideOrder[]>('/v1/driver/offers', {
+      token: driverOneToken,
+    });
+    const regularOffers = await api<RideOrder[]>('/v1/driver/offers', {
+      token: driverTwoToken,
+    });
+    expect(priorityOffers.data?.some((item) => item.id === order.data?.id)).toBe(true);
+    expect(regularOffers.data?.some((item) => item.id === order.data?.id)).toBe(false);
+    const earlyAcceptance = await api(`/v1/driver/orders/${order.data!.id}/accept`, {
+      method: 'POST',
+      token: driverTwoToken,
+    });
+    expect(earlyAcceptance.status).toBe(403);
+    expect(earlyAcceptance.error?.code).toBe('ORDER_PRIORITY_DELAY');
+
+    await connection.execute(
+      `UPDATE orders SET priority_release_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND)
+       WHERE id = ?`,
+      [order.data!.id],
+    );
+    const releasedOffers = await api<RideOrder[]>('/v1/driver/offers', {
+      token: driverTwoToken,
+    });
+    expect(releasedOffers.data?.some((item) => item.id === order.data?.id)).toBe(true);
+    await api(`/v1/orders/${order.data!.id}/cancel`, {
+      method: 'POST',
+      token: passengerToken,
+    });
+
+    await api('/v1/admin/driver-dispatch-settings', {
+      method: 'PUT',
+      token: adminToken,
+      body: { grahovo: 1, district: 1, intercity: 1 },
+    });
+    await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { priorities: { grahovo: false, district: false, intercity: false } },
+    });
+  });
+
   it('updates tariffs, metrics, driver suspension and audit records', async () => {
     const changedTariffs = {
       grahovoFare07To22Minor: originalTariffs.grahovoFare07To22Minor + 100,

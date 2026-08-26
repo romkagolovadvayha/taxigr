@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Host, Switch } from '@expo/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
@@ -15,6 +16,12 @@ import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import { demoDriver, demoOrders, demoPassenger } from '@/data/demo';
+import {
+  defaultDriverPriorities,
+  driverPriorityScopeLabels,
+  driverPriorityScopes,
+  type DriverPriorities,
+} from '@/domain/driver-priority';
 import type {
   AdminAccountProfile,
   AdminAccountStats,
@@ -140,6 +147,7 @@ function demoDetail(kind: Props['kind']): Detail {
       status: 'online',
       commissionBps: 1200,
       hasChildSeat: true,
+      priorities: defaultDriverPriorities,
       approvedAt: profile.createdAt,
       vehicle: { ...demoDriver.vehicle, year: 2021 },
     },
@@ -405,6 +413,32 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
     }
   };
 
+  const savePriorities = async (priorities: DriverPriorities) => {
+    if (!detail || detail.kind !== 'driver' || (!demo && !token)) return;
+    setBusy(true);
+    try {
+      if (!demo) {
+        await apiRequest(`/v1/admin/drivers/${detail.driver.id}`, {
+          method: 'PATCH',
+          token: token ?? undefined,
+          body: JSON.stringify({ priorities }),
+        });
+        await load();
+      } else {
+        setDetail((current) =>
+          current?.kind === 'driver'
+            ? { ...current, driver: { ...current.driver, priorities } }
+            : current,
+        );
+      }
+      setError(undefined);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось сохранить приоритеты');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading && !detail) {
     return (
       <Screen>
@@ -656,6 +690,31 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                       ['Время на линии', formatDuration(detail.stats.onlineMinutes ?? 0)],
                     ]}
                   />
+                  <View style={{ gap: spacing.x2 }}>
+                    <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
+                      Приоритет получения заказов
+                    </Text>
+                    <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+                      Включите зоны, в которых этот водитель будет получать новые заказы раньше
+                      остальных.
+                    </Text>
+                    <Host matchContents={{ vertical: true }} style={{ width: '100%' }}>
+                      {driverPriorityScopes.map((scope) => (
+                        <Switch
+                          key={scope}
+                          label={driverPriorityScopeLabels[scope]}
+                          value={detail.driver.priorities[scope]}
+                          disabled={busy}
+                          onValueChange={(value) =>
+                            void savePriorities({
+                              ...detail.driver.priorities,
+                              [scope]: value,
+                            })
+                          }
+                        />
+                      ))}
+                    </Host>
+                  </View>
                   <View style={{ gap: spacing.x2 }}>
                     <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
                       Индивидуальная комиссия, %

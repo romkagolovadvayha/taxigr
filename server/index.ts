@@ -150,6 +150,21 @@ void routeHandlers.expireStaleSearchingOrders().catch((error) => {
   app.log.error(error, 'initial stale order expiration failed');
 });
 
+const priorityReleaseTimer = setInterval(() => {
+  void routeHandlers.releaseDuePriorityOrders().catch((error) => {
+    app.log.error(error, 'priority order release failed');
+    reportCritical({
+      source: 'server-process',
+      error,
+      context: [['Задача', 'priority order release']],
+    });
+  });
+}, 5_000);
+(priorityReleaseTimer as unknown as { unref?: () => void }).unref?.();
+void routeHandlers.releaseDuePriorityOrders().catch((error) => {
+  app.log.error(error, 'initial priority order release failed');
+});
+
 app.setErrorHandler((error, request, reply) => {
   const normalized = (() => {
     if (error instanceof Error) return error;
@@ -213,6 +228,7 @@ let stopTelegramPolling: (() => Promise<void>) | null = null;
 app.addHook('onClose', async () => {
   clearInterval(authAbusePruneTimer);
   clearInterval(staleOrderTimer);
+  clearInterval(priorityReleaseTimer);
   await stopTelegramPolling?.();
   io.close();
   await db.end();

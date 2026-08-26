@@ -17,6 +17,8 @@ export type OrderRow = RowDataPacket & {
   tariff: TariffCode;
   status: RideStatus;
   pricing_scope: PricingScope;
+  priority_release_at: Date | string | null;
+  priority_released_at: Date | string | null;
   pickup_label: string;
   pickup_details: string | null;
   pickup_lat: number;

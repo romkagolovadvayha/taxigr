@@ -255,6 +255,7 @@ export type AdminAccountSummary = {
   driverStatus?: 'online' | 'offline' | 'busy' | 'suspended';
   commissionBps?: number | null;
   hasChildSeat?: boolean;
+  priorities?: import('./driver-priority').DriverPriorities;
   vehicle?: VehicleDetails;
 };
 
@@ -336,6 +337,7 @@ export type AdminDriverDetail = {
     status: 'online' | 'offline' | 'busy' | 'suspended';
     commissionBps: number | null;
     hasChildSeat: boolean;
+    priorities: import('./driver-priority').DriverPriorities;
     approvedAt: string;
     vehicle?: VehicleDetails;
   };

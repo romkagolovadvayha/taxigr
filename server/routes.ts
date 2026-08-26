@@ -21,6 +21,13 @@ import {
 import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
 import { searchPriceIncreaseSlotAt } from '../src/domain/search-price-increase';
 import {
+  canDriverReceivePriorityOrder,
+  defaultDriverDispatchSettings,
+  driverPriorityScopes,
+  type DriverDispatchSettings,
+  type DriverPriorityScope,
+} from '../src/domain/driver-priority';
+import {
   placeCategories,
   type Address,
   type RideStatus,
@@ -1015,11 +1022,105 @@ async function checkVkMiniAppMessagesPermission(
   return false;
 }
 
+type DriverAudience = 'all' | 'priority' | 'nonpriority' | 'available';
+
+async function driverDispatchSettings(
+  connection?: PoolConnection,
+): Promise<DriverDispatchSettings> {
+  const executor = connection ?? db;
+  const [rows] = await executor.query<
+    (RowDataPacket & { scope: DriverPriorityScope; delay_minutes: number })[]
+  >('SELECT scope, delay_minutes FROM driver_dispatch_settings');
+  const settings = { ...defaultDriverDispatchSettings };
+  for (const row of rows) settings[row.scope] = Number(row.delay_minutes);
+  return settings;
+}
+
+async function eligibleDriverIdsForOrder(
+  orderId: string,
+  audience: DriverAudience,
+  connection?: PoolConnection,
+): Promise<string[]> {
+  const executor = connection ?? db;
+  const priorityClause =
+    audience === 'priority'
+      ? `AND EXISTS (
+           SELECT 1 FROM driver_priority_assignments priority
+           WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+         )`
+      : audience === 'nonpriority'
+        ? `AND NOT EXISTS (
+             SELECT 1 FROM driver_priority_assignments priority
+             WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+           )`
+        : audience === 'available'
+          ? `AND (
+               o.priority_release_at IS NULL
+               OR o.priority_release_at <= UTC_TIMESTAMP(3)
+               OR EXISTS (
+                 SELECT 1 FROM driver_priority_assignments priority
+                 WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+               )
+             )`
+          : '';
+  const [rows] = await executor.query<(RowDataPacket & { id: string })[]>(
+    `SELECT d.id
+     FROM orders o
+     JOIN drivers d ON d.status = 'online'
+     WHERE o.id = ?
+       AND (o.tariff <> 'child' OR d.has_child_seat = TRUE)
+       AND NOT EXISTS (
+         SELECT 1 FROM orders active_order
+         WHERE active_order.driver_id = d.id
+           AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM driver_order_rejections rejected
+         WHERE rejected.order_id = o.id AND rejected.driver_id = d.id
+       )
+       ${priorityClause}`,
+    [orderId],
+  );
+  return rows.map((row) => String(row.id));
+}
+
+async function preparePriorityDispatch(
+  orderId: string,
+  connection: PoolConnection,
+): Promise<string[]> {
+  const [orders] = await connection.query<
+    (RowDataPacket & { pricing_scope: DriverPriorityScope })[]
+  >('SELECT pricing_scope FROM orders WHERE id = ? LIMIT 1 FOR UPDATE', [orderId]);
+  const order = orders[0];
+  if (!order) throw new Error('Order dispatch setup failed');
+  const priorityDriverIds = await eligibleDriverIdsForOrder(orderId, 'priority', connection);
+  const settings = await driverDispatchSettings(connection);
+  const delayMinutes = settings[order.pricing_scope];
+  if (priorityDriverIds.length > 0 && delayMinutes > 0) {
+    await connection.execute(
+      `UPDATE orders
+       SET priority_release_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? MINUTE),
+           priority_released_at = NULL
+       WHERE id = ?`,
+      [delayMinutes, orderId],
+    );
+    return priorityDriverIds;
+  }
+  await connection.execute(
+    `UPDATE orders
+     SET priority_release_at = UTC_TIMESTAMP(3), priority_released_at = UTC_TIMESTAMP(3)
+     WHERE id = ?`,
+    [orderId],
+  );
+  return eligibleDriverIdsForOrder(orderId, 'all', connection);
+}
+
 export type RegisteredRouteHandlers = {
   handleMessengerOrderAction: (
     request: MessengerOrderActionRequest,
   ) => Promise<MessengerOrderActionResult>;
   expireStaleSearchingOrders: () => Promise<number>;
+  releaseDuePriorityOrders: () => Promise<number>;
 };
 
 export async function registerRoutes(
@@ -1044,6 +1145,33 @@ export async function registerRoutes(
   const notifyMessengers = (notification: Promise<void>, event: string): void => {
     void notification.catch((error) =>
       app.log.warn({ error, event }, 'personal messenger notification failed'),
+    );
+  };
+  const sendOrderToDrivers = (
+    order: ReturnType<typeof presentOrder>,
+    driverIds: string[],
+    options: { priceIncreased?: boolean; delayed?: boolean } = {},
+  ): void => {
+    for (const driverId of driverIds) {
+      publish(`driver:${driverId}`, 'order:available', order);
+    }
+    void notifyDrivers(
+      driverIds,
+      driverOrderAvailablePush(order.id, options.priceIncreased),
+    ).catch((error) => app.log.warn({ error }, 'driver order push failed'));
+    notifyMessengers(
+      notifyDriversInMessengers(
+        driverIds,
+        driverRideNotification(
+          order,
+          options.delayed
+            ? { title: 'Новый заказ доступен', body: 'Приоритетные водители не приняли заказ.' }
+            : options.priceIncreased
+              ? { icon: '💰', title: 'Цена повышена' }
+              : undefined,
+        ),
+      ),
+      options.delayed ? 'order.priority-released.drivers' : 'order.available.drivers',
     );
   };
   const handleMessengerOrderAction = createMessengerOrderActionHandler(app);
@@ -1101,6 +1229,32 @@ export async function registerRoutes(
       );
     }
     return expired.length;
+  };
+  const releaseDuePriorityOrders = async (): Promise<number> => {
+    const dueOrders = await withTransaction(async (connection) => {
+      const [rows] = await connection.query<OrderRow[]>(
+        `SELECT * FROM orders
+         WHERE status = 'searching' AND driver_id IS NULL
+           AND priority_released_at IS NULL
+           AND priority_release_at <= UTC_TIMESTAMP(3)
+         ORDER BY priority_release_at ASC LIMIT 100 FOR UPDATE`,
+      );
+      for (const row of rows) {
+        await connection.execute(
+          `UPDATE orders SET priority_released_at = UTC_TIMESTAMP(3)
+           WHERE id = ? AND status = 'searching' AND driver_id IS NULL`,
+          [row.id],
+        );
+      }
+      return rows.map((row) => row.id);
+    });
+    for (const orderId of dueOrders) {
+      const row = await getOrder(orderId);
+      if (!row || row.status !== 'searching' || row.driver_id) continue;
+      const driverIds = await eligibleDriverIdsForOrder(orderId, 'nonpriority');
+      sendOrderToDrivers(presentOrder(row), driverIds, { delayed: true });
+    }
+    return dueOrders.length;
   };
 
   app.get(
@@ -2833,7 +2987,9 @@ export async function registerRoutes(
         `${orderSelect} WHERE o.passenger_id = ? AND o.idempotency_key = ?`,
         [session.id, input.idempotencyKey],
       );
-      if (existingRows[0]) return { order: presentOrder(existingRows[0]), created: false };
+      if (existingRows[0]) {
+        return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
+      }
 
       const [userRows] = await connection.query<
         (RowDataPacket & {
@@ -2987,30 +3143,18 @@ export async function registerRoutes(
           }),
         ],
       );
+      const initialDriverIds = await preparePriorityDispatch(orderId, connection);
       const [insertedRows] = await connection.query<OrderRow[]>(
         `${orderSelect} WHERE o.id = ?`,
         [orderId],
       );
       const row = insertedRows[0];
       if (!row) throw new Error('Order insert failed');
-      return { order: presentOrder(row), created: true };
+      return { order: presentOrder(row), created: true, initialDriverIds };
     });
     if (result.created) {
-      const [eligibleRows] = await db.query<(RowDataPacket & { id: string })[]>(
-        `SELECT id FROM drivers
-         WHERE status = 'online'
-           AND (? <> 'child' OR has_child_seat = TRUE)
-           AND NOT EXISTS (
-             SELECT 1 FROM orders active_order
-             WHERE active_order.driver_id = drivers.id
-               AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-           )`,
-        [result.order.tariff],
-      );
-      const eligibleDriverIds = eligibleRows.map((row) => row.id);
-      for (const driverId of eligibleDriverIds) {
-        publish(`driver:${driverId}`, 'order:available', result.order);
-      }
+      const eligibleDriverIds = result.initialDriverIds;
+      sendOrderToDrivers(result.order, eligibleDriverIds);
       publish('admins', 'order:updated', result.order);
       notifyAdmins({
         icon: '🚕',
@@ -3029,16 +3173,9 @@ export async function registerRoutes(
           ['Комментарий', result.order.comment],
         ],
       });
-      void notifyDrivers(eligibleDriverIds, driverOrderAvailablePush(result.order.id)).catch((error) =>
-        app.log.warn({ error }, 'push notification failed'),
-      );
       notifyMessengers(
         notifyUsersInMessengers([session.id], passengerRideNotification(result.order)),
         'order.created.passenger',
-      );
-      notifyMessengers(
-        notifyDriversInMessengers(eligibleDriverIds, driverRideNotification(result.order)),
-        'order.created.drivers',
       );
       reply.code(201);
     }
@@ -3229,35 +3366,8 @@ export async function registerRoutes(
         ],
       });
       if (payload.status === 'searching' && !payload.driverId) {
-        const [eligibleRows] = await db.query<(RowDataPacket & { id: string })[]>(
-          `SELECT d.id FROM drivers d
-           WHERE d.status = 'online'
-             AND (? <> 'child' OR d.has_child_seat = TRUE)
-             AND NOT EXISTS (
-               SELECT 1 FROM orders active_order
-               WHERE active_order.driver_id = d.id
-                 AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-             )
-             AND NOT EXISTS (
-               SELECT 1 FROM driver_order_rejections rejected
-               WHERE rejected.order_id = ? AND rejected.driver_id = d.id
-             )`,
-          [payload.tariff, id],
-        );
-        const eligibleDriverIds = eligibleRows.map((row) => row.id);
-        for (const driverId of eligibleDriverIds) {
-          publish(`driver:${driverId}`, 'order:available', payload);
-        }
-        void notifyDrivers(eligibleDriverIds, driverOrderAvailablePush(id, true)).catch((error) =>
-          app.log.warn({ error }, 'push notification failed'),
-        );
-        notifyMessengers(
-          notifyDriversInMessengers(eligibleDriverIds, driverRideNotification(payload, {
-            icon: '💰',
-            title: 'Цена повышена',
-          })),
-          'order.search_price_increased.drivers',
-        );
+        const eligibleDriverIds = await eligibleDriverIdsForOrder(id, 'available');
+        sendOrderToDrivers(payload, eligibleDriverIds, { priceIncreased: true });
       }
     }
     return { data: payload };
@@ -3948,6 +4058,14 @@ export async function registerRoutes(
       `${orderSelect}
        WHERE o.status = 'searching' AND o.driver_id IS NULL
           AND o.created_at > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)
+          AND (
+            o.priority_release_at IS NULL
+            OR o.priority_release_at <= UTC_TIMESTAMP(3)
+            OR EXISTS (
+              SELECT 1 FROM driver_priority_assignments priority
+              WHERE priority.driver_id = ? AND priority.scope = o.pricing_scope
+            )
+          )
           AND NOT EXISTS (
             SELECT 1 FROM orders active_order
             WHERE active_order.driver_id = ?
@@ -3961,7 +4079,7 @@ export async function registerRoutes(
            SELECT 1 FROM drivers eligible WHERE eligible.id = ? AND eligible.has_child_seat = TRUE
          ))
        ORDER BY o.created_at ASC LIMIT 20`,
-      [config.ORDER_SEARCH_TTL_MINUTES, driver.id, driver.id, driver.id],
+      [config.ORDER_SEARCH_TTL_MINUTES, driver.id, driver.id, driver.id, driver.id],
     );
     return { data: rows.map(presentOrder) };
   });
@@ -3996,6 +4114,24 @@ export async function registerRoutes(
       }
       if (driver.status !== 'online') {
         throw Object.assign(new Error('Включите статус «На линии»'), { statusCode: 409 });
+      }
+      const [priorityRows] = await connection.query<(RowDataPacket & { assigned: number })[]>(
+        `SELECT EXISTS(
+           SELECT 1 FROM driver_priority_assignments
+           WHERE driver_id = ? AND scope = ?
+         ) AS assigned`,
+        [driver.id, row.pricing_scope],
+      );
+      if (
+        !canDriverReceivePriorityOrder(
+          row.priority_release_at,
+          Boolean(priorityRows[0]?.assigned),
+        )
+      ) {
+        throw Object.assign(
+          new Error('Заказ пока доступен только приоритетным водителям'),
+          { statusCode: 403, code: 'ORDER_PRIORITY_DELAY' },
+        );
       }
       const [activeRows] = await connection.query<(RowDataPacket & { id: string })[]>(
         `SELECT id FROM orders
@@ -4164,7 +4300,13 @@ export async function registerRoutes(
           }),
         ],
       );
-      return { passengerId: row.passenger_id, driverId: driver.id, fromStatus: row.status };
+      const initialDriverIds = await preparePriorityDispatch(id, connection);
+      return {
+        passengerId: row.passenger_id,
+        driverId: driver.id,
+        fromStatus: row.status,
+        initialDriverIds,
+      };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
@@ -4172,28 +4314,10 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
 
-    const [eligibleRows] = await db.query<(RowDataPacket & { id: string })[]>(
-      `SELECT id FROM drivers
-       WHERE status = 'online' AND id <> ?
-          AND (? <> 'child' OR has_child_seat = TRUE)
-          AND NOT EXISTS (
-            SELECT 1 FROM orders active_order
-            WHERE active_order.driver_id = drivers.id
-              AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM driver_order_rejections rejected
-            WHERE rejected.order_id = ? AND rejected.driver_id = drivers.id
-          )`,
-      [participants.driverId, payload.tariff, id],
+    const eligibleDriverIds = participants.initialDriverIds.filter(
+      (driverId) => driverId !== participants.driverId,
     );
-    const eligibleDriverIds = eligibleRows.map((row) => row.id);
-    for (const driverId of eligibleDriverIds) {
-      publish(`driver:${driverId}`, 'order:available', payload);
-    }
-    void notifyDrivers(eligibleDriverIds, driverOrderAvailablePush(id)).catch((error) =>
-      app.log.warn({ error }, 'replacement driver push failed'),
-    );
+    sendOrderToDrivers(payload, eligibleDriverIds);
     notifyMessengers(
       notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
         title: 'Ищем другого водителя',
@@ -5103,6 +5227,12 @@ export async function registerRoutes(
         u.blocked_at AS blockedAt, u.block_reason AS blockReason,
         v.make, v.model, v.year, v.color, v.color_hex AS colorHex, v.plate,
         d.created_at AS createdAt,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'grahovo') AS priorityGrahovo,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'district') AS priorityDistrict,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'intercity') AS priorityIntercity,
         COALESCE(SUM(CASE WHEN o.status = 'completed' AND o.completed_at >= DATE_SUB(DATE(DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 4 HOUR)), INTERVAL 4 HOUR)
           THEN o.price_minor ELSE 0 END), 0) AS grossTodayMinor,
         SUM(CASE WHEN o.status = 'completed' AND o.completed_at >= DATE_SUB(DATE(DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 4 HOUR)), INTERVAL 4 HOUR)
@@ -5130,6 +5260,11 @@ export async function registerRoutes(
         rating: Number(row.rating ?? 5),
         ratingCount: Number(row.ratingCount ?? 0),
         hasChildSeat: Boolean(row.hasChildSeat),
+        priorities: {
+          grahovo: Boolean(row.priorityGrahovo),
+          district: Boolean(row.priorityDistrict),
+          intercity: Boolean(row.priorityIntercity),
+        },
         totalOrders: Number(row.totalOrders ?? 0),
         completedOrders: Number(row.completedOrders ?? 0),
         grossMinor: Number(row.grossMinor ?? 0),
@@ -5157,6 +5292,9 @@ export async function registerRoutes(
         status: 'online' | 'offline' | 'busy' | 'suspended';
         commission_bps: number | null;
         has_child_seat: number;
+        priority_grahovo: number;
+        priority_district: number;
+        priority_intercity: number;
         approved_at: Date | string;
         make: string | null;
         model: string | null;
@@ -5167,6 +5305,12 @@ export async function registerRoutes(
       }
     >(
       `SELECT d.id, d.user_id, d.status, d.commission_bps, d.has_child_seat,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'grahovo') AS priority_grahovo,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'district') AS priority_district,
+        EXISTS(SELECT 1 FROM driver_priority_assignments p
+          WHERE p.driver_id = d.id AND p.scope = 'intercity') AS priority_intercity,
         d.approved_at, v.make, v.model, v.year, v.color, v.color_hex, v.plate
        FROM drivers d
        LEFT JOIN vehicles v ON v.driver_id = d.id AND v.active = TRUE
@@ -5210,6 +5354,11 @@ export async function registerRoutes(
           status: driver.status,
           commissionBps: driver.commission_bps,
           hasChildSeat: Boolean(driver.has_child_seat),
+          priorities: {
+            grahovo: Boolean(driver.priority_grahovo),
+            district: Boolean(driver.priority_district),
+            intercity: Boolean(driver.priority_intercity),
+          },
           approvedAt: new Date(driver.approved_at).toISOString(),
           vehicle:
             driver.make && driver.model && driver.year && driver.color && driver.color_hex && driver.plate
@@ -5254,6 +5403,13 @@ export async function registerRoutes(
       z.object({
         status: z.enum(['offline', 'online', 'suspended']).optional(),
         commissionBps: z.number().int().min(0).max(5000).nullable().optional(),
+        priorities: z
+          .object({
+            grahovo: z.boolean(),
+            district: z.boolean(),
+            intercity: z.boolean(),
+          })
+          .optional(),
       }),
       request.body,
     );
@@ -5263,9 +5419,18 @@ export async function registerRoutes(
           status: string;
           commission_bps: number | null;
           blocked_at: Date | string | null;
+          priority_grahovo: number;
+          priority_district: number;
+          priority_intercity: number;
         })[]
       >(
-        `SELECT d.status, d.commission_bps, u.blocked_at
+        `SELECT d.status, d.commission_bps, u.blocked_at,
+           EXISTS(SELECT 1 FROM driver_priority_assignments p
+             WHERE p.driver_id = d.id AND p.scope = 'grahovo') AS priority_grahovo,
+           EXISTS(SELECT 1 FROM driver_priority_assignments p
+             WHERE p.driver_id = d.id AND p.scope = 'district') AS priority_district,
+           EXISTS(SELECT 1 FROM driver_priority_assignments p
+             WHERE p.driver_id = d.id AND p.scope = 'intercity') AS priority_intercity
          FROM drivers d JOIN users u ON u.id = d.user_id
          WHERE d.id = ? LIMIT 1 FOR UPDATE`,
         [id],
@@ -5303,6 +5468,16 @@ export async function registerRoutes(
           id,
         ],
       );
+      if (input.priorities) {
+        await connection.execute('DELETE FROM driver_priority_assignments WHERE driver_id = ?', [id]);
+        const selectedScopes = driverPriorityScopes.filter((scope) => input.priorities?.[scope]);
+        for (const scope of selectedScopes) {
+          await connection.execute(
+            'INSERT INTO driver_priority_assignments (driver_id, scope) VALUES (?, ?)',
+            [id, scope],
+          );
+        }
+      }
       if (input.status === 'online') await openDriverShift(id, connection);
       else if (input.status === 'offline' || input.status === 'suspended') {
         await closeDriverShift(id, connection);
@@ -5310,7 +5485,11 @@ export async function registerRoutes(
       return current;
     });
     await audit(session.id, 'driver.update', 'driver', id, before, input, request.ip);
-    if (input.status !== undefined || Object.prototype.hasOwnProperty.call(input, 'commissionBps')) {
+    if (
+      input.status !== undefined ||
+      Object.prototype.hasOwnProperty.call(input, 'commissionBps') ||
+      input.priorities !== undefined
+    ) {
       notifyMessengers(
         notifyDriversInMessengers([id], {
           icon: input.status === 'suspended' ? '⛔' : 'ℹ️',
@@ -5328,6 +5507,12 @@ export async function registerRoutes(
               ? input.commissionBps == null
                 ? 'по тарифу сервиса'
                 : `${input.commissionBps / 100}%`
+              : null],
+            ['Приоритет', input.priorities
+              ? driverPriorityScopes
+                  .filter((scope) => input.priorities?.[scope])
+                  .map((scope) => ({ grahovo: 'Грахово', district: 'район', intercity: 'межгород' })[scope])
+                  .join(', ') || 'не назначен'
               : null],
           ],
           action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
@@ -5565,6 +5750,46 @@ export async function registerRoutes(
     return { data: await pricingRules() };
   });
 
+  app.get('/v1/admin/driver-dispatch-settings', async (request) => {
+    await auth(request, 'admin');
+    return { data: await driverDispatchSettings() };
+  });
+
+  app.put('/v1/admin/driver-dispatch-settings', async (request) => {
+    const session = await auth(request, 'admin');
+    const input = parse(
+      z.object({
+        grahovo: z.number().int().min(0).max(120),
+        district: z.number().int().min(0).max(120),
+        intercity: z.number().int().min(0).max(120),
+      }),
+      request.body,
+    );
+    const before = await driverDispatchSettings();
+    await withTransaction(async (connection) => {
+      for (const scope of driverPriorityScopes) {
+        await connection.execute(
+          `INSERT INTO driver_dispatch_settings (scope, delay_minutes, updated_by)
+           VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE delay_minutes = VALUES(delay_minutes),
+             updated_by = VALUES(updated_by)`,
+          [scope, input[scope], session.id],
+        );
+      }
+    });
+    await audit(
+      session.id,
+      'driver_dispatch_settings.update',
+      'driver_dispatch_settings',
+      'all',
+      before,
+      input,
+      request.ip,
+    );
+    publish('admins', 'driver-dispatch-settings:updated', input);
+    return { data: input };
+  });
+
   app.put('/v1/admin/tariffs', async (request) => {
     const session = await auth(request, 'admin');
     const input = parse(
@@ -5627,5 +5852,9 @@ export async function registerRoutes(
     return { data: { currency: 'RUB', ...input } };
   });
 
-  return { handleMessengerOrderAction, expireStaleSearchingOrders };
+  return {
+    handleMessengerOrderAction,
+    expireStaleSearchingOrders,
+    releaseDuePriorityOrders,
+  };
 }

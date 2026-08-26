@@ -6,6 +6,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { driverPriorityScopeLabels, driverPriorityScopes } from '@/domain/driver-priority';
 import type { AdminAccountSummary } from '@/domain/models';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { colors, opacity, radius, spacing, typography } from '@/theme/tokens';
@@ -244,6 +245,15 @@ export function AdminAccountsList({ kind, title, subtitle, items, loading, error
                     {item.phone ?? 'Телефон не указан'}
                     {item.vehicle ? ` · ${item.vehicle.make} ${item.vehicle.model} · ${item.vehicle.plate}` : ''}
                   </Text>
+                  {kind === 'drivers' && item.priorities && (
+                    <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
+                      Приоритет:{' '}
+                      {driverPriorityScopes
+                        .filter((scope) => item.priorities?.[scope])
+                        .map((scope) => driverPriorityScopeLabels[scope])
+                        .join(' · ') || 'не назначен'}
+                    </Text>
+                  )}
                   {!!item.blockReason && (
                     <Text numberOfLines={1} style={{ ...typography.caption, color: colors.dangerText }}>
                       {item.blockReason}
