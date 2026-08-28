@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Text, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
@@ -55,8 +55,10 @@ function SettingToggle({
 
 export function SettingsScreen() {
   const [push, setPush] = useState(false);
+  const [pushChanging, setPushChanging] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushInfo, setPushInfo] = useState<string | null>(null);
+  const [pushSettingsRequired, setPushSettingsRequired] = useState(false);
   const [pushTesting, setPushTesting] = useState(false);
   const { token } = useSession();
   const { dark, setDark } = useAppTheme();
@@ -70,30 +72,75 @@ export function SettingsScreen() {
   const { shareLocationWithDriver, setShareLocationWithDriver } = usePassengerPreferences();
 
   useEffect(() => {
-    void hasNotificationPermission().then(setPush);
+    let active = true;
+    const refreshPermission = async () => {
+      const granted = await hasNotificationPermission();
+      if (!active) return;
+      setPush(granted);
+      if (granted) {
+        setPushError(null);
+        setPushSettingsRequired(false);
+      }
+    };
+    void refreshPermission();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshPermission();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
   }, []);
 
   const changePush = async (enabled: boolean) => {
+    if (pushChanging) return;
+    setPushChanging(true);
     setPushError(null);
     setPushInfo(null);
-    if (enabled) {
-      try {
-        const granted = await requestNotificationPermission();
-        const registered = granted && token
-          ? await syncPushRegistration(token)
-          : false;
-        setPush(registered);
-        if (granted && !registered) setPushError('Не удалось зарегистрировать устройство для push.');
-      } catch (error) {
-        setPush(false);
-        setPushError(error instanceof Error ? error.message : 'Не удалось подключить push.');
-      }
-    } else {
-      if (Platform.OS === 'web') {
-        setPushError('Отключите уведомления в настройках сайта браузера.');
+    setPushSettingsRequired(false);
+    try {
+      if (enabled) {
+        try {
+          const granted = await requestNotificationPermission();
+          if (!granted) {
+            setPush(false);
+            setPushSettingsRequired(Platform.OS !== 'web');
+            setPushError(
+              Platform.OS === 'web'
+                ? 'Разрешите уведомления в настройках сайта браузера.'
+                : 'Android не разрешил уведомления. Откройте настройки приложения и включите их вручную.',
+            );
+            return;
+          }
+          if (!token) {
+            setPush(false);
+            setPushError('Не удалось определить активную сессию. Войдите в приложение ещё раз.');
+            return;
+          }
+          const registered = await syncPushRegistration(token);
+          setPush(registered);
+          if (!registered) setPushError('Не удалось зарегистрировать устройство для push.');
+        } catch (error) {
+          setPush(false);
+          setPushError(error instanceof Error ? error.message : 'Не удалось подключить push.');
+        }
       } else {
-        await Linking.openSettings();
+        if (Platform.OS === 'web') {
+          setPushError('Отключите уведомления в настройках сайта браузера.');
+        } else {
+          await Linking.openSettings();
+        }
       }
+    } finally {
+      setPushChanging(false);
+    }
+  };
+
+  const openNotificationSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch (error) {
+      setPushError(error instanceof Error ? error.message : 'Не удалось открыть настройки приложения.');
     }
   };
 
@@ -156,12 +203,18 @@ export function SettingsScreen() {
           title="Уведомления"
           subtitle="Новые заказы, назначение и прибытие водителя"
           value={push}
+          disabled={pushChanging}
           onValueChange={(value) => void changePush(value)}
         />
         {!!pushError && (
           <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
             {pushError}
           </Text>
+        )}
+        {pushSettingsRequired && (
+          <AppButton variant="secondary" onPress={() => void openNotificationSettings()}>
+            Открыть настройки приложения
+          </AppButton>
         )}
         {!!pushInfo && (
           <Text accessibilityLiveRegion="polite" selectable style={{ ...typography.caption, color: colors.success }}>

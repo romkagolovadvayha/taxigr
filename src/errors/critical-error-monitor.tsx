@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { useSession } from '@/auth/session-provider';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
+import { classifyWebErrorEvent } from '@/errors/web-error-classifier';
 
 type GlobalErrorHandler = (error: Error, isFatal?: boolean) => void;
 type ErrorUtilsApi = {
@@ -23,28 +24,23 @@ export function CriticalErrorMonitor() {
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const handleError = (event: ErrorEvent) => {
-        const target = event.target;
-        const resource =
-          target instanceof HTMLScriptElement
-            ? target.src
-            : target instanceof HTMLLinkElement
-              ? target.href
-              : null;
-        if (resource) {
-          const resourceUrl = new URL(resource, window.location.href);
+        const classified = classifyWebErrorEvent(event, window);
+        if (!classified) return;
+        if (classified.kind === 'resource') {
+          const resourceUrl = new URL(classified.resource.url, window.location.href);
           void reportCriticalClientError(
-            new Error(`Не удалось загрузить ${target instanceof HTMLScriptElement ? 'скрипт' : 'стиль'}`),
+            new Error(`Не удалось загрузить ${classified.resource.label}`),
             {
               source: 'resource-error',
               route: context.current.pathname,
               token: context.current.token,
-              fatal: target instanceof HTMLScriptElement,
+              fatal: classified.resource.fatal,
               resource: `${resourceUrl.origin}${resourceUrl.pathname}`,
             },
           );
           return;
         }
-        void reportCriticalClientError(event.error ?? new Error(event.message || 'Ошибка браузера'), {
+        void reportCriticalClientError(classified.error, {
           source: 'global-error',
           route: context.current.pathname,
           token: context.current.token,

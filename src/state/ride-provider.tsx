@@ -99,6 +99,11 @@ function appendUniqueOrders(current: RideOrder[], next: RideOrder[]): RideOrder[
   return [...current, ...next.filter((order) => !existingIds.has(order.id))];
 }
 
+function updateDriverCoordinates(order: RideOrder, coordinates: Coordinates): RideOrder {
+  if (!order.driver) return order;
+  return { ...order, driver: { ...order.driver, coordinates } };
+}
+
 function idempotencyKey(): string {
   return `ride-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
@@ -128,6 +133,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentRideRef = useRef(currentRide);
   const destinationDefaultToken = useRef<string | null>(null);
   const pendingOrderCreation = useRef<{ fingerprint: string; key: string } | null>(null);
   const transitionInFlight = useRef(false);
@@ -136,6 +142,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     sessionUserIdRef.current = userId;
   }, [userId]);
+
+  useEffect(() => {
+    currentRideRef.current = currentRide;
+  }, [currentRide]);
 
   const selectPickup = useCallback((address: Address) => {
     setRouteCoordinates([]);
@@ -284,16 +294,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
     });
     socket.on('driver:location', (coordinates: Coordinates) => {
-      setCurrentRide((current) => {
-        if (!current?.driver) return current;
-        const next = { ...current, driver: { ...current.driver, coordinates } };
-        setOrders((items) => items.map((item) => (item.id === next.id ? next : item)));
-        return next;
-      });
+      const passengerRideId = currentRideRef.current?.id;
+      setCurrentRide((current) =>
+        current ? updateDriverCoordinates(current, coordinates) : current,
+      );
+      if (passengerRideId) {
+        setOrders((items) =>
+          items.map((item) =>
+            item.id === passengerRideId ? updateDriverCoordinates(item, coordinates) : item,
+          ),
+        );
+      }
       setDriverRide((current) =>
-        current?.driver
-          ? { ...current, driver: { ...current.driver, coordinates } }
-          : current,
+        current ? updateDriverCoordinates(current, coordinates) : current,
       );
     });
     socket.on(

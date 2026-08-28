@@ -48,7 +48,9 @@ export function NotificationRegistrar() {
     let active = true;
     const register = async () => {
       if (!active) return;
-      await syncPushRegistration(token, true);
+      // Registration must not trigger the Android permission dialog by itself.
+      // The user requests it explicitly from the notification settings switch.
+      await syncPushRegistration(token);
     };
     const retryRegistration = () => void register().catch((error) => {
       void reportCriticalClientError(error, {
