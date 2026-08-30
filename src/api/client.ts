@@ -79,7 +79,9 @@ export async function apiRequest<T>(
 
     if (!response.ok) {
       throw new ApiError(
-        payload.error?.message ?? `Ошибка сервера (${response.status})`,
+        payload.error?.message ?? (response.status === 413
+          ? 'Размер загружаемого файла слишком большой'
+          : `Ошибка сервера (${response.status})`),
         response.status,
         payload.error?.code,
       );

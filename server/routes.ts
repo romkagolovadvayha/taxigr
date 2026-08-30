@@ -97,6 +97,7 @@ import {
   decodeRideChatImage,
   MAX_RIDE_CHAT_IMAGE_BYTES,
   presentRideChatMessage,
+  RIDE_CHAT_UPLOAD_BODY_MAX_BYTES,
   rideChatAvatarUrl,
   rideChatMessageSelect,
   rideChatPush,
@@ -3834,7 +3835,8 @@ export async function registerRoutes(
   app.post(
     '/v1/orders/:id/messages',
     {
-      bodyLimit: 5 * 1024 * 1024,
+      // A 5 MB binary image occupies about 6.7 MB after base64 encoding in JSON.
+      bodyLimit: RIDE_CHAT_UPLOAD_BODY_MAX_BYTES,
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (request, reply) => {

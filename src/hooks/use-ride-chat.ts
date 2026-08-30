@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
-import { apiRequest, getSocketUrl } from '@/api/client';
+import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import type {
   RideChatImageMimeType,
@@ -131,21 +131,41 @@ export function useRideChat(orderId: string | undefined) {
     setSending(true);
     setError(null);
     try {
-      const message = await apiRequest<RideChatMessage>(`/v1/orders/${orderId}/messages`, {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          id: randomUUID(),
-          body: normalizedBody,
-          ...(attachment ? { attachment: { type: 'image' as const, ...attachment } } : {}),
-        }),
+      const requestBody = JSON.stringify({
+        id: randomUUID(),
+        body: normalizedBody,
+        ...(attachment ? { attachment: { type: 'image' as const, ...attachment } } : {}),
       });
+      let message: RideChatMessage | undefined;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          message = await apiRequest<RideChatMessage>(`/v1/orders/${orderId}/messages`, {
+            method: 'POST',
+            token,
+            body: requestBody,
+            timeoutMs: attachment ? 45_000 : 12_000,
+          });
+          break;
+        } catch (reason) {
+          const transient = reason instanceof ApiError &&
+            (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT');
+          if (!transient || attempt > 0) throw reason;
+        }
+      }
+      if (!message) throw new ApiError('Не удалось отправить сообщение', 0, 'NETWORK_ERROR');
+      const sentMessage = message;
       setThread((current) => current
-        ? { ...current, messages: upsertRideChatMessage(current.messages, message) }
+        ? { ...current, messages: upsertRideChatMessage(current.messages, sentMessage) }
         : current);
       return true;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Не удалось отправить сообщение или фотографию');
+      const isAttachmentNetworkError = attachment && reason instanceof ApiError &&
+        (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT');
+      setError(isAttachmentNetworkError
+        ? 'Не удалось загрузить фотографию. Проверьте интернет и повторите отправку'
+        : reason instanceof Error
+          ? reason.message
+          : 'Не удалось отправить сообщение или фотографию');
       return false;
     } finally {
       setSending(false);

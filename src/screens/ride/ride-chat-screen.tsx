@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,16 +26,24 @@ import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
 import { IconButton } from '@/components/ui/icon-button';
-import type { RideChatImageMimeType, RideChatMessage } from '@/domain/models';
+import type { RideChatMessage } from '@/domain/models';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
 import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
 import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
-import { base64ByteLength, imageMimeTypeFromBase64 } from '@/utils/image-data';
+import { base64ByteLength } from '@/utils/image-data';
 
 type SelectedChatImage = RideChatImageUpload & {
   uri: string;
   sizeBytes: number;
 };
+
+const imageOptimizationSteps = [
+  { maxDimension: 2_048, compress: 0.78 },
+  { maxDimension: 1_800, compress: 0.68 },
+  { maxDimension: 1_600, compress: 0.58 },
+  { maxDimension: 1_280, compress: 0.48 },
+  { maxDimension: 1_024, compress: 0.4 },
+] as const;
 
 function formatImageSize(sizeBytes: number): string {
   if (sizeBytes < 1_000_000) return `${Math.max(1, Math.round(sizeBytes / 1_000))} КБ`;
@@ -42,6 +51,48 @@ function formatImageSize(sizeBytes: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} МБ`;
+}
+
+function optimizedFileName(fileName: string | null | undefined): string {
+  const baseName = (fileName ?? 'photo')
+    .replace(/\.[^./\\]+$/u, '')
+    .trim()
+    .slice(0, 155);
+  return `${baseName || 'photo'}.jpg`;
+}
+
+async function optimizePickedImage(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<SelectedChatImage> {
+  for (const step of imageOptimizationSteps) {
+    const context = ImageManipulator.manipulate(asset.uri);
+    const longestSide = Math.max(asset.width, asset.height);
+    if (longestSide > step.maxDimension) {
+      context.resize(asset.width >= asset.height
+        ? { width: step.maxDimension, height: null }
+        : { width: null, height: step.maxDimension });
+    }
+    const rendered = await context.renderAsync();
+    const optimized = await rendered.saveAsync({
+      base64: true,
+      compress: step.compress,
+      format: SaveFormat.JPEG,
+    });
+    if (!optimized.base64) continue;
+    const sizeBytes = base64ByteLength(optimized.base64);
+    if (sizeBytes <= RIDE_CHAT_IMAGE_MAX_BYTES) {
+      return {
+        uri: optimized.uri,
+        base64: optimized.base64,
+        mimeType: 'image/jpeg',
+        sizeBytes,
+        width: optimized.width,
+        height: optimized.height,
+        fileName: optimizedFileName(asset.fileName),
+      };
+    }
+  }
+  throw new Error('Не удалось уменьшить фотографию до 5 МБ');
 }
 
 export function RideChatScreen() {
@@ -55,6 +106,7 @@ export function RideChatScreen() {
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedChatImage | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [cameraPermissionBlocked, setCameraPermissionBlocked] = useState(false);
   const {
@@ -69,34 +121,26 @@ export function RideChatScreen() {
 
   const messages = thread?.messages ?? [];
 
-  const acceptPickerResult = useCallback((result: ImagePicker.ImagePickerResult) => {
+  const acceptPickerResult = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (!asset?.base64) {
+    if (!asset?.uri) {
       setPickerError('Не удалось прочитать выбранную фотографию');
       return;
     }
-    const mimeType: RideChatImageMimeType | null = imageMimeTypeFromBase64(asset.base64);
-    if (!mimeType) {
-      setPickerError('Поддерживаются фотографии JPG, PNG и WebP');
-      return;
-    }
-    const sizeBytes = base64ByteLength(asset.base64);
-    if (sizeBytes > RIDE_CHAT_IMAGE_MAX_BYTES) {
-      setPickerError('Фотография слишком большая. Выберите снимок не больше 3 МБ');
-      return;
-    }
+    setPreparingImage(true);
     setPickerError(null);
-    setCameraPermissionBlocked(false);
-    setSelectedImage({
-      uri: asset.uri,
-      base64: asset.base64,
-      mimeType,
-      sizeBytes,
-      ...(asset.width > 0 ? { width: asset.width } : {}),
-      ...(asset.height > 0 ? { height: asset.height } : {}),
-      ...(asset.fileName ? { fileName: asset.fileName.slice(0, 160) } : {}),
-    });
+    try {
+      const optimized = await optimizePickedImage(asset);
+      setCameraPermissionBlocked(false);
+      setSelectedImage(optimized);
+    } catch (reason) {
+      setPickerError(reason instanceof Error
+        ? reason.message
+        : 'Не удалось оптимизировать выбранную фотографию');
+    } finally {
+      setPreparingImage(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -108,7 +152,7 @@ export function RideChatScreen() {
           setPickerError('Не удалось восстановить выбранную фотографию');
           return;
         }
-        acceptPickerResult(result);
+        void acceptPickerResult(result);
       })
       .catch(() => setPickerError('Не удалось восстановить выбранную фотографию'));
   }, [acceptPickerResult]);
@@ -162,10 +206,9 @@ export function RideChatScreen() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         cameraType: ImagePicker.CameraType.back,
-        quality: 0.55,
-        base64: true,
+        quality: 0.9,
       });
-      acceptPickerResult(result);
+      await acceptPickerResult(result);
     } catch {
       setPickerError('Не удалось открыть камеру');
     }
@@ -181,10 +224,9 @@ export function RideChatScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.55,
-        base64: true,
+        quality: 0.9,
       });
-      acceptPickerResult(result);
+      await acceptPickerResult(result);
     } catch {
       setPickerError('Не удалось открыть галерею');
     }
@@ -340,6 +382,18 @@ export function RideChatScreen() {
               )}
               {thread.canSend ? (
                 <View style={{ gap: spacing.x2 }}>
+                  {preparingImage && (
+                    <View
+                      accessibilityLiveRegion="polite"
+                      role="status"
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}
+                    >
+                      <ActivityIndicator size="small" color={colors.inkSecondary} />
+                      <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+                        Оптимизируем фотографию…
+                      </Text>
+                    </View>
+                  )}
                   {!!selectedImage && (
                     <View
                       style={{
@@ -367,7 +421,7 @@ export function RideChatScreen() {
                       />
                       <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
                         <Text numberOfLines={1} style={{ ...typography.caption, color: colors.ink }}>
-                          Фотография готова к отправке
+                          Фотография оптимизирована и готова к отправке
                         </Text>
                         <Text style={{ ...typography.micro, color: colors.inkSecondary }}>
                           {formatImageSize(selectedImage.sizeBytes)}
@@ -376,7 +430,7 @@ export function RideChatScreen() {
                       <IconButton
                         icon="close"
                         label="Убрать фотографию"
-                        disabled={sending}
+                        disabled={sending || preparingImage}
                         size={40}
                         onPress={() => setSelectedImage(null)}
                       />
@@ -387,7 +441,7 @@ export function RideChatScreen() {
                       ref={attachmentButtonRef}
                       icon="paperclip"
                       label="Прикрепить фотографию"
-                      disabled={sending}
+                      disabled={sending || preparingImage}
                       size={52}
                       onPress={() => setAttachmentMenuOpen(true)}
                     />
@@ -398,14 +452,15 @@ export function RideChatScreen() {
                       placeholder={selectedImage ? 'Добавить подпись' : 'Напишите сообщение'}
                       placeholderTextColor={colors.inkSecondary}
                       multiline
+                      scrollEnabled
+                      textAlignVertical="center"
                       maxLength={1_000}
                       editable={!sending}
                       style={{
                         flex: 1,
-                        minHeight: 52,
-                        maxHeight: 120,
+                        height: 52,
                         paddingHorizontal: spacing.x4,
-                        paddingVertical: spacing.x3,
+                        paddingVertical: 0,
                         borderRadius: radius.lg,
                         borderCurve: 'continuous',
                         borderWidth: 1,
@@ -420,8 +475,8 @@ export function RideChatScreen() {
                       accessibilityLabel={selectedImage && !draft.trim()
                         ? 'Отправить фотографию'
                         : 'Отправить сообщение'}
-                      aria-busy={sending}
-                      disabled={(!draft.trim() && !selectedImage) || sending}
+                      aria-busy={sending || preparingImage}
+                      disabled={(!draft.trim() && !selectedImage) || sending || preparingImage}
                       onPress={() => void handleSend()}
                       style={({ pressed }) => ({
                         width: 52,
@@ -430,7 +485,7 @@ export function RideChatScreen() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: colors.brand,
-                        opacity: (!draft.trim() && !selectedImage) || sending
+                        opacity: (!draft.trim() && !selectedImage) || sending || preparingImage
                           ? 0.42
                           : pressed
                             ? 0.82
@@ -454,7 +509,7 @@ export function RideChatScreen() {
         <AppModal
           visible={attachmentMenuOpen}
           title="Прикрепить фотографию"
-          description="Сделайте новый снимок или выберите готовый из галереи. Максимальный размер — 3 МБ."
+          description="Сделайте снимок или выберите фотографию из галереи. Мы автоматически уменьшим её; максимальный размер после оптимизации — 5 МБ."
           returnFocusRef={attachmentButtonRef}
           onClose={() => setAttachmentMenuOpen(false)}
         >

@@ -91,6 +91,7 @@ describe('ride chat', () => {
   });
 
   it('accepts real image bytes, rejects disguised files and describes photo-only pushes', () => {
+    expect(MAX_RIDE_CHAT_IMAGE_BYTES).toBe(5_000_000);
     const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
     expect(decodeRideChatImage(pngBase64, 'image/png').subarray(0, 8)).toEqual(
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
@@ -102,6 +103,13 @@ describe('ride chat', () => {
     } catch (error) {
       expect(error).toMatchObject({ statusCode: 400, code: 'RIDE_CHAT_IMAGE_INVALID' });
     }
+
+    const jpegAtLimit = Buffer.alloc(MAX_RIDE_CHAT_IMAGE_BYTES);
+    jpegAtLimit[0] = 0xff;
+    jpegAtLimit[1] = 0xd8;
+    expect(decodeRideChatImage(jpegAtLimit.toString('base64'), 'image/jpeg')).toHaveLength(
+      MAX_RIDE_CHAT_IMAGE_BYTES,
+    );
 
     const oversizedJpeg = Buffer.alloc(MAX_RIDE_CHAT_IMAGE_BYTES + 1);
     oversizedJpeg[0] = 0xff;

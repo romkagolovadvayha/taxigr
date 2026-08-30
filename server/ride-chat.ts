@@ -9,6 +9,7 @@ import type { PushMessage } from './push';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '../src/domain/ride-chat';
 
 export const MAX_RIDE_CHAT_IMAGE_BYTES = RIDE_CHAT_IMAGE_MAX_BYTES;
+export const RIDE_CHAT_UPLOAD_BODY_MAX_BYTES = 8 * 1024 * 1024;
 
 export type RideChatMessageRow = RowDataPacket & {
   id: string;
@@ -98,7 +99,7 @@ export function decodeRideChatImage(
   const payload = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
   const bytes = Buffer.from(payload, 'base64');
   if (!bytes.length || bytes.length > MAX_RIDE_CHAT_IMAGE_BYTES) {
-    throw Object.assign(new Error('Фотография должна быть не больше 3 МБ'), {
+    throw Object.assign(new Error('Фотография должна быть не больше 5 МБ'), {
       statusCode: 413,
       code: 'RIDE_CHAT_IMAGE_TOO_LARGE',
     });

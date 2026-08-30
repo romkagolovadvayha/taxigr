@@ -1,6 +1,6 @@
 import type { RideChatMessage, RideStatus } from '@/domain/models';
 
-export const RIDE_CHAT_IMAGE_MAX_BYTES = 3_000_000;
+export const RIDE_CHAT_IMAGE_MAX_BYTES = 5_000_000;
 
 const writableStatuses = new Set<RideStatus>([
   'accepted',

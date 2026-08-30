@@ -1,4 +1,6 @@
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
+import regular from 'expo-symbols/androidWeights/regular';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { colors } from '@/theme/tokens';
@@ -62,6 +64,22 @@ export function AppIcon({
         contentFit="contain"
         alt=""
         accessible={false}
+      />
+    );
+  }
+
+  if (name === 'paperclip' || name === 'send') {
+    return (
+      <SymbolView
+        name={name === 'paperclip'
+          ? { ios: 'paperclip', android: 'attach_file', web: 'attach_file' }
+          : { ios: 'paperplane.fill', android: 'send', web: 'send' }}
+        size={size}
+        tintColor={color}
+        weight={{ ios: 'regular', android: regular }}
+        accessible={false}
+        aria-hidden
+        style={{ width: size, height: size }}
       />
     );
   }
@@ -151,9 +169,6 @@ export function AppIcon({
           <Path d="M8 8h8M8 12h8M8 16h5" {...common} />
         </>
       )}
-      {name === 'paperclip' && (
-        <Path d="M8.5 12.5l6.7-6.7a3.2 3.2 0 014.5 4.5l-8.2 8.2a5 5 0 01-7.1-7.1l8-8a2.8 2.8 0 014 4l-7.8 7.8a1.2 1.2 0 01-1.7-1.7l7.1-7.1" {...common} />
-      )}
       {name === 'phone' && (
         <Path
           d="M7.2 3.5l2.2 4.2-2 1.7a15.6 15.6 0 007.2 7.2l1.7-2 4.2 2.2-.8 3.7c-.2.9-1 1.5-1.9 1.5C9.1 22 2 14.9 2 6.2c0-.9.6-1.7 1.5-1.9z"
@@ -178,12 +193,6 @@ export function AppIcon({
         <>
           <Circle cx="10.5" cy="10.5" r="6.5" {...common} />
           <Path d="M15.5 15.5L21 21" {...common} />
-        </>
-      )}
-      {name === 'send' && (
-        <>
-          <Path d="M3 11.5L21 3l-7.5 18-2.2-7.3L3 11.5z" {...common} />
-          <Path d="M11.3 13.7L21 3" {...common} />
         </>
       )}
       {name === 'settings' && (

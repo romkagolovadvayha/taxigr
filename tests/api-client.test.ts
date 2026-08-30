@@ -61,4 +61,24 @@ describe('API client request bodies', () => {
       expect.objectContaining({ body: undefined }),
     );
   });
+
+  it('explains an oversized upload even when a proxy returns a non-JSON 413 response', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 413,
+      json: async () => {
+        throw new SyntaxError('HTML response');
+      },
+    }));
+    const { apiRequest } = await import('../src/api/client');
+
+    await expect(apiRequest('/v1/orders/order/messages', {
+      method: 'POST',
+      body: JSON.stringify({ attachment: true }),
+    })).rejects.toMatchObject({
+      status: 413,
+      message: 'Размер загружаемого файла слишком большой',
+    });
+  });
 });
