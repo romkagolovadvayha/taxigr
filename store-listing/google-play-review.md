@@ -14,9 +14,10 @@ Instructions:
 
 The code is permanent and reusable; no SMS, external messenger, payment, subscription, or location restriction is required. The account has passenger-only access. Reviewers can select addresses, calculate a fare, and inspect the order confirmation flow. Please do not submit a real ride order.
 
-## Release notes 1.0.2 (12)
+## Release notes 1.0.6 (21)
 
-- Added VK ID phone verification and optional community bot messages.
-- Improved the authentication flow and direct VK community chat opening.
-- Polished messenger icons and sign-in UI.
-- Improved reliability of production authentication.
+- Added multi-stop routes.
+- Added passenger-driver ride chat with photo attachments.
+- Added queued next rides for drivers.
+- Improved routing, notifications, and car display on the map.
+- Fixed chat image upload and full-screen preview issues.
