@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 
@@ -85,18 +86,29 @@ export function AdminOrdersScreen() {
             </View>
             <StatusChip label={rideStatusLabel[order.status]} tone={order.status === 'completed' ? 'success' : 'info'} />
             <MoneyValue valueMinor={order.priceMinor} compact />
-            {!['completed', 'cancelled'].includes(order.status) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
               <AppButton
-                variant="quiet"
+                variant="secondary"
+                compact
                 fullWidth={false}
-                onPress={() => {
-                  setCancellationReason('');
-                  setSelectedOrder(order);
-                }}
+                onPress={() => router.push(`/admin/orders/${order.id}` as never)}
               >
-                Отменить
+                Подробнее
               </AppButton>
-            )}
+              {!['completed', 'cancelled'].includes(order.status) && (
+                <AppButton
+                  variant="quiet"
+                  compact
+                  fullWidth={false}
+                  onPress={() => {
+                    setCancellationReason('');
+                    setSelectedOrder(order);
+                  }}
+                >
+                  Отменить
+                </AppButton>
+              )}
+            </View>
           </View>
         ))}
       </View>

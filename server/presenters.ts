@@ -28,6 +28,7 @@ export type OrderRow = RowDataPacket & {
   destination_details: string | null;
   destination_lat: number;
   destination_lon: number;
+  destinations_json: unknown;
   distance_meters: number;
   duration_seconds: number;
   route_geometry: unknown;
@@ -117,23 +118,57 @@ function address(
   };
 }
 
+function destinations(value: unknown): Address[] {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return [];
+    const candidate = item as Partial<Address>;
+    const latitude = candidate.coordinates?.latitude;
+    const longitude = candidate.coordinates?.longitude;
+    if (
+      typeof candidate.label !== 'string' ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) return [];
+    return [address(
+      candidate.id ?? `destination-${index + 1}`,
+      candidate.label,
+      candidate.details ?? null,
+      Number(latitude),
+      Number(longitude),
+    )];
+  });
+}
+
 export function presentOrder(row: OrderRow): RideOrder {
   const assigned =
     Boolean(row.driver_id) &&
     ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(row.status);
+  const orderedDestinations = destinations(row.destinations_json);
+  const legacyDestination = address(
+    'destination',
+    row.destination_label,
+    row.destination_details,
+    row.destination_lat,
+    row.destination_lon,
+  );
+  const finalDestination = orderedDestinations.at(-1) ?? legacyDestination;
   return {
     id: row.id,
     passengerId: row.passenger_id,
     driverId: row.driver_id ?? undefined,
     driverQueuePosition: assigned ? (row.active_driver_id ? 1 : 2) : undefined,
     pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
-    destination: address(
-      'destination',
-      row.destination_label,
-      row.destination_details,
-      row.destination_lat,
-      row.destination_lon,
-    ),
+    destinations: orderedDestinations.length ? orderedDestinations : [legacyDestination],
+    destination: finalDestination,
     tariff: row.tariff,
     status: row.status,
     pricingScope: row.pricing_scope,

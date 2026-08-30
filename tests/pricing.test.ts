@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateCommissionMinor,
   calculateFareMinor,
+  calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
   defaultPricingRules,
   farePeriodAt,
@@ -56,6 +57,48 @@ describe('route pricing', () => {
     const economy = calculateFareMinor(9_500, 'economy', 'district', rules, daytime);
     const child = calculateFareMinor(9_500, 'child', 'district', rules, daytime);
     expect(child - economy).toBe(defaultPricingRules.childSurchargeMinor);
+  });
+
+  it('adds 60 percent of the Grahovo fare for every additional local stop', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    const segments = [
+      { distanceMeters: 800, scope: 'grahovo' as const },
+      { distanceMeters: 1_100, scope: 'grahovo' as const },
+      { distanceMeters: 900, scope: 'grahovo' as const },
+    ];
+
+    expect(calculateMultiStopFareMinor(segments, 'economy', true, rules, daytime)).toBe(33_000);
+    expect(calculateMultiStopFareMinor(segments, 'child', true, rules, daytime)).toBe(40_000);
+    expect(
+      calculateMultiStopFareMinor(
+        segments,
+        'economy',
+        true,
+        { ...rules, additionalStopGrahovoSurchargeBps: 4_000 },
+        daytime,
+      ),
+    ).toBe(27_000);
+  });
+
+  it('adds each district or intercity leg by its current tariff', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    const segments = [
+      { distanceMeters: 10_000, scope: 'district' as const },
+      { distanceMeters: 50_000, scope: 'intercity' as const },
+    ];
+
+    expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(210_000);
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(217_000);
+  });
+
+  it('adds a district leg to an earlier fixed Grahovo leg', () => {
+    const daytime = new Date('2026-08-03T03:00:00.000Z');
+    const segments = [
+      { distanceMeters: 900, scope: 'grahovo' as const },
+      { distanceMeters: 10_000, scope: 'district' as const },
+    ];
+
+    expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(75_000);
   });
 });
 

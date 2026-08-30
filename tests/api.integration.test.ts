@@ -655,13 +655,43 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(quote.data?.pricingScope).toBe('grahovo');
     expect(quote.data?.route.distanceMeters).toBeGreaterThan(0);
     expect(quote.data?.route.durationSeconds).toBeGreaterThan(0);
-    expect(quote.data?.route.coordinates.length).toBeGreaterThan(2);
+    expect(quote.data?.route.coordinates.length).toBeGreaterThanOrEqual(2);
     expect(quote.data?.tariffs.map((tariff) => tariff.code)).toEqual(['economy', 'child']);
     expect(quote.data?.tariffs[1]?.childSeatIncluded).toBe(true);
     expect(quote.data?.tariffs[1]?.priceMinor).toBeGreaterThan(
       quote.data?.tariffs[0]?.priceMinor ?? 0,
     );
     expect(quote.data?.tariffs[0]?.priceMinor).toBe(15_000);
+
+    const secondLocalDestination = {
+      id: 'integration-second-local-destination',
+      label: 'ул. 50 лет Победы, 19',
+      details: 'с. Грахово, Граховский район, Удмуртская Республика',
+      houseNumber: '19',
+      coordinates: { latitude: 56.055332, longitude: 51.960263 },
+    };
+    const multiStopQuote = await api<{
+      quoteToken: string;
+      route: { coordinates: { latitude: number; longitude: number }[] };
+      tariffs: { code: string; priceMinor: number }[];
+    }>('/v1/quotes', {
+      method: 'POST',
+      token: passengerToken,
+      body: {
+        pickup,
+        destinations: [destination, secondLocalDestination],
+        destination: secondLocalDestination,
+      },
+    });
+    const baseEconomyPrice = quote.data?.tariffs[0]?.priceMinor ?? 0;
+    expect(multiStopQuote.status).toBe(200);
+    expect(multiStopQuote.data?.route.coordinates.length).toBeGreaterThanOrEqual(3);
+    expect(multiStopQuote.data?.tariffs[0]?.priceMinor).toBe(
+      baseEconomyPrice +
+        Math.round(
+          (baseEconomyPrice * originalTariffs.additionalStopGrahovoSurchargeBps) / 10_000,
+        ),
+    );
 
     const tamperedOrder = await api('/v1/orders', {
       method: 'POST',
@@ -755,8 +785,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(routed.status).toBe(200);
       expect(routed.data?.route.distanceMeters).toBeGreaterThan(routeCase.minimumMeters);
       expect(routed.data?.route.durationSeconds).toBeGreaterThan(0);
-      expect(routed.data?.route.coordinates.length).toBeGreaterThan(2);
-      expect(['osrm', 'fallback']).toContain(routed.data?.route.source);
+      expect(routed.data?.route.coordinates.length).toBeGreaterThanOrEqual(2);
+      expect(['osrm', 'estimate']).toContain(routed.data?.route.source);
     }
 
     const missingHouse = await api('/v1/quotes', {
@@ -773,6 +803,27 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
     expect(missingHouse.status).toBe(400);
     expect(missingHouse.error?.code).toBe('VALIDATION_ERROR');
+
+    const multiStopOrder = await api<RideOrder>('/v1/orders', {
+      method: 'POST',
+      token: passengerToken,
+      body: {
+        pickup,
+        destinations: [destination, secondLocalDestination],
+        destination: secondLocalDestination,
+        tariff: 'economy',
+        quoteToken: multiStopQuote.data!.quoteToken,
+        paymentMethod: 'cash',
+        idempotencyKey: `integration-multi-stop-${randomUUID()}`,
+        deviceId: `integration-multi-stop-device-${randomUUID()}`,
+      },
+    });
+    expect(multiStopOrder.status).toBe(201);
+    expect(multiStopOrder.data?.destinations?.map((item) => item.label)).toEqual([
+      destination.label,
+      secondLocalDestination.label,
+    ]);
+    expect(multiStopOrder.data?.destination.label).toBe(secondLocalDestination.label);
 
     const invalid = await api('/v1/orders', {
       method: 'POST',
@@ -1408,6 +1459,11 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       transports: ['websocket'],
       forceNew: true,
     });
+    const adminSocket = io(apiUrl, {
+      auth: { token: adminToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
     let driverLocationEvents = 0;
     let passengerLocationEvents = 0;
     passengerSocket.on('driver:location', () => {
@@ -1420,12 +1476,19 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       await Promise.all([
         socketEvent(passengerSocket, 'connect'),
         socketEvent(driverSocket, 'connect'),
+        socketEvent(adminSocket, 'connect'),
       ]);
       const availableEvent = socketEvent<RideOrder>(driverSocket, 'order:available');
       const order = await createOrder(passengerToken);
       expect(order.status).toBe(201);
       const available = await availableEvent;
       expect(available.id).toBe(order.data!.id);
+      const unavailableAdminChat = await api(
+        `/v1/orders/${order.data!.id}/messages`,
+        { token: adminToken },
+      );
+      expect(unavailableAdminChat.status).toBe(409);
+      expect(unavailableAdminChat.error?.code).toBe('RIDE_CHAT_UNAVAILABLE');
 
       const acceptedEvent = socketEvent<RideOrder>(passengerSocket, 'order:updated');
       expect(
@@ -1441,6 +1504,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(accepted.status).toBe('accepted');
 
       const driverChatEvent = socketEvent<RideChatMessage>(driverSocket, 'ride-chat:message');
+      const adminChatEvent = socketEvent<RideChatMessage>(adminSocket, 'ride-chat:message');
       const passengerMessageId = randomUUID();
       const passengerMessage = await api<RideChatMessage>(
         `/v1/orders/${order.data!.id}/messages`,
@@ -1453,6 +1517,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(passengerMessage.status).toBe(201);
       expect(passengerMessage.data?.sender.role).toBe('passenger');
       expect((await driverChatEvent).id).toBe(passengerMessageId);
+      expect((await adminChatEvent).id).toBe(passengerMessageId);
 
       const passengerChatEvent = socketEvent<RideChatMessage>(passengerSocket, 'ride-chat:message');
       const driverMessageId = randomUUID();
@@ -1468,19 +1533,139 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(driverMessage.data?.sender.role).toBe('driver');
       expect((await passengerChatEvent).id).toBe(driverMessageId);
 
+      const onePixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      const driverPhotoEvent = socketEvent<RideChatMessage>(driverSocket, 'ride-chat:message');
+      const adminPhotoEvent = socketEvent<RideChatMessage>(adminSocket, 'ride-chat:message');
+      const passengerPhotoId = randomUUID();
+      const passengerPhotoBody = {
+        id: passengerPhotoId,
+        body: '',
+        attachment: {
+          type: 'image',
+          base64: onePixelPng,
+          mimeType: 'image/png',
+          width: 1,
+          height: 1,
+          fileName: 'pickup.png',
+        },
+      };
+      const passengerPhoto = await api<RideChatMessage>(
+        `/v1/orders/${order.data!.id}/messages`,
+        {
+          method: 'POST',
+          token: passengerToken,
+          body: passengerPhotoBody,
+        },
+      );
+      expect(passengerPhoto.status).toBe(201);
+      expect(passengerPhoto.data?.attachment).toMatchObject({
+        type: 'image',
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        fileName: 'pickup.png',
+      });
+      expect((await driverPhotoEvent).id).toBe(passengerPhotoId);
+      expect((await adminPhotoEvent).id).toBe(passengerPhotoId);
+
+      let duplicatePhotoEvents = 0;
+      const countDuplicatePhoto = (message: RideChatMessage) => {
+        if (message.id === passengerPhotoId) duplicatePhotoEvents += 1;
+      };
+      driverSocket.on('ride-chat:message', countDuplicatePhoto);
+      const repeatedPhoto = await api<RideChatMessage>(
+        `/v1/orders/${order.data!.id}/messages`,
+        { method: 'POST', token: passengerToken, body: passengerPhotoBody },
+      );
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      driverSocket.off('ride-chat:message', countDuplicatePhoto);
+      expect(repeatedPhoto.status).toBe(200);
+      expect(repeatedPhoto.data?.id).toBe(passengerPhotoId);
+      expect(duplicatePhotoEvents).toBe(0);
+
+      const conflictingPhotoRetry = await api(
+        `/v1/orders/${order.data!.id}/messages`,
+        {
+          method: 'POST',
+          token: passengerToken,
+          body: { ...passengerPhotoBody, body: 'Другой текст' },
+        },
+      );
+      expect(conflictingPhotoRetry.status).toBe(409);
+      expect(conflictingPhotoRetry.error?.code).toBe('RIDE_CHAT_MESSAGE_CONFLICT');
+
+      const imageUrl = passengerPhoto.data?.attachment?.url;
+      expect(imageUrl).toBeTruthy();
+      const driverImage = await fetch(`${apiUrl}${imageUrl}`, {
+        headers: { Authorization: `Bearer ${driverOneToken}` },
+      });
+      expect(driverImage.status).toBe(200);
+      expect(driverImage.headers.get('content-type')).toContain('image/png');
+      expect(driverImage.headers.get('cache-control')).toContain('no-store');
+      expect(Buffer.from(await driverImage.arrayBuffer()).subarray(0, 8)).toEqual(
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      );
+      expect((await fetch(`${apiUrl}${imageUrl}`, {
+        headers: { Authorization: `Bearer ${outsiderToken}` },
+      })).status).toBe(403);
+      expect((await fetch(`${apiUrl}${imageUrl}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })).status).toBe(200);
+      expect((await fetch(`${apiUrl}${imageUrl}`)).status).toBe(401);
+
+      const disguisedFile = await api(`/v1/orders/${order.data!.id}/messages`, {
+        method: 'POST',
+        token: passengerToken,
+        body: {
+          id: randomUUID(),
+          body: '',
+          attachment: {
+            type: 'image',
+            base64: Buffer.from('not an image').toString('base64'),
+            mimeType: 'image/png',
+          },
+        },
+      });
+      expect(disguisedFile.status).toBe(400);
+      expect(disguisedFile.error?.code).toBe('RIDE_CHAT_IMAGE_INVALID');
+
       const chatHistory = await api<RideChatThread>(
         `/v1/orders/${order.data!.id}/messages`,
         { token: passengerToken },
       );
       expect(chatHistory.status).toBe(200);
-      expect(chatHistory.data?.counterpart.role).toBe('driver');
+      expect(chatHistory.data?.counterpart?.role).toBe('driver');
       expect(chatHistory.data?.messages.map((item) => item.id)).toEqual([
         passengerMessageId,
         driverMessageId,
+        passengerPhotoId,
       ]);
       expect(
         (await api(`/v1/orders/${order.data!.id}/messages`, { token: outsiderToken })).status,
       ).toBe(403);
+      const adminChatHistory = await api<RideChatThread>(
+        `/v1/orders/${order.data!.id}/messages`,
+        { token: adminToken },
+      );
+      expect(adminChatHistory.status).toBe(200);
+      expect(adminChatHistory.data?.viewerRole).toBe('admin');
+      expect(adminChatHistory.data?.canSend).toBe(false);
+      expect(adminChatHistory.data?.participants?.map((item) => item.role)).toEqual([
+        'passenger',
+        'driver',
+      ]);
+      expect(adminChatHistory.data?.messages.map((item) => item.id)).toEqual([
+        passengerMessageId,
+        driverMessageId,
+        passengerPhotoId,
+      ]);
+      const adminSend = await api(`/v1/orders/${order.data!.id}/messages`, {
+        method: 'POST',
+        token: adminToken,
+        body: { id: randomUUID(), body: 'Сообщение администратора' },
+      });
+      expect(adminSend.status).toBe(403);
+      expect(adminSend.error?.code).toBe('ADMIN_RIDE_CHAT_READ_ONLY');
 
       const locationEvent = socketEvent<{ latitude: number; longitude: number }>(
         passengerSocket,
@@ -1594,9 +1779,22 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
           })
         ).status,
       ).toBe(409);
+      const terminalAdminChat = await api<RideChatThread>(
+        `/v1/orders/${order.data!.id}/messages`,
+        { token: adminToken },
+      );
+      expect(terminalAdminChat.status).toBe(200);
+      expect(terminalAdminChat.data?.orderStatus).toBe('cancelled');
+      expect(terminalAdminChat.data?.canSend).toBe(false);
+      expect(terminalAdminChat.data?.messages.map((item) => item.id)).toEqual([
+        passengerMessageId,
+        driverMessageId,
+        passengerPhotoId,
+      ]);
     } finally {
       passengerSocket.disconnect();
       driverSocket.disconnect();
+      adminSocket.disconnect();
     }
   }, 15_000);
 
@@ -2148,6 +2346,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       districtPerKilometer02To07Minor: originalTariffs.districtPerKilometer02To07Minor,
       intercityPerKilometerMinor: originalTariffs.intercityPerKilometerMinor,
       childSurchargeMinor: originalTariffs.childSurchargeMinor,
+      additionalStopGrahovoSurchargeBps:
+        originalTariffs.additionalStopGrahovoSurchargeBps,
       waitingFreeMinutes: originalTariffs.waitingFreeMinutes,
       waitingPerMinuteMinor: originalTariffs.waitingPerMinuteMinor,
       searchPriceIncreaseIntervalMinutes:

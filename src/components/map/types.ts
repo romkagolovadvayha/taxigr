@@ -10,6 +10,7 @@ export type MapViewportInsets = {
 
 export type TaxiMapProps = {
   pickup?: Address | null;
+  destinations?: Address[] | null;
   destination?: Address | null;
   routeCoordinates?: Coordinates[] | null;
   pickupEtaMinutes?: number | null;

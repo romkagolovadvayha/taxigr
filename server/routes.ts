@@ -6,14 +6,17 @@ import { z } from 'zod';
 import {
   calculateCommissionMinor,
   calculateFareMinor,
+  calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
-  classifyPricingScope,
+  classifyMultiStopPricingScope,
   farePeriodAt,
   farePeriodLabel,
+  isGrahovoAddress,
   type PricingRules,
   type PricingScope,
 } from '../src/domain/pricing';
 import { hasHouseNumber } from '../src/domain/address-precision';
+import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
   liveLocationUpdateDelay,
@@ -33,6 +36,7 @@ import {
   placeCategories,
   type RideChatParticipant,
   type RideChatRole,
+  type RideChatViewerRole,
   type Address,
   type RideStatus,
   type TariffCode,
@@ -90,6 +94,8 @@ import {
 } from './presenters';
 import { driverRideNotification, passengerRideNotification } from './ride-messenger';
 import {
+  decodeRideChatImage,
+  MAX_RIDE_CHAT_IMAGE_BYTES,
   presentRideChatMessage,
   rideChatAvatarUrl,
   rideChatMessageSelect,
@@ -113,7 +119,8 @@ import {
   linkMessengerIdentity,
 } from './repositories';
 import {
-  getPricedRouteMetrics,
+  getMultiStopPricedRouteMetrics,
+  getMultiStopRouteMetrics,
   getRouteMetrics,
   haversineMeters,
 } from './routing';
@@ -229,7 +236,11 @@ const rideStatusLabels: Record<RideStatus, string> = {
   completed: 'поездка завершена',
   cancelled: 'заказ отменён',
 };
-const quoteSchema = z.object({ pickup: addressSchema, destination: addressSchema });
+const quoteSchema = z.object({
+  pickup: addressSchema,
+  destination: addressSchema,
+  destinations: z.array(addressSchema).min(1).max(5).optional(),
+});
 const createOrderSchema = quoteSchema.extend({
   tariff: tariffSchema,
   quoteToken: z.string().min(32).max(32_000),
@@ -396,7 +407,17 @@ const ratingSchema = z.object({
 });
 const rideChatMessageSchema = z.object({
   id: z.string().uuid(),
-  body: z.string().trim().min(1).max(1_000),
+  body: z.string().trim().max(1_000).default(''),
+  attachment: z.object({
+    type: z.literal('image'),
+    base64: z.string().min(16).max(Math.ceil(MAX_RIDE_CHAT_IMAGE_BYTES / 3) * 4 + 64),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    width: z.number().int().min(1).max(20_000).optional(),
+    height: z.number().int().min(1).max(20_000).optional(),
+    fileName: z.string().trim().min(1).max(160).optional(),
+  }).optional(),
+}).refine((input) => input.body.length > 0 || input.attachment, {
+  message: 'Добавьте текст или фотографию',
 });
 const vehicleDetailsSchema = z.object({
   vehicleMake: z.string().trim().min(2).max(80),
@@ -517,6 +538,7 @@ type PricingRow = RowDataPacket & {
   district_per_kilometer_02_07_minor: number;
   intercity_per_kilometer_minor: number;
   child_surcharge_minor: number;
+  additional_stop_grahovo_surcharge_bps: number;
   waiting_free_minutes: number;
   waiting_per_minute_minor: number;
   search_price_increase_interval_minutes: number;
@@ -542,6 +564,7 @@ async function pricingRules(connection?: PoolConnection): Promise<PricingRules> 
     districtPerKilometer02To07Minor: row.district_per_kilometer_02_07_minor,
     intercityPerKilometerMinor: row.intercity_per_kilometer_minor,
     childSurchargeMinor: row.child_surcharge_minor,
+    additionalStopGrahovoSurchargeBps: row.additional_stop_grahovo_surcharge_bps,
     waitingFreeMinutes: row.waiting_free_minutes,
     waitingPerMinuteMinor: row.waiting_per_minute_minor,
     searchPriceIncreaseIntervalMinutes: row.search_price_increase_interval_minutes,
@@ -560,6 +583,8 @@ function quoteTariffs(
   includesDriverApproach: boolean,
   pricedAt = new Date(),
   etaMinutes: Record<TariffCode, number> = { economy: 10, child: 15 },
+  priceOverrides?: Record<TariffCode, number>,
+  destinationCount = 1,
 ) {
   const periodDescription = farePeriodLabel[farePeriodAt(pricedAt)];
   const approachDescription = includesDriverApproach ? ' · подача из Грахово включена' : '';
@@ -576,8 +601,45 @@ function quoteTariffs(
             : `Междугородняя поездка${approachDescription}`,
     childSeatIncluded: code === 'child',
     etaMinutes: etaMinutes[code],
-    priceMinor: calculateFareMinor(pricingDistanceMeters, code, scope, rules, pricedAt),
+    priceMinor:
+      priceOverrides?.[code] ??
+      calculateFareMinor(pricingDistanceMeters, code, scope, rules, pricedAt),
+    ...(destinationCount > 1 ? { stopCount: destinationCount } : {}),
   }));
+}
+
+function multiStopPrices(
+  pickup: Address,
+  destinations: readonly Address[],
+  segmentDistances: readonly number[],
+  segmentScopes: readonly PricingScope[],
+  driverApproachDistanceMeters: number,
+  rules: PricingRules,
+  pricedAt: Date,
+): Record<TariffCode, number> {
+  const allPointsInGrahovo = [pickup, ...destinations].every(isGrahovoAddress);
+  const segments = segmentDistances.map((distanceMeters, index) => ({
+    distanceMeters,
+    scope: segmentScopes[index]!,
+  }));
+  return {
+    economy: calculateMultiStopFareMinor(
+      segments,
+      'economy',
+      allPointsInGrahovo,
+      rules,
+      pricedAt,
+      driverApproachDistanceMeters,
+    ),
+    child: calculateMultiStopFareMinor(
+      segments,
+      'child',
+      allPointsInGrahovo,
+      rules,
+      pricedAt,
+      driverApproachDistanceMeters,
+    ),
+  };
 }
 
 async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffCode, number>> {
@@ -636,12 +698,29 @@ async function resolveTrustedAddress(address: Address): Promise<Address> {
   };
 }
 
-async function resolveTrustedAddresses(input: { pickup: Address; destination: Address }) {
-  const [pickup, destination] = await Promise.all([
+function submittedDestinations(input: { destination: Address; destinations?: Address[] }): Address[] {
+  const destinations = input.destinations ?? [input.destination];
+  const finalDestination = destinations.at(-1);
+  if (!finalDestination || !addressesMatch(finalDestination, input.destination)) {
+    throw Object.assign(new Error('Последняя точка маршрута не совпадает с адресом назначения'), {
+      statusCode: 422,
+      code: 'DESTINATION_ORDER_MISMATCH',
+    });
+  }
+  return destinations;
+}
+
+async function resolveTrustedAddresses(input: {
+  pickup: Address;
+  destination: Address;
+  destinations?: Address[];
+}) {
+  const requestedDestinations = submittedDestinations(input);
+  const [pickup, ...destinations] = await Promise.all([
     resolveTrustedAddress(input.pickup),
-    resolveTrustedAddress(input.destination),
+    ...requestedDestinations.map(resolveTrustedAddress),
   ]);
-  return { pickup, destination };
+  return { pickup, destinations, destination: destinations.at(-1)! };
 }
 
 function addressesMatch(left: Address, right: Address): boolean {
@@ -675,8 +754,9 @@ type RideChatAccessRow = RowDataPacket & {
 
 type RideChatAccess = {
   row: RideChatAccessRow;
-  viewerRole: RideChatRole;
-  counterpart: RideChatParticipant;
+  viewerRole: RideChatViewerRole;
+  counterpart?: RideChatParticipant;
+  participants?: RideChatParticipant[];
 };
 
 async function getRideChatAccess(
@@ -750,6 +830,37 @@ async function getRideChatAccess(
           row.passenger_updated_at,
         ),
       },
+    };
+  }
+
+  if (session.roles.includes('admin')) {
+    return {
+      row,
+      viewerRole: 'admin',
+      participants: [
+        {
+          id: row.passenger_id,
+          name: row.passenger_name,
+          role: 'passenger',
+          avatarUrl: rideChatAvatarUrl(
+            row.passenger_id,
+            row.passenger_avatar_url,
+            row.passenger_avatar_mime,
+            row.passenger_updated_at,
+          ),
+        },
+        {
+          id: row.driver_user_id,
+          name: row.driver_name,
+          role: 'driver',
+          avatarUrl: rideChatAvatarUrl(
+            row.driver_user_id,
+            row.driver_avatar_url,
+            row.driver_avatar_mime,
+            row.driver_updated_at,
+          ),
+        },
+      ],
     };
   }
 
@@ -3208,15 +3319,24 @@ export async function registerRoutes(
   app.post('/v1/quotes', async (request) => {
     const session = await auth(request, 'passenger');
     const input = parse(quoteSchema, request.body);
-    const { pickup, destination } = await resolveTrustedAddresses(input);
-    const pricingScope = classifyPricingScope(pickup, destination);
+    const { pickup, destination, destinations } = await resolveTrustedAddresses(input);
+    const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
     const [pricedRoute, rules, etaMinutes] = await Promise.all([
-      getPricedRouteMetrics(pickup, destination),
+      getMultiStopPricedRouteMetrics(pickup, destinations),
       pricingRules(),
       estimateTariffEtaMinutes(pickup),
     ]);
-    const { tripRoute: route, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
+    const { tripRoute: route, segments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
     const pricedAt = new Date();
+    const prices = multiStopPrices(
+      pickup,
+      destinations,
+      segments.map((segment) => segment.route.distanceMeters),
+      segments.map((segment) => segment.scope),
+      driverApproachRoute?.distanceMeters ?? 0,
+      rules,
+      pricedAt,
+    );
     const tariffs = quoteTariffs(
       pricingDistanceMeters,
       rules,
@@ -3224,11 +3344,14 @@ export async function registerRoutes(
       driverApproachRoute !== null && pricingDistanceMeters > route.distanceMeters,
       pricedAt,
       etaMinutes,
+      prices,
+      destinations.length,
     );
     const quoteToken = await signOrderQuote({
       passengerId: session.id,
       pickup,
       destination,
+      destinations,
       pricingScope,
       route: {
         distanceMeters: route.distanceMeters,
@@ -3238,8 +3361,8 @@ export async function registerRoutes(
       pricingDistanceMeters,
       driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
       prices: {
-        economy: tariffs.find((tariff) => tariff.code === 'economy')!.priceMinor,
-        child: tariffs.find((tariff) => tariff.code === 'child')!.priceMinor,
+        economy: prices.economy,
+        child: prices.child,
       },
       pricedAt: pricedAt.toISOString(),
     });
@@ -3269,13 +3392,23 @@ export async function registerRoutes(
         });
       }
       const input = parse(quoteSchema, request.body);
-      const { pickup, destination } = await resolveTrustedAddresses(input);
-      const pricingScope = classifyPricingScope(pickup, destination);
+      const { pickup, destinations } = await resolveTrustedAddresses(input);
+      const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
       const [pricedRoute, rules] = await Promise.all([
-        getPricedRouteMetrics(pickup, destination),
+        getMultiStopPricedRouteMetrics(pickup, destinations),
         pricingRules(),
       ]);
-      const { tripRoute: route, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
+      const { tripRoute: route, segments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
+      const pricedAt = new Date();
+      const prices = multiStopPrices(
+        pickup,
+        destinations,
+        segments.map((segment) => segment.route.distanceMeters),
+        segments.map((segment) => segment.scope),
+        driverApproachRoute?.distanceMeters ?? 0,
+        rules,
+        pricedAt,
+      );
       return {
         data: {
           route,
@@ -3287,6 +3420,10 @@ export async function registerRoutes(
             rules,
             pricingScope,
             driverApproachRoute !== null && pricingDistanceMeters > route.distanceMeters,
+            pricedAt,
+            { economy: 10, child: 15 },
+            prices,
+            destinations.length,
           ),
           currency: 'RUB',
         },
@@ -3315,14 +3452,17 @@ export async function registerRoutes(
     const submitted = await resolveTrustedAddresses(input);
     if (
       !addressesMatch(submitted.pickup, quote.pickup) ||
-      !addressesMatch(submitted.destination, quote.destination)
+      submitted.destinations.length !== quote.destinations.length ||
+      submitted.destinations.some(
+        (destination, index) => !addressesMatch(destination, quote.destinations[index]!),
+      )
     ) {
       throw Object.assign(new Error('Адреса изменились после расчёта стоимости'), {
         statusCode: 409,
         code: 'QUOTE_ADDRESS_MISMATCH',
       });
     }
-    const route = await getRouteMetrics(quote.pickup.coordinates, quote.destination.coordinates);
+    const { tripRoute: route } = await getMultiStopRouteMetrics(quote.pickup, quote.destinations);
     const { pricingDistanceMeters, pricingScope } = quote;
     const price = quote.prices[input.tariff];
     if (!Number.isSafeInteger(price) || price <= 0) {
@@ -3444,12 +3584,12 @@ export async function registerRoutes(
           id, passenger_id, device_fingerprint, tariff, status, pricing_scope,
           pickup_label, pickup_details, pickup_lat, pickup_lon,
           destination_label, destination_details, destination_lat, destination_lon,
-          distance_meters, duration_seconds, route_geometry,
+          destinations_json, distance_meters, duration_seconds, route_geometry,
           base_price_minor, price_minor, commission_minor, commission_bps,
           waiting_free_minutes, waiting_per_minute_minor,
           search_price_increase_interval_minutes, search_price_increase_step_minor,
           payment_method, comment, idempotency_key
-        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           session.id,
@@ -3464,6 +3604,7 @@ export async function registerRoutes(
           quote.destination.details ?? null,
           quote.destination.coordinates.latitude,
           quote.destination.coordinates.longitude,
+          JSON.stringify(quote.destinations),
           route.distanceMeters,
           route.durationSeconds,
           JSON.stringify(route.coordinates),
@@ -3517,7 +3658,10 @@ export async function registerRoutes(
         },
         entity: { label: 'Заказ', id: result.order.id },
         details: [
-          ['Маршрут', `${result.order.pickup.label} → ${result.order.destination.label}`],
+          ['Маршрут', formatMultiStopRouteLabel(
+            result.order.pickup,
+            result.order.destinations ?? [result.order.destination],
+          )],
           ['Тариф', tariffLabels[result.order.tariff]],
           ['Стоимость', formatMoney(result.order.priceMinor)],
           ['Оплата', paymentMethodLabels[result.order.paymentMethod]],
@@ -3648,66 +3792,148 @@ export async function registerRoutes(
         orderStatus: access.row.order_status,
         viewerRole: access.viewerRole,
         counterpart: access.counterpart,
+        participants: access.participants,
         messages: rows.reverse().map(presentRideChatMessage),
-        canSend: canSendRideChatMessage(access.row.order_status),
+        canSend:
+          access.viewerRole !== 'admin' &&
+          canSendRideChatMessage(access.row.order_status),
       },
     };
   });
 
-  app.post('/v1/orders/:id/messages', async (request, reply) => {
+  app.get('/v1/orders/:id/messages/:messageId/image', async (request, reply) => {
     const session = await auth(request);
-    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
-    const input = parse(rideChatMessageSchema, request.body);
-    const result = await withTransaction(async (connection) => {
-      const access = await getRideChatAccess(id, session, connection, true);
-      if (!canSendRideChatMessage(access.row.order_status)) {
-        throw Object.assign(new Error('Чат закрыт: поездка уже завершена'), {
-          statusCode: 409,
-          code: 'RIDE_CHAT_CLOSED',
-        });
-      }
-
-      await connection.execute(
-        `INSERT IGNORE INTO ride_chat_messages (id, order_id, sender_user_id, body)
-         VALUES (?, ?, ?, ?)`,
-        [input.id, id, session.id, input.body],
-      );
-      const [messageRows] = await connection.query<RideChatMessageRow[]>(
-        `${rideChatMessageSelect} WHERE message.id = ? LIMIT 1`,
-        [input.id],
-      );
-      const messageRow = messageRows[0];
-      if (
-        !messageRow ||
-        messageRow.order_id !== id ||
-        messageRow.sender_user_id !== session.id ||
-        messageRow.body !== input.body
-      ) {
-        throw Object.assign(new Error('Не удалось сохранить сообщение'), {
-          statusCode: 409,
-          code: 'RIDE_CHAT_MESSAGE_CONFLICT',
-        });
-      }
-
-      return { access, message: presentRideChatMessage(messageRow) };
-    });
-
-    publish(`user:${result.access.row.passenger_id}`, 'ride-chat:message', result.message);
-    publish(`user:${result.access.row.driver_user_id}`, 'ride-chat:message', result.message);
-
-    const recipientUserId = result.access.viewerRole === 'passenger'
-      ? result.access.row.driver_user_id
-      : result.access.row.passenger_id;
-    const recipientRole: RideChatRole = result.access.viewerRole === 'passenger'
-      ? 'driver'
-      : 'passenger';
-    void notifyUsers([recipientUserId!], rideChatPush(result.message, recipientRole)).catch((error) =>
-      request.log.warn({ error, orderId: id }, 'ride chat push notification failed'),
+    const { id, messageId } = parse(
+      z.object({ id: z.string().uuid(), messageId: z.string().uuid() }),
+      request.params,
     );
-
-    reply.code(201);
-    return { data: result.message };
+    await getRideChatAccess(id, session);
+    const [rows] = await db.query<
+      (RowDataPacket & { attachment_data: Buffer | null; attachment_mime: string | null })[]
+    >(
+      `SELECT attachment_data, attachment_mime
+       FROM ride_chat_messages
+       WHERE id = ? AND order_id = ?
+       LIMIT 1`,
+      [messageId, id],
+    );
+    const image = rows[0];
+    if (!image?.attachment_data || !image.attachment_mime) {
+      throw Object.assign(new Error('Фотография из сообщения не найдена'), {
+        statusCode: 404,
+        code: 'RIDE_CHAT_IMAGE_NOT_FOUND',
+      });
+    }
+    return reply
+      .header('Cache-Control', 'private, no-store')
+      .header('Content-Disposition', 'inline')
+      .type(image.attachment_mime)
+      .send(image.attachment_data);
   });
+
+  app.post(
+    '/v1/orders/:id/messages',
+    {
+      bodyLimit: 5 * 1024 * 1024,
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const session = await auth(request);
+      const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+      const input = parse(rideChatMessageSchema, request.body);
+      const result = await withTransaction(async (connection) => {
+        const access = await getRideChatAccess(id, session, connection, true);
+        if (access.viewerRole === 'admin') {
+          throw Object.assign(new Error('Администратор может только просматривать переписку'), {
+            statusCode: 403,
+            code: 'ADMIN_RIDE_CHAT_READ_ONLY',
+          });
+        }
+        if (!canSendRideChatMessage(access.row.order_status)) {
+          throw Object.assign(new Error('Чат закрыт: поездка уже завершена'), {
+            statusCode: 409,
+            code: 'RIDE_CHAT_CLOSED',
+          });
+        }
+        const attachmentBytes = input.attachment
+          ? decodeRideChatImage(input.attachment.base64, input.attachment.mimeType)
+          : null;
+        const attachmentSha256 = attachmentBytes
+          ? createHash('sha256').update(attachmentBytes).digest('hex')
+          : null;
+
+        const [insertResult] = await connection.execute<
+          import('mysql2/promise').ResultSetHeader
+        >(
+          `INSERT IGNORE INTO ride_chat_messages
+            (id, order_id, sender_user_id, body, attachment_mime, attachment_data,
+             attachment_size_bytes, attachment_width, attachment_height,
+             attachment_file_name, attachment_sha256)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            input.id,
+            id,
+            session.id,
+            input.body,
+            input.attachment?.mimeType ?? null,
+            attachmentBytes,
+            attachmentBytes?.length ?? null,
+            input.attachment?.width ?? null,
+            input.attachment?.height ?? null,
+            input.attachment?.fileName ?? null,
+            attachmentSha256,
+          ],
+        );
+        const [messageRows] = await connection.query<RideChatMessageRow[]>(
+          `${rideChatMessageSelect} WHERE message.id = ? LIMIT 1`,
+          [input.id],
+        );
+        const messageRow = messageRows[0];
+        const attachmentMatches = input.attachment
+          ? messageRow?.attachment_sha256 === attachmentSha256 &&
+            messageRow?.attachment_mime === input.attachment.mimeType &&
+            Number(messageRow?.attachment_size_bytes) === attachmentBytes?.length
+          : !messageRow?.attachment_mime && !messageRow?.attachment_sha256;
+        if (
+          !messageRow ||
+          messageRow.order_id !== id ||
+          messageRow.sender_user_id !== session.id ||
+          messageRow.body !== input.body ||
+          !attachmentMatches
+        ) {
+          throw Object.assign(new Error('Не удалось сохранить сообщение'), {
+            statusCode: 409,
+            code: 'RIDE_CHAT_MESSAGE_CONFLICT',
+          });
+        }
+
+        return {
+          access,
+          message: presentRideChatMessage(messageRow),
+          isNew: insertResult.affectedRows > 0,
+        };
+      });
+
+      if (result.isNew) {
+        publish(`user:${result.access.row.passenger_id}`, 'ride-chat:message', result.message);
+        publish(`user:${result.access.row.driver_user_id}`, 'ride-chat:message', result.message);
+        publish('admins', 'ride-chat:message', result.message);
+
+        const recipientUserId = result.access.viewerRole === 'passenger'
+          ? result.access.row.driver_user_id
+          : result.access.row.passenger_id;
+        const recipientRole: RideChatRole = result.access.viewerRole === 'passenger'
+          ? 'driver'
+          : 'passenger';
+        void notifyUsers([recipientUserId!], rideChatPush(result.message, recipientRole)).catch((error) =>
+          request.log.warn({ error, orderId: id }, 'ride chat push notification failed'),
+        );
+      }
+
+      reply.code(result.isNew ? 201 : 200);
+      return { data: result.message };
+    },
+  );
 
   app.post('/v1/orders/:id/search-price-increase', async (request) => {
     const session = await auth(request, 'passenger');
@@ -3796,7 +4022,7 @@ export async function registerRoutes(
         },
         entity: { label: 'Заказ', id },
         details: [
-          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+          ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
           ['Повышение', formatMoney(result.increaseMinor)],
           ['Новая стоимость', formatMoney(payload.priceMinor)],
         ],
@@ -3927,7 +4153,7 @@ export async function registerRoutes(
         details: [
           ['Оценка', `${score} из 5`],
           ['Кому', participants.raterRole === 'passenger' ? 'водителю' : 'пассажиру'],
-          ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+          ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
         ],
       });
       return { data: raterPayload };
@@ -4067,7 +4293,7 @@ export async function registerRoutes(
       details: [
         ['Предыдущий статус', rideStatusLabels[participants.fromStatus]],
         ['Причина', reason],
-        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
         ['Стоимость', formatMoney(payload.priceMinor)],
         ['Назначенный водитель', payload.driver?.name],
       ],
@@ -4485,6 +4711,18 @@ export async function registerRoutes(
               latitude: Number(order.destination_lat),
               longitude: Number(order.destination_lon),
             };
+      if (targetKind === 'destination') {
+        const presentedOrder = presentOrder(order);
+        const { tripRoute } = await getMultiStopRouteMetrics(
+          {
+            id: 'driver-current-location',
+            label: 'Текущее положение водителя',
+            coordinates: origin,
+          },
+          presentedOrder.destinations ?? [presentedOrder.destination],
+        );
+        return { data: { ...tripRoute, target: targetKind } };
+      }
       return {
         data: {
           ...(await getRouteMetrics(origin, target)),
@@ -4670,7 +4908,7 @@ export async function registerRoutes(
           ? `${payload.driver.vehicle.make} ${payload.driver.vehicle.model}, ${payload.driver.vehicle.plate}`
           : null],
         ['Пассажир', payload.passenger?.name],
-        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
         ['Стоимость', formatMoney(payload.priceMinor)],
       ],
     });
@@ -4790,7 +5028,7 @@ export async function registerRoutes(
       details: [
         ['Статус до отказа', rideStatusLabels[participants.fromStatus]],
         ['Причина', reason],
-        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
       ],
     });
     return { data: payload };
@@ -5070,7 +5308,7 @@ export async function registerRoutes(
       details: [
         ['Статус', rideStatusLabels[status]],
         ['Пассажир', payload.passenger?.name],
-        ['Маршрут', `${payload.pickup.label} → ${payload.destination.label}`],
+        ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
         ['Стоимость', status === 'completed' ? formatMoney(payload.priceMinor) : null],
         ['Ожидание', status === 'completed' && (payload.waitingPriceMinor ?? 0) > 0
           ? formatMoney(payload.waitingPriceMinor ?? 0)
@@ -6268,6 +6506,7 @@ export async function registerRoutes(
         districtPerKilometer02To07Minor: z.number().int().min(0).max(1_000_000),
         intercityPerKilometerMinor: z.number().int().min(0).max(1_000_000),
         childSurchargeMinor: z.number().int().min(0).max(1_000_000),
+        additionalStopGrahovoSurchargeBps: z.number().int().min(0).max(20_000),
         waitingFreeMinutes: z.number().int().min(0).max(120),
         waitingPerMinuteMinor: z.number().int().min(0).max(100_000),
         searchPriceIncreaseIntervalMinutes: z.number().int().min(1).max(120),
@@ -6287,7 +6526,8 @@ export async function registerRoutes(
        district_per_kilometer_22_02_minor = ?,
        district_per_kilometer_02_07_minor = ?,
        intercity_per_kilometer_minor = ?,
-       child_surcharge_minor = ?, waiting_free_minutes = ?,
+       child_surcharge_minor = ?, additional_stop_grahovo_surcharge_bps = ?,
+       waiting_free_minutes = ?,
        waiting_per_minute_minor = ?, search_price_increase_interval_minutes = ?,
        search_price_increase_step_minor = ?, service_commission_bps = ?,
        passenger_cancellation_limit = ?, passenger_cancellation_window_hours = ?,
@@ -6302,6 +6542,7 @@ export async function registerRoutes(
         input.districtPerKilometer02To07Minor,
         input.intercityPerKilometerMinor,
         input.childSurchargeMinor,
+        input.additionalStopGrahovoSurchargeBps,
         input.waitingFreeMinutes,
         input.waitingPerMinuteMinor,
         input.searchPriceIncreaseIntervalMinutes,

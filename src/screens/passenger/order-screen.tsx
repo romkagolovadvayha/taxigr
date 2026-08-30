@@ -41,6 +41,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
+    destinations,
     destination,
     tariffs,
     selectedTariff,
@@ -54,7 +55,8 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
     error,
   } = useRide();
   const selected = tariffs.find((item) => item.code === selectedTariff)!;
-  const routeIsPrecise = hasHouseNumber(pickup) && hasHouseNumber(destination);
+  const routeIsPrecise =
+    hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
   const quoteLoading = routeIsPrecise && quoteStatus === 'loading';
   const quoteReady = routeIsPrecise && quoteStatus === 'ready';
 
@@ -82,6 +84,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
     <View style={{ gap: spacing.x2 }}>
       <AddressFields
         pickup={pickup}
+        destinations={destinations}
         destination={destination}
         onUseLocation={() => void selectCurrentLocation()}
         locationLoading={locationLoading}
@@ -117,6 +120,7 @@ export function OrderScreen() {
   const [arrivalClock, setArrivalClock] = useState(() => new Date());
   const {
     pickup,
+    destinations,
     destination,
     routeCoordinates,
     routeSummary,
@@ -180,6 +184,7 @@ export function OrderScreen() {
   const map = (
     <TaxiMap
       pickup={rideInProgress || routeCompleted ? null : currentRide?.pickup ?? pickup}
+      destinations={currentRide?.destinations ?? destinations}
       destination={currentRide?.destination ?? destination}
       routeCoordinates={currentRide?.routeCoordinates ?? routeCoordinates}
       pickupEtaMinutes={

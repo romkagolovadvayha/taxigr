@@ -59,6 +59,27 @@ export function buildDemoRoute(pickup: Address, destination: Address): RouteSumm
   };
 }
 
+export function buildDemoMultiStopRoute(
+  pickup: Address,
+  destinations: readonly Address[],
+): RouteSummary & { segmentDistances: number[] } {
+  const routes: RouteSummary[] = [];
+  let origin = pickup;
+  for (const destination of destinations) {
+    routes.push(buildDemoRoute(origin, destination));
+    origin = destination;
+  }
+  return {
+    distanceMeters: routes.reduce((total, route) => total + route.distanceMeters, 0),
+    durationSeconds: routes.reduce((total, route) => total + route.durationSeconds, 0),
+    source: 'estimate',
+    coordinates: routes.flatMap((route, index) =>
+      index === 0 ? route.coordinates : route.coordinates.slice(1),
+    ),
+    segmentDistances: routes.map((route) => route.distanceMeters),
+  };
+}
+
 function offsetInsideRange(value: number, offset: number, limit: number): number {
   return value + offset <= limit ? value + offset : value - offset;
 }

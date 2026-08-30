@@ -4,6 +4,7 @@ import {
   estimateRoute,
   GRAHOVO_DRIVER_BASE,
   getPricedRouteMetrics,
+  getMultiStopRouteMetrics,
   haversineMeters,
   parseOsrmRoute,
   type RouteMetrics,
@@ -72,6 +73,52 @@ describe('open routing fallback', () => {
         routes: [{ distance: 1_000, duration: 120 }],
       }),
     ).toThrow('OSRM route is unavailable');
+  });
+
+  it('builds one ordered route through every destination', async () => {
+    const pickup = {
+      id: 'pickup',
+      label: 'с. Грахово, ул. Ачинцева, 5',
+      coordinates: grahovo,
+    };
+    const first = {
+      id: 'first',
+      label: 'с. Грахово, ул. Советская, 10',
+      coordinates: { latitude: 56.05, longitude: 51.96 },
+    };
+    const second = {
+      id: 'second',
+      label: 'д. Поршур, ул. Бабаева, 32',
+      details: 'Граховский район, Удмуртская Республика',
+      coordinates: { latitude: 56.0248, longitude: 51.839 },
+    };
+    const calls: Array<{ origin: typeof grahovo; destination: typeof grahovo }> = [];
+
+    const result = await getMultiStopRouteMetrics(
+      pickup,
+      [first, second],
+      async (origin, destination) => {
+        calls.push({ origin, destination });
+        return {
+          distanceMeters: 1_000 * calls.length,
+          durationSeconds: 100 * calls.length,
+          source: 'estimate',
+          coordinates: [],
+        };
+      },
+    );
+
+    expect(calls).toEqual([
+      { origin: pickup.coordinates, destination: first.coordinates },
+      { origin: first.coordinates, destination: second.coordinates },
+    ]);
+    expect(result.tripRoute.distanceMeters).toBe(3_000);
+    expect(result.tripRoute.durationSeconds).toBe(300);
+    expect(result.tripRoute.coordinates).toEqual([
+      pickup.coordinates,
+      first.coordinates,
+      second.coordinates,
+    ]);
   });
 });
 

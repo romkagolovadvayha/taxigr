@@ -29,6 +29,7 @@
       },
       "predictiveBackGestureEnabled": true,
       "permissions": [
+        "CAMERA",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
@@ -65,8 +66,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Разрешите выбрать фотографию для аватара профиля.",
-          "cameraPermission": false,
+          "photosPermission": "Разрешите выбрать фотографию для аватара профиля или отправки в чате.",
+          "cameraPermission": "Разрешите использовать камеру, чтобы фотографировать и отправлять снимки в чате.",
           "microphonePermission": false
         }
       ],

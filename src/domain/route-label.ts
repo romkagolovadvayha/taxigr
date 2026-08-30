@@ -6,6 +6,12 @@ type RouteAddressLabels = {
   sameLocality: boolean;
 };
 
+type MultiStopRouteAddressLabels = {
+  pickup: string;
+  destinations: string[];
+  sameLocality: boolean;
+};
+
 const LOCALITY_SEGMENT = /^(село|с\.?|деревня|д\.?|город|г\.?|пос(?:е|ё)лок|пос\.?|пгт\.?|п\.?)\s+(.+)$/iu;
 
 function localityKey(segment: string): string | null {
@@ -66,4 +72,33 @@ export function formatRouteLabel(
 ): string {
   const labels = formatRouteAddresses(pickup, destination);
   return `${labels.pickup} → ${labels.destination}`;
+}
+
+export function formatMultiStopRouteLabel(
+  pickup: Pick<Address, 'label' | 'details'>,
+  destinations: readonly Pick<Address, 'label' | 'details'>[],
+): string {
+  const labels = formatMultiStopRouteAddresses(pickup, destinations);
+  return [labels.pickup, ...labels.destinations].join(' → ');
+}
+
+export function formatMultiStopRouteAddresses(
+  pickup: Pick<Address, 'label' | 'details'>,
+  destinations: readonly Pick<Address, 'label' | 'details'>[],
+): MultiStopRouteAddressLabels {
+  if (!destinations.length) {
+    return { pickup: pickup.label, destinations: [], sameLocality: false };
+  }
+  const parts = [pickup, ...destinations].map(addressParts);
+  const commonLocality = parts[0]?.locality;
+  const sameLocality =
+    commonLocality != null && parts.every((part) => part.locality === commonLocality);
+  const labels = [pickup, ...destinations].map((address, index) =>
+    sameLocality ? parts[index]!.localLabel : address.label,
+  );
+  return {
+    pickup: labels[0]!,
+    destinations: labels.slice(1),
+    sameLocality,
+  };
 }

@@ -1,6 +1,6 @@
 import type { RideOrder } from '../src/domain/models';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
-import { formatRouteLabel } from '../src/domain/route-label';
+import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import { formatMoney } from './admin-telegram';
 import {
   appUrl,
@@ -260,7 +260,7 @@ export function passengerRideNotification(
     title: overrides.title ?? title,
     body: overrides.body ?? (queued
       ? 'Ваш заказ следующий. Сообщим, когда водитель освободится.'
-      : formatRouteLabel(ride.pickup, ride.destination)),
+      : formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: passengerRideButtons(ride),
     locations: activeDriver && !queued && !['completed', 'cancelled'].includes(ride.status)
@@ -311,8 +311,8 @@ export function driverRideNotification(
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
     body: overrides.body ?? (queued
-      ? `После текущей поездки · ${formatRouteLabel(ride.pickup, ride.destination)}`
-      : formatRouteLabel(ride.pickup, ride.destination)),
+      ? `После текущей поездки · ${formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])}`
+      : formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: driverRideButtons(ride),
     locations: driverTargetLocation(ride),

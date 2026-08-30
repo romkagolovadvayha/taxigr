@@ -14,6 +14,7 @@ export type PricingRules = {
   districtPerKilometer02To07Minor: number;
   intercityPerKilometerMinor: number;
   childSurchargeMinor: number;
+  additionalStopGrahovoSurchargeBps: number;
   waitingFreeMinutes: number;
   waitingPerMinuteMinor: number;
   searchPriceIncreaseIntervalMinutes: number;
@@ -34,6 +35,7 @@ export const defaultPricingRules: PricingRules = {
   districtPerKilometer02To07Minor: 6_000,
   intercityPerKilometerMinor: 3_000,
   childSurchargeMinor: 7_000,
+  additionalStopGrahovoSurchargeBps: 6_000,
   waitingFreeMinutes: 3,
   waitingPerMinuteMinor: 400,
   searchPriceIncreaseIntervalMinutes: 4,
@@ -93,6 +95,26 @@ export function classifyPricingScope(
   return 'intercity';
 }
 
+const pricingScopeRank: Record<PricingScope, number> = {
+  grahovo: 0,
+  district: 1,
+  intercity: 2,
+};
+
+export function classifyMultiStopPricingScope(
+  pickup: Address,
+  destinations: readonly Address[],
+): PricingScope {
+  let scope: PricingScope = 'grahovo';
+  let origin = pickup;
+  for (const destination of destinations) {
+    const segmentScope = classifyPricingScope(origin, destination);
+    if (pricingScopeRank[segmentScope] > pricingScopeRank[scope]) scope = segmentScope;
+    origin = destination;
+  }
+  return scope;
+}
+
 export const pricingScopeLabel: Record<PricingScope, string> = {
   grahovo: 'По Грахово',
   district: 'По Граховскому району',
@@ -148,6 +170,49 @@ export function calculateFareMinor(
       );
   return routePrice +
     (tariff === 'child' ? rules.childSurchargeMinor : 0);
+}
+
+export type PricedRouteSegment = {
+  distanceMeters: number;
+  scope: PricingScope;
+};
+
+/**
+ * Prices an ordered route. When every point is inside Grahovo, each extra stop
+ * adds the configured share of the current fixed Grahovo fare. As soon as a
+ * route leaves Grahovo, every leg is added using its normal district/intercity
+ * tariff. The child-seat surcharge is charged once per order.
+ */
+export function calculateMultiStopFareMinor(
+  segments: readonly PricedRouteSegment[],
+  tariff: TariffCode,
+  allPointsInGrahovo: boolean,
+  rules = defaultPricingRules,
+  date = new Date(),
+  driverApproachDistanceMeters = 0,
+): number {
+  if (!segments.length) return 0;
+
+  const childSurcharge = tariff === 'child' ? rules.childSurchargeMinor : 0;
+  if (allPointsInGrahovo) {
+    const baseFare = grahovoFareMinorAt(rules, date);
+    const extraStopFare = Math.round(
+      (baseFare * rules.additionalStopGrahovoSurchargeBps) / 10_000,
+    );
+    return baseFare + extraStopFare * Math.max(0, segments.length - 1) + childSurcharge;
+  }
+
+  let approachApplied = false;
+  const routeFare = segments.reduce((total, segment) => {
+    const includeApproach =
+      !approachApplied && segment.scope === 'intercity' && driverApproachDistanceMeters > 0;
+    if (includeApproach) approachApplied = true;
+    const distanceMeters =
+      segment.distanceMeters +
+      (includeApproach ? driverApproachDistanceMeters : 0);
+    return total + calculateFareMinor(distanceMeters, 'economy', segment.scope, rules, date);
+  }, 0);
+  return routeFare + childSurcharge;
 }
 
 export function calculateWaitingChargeMinor(

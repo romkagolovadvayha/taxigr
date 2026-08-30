@@ -21,6 +21,9 @@ export type ColorPalette = {
   successSoft: string;
   successText: string;
   call: string;
+  callHover: string;
+  callPressed: string;
+  callBorder: string;
   callInk: string;
   warning: string;
   warningSoft: string;
@@ -64,8 +67,11 @@ export const lightColors: ColorPalette = {
   success: '#18A957',
   successSoft: '#E7F7EE',
   successText: '#107C41',
-  call: '#18A957',
-  callInk: '#181818',
+  call: '#ECF8F1',
+  callHover: '#E5F4EB',
+  callPressed: '#DDF1E6',
+  callBorder: '#B7DFC7',
+  callInk: '#0F6F3B',
   warning: '#F59E0B',
   warningSoft: '#FFF4D6',
   warningText: '#855700',
@@ -108,8 +114,11 @@ export const darkColors: ColorPalette = {
   success: '#35C878',
   successSoft: '#173B29',
   successText: '#7CE5AA',
-  call: '#35C878',
-  callInk: '#181818',
+  call: '#193B29',
+  callHover: '#1D432F',
+  callPressed: '#214B35',
+  callBorder: '#2B6847',
+  callInk: '#91E6B4',
   warning: '#F7B84B',
   warningSoft: '#443412',
   warningText: '#FFD27A',
@@ -260,4 +269,5 @@ export const layout = {
   modalMaxHeight: '92%',
   chartHeight: 144,
   fullInset: 0,
+  stopRowHeight: 76,
 } as const;

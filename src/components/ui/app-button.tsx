@@ -79,17 +79,26 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
       aria-busy={loading}
       disabled={disabled || loading}
       onPress={handlePress}
-      style={({ pressed }) => [
+      style={({ hovered, pressed }) => [
         {
           minHeight: compact ? 48 : 56,
           width: fullWidth ? '100%' : undefined,
           paddingHorizontal: compact ? spacing.x3 : spacing.x6,
           borderRadius: radius.lg,
           borderCurve: 'continuous',
-          backgroundColor: backgrounds[variant],
+          backgroundColor:
+            variant === 'call'
+              ? pressed
+                ? colors.callPressed
+                : hovered
+                  ? colors.callHover
+                  : colors.call
+              : backgrounds[variant],
+          borderWidth: variant === 'call' ? 1 : 0,
+          borderColor: variant === 'call' ? colors.callBorder : colors.transparent,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: disabled || loading ? 0.42 : pressed ? 0.88 : 1,
+          opacity: disabled || loading ? 0.42 : pressed && variant !== 'call' ? 0.88 : 1,
         },
         style,
       ]}

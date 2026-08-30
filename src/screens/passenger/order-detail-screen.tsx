@@ -11,7 +11,7 @@ import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { pricingScopeLabel } from '@/domain/pricing';
-import { formatRouteAddresses } from '@/domain/route-label';
+import { formatMultiStopRouteAddresses } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { formatWaitingDuration } from '@/domain/waiting';
 import { useRide } from '@/state/ride-provider';
@@ -34,7 +34,8 @@ export function OrderDetailScreen() {
     );
   }
 
-  const routeAddresses = formatRouteAddresses(order.pickup, order.destination);
+  const destinations = order.destinations ?? [order.destination];
+  const routeAddresses = formatMultiStopRouteAddresses(order.pickup, destinations);
   const rows = [
     ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
     [
@@ -120,10 +121,16 @@ export function OrderDetailScreen() {
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.pickup}</Text>
             </View>
             <View style={{ height: 1, backgroundColor: colors.border }} />
-            <View>
-              <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>КУДА</Text>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.destination}</Text>
-            </View>
+            {routeAddresses.destinations.map((label, index) => (
+              <View key={`${label}:${index}`}>
+                <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
+                  {index === destinations.length - 1 ? 'КУДА' : `ОСТАНОВКА ${index + 1}`}
+                </Text>
+                <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+                  {label}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>

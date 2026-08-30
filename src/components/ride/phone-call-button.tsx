@@ -55,7 +55,7 @@ export function PhoneCallButton({
         icon={
           <AppIcon
             name="phone"
-            size={compact ? 20 : spacing.x6}
+            size={compact ? 20 : 22}
             color={variant === 'call' ? colors.callInk : colors.ink}
           />
         }

@@ -1,138 +1,62 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'react-native-reanimated';
 import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
+  Platform,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { resolveApiUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import {
+  RideChatAvatar,
+  RideChatMessageRow,
+} from '@/components/ride/ride-chat-message-row';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
+import { AppModal } from '@/components/ui/app-modal';
 import { IconButton } from '@/components/ui/icon-button';
-import type { RideChatMessage, RideChatParticipant } from '@/domain/models';
-import { formatRideChatTime } from '@/domain/ride-chat';
-import { useRideChat } from '@/hooks/use-ride-chat';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import type { RideChatImageMimeType, RideChatMessage } from '@/domain/models';
+import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
+import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
+import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { base64ByteLength, imageMimeTypeFromBase64 } from '@/utils/image-data';
 
-function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/u)
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase('ru-RU') ?? '')
-    .join('') || '—';
-}
+type SelectedChatImage = RideChatImageUpload & {
+  uri: string;
+  sizeBytes: number;
+};
 
-function ChatAvatar({ participant, size = 38 }: { participant: RideChatParticipant; size?: number }) {
-  const fallback = (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: participant.role === 'driver' ? colors.brand : colors.infoSoft,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      <Text
-        style={{
-          ...typography.caption,
-          color: participant.role === 'driver' ? colors.brandInk : colors.infoText,
-          fontWeight: '700',
-        }}
-      >
-        {initials(participant.name)}
-      </Text>
-    </View>
-  );
-
-  if (!participant.avatarUrl) return fallback;
-
-  return (
-    <Image
-      source={resolveApiUrl(participant.avatarUrl)}
-      accessibilityLabel={`Аватар: ${participant.name}`}
-      contentFit="cover"
-      transition={120}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surfaceSecondary,
-      }}
-    />
-  );
-}
-
-function MessageRow({ message, own }: { message: RideChatMessage; own: boolean }) {
-  return (
-    <View
-      accessibilityLabel={`${message.sender.name}, ${formatRideChatTime(message.createdAt)}: ${message.body}`}
-      style={{
-        width: '100%',
-        flexDirection: own ? 'row-reverse' : 'row',
-        alignItems: 'flex-end',
-        gap: spacing.x2,
-      }}
-    >
-      <ChatAvatar participant={message.sender} size={32} />
-      <View
-        style={{
-          maxWidth: '78%',
-          paddingHorizontal: spacing.x4,
-          paddingVertical: spacing.x3,
-          gap: spacing.x1,
-          borderRadius: radius.lg,
-          borderCurve: 'continuous',
-          backgroundColor: own ? colors.brand : colors.surface,
-          borderWidth: own ? 0 : 1,
-          borderColor: colors.border,
-        }}
-      >
-        {!own && (
-          <Text selectable style={{ ...typography.micro, color: colors.inkSecondary }}>
-            {message.sender.name}
-          </Text>
-        )}
-        <Text selectable style={{ ...typography.body, color: own ? colors.brandInk : colors.ink }}>
-          {message.body}
-        </Text>
-        <Text
-          selectable
-          style={{
-            ...typography.micro,
-            color: own ? colors.brandInkSecondary : colors.inkMuted,
-            textAlign: 'right',
-            fontVariant: ['tabular-nums'],
-          }}
-        >
-          {formatRideChatTime(message.createdAt)}
-        </Text>
-      </View>
-    </View>
-  );
+function formatImageSize(sizeBytes: number): string {
+  if (sizeBytes < 1_000_000) return `${Math.max(1, Math.round(sizeBytes / 1_000))} КБ`;
+  return `${(sizeBytes / 1_000_000).toLocaleString('ru-RU', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} МБ`;
 }
 
 export function RideChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useSession();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const listRef = useRef<FlatList<RideChatMessage>>(null);
+  const attachmentButtonRef = useRef<View>(null);
   const previousMessageCount = useRef(0);
   const [draft, setDraft] = useState('');
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<SelectedChatImage | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [cameraPermissionBlocked, setCameraPermissionBlocked] = useState(false);
   const {
     thread,
     loading,
@@ -145,19 +69,125 @@ export function RideChatScreen() {
 
   const messages = thread?.messages ?? [];
 
+  const acceptPickerResult = useCallback((result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.base64) {
+      setPickerError('Не удалось прочитать выбранную фотографию');
+      return;
+    }
+    const mimeType: RideChatImageMimeType | null = imageMimeTypeFromBase64(asset.base64);
+    if (!mimeType) {
+      setPickerError('Поддерживаются фотографии JPG, PNG и WebP');
+      return;
+    }
+    const sizeBytes = base64ByteLength(asset.base64);
+    if (sizeBytes > RIDE_CHAT_IMAGE_MAX_BYTES) {
+      setPickerError('Фотография слишком большая. Выберите снимок не больше 3 МБ');
+      return;
+    }
+    setPickerError(null);
+    setCameraPermissionBlocked(false);
+    setSelectedImage({
+      uri: asset.uri,
+      base64: asset.base64,
+      mimeType,
+      sizeBytes,
+      ...(asset.width > 0 ? { width: asset.width } : {}),
+      ...(asset.height > 0 ? { height: asset.height } : {}),
+      ...(asset.fileName ? { fileName: asset.fileName.slice(0, 160) } : {}),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void ImagePicker.getPendingResultAsync()
+      .then((result) => {
+        if (!result) return;
+        if ('code' in result) {
+          setPickerError('Не удалось восстановить выбранную фотографию');
+          return;
+        }
+        acceptPickerResult(result);
+      })
+      .catch(() => setPickerError('Не удалось восстановить выбранную фотографию'));
+  }, [acceptPickerResult]);
+
   useEffect(() => {
     if (!messages.length || messages.length === previousMessageCount.current) return;
-    const animated = previousMessageCount.current > 0;
+    const animated = previousMessageCount.current > 0 && !reduceMotion;
     previousMessageCount.current = messages.length;
-    const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated }), 40);
-    return () => clearTimeout(timer);
-  }, [messages.length]);
+    const frame = requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length, reduceMotion]);
 
   const handleSend = async () => {
     const body = draft.trim();
-    if (!body) return;
-    const sent = await sendMessage(body);
-    if (sent) setDraft((current) => (current.trim() === body ? '' : current));
+    if (!body && !selectedImage) return;
+    const attachment = selectedImage
+      ? {
+          base64: selectedImage.base64,
+          mimeType: selectedImage.mimeType,
+          ...(selectedImage.width ? { width: selectedImage.width } : {}),
+          ...(selectedImage.height ? { height: selectedImage.height } : {}),
+          ...(selectedImage.fileName ? { fileName: selectedImage.fileName } : {}),
+        }
+      : undefined;
+    const sent = await sendMessage(body, attachment);
+    if (sent) {
+      setDraft((current) => (current.trim() === body ? '' : current));
+      setSelectedImage(null);
+      setPickerError(null);
+    }
+  };
+
+  const takePhoto = async () => {
+    setAttachmentMenuOpen(false);
+    setPickerError(null);
+    setCameraPermissionBlocked(false);
+    try {
+      if (Platform.OS !== 'web') {
+        await new Promise((resolve) => setTimeout(resolve, motion.duration.sheet));
+      }
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          setCameraPermissionBlocked(!permission.canAskAgain);
+          setPickerError(permission.canAskAgain
+            ? 'Разрешите доступ к камере, чтобы сделать снимок'
+            : 'Доступ к камере запрещён. Откройте настройки приложения и разрешите камеру');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        cameraType: ImagePicker.CameraType.back,
+        quality: 0.55,
+        base64: true,
+      });
+      acceptPickerResult(result);
+    } catch {
+      setPickerError('Не удалось открыть камеру');
+    }
+  };
+
+  const chooseFromGallery = async () => {
+    setAttachmentMenuOpen(false);
+    setPickerError(null);
+    setCameraPermissionBlocked(false);
+    try {
+      if (Platform.OS !== 'web') {
+        await new Promise((resolve) => setTimeout(resolve, motion.duration.sheet));
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.55,
+        base64: true,
+      });
+      acceptPickerResult(result);
+    } catch {
+      setPickerError('Не удалось открыть галерею');
+    }
   };
 
   const backFallback = thread?.viewerRole === 'driver' ? '/driver' : '/';
@@ -194,7 +224,7 @@ export function RideChatScreen() {
             label="Назад"
             onPress={() => (router.canGoBack() ? router.back() : router.replace(backFallback))}
           />
-          {thread?.counterpart && <ChatAvatar participant={thread.counterpart} />}
+          {thread?.counterpart && <RideChatAvatar participant={thread.counterpart} />}
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               accessibilityRole="header"
@@ -202,9 +232,14 @@ export function RideChatScreen() {
               numberOfLines={1}
               style={{ ...typography.sectionTitle, color: colors.ink }}
             >
-              {thread?.counterpart.name ?? 'Чат поездки'}
+              {thread?.counterpart?.name ?? 'Чат поездки'}
             </Text>
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+            <Text
+              accessibilityLiveRegion="polite"
+              role="status"
+              selectable
+              style={{ ...typography.caption, color: colors.inkSecondary }}
+            >
               {connected ? 'Сообщения приходят в реальном времени' : 'Подключение к чату…'}
             </Text>
           </View>
@@ -212,7 +247,7 @@ export function RideChatScreen() {
 
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x3 }}>
-            <ActivityIndicator color={colors.ink} />
+            <ActivityIndicator accessibilityLabel="Загружаем сообщения" color={colors.ink} />
             <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
               Загружаем сообщения…
             </Text>
@@ -241,10 +276,13 @@ export function RideChatScreen() {
           <>
             <FlatList
               ref={listRef}
+              accessibilityLabel="Сообщения поездки"
+              accessibilityLiveRegion="polite"
+              role="log"
               data={messages}
               keyExtractor={(message) => message.id}
               renderItem={({ item }) => (
-                <MessageRow message={item} own={item.sender.id === user?.id} />
+                <RideChatMessageRow message={item} own={item.sender.id === user?.id} />
               )}
               contentInsetAdjustmentBehavior="automatic"
               keyboardDismissMode="interactive"
@@ -281,56 +319,129 @@ export function RideChatScreen() {
                 backgroundColor: colors.surface,
               }}
             >
-              {!!error && (
-                <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.dangerText }}>
-                  {error}
-                </Text>
+              {!!(error || pickerError) && (
+                <View style={{ alignItems: 'flex-start', gap: spacing.x2 }}>
+                  <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.dangerText }}>
+                    {pickerError ?? error}
+                  </Text>
+                  {cameraPermissionBlocked && (
+                    <AppButton
+                      compact
+                      fullWidth={false}
+                      variant="secondary"
+                      onPress={() => void Linking.openSettings().catch(() => {
+                        setPickerError('Не удалось открыть настройки приложения');
+                      })}
+                    >
+                      Открыть настройки
+                    </AppButton>
+                  )}
+                </View>
               )}
               {thread.canSend ? (
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.x2 }}>
-                  <TextInput
-                    accessibilityLabel="Сообщение"
-                    value={draft}
-                    onChangeText={setDraft}
-                    placeholder="Напишите сообщение"
-                    placeholderTextColor={colors.inkMuted}
-                    multiline
-                    maxLength={1_000}
-                    editable={!sending}
-                    style={{
-                      flex: 1,
-                      minHeight: 52,
-                      maxHeight: 120,
-                      paddingHorizontal: spacing.x4,
-                      paddingVertical: spacing.x3,
-                      borderRadius: radius.lg,
-                      borderCurve: 'continuous',
-                      borderWidth: 1,
-                      borderColor: colors.borderStrong,
-                      backgroundColor: colors.canvas,
-                      color: colors.ink,
-                      ...typography.body,
-                    }}
-                  />
-                  <AnimatedPressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Отправить сообщение"
-                    disabled={!draft.trim() || sending}
-                    onPress={() => void handleSend()}
-                    style={({ pressed }) => ({
-                      width: 52,
-                      height: 52,
-                      borderRadius: radius.pill,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: colors.brand,
-                      opacity: !draft.trim() || sending ? 0.42 : pressed ? 0.82 : 1,
-                    })}
-                  >
-                    {sending
-                      ? <ActivityIndicator color={colors.brandInk} />
-                      : <AppIcon name="send" color={colors.brandInk} size={22} />}
-                  </AnimatedPressable>
+                <View style={{ gap: spacing.x2 }}>
+                  {!!selectedImage && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.x3,
+                        padding: spacing.x2,
+                        borderRadius: radius.lg,
+                        borderCurve: 'continuous',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        backgroundColor: colors.canvas,
+                      }}
+                    >
+                      <Image
+                        source={selectedImage.uri}
+                        accessible={false}
+                        contentFit="cover"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: radius.md,
+                          backgroundColor: colors.surfaceSecondary,
+                        }}
+                      />
+                      <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
+                        <Text numberOfLines={1} style={{ ...typography.caption, color: colors.ink }}>
+                          Фотография готова к отправке
+                        </Text>
+                        <Text style={{ ...typography.micro, color: colors.inkSecondary }}>
+                          {formatImageSize(selectedImage.sizeBytes)}
+                        </Text>
+                      </View>
+                      <IconButton
+                        icon="close"
+                        label="Убрать фотографию"
+                        disabled={sending}
+                        size={40}
+                        onPress={() => setSelectedImage(null)}
+                      />
+                    </View>
+                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.x2 }}>
+                    <IconButton
+                      ref={attachmentButtonRef}
+                      icon="paperclip"
+                      label="Прикрепить фотографию"
+                      disabled={sending}
+                      size={52}
+                      onPress={() => setAttachmentMenuOpen(true)}
+                    />
+                    <TextInput
+                      accessibilityLabel="Сообщение"
+                      value={draft}
+                      onChangeText={setDraft}
+                      placeholder={selectedImage ? 'Добавить подпись' : 'Напишите сообщение'}
+                      placeholderTextColor={colors.inkSecondary}
+                      multiline
+                      maxLength={1_000}
+                      editable={!sending}
+                      style={{
+                        flex: 1,
+                        minHeight: 52,
+                        maxHeight: 120,
+                        paddingHorizontal: spacing.x4,
+                        paddingVertical: spacing.x3,
+                        borderRadius: radius.lg,
+                        borderCurve: 'continuous',
+                        borderWidth: 1,
+                        borderColor: colors.inkSecondary,
+                        backgroundColor: colors.canvas,
+                        color: colors.ink,
+                        ...typography.body,
+                      }}
+                    />
+                    <AnimatedPressable
+                      accessibilityRole="button"
+                      accessibilityLabel={selectedImage && !draft.trim()
+                        ? 'Отправить фотографию'
+                        : 'Отправить сообщение'}
+                      aria-busy={sending}
+                      disabled={(!draft.trim() && !selectedImage) || sending}
+                      onPress={() => void handleSend()}
+                      style={({ pressed }) => ({
+                        width: 52,
+                        height: 52,
+                        borderRadius: radius.pill,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: colors.brand,
+                        opacity: (!draft.trim() && !selectedImage) || sending
+                          ? 0.42
+                          : pressed
+                            ? 0.82
+                            : 1,
+                      })}
+                    >
+                      {sending
+                        ? <ActivityIndicator color={colors.brandInk} />
+                        : <AppIcon name="send" color={colors.brandInk} size={22} />}
+                    </AnimatedPressable>
+                  </View>
                 </View>
               ) : (
                 <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textAlign: 'center' }}>
@@ -340,6 +451,28 @@ export function RideChatScreen() {
             </View>
           </>
         )}
+        <AppModal
+          visible={attachmentMenuOpen}
+          title="Прикрепить фотографию"
+          description="Сделайте новый снимок или выберите готовый из галереи. Максимальный размер — 3 МБ."
+          returnFocusRef={attachmentButtonRef}
+          onClose={() => setAttachmentMenuOpen(false)}
+        >
+          <AppButton
+            variant="secondary"
+            icon={<AppIcon name="camera" size={22} color={colors.ink} />}
+            onPress={() => void takePhoto()}
+          >
+            Сфотографировать
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            icon={<AppIcon name="image" size={22} color={colors.ink} />}
+            onPress={() => void chooseFromGallery()}
+          >
+            Выбрать из галереи
+          </AppButton>
+        </AppModal>
       </View>
     </KeyboardAvoidingView>
   );

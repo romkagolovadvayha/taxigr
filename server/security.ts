@@ -18,6 +18,7 @@ export type OrderQuoteClaims = {
   passengerId: string;
   pickup: Address;
   destination: Address;
+  destinations: Address[];
   pricingScope: PricingScope;
   route: Omit<RouteSummary, 'coordinates'>;
   pricingDistanceMeters: number;

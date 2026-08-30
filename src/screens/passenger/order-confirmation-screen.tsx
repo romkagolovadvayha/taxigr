@@ -22,6 +22,7 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 export function OrderConfirmationScreen() {
   const {
     pickup,
+    destinations,
     destination,
     tariffs,
     selectedTariff,
@@ -39,7 +40,8 @@ export function OrderConfirmationScreen() {
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
-  const addressesArePrecise = hasHouseNumber(pickup) && hasHouseNumber(destination);
+  const addressesArePrecise =
+    hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
   const routeReady = addressesArePrecise && quoteStatus === 'ready';
   const canSubmit =
     !!pickup &&
@@ -108,6 +110,7 @@ export function OrderConfirmationScreen() {
         >
           <AddressFields
             pickup={pickup}
+            destinations={destinations}
             destination={destination}
             compact
             onUseLocation={() => void selectCurrentLocation()}

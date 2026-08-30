@@ -18,7 +18,9 @@ import { MoneyValue } from '@/components/ui/money-value';
 import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
-import { formatRouteAddresses } from '@/domain/route-label';
+import {
+  formatMultiStopRouteAddresses,
+} from '@/domain/route-label';
 import {
   driverRouteTarget,
   driverTransitionLabel,
@@ -150,7 +152,11 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
     );
   }
 
-  const routeAddresses = formatRouteAddresses(currentRide.pickup, currentRide.destination);
+  const rideDestinations = currentRide.destinations ?? [currentRide.destination];
+  const routeAddresses = formatMultiStopRouteAddresses(
+    currentRide.pickup,
+    rideDestinations,
+  );
 
   if (currentRide.status === 'searching') {
     return (
@@ -172,7 +178,15 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         </View>
         <View>
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>КУДА</Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.destination}</Text>
+          {routeAddresses.destinations.map((label, index) => (
+            <Text
+              key={`${label}:${index}`}
+              selectable
+              style={{ ...typography.bodyStrong, color: colors.ink }}
+            >
+              {rideDestinations.length > 1 ? `${index + 1}. ` : ''}{label}
+            </Text>
+          ))}
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -301,7 +315,7 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             {routeAddresses.pickup}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {routeAddresses.destination}
+            → {routeAddresses.destinations.join(' → ')}
           </Text>
         </View>
       )}
@@ -378,7 +392,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             {nextDriverRide.pickup.label}
           </Text>
           <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {nextDriverRide.destination.label}
+            → {formatMultiStopRouteAddresses(
+              nextDriverRide.pickup,
+              nextDriverRide.destinations ?? [nextDriverRide.destination],
+            ).destinations.join(' → ')}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
             После завершения текущей поездки этот заказ автоматически станет текущим.
@@ -435,7 +452,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             {driverOffer.pickup.label}
           </Text>
           <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {driverOffer.destination.label}
+            → {formatMultiStopRouteAddresses(
+              driverOffer.pickup,
+              driverOffer.destinations ?? [driverOffer.destination],
+            ).destinations.join(' → ')}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
             <AppButton
@@ -818,6 +838,7 @@ export function DriverHomeScreen() {
       >
         <TaxiMap
           pickup={mapPickup}
+          destinations={currentRide?.destinations}
           destination={mapDestination}
           routeCoordinates={activeRouteCoordinates}
           routeTarget={navigation.targetKind}

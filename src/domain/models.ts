@@ -104,6 +104,8 @@ export type RideOrder = {
   driverId?: string;
   driverQueuePosition?: 1 | 2;
   pickup: Address;
+  /** Ordered drop-off points. `destination` remains the final point for compatibility. */
+  destinations?: Address[];
   destination: Address;
   tariff: TariffCode;
   status: RideStatus;
@@ -162,11 +164,25 @@ export type PassengerSummary = {
 
 export type RideChatRole = 'passenger' | 'driver';
 
+export type RideChatViewerRole = RideChatRole | 'admin';
+
 export type RideChatParticipant = {
   id: string;
   name: string;
   role: RideChatRole;
   avatarUrl?: string;
+};
+
+export type RideChatImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export type RideChatImageAttachment = {
+  type: 'image';
+  url: string;
+  mimeType: RideChatImageMimeType;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  fileName?: string;
 };
 
 export type RideChatMessage = {
@@ -175,13 +191,15 @@ export type RideChatMessage = {
   body: string;
   createdAt: string;
   sender: RideChatParticipant;
+  attachment?: RideChatImageAttachment;
 };
 
 export type RideChatThread = {
   orderId: string;
   orderStatus: RideStatus;
-  viewerRole: RideChatRole;
-  counterpart: RideChatParticipant;
+  viewerRole: RideChatViewerRole;
+  counterpart?: RideChatParticipant;
+  participants?: RideChatParticipant[];
   messages: RideChatMessage[];
   canSend: boolean;
 };

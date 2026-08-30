@@ -1,10 +1,14 @@
+import { Image } from 'expo-image';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { colors } from '@/theme/tokens';
 
+const carPng = require('../../../assets/vehicles/driver-map-car.png');
+
 export type AppIconName =
   | 'back'
   | 'ban'
+  | 'camera'
   | 'car'
   | 'chat'
   | 'child-seat'
@@ -13,11 +17,16 @@ export type AppIconName =
   | 'clock'
   | 'close'
   | 'document'
+  | 'drag'
   | 'earnings'
+  | 'flag'
   | 'location'
+  | 'image'
   | 'menu'
   | 'orders'
+  | 'paperclip'
   | 'phone'
+  | 'plus'
   | 'profile'
   | 'recenter'
   | 'search'
@@ -45,6 +54,18 @@ export function AppIcon({
   strokeWidth = 2,
   filled = false,
 }: Props) {
+  if (name === 'car') {
+    return (
+      <Image
+        source={carPng}
+        style={{ width: size, height: size }}
+        contentFit="contain"
+        alt=""
+        accessible={false}
+      />
+    );
+  }
+
   const common = {
     fill: 'none',
     stroke: color,
@@ -62,12 +83,10 @@ export function AppIcon({
           <Path d="M5.7 5.7l12.6 12.6" {...common} />
         </>
       )}
-      {name === 'car' && (
+      {name === 'camera' && (
         <>
-          <Path d="M4 15l1.8-5.2A2 2 0 017.7 8h8.6a2 2 0 011.9 1.3L20 15" {...common} />
-          <Path d="M3 15h18v4H3zM6 19v2M18 19v2" {...common} />
-          <Circle cx="7" cy="16.5" r="1" fill={color} />
-          <Circle cx="17" cy="16.5" r="1" fill={color} />
+          <Path d="M4 7h3l1.5-2h7L17 7h3v12H4z" {...common} />
+          <Circle cx="12" cy="13" r="3.5" {...common} />
         </>
       )}
       {name === 'chat' && (
@@ -97,15 +116,32 @@ export function AppIcon({
           <Path d="M14 3v5h4M9 13h6M9 17h6" {...common} />
         </>
       )}
+      {name === 'drag' && (
+        <>
+          <Path d="M7 7h10M7 12h10M7 17h10" {...common} />
+        </>
+      )}
       {name === 'earnings' && (
         <>
           <Path d="M4 19V9M10 19V5M16 19v-7M22 19H2" {...common} />
+        </>
+      )}
+      {name === 'flag' && (
+        <>
+          <Path d="M6 21V4M7 5h10l-2 3 2 3H7" {...common} />
         </>
       )}
       {name === 'location' && (
         <>
           <Path d="M12 22s7-5.3 7-12a7 7 0 10-14 0c0 6.7 7 12 7 12z" {...common} />
           <Circle cx="12" cy="10" r="2.5" {...common} />
+        </>
+      )}
+      {name === 'image' && (
+        <>
+          <Rect x="3" y="4" width="18" height="16" rx="3" {...common} />
+          <Circle cx="9" cy="10" r="2" {...common} />
+          <Path d="M4 18l5-4 3 2 3-4 5 5" {...common} />
         </>
       )}
       {name === 'menu' && <Path d="M4 7h16M4 12h16M4 17h16" {...common} />}
@@ -115,12 +151,16 @@ export function AppIcon({
           <Path d="M8 8h8M8 12h8M8 16h5" {...common} />
         </>
       )}
+      {name === 'paperclip' && (
+        <Path d="M8.5 12.5l6.7-6.7a3.2 3.2 0 014.5 4.5l-8.2 8.2a5 5 0 01-7.1-7.1l8-8a2.8 2.8 0 014 4l-7.8 7.8a1.2 1.2 0 01-1.7-1.7l7.1-7.1" {...common} />
+      )}
       {name === 'phone' && (
         <Path
           d="M7.2 3.5l2.2 4.2-2 1.7a15.6 15.6 0 007.2 7.2l1.7-2 4.2 2.2-.8 3.7c-.2.9-1 1.5-1.9 1.5C9.1 22 2 14.9 2 6.2c0-.9.6-1.7 1.5-1.9z"
           {...common}
         />
       )}
+      {name === 'plus' && <Path d="M12 5v14M5 12h14" {...common} />}
       {name === 'profile' && (
         <>
           <Circle cx="12" cy="8" r="4" {...common} />

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildNativeMapHtml } from '../src/components/map/native-map-html';
+import {
+  buildNativeMapHtml,
+  serializeNativeMapState,
+} from '../src/components/map/native-map-html';
 
 describe('native map route overlays', () => {
   it('contains compact zoom-aware points and arrival callouts', () => {
@@ -22,12 +25,36 @@ describe('native map route overlays', () => {
     expect(html).toContain('routeCoordinates[routeCoordinates.length-1]');
   });
 
-  it('uses the shared transparent car silhouette for the driver', () => {
+  it('renders numbered intermediate destination markers and serializes their order', () => {
+    const html = buildNativeMapHtml('test-key');
+    const destinations = [
+      {
+        id: 'first',
+        label: 'Первая остановка',
+        coordinates: { latitude: 56.04, longitude: 51.95 },
+      },
+      {
+        id: 'final',
+        label: 'Финиш',
+        coordinates: { latitude: 56.05, longitude: 51.96 },
+      },
+    ];
+
+    expect(html).toContain('destinations.forEach((destination,index)');
+    expect(html).toContain("isFinal?(state.destinationArrivalLabel||undefined):String(index+1)");
+    expect(JSON.parse(serializeNativeMapState({ destinations })).destinations).toEqual(
+      destinations,
+    );
+  });
+
+  it('uses the shared transparent PNG car for the driver', () => {
     const html = buildNativeMapHtml('test-key');
 
     expect(html).toContain("if(kind==='driver'){");
     expect(html).toContain('el.innerHTML=');
+    expect(html).toContain('data:image/png;base64,iVBORw0KGgo');
     expect(html).toContain('.marker.driver{width:28px;height:40px;border:0');
+    expect(html).not.toContain('<svg');
     expect(html).not.toContain("el.textContent='🚕'");
   });
 

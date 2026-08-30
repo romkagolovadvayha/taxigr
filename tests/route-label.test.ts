@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatRouteAddresses, formatRouteLabel } from '../src/domain/route-label';
+import {
+  formatMultiStopRouteAddresses,
+  formatMultiStopRouteLabel,
+  formatRouteAddresses,
+  formatRouteLabel,
+} from '../src/domain/route-label';
 
 describe('route labels', () => {
   it('removes a repeated locality from both addresses', () => {
@@ -37,6 +42,23 @@ describe('route labels', () => {
   it('does not shorten addresses when their localities are unknown', () => {
     expect(formatRouteLabel({ label: 'ул. Полевая, 1' }, { label: 'ул. Садовая, 2' })).toBe(
       'ул. Полевая, 1 → ул. Садовая, 2',
+    );
+  });
+
+  it('formats every stop and removes the shared locality', () => {
+    const pickup = { label: 'с. Грахово, ул. Юбилейная, 5' };
+    const destinations = [
+      { label: 'с. Грахово, ул. Ачинцева, 2а' },
+      { label: 'с. Грахово, ул. 50 лет Победы, 19' },
+    ];
+
+    expect(formatMultiStopRouteAddresses(pickup, destinations)).toEqual({
+      pickup: 'ул. Юбилейная, 5',
+      destinations: ['ул. Ачинцева, 2а', 'ул. 50 лет Победы, 19'],
+      sameLocality: true,
+    });
+    expect(formatMultiStopRouteLabel(pickup, destinations)).toBe(
+      'ул. Юбилейная, 5 → ул. Ачинцева, 2а → ул. 50 лет Победы, 19',
     );
   });
 });

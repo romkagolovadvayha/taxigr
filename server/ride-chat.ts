@@ -1,10 +1,14 @@
 import type { RowDataPacket } from 'mysql2/promise';
 
 import type {
+  RideChatImageMimeType,
   RideChatMessage,
   RideChatRole,
 } from '../src/domain/models';
 import type { PushMessage } from './push';
+import { RIDE_CHAT_IMAGE_MAX_BYTES } from '../src/domain/ride-chat';
+
+export const MAX_RIDE_CHAT_IMAGE_BYTES = RIDE_CHAT_IMAGE_MAX_BYTES;
 
 export type RideChatMessageRow = RowDataPacket & {
   id: string;
@@ -17,10 +21,19 @@ export type RideChatMessageRow = RowDataPacket & {
   avatar_url: string | null;
   avatar_mime: string | null;
   sender_updated_at: Date | string;
+  attachment_mime: RideChatImageMimeType | null;
+  attachment_size_bytes: number | null;
+  attachment_width: number | null;
+  attachment_height: number | null;
+  attachment_file_name: string | null;
+  attachment_sha256: string | null;
 };
 
 export const rideChatMessageSelect = `
   SELECT message.id, message.order_id, message.sender_user_id, message.body,
+    message.attachment_mime, message.attachment_size_bytes,
+    message.attachment_width, message.attachment_height,
+    message.attachment_file_name, message.attachment_sha256,
     message.created_at, sender.name AS sender_name,
     CASE
       WHEN message.sender_user_id = orders.passenger_id THEN 'passenger'
@@ -62,7 +75,48 @@ export function presentRideChatMessage(row: RideChatMessageRow): RideChatMessage
         row.sender_updated_at,
       ),
     },
+    ...(row.attachment_mime && row.attachment_size_bytes
+      ? {
+          attachment: {
+            type: 'image' as const,
+            url: `/v1/orders/${row.order_id}/messages/${row.id}/image`,
+            mimeType: row.attachment_mime,
+            sizeBytes: Number(row.attachment_size_bytes),
+            ...(row.attachment_width ? { width: Number(row.attachment_width) } : {}),
+            ...(row.attachment_height ? { height: Number(row.attachment_height) } : {}),
+            ...(row.attachment_file_name ? { fileName: row.attachment_file_name } : {}),
+          },
+        }
+      : {}),
   };
+}
+
+export function decodeRideChatImage(
+  base64: string,
+  mimeType: RideChatImageMimeType,
+): Buffer {
+  const payload = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
+  const bytes = Buffer.from(payload, 'base64');
+  if (!bytes.length || bytes.length > MAX_RIDE_CHAT_IMAGE_BYTES) {
+    throw Object.assign(new Error('Фотография должна быть не больше 3 МБ'), {
+      statusCode: 413,
+      code: 'RIDE_CHAT_IMAGE_TOO_LARGE',
+    });
+  }
+  const validMagic =
+    (mimeType === 'image/jpeg' && bytes[0] === 0xff && bytes[1] === 0xd8) ||
+    (mimeType === 'image/png' &&
+      bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+    (mimeType === 'image/webp' &&
+      bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      bytes.subarray(8, 12).toString('ascii') === 'WEBP');
+  if (!validMagic) {
+    throw Object.assign(new Error('Выбранный файл не похож на фотографию'), {
+      statusCode: 400,
+      code: 'RIDE_CHAT_IMAGE_INVALID',
+    });
+  }
+  return bytes;
 }
 
 export function rideChatPush(
@@ -71,7 +125,7 @@ export function rideChatPush(
 ): PushMessage {
   return {
     title: `Сообщение от ${message.sender.name}`,
-    body: message.body,
+    body: message.body || (message.attachment ? 'Фотография' : 'Новое сообщение'),
     data: {
       orderId: message.orderId,
       role: recipientRole,

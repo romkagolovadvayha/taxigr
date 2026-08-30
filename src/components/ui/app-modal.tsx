@@ -43,9 +43,16 @@ export function AppModal({
       previousWebFocus.current = document.activeElement as FocusableWebNode | null;
     }
     if (!visible && wasVisible.current) {
-      const returnTarget =
-        (returnFocusRef?.current as unknown as FocusableWebNode | null) ?? previousWebFocus.current;
-      returnTarget?.focus?.();
+      if (Platform.OS === 'web') {
+        const returnTarget =
+          (returnFocusRef?.current as unknown as FocusableWebNode | null) ?? previousWebFocus.current;
+        returnTarget?.focus?.();
+      } else if (returnFocusRef?.current) {
+        const handle = findNodeHandle(returnFocusRef.current);
+        if (handle) {
+          requestAnimationFrame(() => AccessibilityInfo.setAccessibilityFocus(handle));
+        }
+      }
     }
     wasVisible.current = visible;
   }, [returnFocusRef, visible]);

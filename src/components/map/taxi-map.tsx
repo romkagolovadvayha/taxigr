@@ -22,6 +22,7 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
     () =>
       serializeNativeMapState({
         pickup: props.pickup,
+        destinations: props.destinations,
         destination: props.destination,
         routeCoordinates: smoothRouteCoordinates(
           props.trimCompletedRoute
@@ -42,6 +43,7 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
       }),
     [
       props.destination,
+      props.destinations,
       props.destinationArrivalLabel,
       props.driver,
       props.driverHeading,

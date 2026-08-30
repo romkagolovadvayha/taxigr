@@ -15,7 +15,7 @@ import { StatusChip } from '@/components/ui/status-chip';
 import { VehicleIllustration } from '@/components/vehicle/vehicle-illustration';
 import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
-import { formatRouteLabel } from '@/domain/route-label';
+import { formatMultiStopRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
@@ -181,7 +181,7 @@ export function ActiveRidePanel({
             {rideHeadline(ride, pickupEtaMinutes)}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {formatRouteLabel(ride.pickup, ride.destination)}
+            {formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])}
           </Text>
         </View>
         <MoneyValue valueMinor={ride.priceMinor} compact />
@@ -248,7 +248,6 @@ export function ActiveRidePanel({
               phone={driver.phone}
               label="Звонок"
               accessibilityLabel="Позвонить водителю"
-              variant="secondary"
               compact
               containerStyle={{ flex: 1 }}
             />

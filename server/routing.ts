@@ -1,5 +1,10 @@
 import type { Address } from '../src/domain/models';
-import { classifyPricingScope, isGrahovoAddress } from '../src/domain/pricing';
+import {
+  classifyMultiStopPricingScope,
+  classifyPricingScope,
+  isGrahovoAddress,
+  type PricingScope,
+} from '../src/domain/pricing';
 import { config } from './config';
 
 export type Point = { latitude: number; longitude: number };
@@ -13,6 +18,20 @@ export type RouteMetrics = {
 
 export type PricedRouteMetrics = {
   tripRoute: RouteMetrics;
+  driverApproachRoute: RouteMetrics | null;
+  pricingDistanceMeters: number;
+};
+
+export type MultiStopRouteSegment = {
+  origin: Address;
+  destination: Address;
+  scope: PricingScope;
+  route: RouteMetrics;
+};
+
+export type MultiStopPricedRouteMetrics = {
+  tripRoute: RouteMetrics;
+  segments: MultiStopRouteSegment[];
   driverApproachRoute: RouteMetrics | null;
   pricingDistanceMeters: number;
 };
@@ -158,6 +177,77 @@ export async function getRouteMetrics(origin: Point, destination: Point): Promis
     routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
     return remember(key, estimateRoute(origin, destination));
   }
+}
+
+function routeCoordinatesForSegment(
+  origin: Point,
+  destination: Point,
+  route: RouteMetrics,
+): Point[] {
+  return route.coordinates.length >= 2 ? route.coordinates : [origin, destination];
+}
+
+export async function getMultiStopRouteMetrics(
+  pickup: Address,
+  destinations: readonly Address[],
+  resolveRoute: RouteMetricsResolver = getRouteMetrics,
+): Promise<{ tripRoute: RouteMetrics; segments: MultiStopRouteSegment[] }> {
+  const addressPairs = destinations.map((destination, index) => ({
+    origin: index === 0 ? pickup : destinations[index - 1]!,
+    destination,
+  }));
+  const routes = await Promise.all(
+    addressPairs.map(({ origin, destination }) =>
+      resolveRoute(origin.coordinates, destination.coordinates),
+    ),
+  );
+  const segments = addressPairs.map(({ origin, destination }, index) => ({
+    origin,
+    destination,
+    scope: classifyPricingScope(origin, destination),
+    route: routes[index]!,
+  }));
+  const coordinates = segments.flatMap((segment, index) => {
+    const points = routeCoordinatesForSegment(
+      segment.origin.coordinates,
+      segment.destination.coordinates,
+      segment.route,
+    );
+    return index === 0 ? points : points.slice(1);
+  });
+  return {
+    segments,
+    tripRoute: {
+      distanceMeters: routes.reduce((total, route) => total + route.distanceMeters, 0),
+      durationSeconds: routes.reduce((total, route) => total + route.durationSeconds, 0),
+      source: routes.every((route) => route.source === 'osrm') ? 'osrm' : 'estimate',
+      coordinates,
+    },
+  };
+}
+
+export async function getMultiStopPricedRouteMetrics(
+  pickup: Address,
+  destinations: readonly Address[],
+  resolveRoute: RouteMetricsResolver = getRouteMetrics,
+): Promise<MultiStopPricedRouteMetrics> {
+  const tripPromise = getMultiStopRouteMetrics(pickup, destinations, resolveRoute);
+  const approachPromise = isGrahovoAddress(pickup)
+    ? Promise.resolve<RouteMetrics | null>(null)
+    : resolveRoute(GRAHOVO_DRIVER_BASE, pickup.coordinates);
+  const [{ tripRoute, segments }, driverApproachRoute] = await Promise.all([
+    tripPromise,
+    approachPromise,
+  ]);
+  const scope = classifyMultiStopPricingScope(pickup, destinations);
+  return {
+    tripRoute,
+    segments,
+    driverApproachRoute,
+    pricingDistanceMeters:
+      tripRoute.distanceMeters +
+      (scope === 'intercity' ? (driverApproachRoute?.distanceMeters ?? 0) : 0),
+  };
 }
 
 export async function getPricedRouteMetrics(

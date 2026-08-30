@@ -16,7 +16,12 @@ import {
   selectDriverOrderQueue,
 } from '@/domain/driver-order-queue';
 import type { InitialLegalAcceptance } from '@/legal/documents';
-import { buildDemoDriverOffer, buildDemoRoute, placeDemoDriverNearPickup } from '@/domain/demo-flow';
+import {
+  buildDemoDriverOffer,
+  buildDemoMultiStopRoute,
+  buildDemoRoute,
+  placeDemoDriverNearPickup,
+} from '@/domain/demo-flow';
 import type {
   Address,
   Coordinates,
@@ -30,9 +35,12 @@ import type {
 import {
   buildTariffs,
   calculateCommissionMinor,
+  calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
+  classifyMultiStopPricingScope,
   classifyPricingScope,
   defaultPricingRules,
+  isGrahovoAddress,
 } from '@/domain/pricing';
 import { canTransitionRide } from '@/domain/ride-state';
 import {
@@ -44,6 +52,7 @@ import { getInstallationId } from '@/storage/device-id';
 
 type RideContextValue = {
   pickup: Address | null;
+  destinations: Address[];
   destination: Address | null;
   routeCoordinates: Coordinates[];
   routeSummary: RouteSummary | null;
@@ -64,6 +73,10 @@ type RideContextValue = {
   error: string | null;
   setPickup: (address: Address) => void;
   setDestination: (address: Address) => void;
+  setDestinationAt: (index: number, address: Address) => void;
+  addDestination: (address: Address) => void;
+  removeDestination: (index: number) => void;
+  reorderDestinations: (fromIndex: number, toIndex: number) => void;
   setSelectedTariff: (tariff: TariffCode) => void;
   setSelectedPaymentMethod: (method: PaymentMethod) => void;
   createRide: (
@@ -121,7 +134,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const isDriver = user?.roles.includes('driver') ?? false;
   const isAdmin = user?.roles.includes('admin') ?? false;
   const [pickup, setPickup] = useState<Address | null>(null);
-  const [destination, setDestination] = useState<Address | null>(null);
+  const [destinations, setDestinations] = useState<Address[]>([]);
+  const destination = destinations.at(-1) ?? null;
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
   const [selectedTariff, setSelectedTariff] = useState<TariffCode>('economy');
@@ -159,17 +173,79 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setRouteCoordinates([]);
     setRouteSummary(null);
     setQuoteToken(null);
-    setQuoteStatus(hasHouseNumber(address) && hasHouseNumber(destination) ? 'loading' : 'idle');
+    setQuoteStatus(
+      hasHouseNumber(address) && destinations.length > 0 && destinations.every(hasHouseNumber)
+        ? 'loading'
+        : 'idle',
+    );
     setPickup(address);
-  }, [destination]);
+  }, [destinations]);
 
   const selectDestination = useCallback((address: Address) => {
     setRouteCoordinates([]);
     setRouteSummary(null);
     setQuoteToken(null);
     setQuoteStatus(hasHouseNumber(pickup) && hasHouseNumber(address) ? 'loading' : 'idle');
-    setDestination(address);
+    setDestinations((current) =>
+      current.length ? current.map((item, index) => index === current.length - 1 ? address : item) : [address],
+    );
   }, [pickup]);
+
+  const updateDestinations = useCallback(
+    (update: (current: Address[]) => Address[]) => {
+      setRouteCoordinates([]);
+      setRouteSummary(null);
+      setQuoteToken(null);
+      setDestinations((current) => {
+        const next = update(current);
+        setQuoteStatus(
+          hasHouseNumber(pickup) && next.length > 0 && next.every(hasHouseNumber)
+            ? 'loading'
+            : 'idle',
+        );
+        return next;
+      });
+    },
+    [pickup],
+  );
+
+  const setDestinationAt = useCallback(
+    (index: number, address: Address) => {
+      updateDestinations((current) =>
+        current.map((item, itemIndex) => itemIndex === index ? address : item),
+      );
+    },
+    [updateDestinations],
+  );
+
+  const addDestination = useCallback(
+    (address: Address) => updateDestinations((current) => [...current, address].slice(0, 5)),
+    [updateDestinations],
+  );
+
+  const removeDestination = useCallback(
+    (index: number) => updateDestinations((current) => current.filter((_, itemIndex) => itemIndex !== index)),
+    [updateDestinations],
+  );
+
+  const reorderDestinations = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      updateDestinations((current) => {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= current.length ||
+          toIndex >= current.length
+        ) return current;
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        if (moved) next.splice(toIndex, 0, moved);
+        return next;
+      });
+    },
+    [updateDestinations],
+  );
 
   const applyPassengerOrder = useCallback((ride: RideOrder) => {
     setOrders((previous) => upsertOrder(previous, ride));
@@ -204,7 +280,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
         const passengerOrders = userId === demoPassenger.id ? demoOrders : [];
         const demoHistory = buildDestinationHistory(passengerOrders, userId);
         setPickup(null);
-        setDestination((current) => current ?? demoHistory.lastDestination);
+        setDestinations((current) =>
+          current.length || !demoHistory.lastDestination ? current : [demoHistory.lastDestination],
+        );
         setOrders(passengerOrders);
         setAdminOrders(isAdmin ? demoOrders : []);
         setPassengerOrdersHasMore(false);
@@ -224,11 +302,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setNextDriverRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
       setDriverOffer((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
       setPickup((address) => (address && demoAddresses.some((item) => item.id === address.id) ? null : address));
-      setDestination((address) => (address && demoAddresses.some((item) => item.id === address.id) ? null : address));
+      setDestinations((items) =>
+        items.filter((address) => !demoAddresses.some((item) => item.id === address.id)),
+      );
 
       if (!token) {
         setPickup(null);
-        setDestination(null);
+        setDestinations([]);
         setOrders([]);
         setAdminOrders([]);
         setPassengerOrdersHasMore(false);
@@ -271,7 +351,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setAdminOrdersHasMore(allOrders.length === 50);
       if (destinationDefaultToken.current !== token) {
         const history = buildDestinationHistory(passengerOrders, userId);
-        setDestination((current) => current ?? history.lastDestination);
+        setDestinations((current) =>
+          current.length || !history.lastDestination ? current : [history.lastDestination],
+        );
         destinationDefaultToken.current = token;
       }
     } catch (reason) {
@@ -419,7 +501,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       !pickup ||
       !destination ||
       !hasHouseNumber(pickup) ||
-      !hasHouseNumber(destination)
+      !destinations.every(hasHouseNumber)
     ) {
       const idleTimer = setTimeout(() => setQuoteStatus('idle'), 0);
       return () => clearTimeout(idleTimer);
@@ -433,8 +515,23 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }, 0);
     const timer = setTimeout(() => {
       if (demoSession) {
-        const route = buildDemoRoute(pickup, destination);
-        setTariffs(buildTariffs(route.distanceMeters, classifyPricingScope(pickup, destination)));
+        const route = buildDemoMultiStopRoute(pickup, destinations);
+        const allPointsInGrahovo = [pickup, ...destinations].every(isGrahovoAddress);
+        const segments = destinations.map((item, index) => ({
+          distanceMeters: route.segmentDistances[index]!,
+          scope: classifyPricingScope(index === 0 ? pickup : destinations[index - 1]!, item),
+        }));
+        const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
+        setTariffs(
+          buildTariffs(route.distanceMeters, pricingScope).map((tariff) => ({
+            ...tariff,
+            priceMinor: calculateMultiStopFareMinor(
+              segments,
+              tariff.code,
+              allPointsInGrahovo,
+            ),
+          })),
+        );
         setRouteCoordinates(route.coordinates);
         setRouteSummary(route);
         setQuoteStatus('ready');
@@ -448,7 +545,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }>('/v1/quotes', {
         method: 'POST',
         token,
-        body: JSON.stringify({ pickup, destination }),
+        body: JSON.stringify({ pickup, destination, destinations }),
         signal: controller.signal,
       })
         .then((response) => {
@@ -478,7 +575,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       clearTimeout(loadingTimer);
       clearTimeout(timer);
     };
-  }, [demoSession, destination, pickup, token]);
+  }, [demoSession, destination, destinations, pickup, token]);
 
   const createDriverOffer = useCallback(async () => {
     if (!demoSession || !isDriver) return null;
@@ -511,8 +608,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const createRide = useCallback(
     async (comment?: string, legalAcceptance?: InitialLegalAcceptance) => {
-      if (!pickup || !destination || !hasHouseNumber(pickup) || !hasHouseNumber(destination)) {
-        setError('Укажите номер дома для места подачи и назначения');
+      if (
+        !pickup ||
+        !destination ||
+        !hasHouseNumber(pickup) ||
+        !destinations.length ||
+        !destinations.every(hasHouseNumber)
+      ) {
+        setError('Укажите номер дома для места подачи и всех точек назначения');
         return null;
       }
       if (quoteStatus !== 'ready' || !routeSummary) {
@@ -522,11 +625,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
       const tariff = tariffs.find((item) => item.code === selectedTariff)!;
       if (demoSession) {
         const now = new Date().toISOString();
-        const pricingScope = classifyPricingScope(pickup, destination);
+        const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
         const ride: RideOrder = {
           id: `ride-${Date.now()}`,
           passengerId: 'demo-passenger',
           pickup,
+          destinations,
           destination,
           tariff: selectedTariff,
           status: 'searching',
@@ -563,6 +667,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
       const creationFingerprint = JSON.stringify({
         pickup,
+        destinations,
         destination,
         tariff: selectedTariff,
         paymentMethod: selectedPaymentMethod,
@@ -582,6 +687,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           token,
           body: JSON.stringify({
             pickup,
+            destinations,
             destination,
             tariff: selectedTariff,
             quoteToken,
@@ -639,6 +745,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       applyPassengerOrder,
       demoSession,
       destination,
+      destinations,
       markInitialLegalConsentAccepted,
       pickup,
       quoteStatus,
@@ -1019,6 +1126,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       pickup,
+      destinations,
       destination,
       routeCoordinates,
       routeSummary,
@@ -1039,6 +1147,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       error,
       setPickup: selectPickup,
       setDestination: selectDestination,
+      setDestinationAt,
+      addDestination,
+      removeDestination,
+      reorderDestinations,
       setSelectedTariff,
       setSelectedPaymentMethod,
       createRide,
@@ -1065,6 +1177,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       createDriverOffer,
       createRide,
       currentRide,
+      destinations,
       driverOffer,
       driverRide,
       nextDriverRide,
@@ -1075,6 +1188,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       routeSummary,
       selectDestination,
       selectPickup,
+      setDestinationAt,
+      addDestination,
+      removeDestination,
+      reorderDestinations,
       error,
       adminOrders,
       passengerOrdersHasMore,

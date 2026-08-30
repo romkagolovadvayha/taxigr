@@ -7,6 +7,8 @@ import {
   upsertRideChatMessage,
 } from '../src/domain/ride-chat';
 import {
+  decodeRideChatImage,
+  MAX_RIDE_CHAT_IMAGE_BYTES,
   presentRideChatMessage,
   rideChatPush,
   type RideChatMessageRow,
@@ -56,10 +58,25 @@ describe('ride chat', () => {
       avatar_url: null,
       avatar_mime: 'image/jpeg',
       sender_updated_at: new Date('2026-08-30T11:00:00.000Z'),
+      attachment_mime: 'image/png',
+      attachment_size_bytes: 68,
+      attachment_width: 1,
+      attachment_height: 1,
+      attachment_file_name: 'pickup.png',
+      attachment_sha256: 'hash',
     } as RideChatMessageRow);
 
     expect(presented.sender.avatarUrl).toContain('/v1/users/00000000-0000-4000-8000-000000000020/avatar?v=');
     expect(presented.createdAt).toBe('2026-08-30T12:00:00.000Z');
+    expect(presented.attachment).toEqual({
+      type: 'image',
+      url: `/v1/orders/${presented.orderId}/messages/${presented.id}/image`,
+      mimeType: 'image/png',
+      sizeBytes: 68,
+      width: 1,
+      height: 1,
+      fileName: 'pickup.png',
+    });
     expect(rideChatPush(presented, 'passenger')).toMatchObject({
       title: 'Сообщение от Иван',
       body: 'Я уже подъехал',
@@ -71,5 +88,39 @@ describe('ride chat', () => {
       },
     });
     expect(formatRideChatTime(presented.createdAt)).toMatch(/^\d{2}:\d{2}$/u);
+  });
+
+  it('accepts real image bytes, rejects disguised files and describes photo-only pushes', () => {
+    const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    expect(decodeRideChatImage(pngBase64, 'image/png').subarray(0, 8)).toEqual(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    );
+
+    try {
+      decodeRideChatImage(Buffer.from('not an image').toString('base64'), 'image/png');
+      throw new Error('Expected disguised file to be rejected');
+    } catch (error) {
+      expect(error).toMatchObject({ statusCode: 400, code: 'RIDE_CHAT_IMAGE_INVALID' });
+    }
+
+    const oversizedJpeg = Buffer.alloc(MAX_RIDE_CHAT_IMAGE_BYTES + 1);
+    oversizedJpeg[0] = 0xff;
+    oversizedJpeg[1] = 0xd8;
+    try {
+      decodeRideChatImage(oversizedJpeg.toString('base64'), 'image/jpeg');
+      throw new Error('Expected oversized image to be rejected');
+    } catch (error) {
+      expect(error).toMatchObject({ statusCode: 413, code: 'RIDE_CHAT_IMAGE_TOO_LARGE' });
+    }
+
+    expect(rideChatPush({
+      ...message('photo', '2026-08-30T12:00:00.000Z', ''),
+      attachment: {
+        type: 'image',
+        url: '/protected/photo',
+        mimeType: 'image/png',
+        sizeBytes: 68,
+      },
+    }, 'driver').body).toBe('Фотография');
   });
 });

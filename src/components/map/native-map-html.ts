@@ -3,10 +3,11 @@ import type { DriverRouteTarget } from '@/domain/ride-state';
 import type { MapViewportInsets } from '@/components/map/types';
 import { motion, type AppColorScheme } from '../../theme/tokens';
 
-import { driverMarkerSvgMarkup } from './driver-marker';
+import { driverMarkerPngMarkup } from './driver-marker';
 
 type State = {
   pickup?: Address | null;
+  destinations?: Address[] | null;
   destination?: Address | null;
   routeCoordinates?: Coordinates[] | null;
   pickupEtaMinutes?: number | null;
@@ -88,7 +89,7 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
         }
       }
       if(kind==='driver'){
-        el.innerHTML=${JSON.stringify(driverMarkerSvgMarkup())};
+        el.innerHTML=${JSON.stringify(driverMarkerPngMarkup())};
         const rotation=navigationMode?0:(Number.isFinite(heading)?heading:0);
         el.style.transform='translate(-50%,-50%) rotate('+rotation+'deg)';
         el.style.transition='transform ${motion.duration.tracking}ms linear';
@@ -165,7 +166,19 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
         ?Math.round(state.pickupEtaMinutes)+' мин'
         :undefined;
       if(state.pickup&&pickupMarkerCoordinates) add(new YMapMarker({coordinates:[pickupMarkerCoordinates.longitude,pickupMarkerCoordinates.latitude],zIndex:1100},marker('pickup',pickupCallout)));
-      if(state.destination&&destinationMarkerCoordinates) add(new YMapMarker({coordinates:[destinationMarkerCoordinates.longitude,destinationMarkerCoordinates.latitude],zIndex:1100},marker('destination',state.destinationArrivalLabel||undefined)));
+      const destinations=Array.isArray(state.destinations)&&state.destinations.length
+        ?state.destinations
+        :state.destination?[state.destination]:[];
+      destinations.forEach((destination,index)=>{
+        const isFinal=index===destinations.length-1;
+        const coordinates=isFinal&&destinationMarkerCoordinates
+          ?destinationMarkerCoordinates
+          :destination.coordinates;
+        if(coordinates) add(new YMapMarker(
+          {coordinates:[coordinates.longitude,coordinates.latitude],zIndex:1100+index},
+          marker('destination',isFinal?(state.destinationArrivalLabel||undefined):String(index+1))
+        ));
+      });
       const fallbackCoordinates=state.pickup&&state.destination
         ?[state.pickup.coordinates,state.destination.coordinates]
         :null;

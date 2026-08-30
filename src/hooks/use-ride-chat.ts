@@ -5,8 +5,21 @@ import { io, type Socket } from 'socket.io-client';
 
 import { apiRequest, getSocketUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
-import type { RideChatMessage, RideChatThread, RideOrder } from '@/domain/models';
+import type {
+  RideChatImageMimeType,
+  RideChatMessage,
+  RideChatThread,
+  RideOrder,
+} from '@/domain/models';
 import { canSendRideChatMessage, upsertRideChatMessage } from '@/domain/ride-chat';
+
+export type RideChatImageUpload = {
+  base64: string;
+  mimeType: RideChatImageMimeType;
+  width?: number;
+  height?: number;
+  fileName?: string;
+};
 
 export function useRideChat(orderId: string | undefined) {
   const { token } = useSession();
@@ -70,7 +83,9 @@ export function useRideChat(orderId: string | undefined) {
         ? {
             ...current,
             orderStatus: order.status,
-            canSend: canSendRideChatMessage(order.status),
+            canSend:
+              current.viewerRole !== 'admin' &&
+              canSendRideChatMessage(order.status),
           }
         : current);
     };
@@ -99,9 +114,18 @@ export function useRideChat(orderId: string | undefined) {
     return () => subscription.remove();
   }, [orderId, reload, token]);
 
-  const sendMessage = useCallback(async (body: string): Promise<boolean> => {
+  const sendMessage = useCallback(async (
+    body: string,
+    attachment?: RideChatImageUpload,
+  ): Promise<boolean> => {
     const normalizedBody = body.trim();
-    if (!normalizedBody || !token || token.startsWith('demo:') || !orderId || !thread?.canSend) {
+    if (
+      (!normalizedBody && !attachment) ||
+      !token ||
+      token.startsWith('demo:') ||
+      !orderId ||
+      !thread?.canSend
+    ) {
       return false;
     }
     setSending(true);
@@ -110,14 +134,18 @@ export function useRideChat(orderId: string | undefined) {
       const message = await apiRequest<RideChatMessage>(`/v1/orders/${orderId}/messages`, {
         method: 'POST',
         token,
-        body: JSON.stringify({ id: randomUUID(), body: normalizedBody }),
+        body: JSON.stringify({
+          id: randomUUID(),
+          body: normalizedBody,
+          ...(attachment ? { attachment: { type: 'image' as const, ...attachment } } : {}),
+        }),
       });
       setThread((current) => current
         ? { ...current, messages: upsertRideChatMessage(current.messages, message) }
         : current);
       return true;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Не удалось отправить сообщение');
+      setError(reason instanceof Error ? reason.message : 'Не удалось отправить сообщение или фотографию');
       return false;
     } finally {
       setSending(false);

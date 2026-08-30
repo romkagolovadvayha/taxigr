@@ -5,7 +5,7 @@ import type { MapViewportInsets, TaxiMapProps } from '@/components/map/types';
 import {
   DRIVER_MARKER_HEIGHT,
   DRIVER_MARKER_WIDTH,
-  driverMarkerSvgMarkup,
+  driverMarkerPngMarkup,
 } from '@/components/map/driver-marker';
 import { smoothRouteCoordinates } from '@/components/map/route-geometry';
 import { remainingRouteCoordinates } from '@/domain/route-tracking';
@@ -136,7 +136,7 @@ function markerElement(
     element.style.background = 'transparent';
     element.style.border = '0';
     element.style.boxShadow = 'none';
-    element.innerHTML = driverMarkerSvgMarkup(colors.brand, colors.brandInk);
+    element.innerHTML = driverMarkerPngMarkup();
     const rotation = navigationMode ? 0 : (heading ?? 0);
     element.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
     element.style.transition = reduceMotion
@@ -153,6 +153,7 @@ function markerElement(
 
 export const TaxiMap = memo(function TaxiMap({
   pickup,
+  destinations,
   destination,
   routeCoordinates,
   pickupEtaMinutes,
@@ -287,26 +288,32 @@ export const TaxiMap = memo(function TaxiMap({
         ),
       );
     }
-    if (destination && destinationMarkerCoordinates) {
+    const orderedDestinations = destinations?.length
+      ? destinations
+      : destination
+        ? [destination]
+        : [];
+    orderedDestinations.forEach((item, index) => {
+      const final = index === orderedDestinations.length - 1;
+      const markerCoordinates = final && destinationMarkerCoordinates
+        ? destinationMarkerCoordinates
+        : item.coordinates;
       const destinationElement = routePointElement(
         'destination',
-        destinationArrivalLabel ?? undefined,
+        final ? destinationArrivalLabel ?? undefined : String(index + 1),
         zoomRef.current,
       );
       routePointElementsRef.current.push(destinationElement);
       add(
         new api.YMapMarker(
           {
-            coordinates: [
-              destinationMarkerCoordinates.longitude,
-              destinationMarkerCoordinates.latitude,
-            ],
-            zIndex: 1100,
+            coordinates: [markerCoordinates.longitude, markerCoordinates.latitude],
+            zIndex: 1100 + index,
           },
           destinationElement,
         ),
       );
-    }
+    });
     const visibleCoordinates =
       renderedRouteCoordinates.length >= 2
         ? renderedRouteCoordinates
@@ -354,6 +361,7 @@ export const TaxiMap = memo(function TaxiMap({
     colorScheme,
     destination,
     destinationArrivalLabel,
+    destinations,
     followDriver,
     mapReady,
     pickup,

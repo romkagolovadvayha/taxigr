@@ -815,6 +815,14 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                 <Text style={{ ...typography.bodyStrong, color: colors.ink, fontVariant: ['tabular-nums'] }}>
                   {formatMoney(order.priceMinor)}
                 </Text>
+                <AppButton
+                  fullWidth={false}
+                  compact
+                  variant="secondary"
+                  onPress={() => router.push(`/admin/orders/${order.id}` as never)}
+                >
+                  Открыть заказ
+                </AppButton>
               </View>
             ))}
           </SurfaceCard>

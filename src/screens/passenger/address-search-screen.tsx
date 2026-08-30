@@ -272,9 +272,11 @@ function AddressResult({
 }
 
 export function AddressSearchScreen() {
-  const { field, initialQuery } = useLocalSearchParams<{
+  const { field, initialQuery, destinationIndex, append } = useLocalSearchParams<{
     field?: 'pickup' | 'destination';
     initialQuery?: string | string[];
+    destinationIndex?: string;
+    append?: string;
   }>();
   const initialQueryValue = Array.isArray(initialQuery) ? initialQuery[0] ?? '' : initialQuery ?? '';
   const [query, setQuery] = useState(initialQueryValue);
@@ -288,7 +290,13 @@ export function AddressSearchScreen() {
   const searchAbortController = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
   const { token } = useSession();
-  const { setPickup, setDestination, destinationHistory } = useRide();
+  const {
+    setPickup,
+    setDestination,
+    setDestinationAt,
+    addDestination,
+    destinationHistory,
+  } = useRide();
 
   useFocusEffect(
     useCallback(() => {
@@ -426,9 +434,16 @@ export function AddressSearchScreen() {
       });
       return;
     }
-    if (field === 'pickup') setPickup(address);
-    else setDestination(address);
-    goBackOrReplace('/');
+    if (field === 'pickup') {
+      setPickup(address);
+    } else if (append === '1') {
+      addDestination(address);
+    } else {
+      const index = Number(destinationIndex);
+      if (Number.isInteger(index) && index >= 0) setDestinationAt(index, address);
+      else setDestination(address);
+    }
+    goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
   };
 
   return (

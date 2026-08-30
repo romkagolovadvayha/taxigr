@@ -10,6 +10,7 @@ import { colors, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   pickup: Address | null;
+  destinations?: Address[];
   destination: Address | null;
   onUseLocation?: () => void;
   locationLoading?: boolean;
@@ -23,6 +24,8 @@ function AddressRow({
   compact,
   onUseLocation,
   locationLoading,
+  destinations,
+  onAddDestination,
 }: {
   kind: 'pickup' | 'destination';
   label: string;
@@ -30,27 +33,36 @@ function AddressRow({
   compact: boolean;
   onUseLocation?: () => void;
   locationLoading?: boolean;
+  destinations?: Address[];
+  onAddDestination?: () => void;
 }) {
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
-  const needsHouseNumber = !!address && !hasHouseNumber(address);
+  const addDestinationAction = kind === 'destination' && !!address && !!onAddDestination;
+  const needsHouseNumber = kind === 'destination' && destinations?.length
+    ? destinations.some((item) => !hasHouseNumber(item))
+    : !!address && !hasHouseNumber(address);
   return (
     <View style={{ position: 'relative' }}>
       <AnimatedPressable
         feedback="subtle"
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${address?.label ?? 'не указано'}${needsHouseNumber ? ', требуется номер дома' : ''}`}
-        onPress={() =>
+        onPress={() => {
+          if (kind === 'destination' && address) {
+            router.push('/stops' as never);
+            return;
+          }
           router.push({
             pathname: '/address-search',
             params: { field: kind, initialQuery: address?.label ?? '' },
-          })
-        }
+          });
+        }}
         style={({ pressed }) => ({
           minHeight: compact ? 48 : 58,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.x4,
-          paddingRight: compactLocationAction ? 56 : 0,
+          paddingRight: compactLocationAction || addDestinationAction ? 56 : 0,
           opacity: pressed ? 0.68 : 1,
         })}
       >
@@ -71,7 +83,9 @@ function AddressRow({
             numberOfLines={1}
             style={{ ...typography.body, color: address ? colors.ink : colors.inkSecondary }}
           >
-            {address?.label ??
+            {kind === 'destination' && destinations && destinations.length > 1
+              ? destinations.map((item) => item.label).join(' → ')
+              : address?.label ??
               (kind === 'pickup'
                 ? locationLoading
                   ? 'Определяем местоположение…'
@@ -84,10 +98,33 @@ function AddressRow({
             </Text>
           )}
         </View>
-        {!compactLocationAction && (
+        {!compactLocationAction && !addDestinationAction ? (
           <Text style={{ ...typography.sectionTitle, color: colors.inkMuted }}>›</Text>
-        )}
+        ) : null}
       </AnimatedPressable>
+      {addDestinationAction && (
+        <AnimatedPressable
+          feedback="subtle"
+          accessibilityRole="button"
+          accessibilityLabel="Добавить ещё одну точку назначения"
+          hitSlop={2}
+          onPress={onAddDestination}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            right: -2,
+            top: 2,
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.surfaceSecondary,
+            opacity: pressed ? 0.68 : 1,
+          })}
+        >
+          <AppIcon name="plus" size={22} color={colors.ink} />
+        </AnimatedPressable>
+      )}
       {compactLocationAction && (
         <AnimatedPressable
           accessibilityRole="button"
@@ -119,6 +156,7 @@ function AddressRow({
 
 export function AddressFields({
   pickup,
+  destinations,
   destination,
   onUseLocation,
   locationLoading,
@@ -127,6 +165,7 @@ export function AddressFields({
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       router.prefetch('/address-search');
+      router.prefetch('/stops' as never);
     });
 
     return () => cancelAnimationFrame(frame);
@@ -166,7 +205,18 @@ export function AddressFields({
         </AnimatedPressable>
       )}
       <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 26 }} />
-      <AddressRow kind="destination" label="Куда" address={destination} compact={compact} />
+      <AddressRow
+        kind="destination"
+        label="Куда"
+        address={destination}
+        destinations={destinations}
+        compact={compact}
+        onAddDestination={
+          (destinations?.length ?? 0) < 5
+            ? () => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })
+            : undefined
+        }
+      />
     </View>
   );
 }

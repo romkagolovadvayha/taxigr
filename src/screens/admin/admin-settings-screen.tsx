@@ -23,6 +23,7 @@ type EditableKey =
   | 'districtPerKilometer02To07Minor'
   | 'intercityPerKilometerMinor'
   | 'childSurchargeMinor'
+  | 'additionalStopGrahovoSurchargeBps'
   | 'waitingFreeMinutes'
   | 'waitingPerMinuteMinor'
   | 'searchPriceIncreaseIntervalMinutes'
@@ -331,11 +332,21 @@ export function AdminSettingsScreen() {
             (value) => changeRubles('childSurchargeMinor', value),
             '₽',
           )}
+          {field(
+            'Каждая дополнительная точка по Грахово',
+            String(rules.additionalStopGrahovoSurchargeBps / 100),
+            (value) => changeInteger('additionalStopGrahovoSurchargeBps', value, 100),
+            '%',
+            'Надбавка за дополнительную точку по Грахово в процентах',
+          )}
         </View>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           В Грахово действует фиксированная сумма, в Граховском районе — ставка за
           километр по времени оформления заказа. Межгород рассчитывается по отдельной
           ставке за километр. Временные интервалы считаются по самарскому времени.
+          Если весь маршрут проходит по Грахово, каждая дополнительная точка добавляет{' '}
+          {rules.additionalStopGrahovoSurchargeBps / 100}% текущей фиксированной стоимости.
+          Для точек в районе и межгороде каждый следующий участок считается по действующему тарифу.
         </Text>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           Детский тариф назначает любую машину с подтверждённым креслом — пассажир

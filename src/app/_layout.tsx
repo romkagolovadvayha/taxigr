@@ -177,6 +177,16 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen
+            name="stops"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.58, 1],
+              sheetInitialDetentIndex: 0,
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 30,
+            }}
+          />
+          <Stack.Screen
             name="order-confirmation"
             options={{
               presentation: 'formSheet',
