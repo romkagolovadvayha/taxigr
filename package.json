@@ -36,6 +36,7 @@
     "expo-task-manager": "~57.0.13",
     "fastify": "^5.10.0",
     "jose": "^6.2.4",
+    "lucide-react-native": "^1.37.0",
     "mysql2": "^3.23.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",

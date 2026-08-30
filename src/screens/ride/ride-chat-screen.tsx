@@ -30,7 +30,7 @@ import type { RideChatMessage } from '@/domain/models';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
 import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
 import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
-import { base64ByteLength } from '@/utils/image-data';
+import { base64ByteLength, imageResizeToFit } from '@/utils/image-data';
 
 type SelectedChatImage = RideChatImageUpload & {
   uri: string;
@@ -66,12 +66,8 @@ async function optimizePickedImage(
 ): Promise<SelectedChatImage> {
   for (const step of imageOptimizationSteps) {
     const context = ImageManipulator.manipulate(asset.uri);
-    const longestSide = Math.max(asset.width, asset.height);
-    if (longestSide > step.maxDimension) {
-      context.resize(asset.width >= asset.height
-        ? { width: step.maxDimension, height: null }
-        : { width: null, height: step.maxDimension });
-    }
+    const resize = imageResizeToFit(asset.width, asset.height, step.maxDimension);
+    if (resize) context.resize(resize);
     const rendered = await context.renderAsync();
     const optimized = await rendered.saveAsync({
       base64: true,
@@ -451,9 +447,7 @@ export function RideChatScreen() {
                       onChangeText={setDraft}
                       placeholder={selectedImage ? 'Добавить подпись' : 'Напишите сообщение'}
                       placeholderTextColor={colors.inkSecondary}
-                      multiline
-                      scrollEnabled
-                      textAlignVertical="center"
+                      multiline={false}
                       maxLength={1_000}
                       editable={!sending}
                       style={{
@@ -461,6 +455,8 @@ export function RideChatScreen() {
                         height: 52,
                         paddingHorizontal: spacing.x4,
                         paddingVertical: 0,
+                        textAlignVertical: 'center',
+                        includeFontPadding: false,
                         borderRadius: radius.lg,
                         borderCurve: 'continuous',
                         borderWidth: 1,

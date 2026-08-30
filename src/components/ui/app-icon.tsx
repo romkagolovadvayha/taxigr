@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import regular from 'expo-symbols/androidWeights/regular';
+import { Paperclip, Send } from 'lucide-react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { colors } from '@/theme/tokens';
@@ -69,17 +68,15 @@ export function AppIcon({
   }
 
   if (name === 'paperclip' || name === 'send') {
+    const LibraryIcon = name === 'paperclip' ? Paperclip : Send;
     return (
-      <SymbolView
-        name={name === 'paperclip'
-          ? { ios: 'paperclip', android: 'attach_file', web: 'attach_file' }
-          : { ios: 'paperplane.fill', android: 'send', web: 'send' }}
+      <LibraryIcon
         size={size}
-        tintColor={color}
-        weight={{ ios: 'regular', android: regular }}
+        color={color}
+        strokeWidth={2}
+        absoluteStrokeWidth
         accessible={false}
         aria-hidden
-        style={{ width: size, height: size }}
       />
     );
   }
