@@ -35,6 +35,13 @@ export type ColorPalette = {
   infoText: string;
   route: string;
   mapFallback: string;
+  vehicleGlass: string;
+  vehicleGlassHighlight: string;
+  vehicleOutline: string;
+  vehicleTire: string;
+  vehicleWheel: string;
+  vehiclePlateSurface: string;
+  vehiclePlateInk: string;
   overlay: string;
   transparent: string;
 };
@@ -72,6 +79,13 @@ export const lightColors: ColorPalette = {
   infoText: '#1E64B7',
   route: '#16B96B',
   mapFallback: '#E9EFE7',
+  vehicleGlass: '#AFC7D8',
+  vehicleGlassHighlight: '#EAF6FC',
+  vehicleOutline: '#24272B',
+  vehicleTire: '#202225',
+  vehicleWheel: '#AEB4BC',
+  vehiclePlateSurface: '#FFFFFF',
+  vehiclePlateInk: '#111111',
   overlay: 'rgba(0,0,0,0.48)',
   transparent: 'transparent',
 };
@@ -109,6 +123,13 @@ export const darkColors: ColorPalette = {
   infoText: '#9AC6FF',
   route: '#31D17E',
   mapFallback: '#202522',
+  vehicleGlass: '#7895A8',
+  vehicleGlassHighlight: '#C6D9E4',
+  vehicleOutline: '#17191B',
+  vehicleTire: '#111315',
+  vehicleWheel: '#9299A1',
+  vehiclePlateSurface: '#FFFFFF',
+  vehiclePlateInk: '#111111',
   overlay: 'rgba(0,0,0,0.66)',
   transparent: 'transparent',
 };

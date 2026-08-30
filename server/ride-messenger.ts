@@ -132,6 +132,12 @@ export function driverRideButtons(ride: RideOrder): MessengerButton[][] {
       [link('📱 Открыть заказы', appUrl('/driver'))],
     ];
   }
+  if (ride.driverQueuePosition === 2) {
+    return [
+      [callback(ride, 'refresh', '🔄 Обновить')],
+      [link('📱 Открыть следующий заказ', appUrl('/driver'))],
+    ];
+  }
   const nextActions: Partial<Record<RideOrder['status'], [RideMessengerAction, string]>> = {
     accepted: ['driver-arriving', '🚗 Выехал к пассажиру'],
     driver_arriving: ['driver-waiting', '📍 Я на месте'],
@@ -183,6 +189,7 @@ function vehicle(ride: RideOrder): string | null {
 }
 
 function driverLocation(ride: RideOrder): MessengerLocation[] {
+  if (ride.driverQueuePosition === 2) return [];
   const coordinates = ride.driver?.coordinates;
   return coordinates
     ? [{
@@ -195,6 +202,7 @@ function driverLocation(ride: RideOrder): MessengerLocation[] {
 }
 
 function driverTargetLocation(ride: RideOrder): MessengerLocation[] {
+  if (ride.driverQueuePosition === 2) return [];
   if (['searching', 'accepted', 'driver_arriving'].includes(ride.status)) {
     return [{
       title: 'Место подачи',
@@ -229,8 +237,12 @@ export function passengerRideNotification(
   ride: RideOrder,
   overrides: Partial<Pick<PersonalMessengerNotification, 'icon' | 'title' | 'body' | 'details'>> = {},
 ): PersonalMessengerNotification {
-  const [icon, baseTitle] = passengerTitles[ride.status];
-  const title = ride.status === 'searching'
+  const [baseIcon, baseTitle] = passengerTitles[ride.status];
+  const queued = ride.driverQueuePosition === 2;
+  const icon = queued ? '🕓' : baseIcon;
+  const title = queued
+    ? 'Водитель завершает предыдущий заказ'
+    : ride.status === 'searching'
     ? `${baseTitle} · ${formatElapsedClock(ride.createdAt)}`
     : baseTitle;
   const activeDriver = ride.driverId && ride.driver;
@@ -246,10 +258,12 @@ export function passengerRideNotification(
     audience: 'passenger',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
-    body: overrides.body ?? formatRouteLabel(ride.pickup, ride.destination),
+    body: overrides.body ?? (queued
+      ? 'Ваш заказ следующий. Сообщим, когда водитель освободится.'
+      : formatRouteLabel(ride.pickup, ride.destination)),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: passengerRideButtons(ride),
-    locations: activeDriver && !['completed', 'cancelled'].includes(ride.status)
+    locations: activeDriver && !queued && !['completed', 'cancelled'].includes(ride.status)
       ? driverLocation(ride)
       : [],
   };
@@ -270,8 +284,12 @@ export function driverRideNotification(
   ride: RideOrder,
   overrides: Partial<Pick<PersonalMessengerNotification, 'icon' | 'title' | 'body' | 'details'>> = {},
 ): PersonalMessengerNotification {
-  const [icon, baseTitle] = driverTitles[ride.status];
-  const title = ride.status === 'searching'
+  const [baseIcon, baseTitle] = driverTitles[ride.status];
+  const queued = ride.driverQueuePosition === 2;
+  const icon = queued ? '🕓' : baseIcon;
+  const title = queued
+    ? 'Следующий заказ принят'
+    : ride.status === 'searching'
     ? `${baseTitle} · поиск ${formatElapsedClock(ride.createdAt)}`
     : baseTitle;
   const assigned = Boolean(ride.driverId);
@@ -292,7 +310,9 @@ export function driverRideNotification(
     audience: 'driver',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
-    body: overrides.body ?? formatRouteLabel(ride.pickup, ride.destination),
+    body: overrides.body ?? (queued
+      ? `После текущей поездки · ${formatRouteLabel(ride.pickup, ride.destination)}`
+      : formatRouteLabel(ride.pickup, ride.destination)),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: driverRideButtons(ride),
     locations: driverTargetLocation(ride),

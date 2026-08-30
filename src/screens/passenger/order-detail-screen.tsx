@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
+import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { IconButton } from '@/components/ui/icon-button';
@@ -97,6 +98,9 @@ export function OrderDetailScreen() {
             label="Позвонить водителю"
           />
         )}
+      {order.driver && !['completed', 'cancelled'].includes(order.status) && (
+        <RideChatButton orderId={order.id} label="Написать водителю" />
+      )}
       <View
         style={{
           padding: spacing.x5,

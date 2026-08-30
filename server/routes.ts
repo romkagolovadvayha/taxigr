@@ -19,6 +19,8 @@ import {
   liveLocationUpdateDelay,
 } from '../src/domain/live-location';
 import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
+import { canSendRideChatMessage } from '../src/domain/ride-chat';
+import { maximumAssignedDriverOrders } from '../src/domain/driver-order-queue';
 import { searchPriceIncreaseSlotAt } from '../src/domain/search-price-increase';
 import {
   canDriverReceivePriorityOrder,
@@ -29,6 +31,8 @@ import {
 } from '../src/domain/driver-priority';
 import {
   placeCategories,
+  type RideChatParticipant,
+  type RideChatRole,
   type Address,
   type RideStatus,
   type TariffCode,
@@ -85,6 +89,13 @@ import {
   type OrderRow,
 } from './presenters';
 import { driverRideNotification, passengerRideNotification } from './ride-messenger';
+import {
+  presentRideChatMessage,
+  rideChatAvatarUrl,
+  rideChatMessageSelect,
+  rideChatPush,
+  type RideChatMessageRow,
+} from './ride-chat';
 import { findPlace, listPlaces, placeToAddress, searchPlaces } from './places';
 import {
   deviceFingerprint,
@@ -347,6 +358,11 @@ const profileSchema = z.object({
   name: z.string().trim().min(2).max(160),
   gender: z.enum(['male', 'female']),
 });
+const notificationChannelProviderSchema = z.enum(['vk', 'max', 'telegram']);
+const notificationChannelSchema = z.object({
+  provider: notificationChannelProviderSchema,
+  enabled: z.boolean(),
+});
 const avatarSchema = z.object({
   base64: z.string().min(16).max(3_500_000),
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
@@ -377,6 +393,10 @@ function decodeAvatar(input: z.infer<typeof avatarSchema>): Buffer {
 }
 const ratingSchema = z.object({
   score: z.number().int().min(1).max(5),
+});
+const rideChatMessageSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string().trim().min(1).max(1_000),
 });
 const vehicleDetailsSchema = z.object({
   vehicleMake: z.string().trim().min(2).max(80),
@@ -635,6 +655,108 @@ function addressesMatch(left: Address, right: Address): boolean {
 
 async function getOrder(id: string): Promise<OrderRow | null> {
   return firstRow<OrderRow>(`${orderSelect} WHERE o.id = ?`, [id]);
+}
+
+type RideChatAccessRow = RowDataPacket & {
+  order_id: string;
+  order_status: RideStatus;
+  passenger_id: string;
+  passenger_name: string;
+  passenger_avatar_url: string | null;
+  passenger_avatar_mime: string | null;
+  passenger_updated_at: Date | string;
+  driver_id: string | null;
+  driver_user_id: string | null;
+  driver_name: string | null;
+  driver_avatar_url: string | null;
+  driver_avatar_mime: string | null;
+  driver_updated_at: Date | string | null;
+};
+
+type RideChatAccess = {
+  row: RideChatAccessRow;
+  viewerRole: RideChatRole;
+  counterpart: RideChatParticipant;
+};
+
+async function getRideChatAccess(
+  orderId: string,
+  session: AuthUser,
+  connection?: PoolConnection,
+  lock = false,
+): Promise<RideChatAccess> {
+  const executor = connection ?? db;
+  const [rows] = await executor.query<RideChatAccessRow[]>(
+    `SELECT orders.id AS order_id, orders.status AS order_status,
+       orders.passenger_id, passenger.name AS passenger_name,
+       passenger.avatar_url AS passenger_avatar_url,
+       passenger.avatar_mime AS passenger_avatar_mime,
+       passenger.updated_at AS passenger_updated_at,
+       orders.driver_id, driver.user_id AS driver_user_id,
+       driver_user.name AS driver_name,
+       driver_user.avatar_url AS driver_avatar_url,
+       driver_user.avatar_mime AS driver_avatar_mime,
+       driver_user.updated_at AS driver_updated_at
+     FROM orders
+     JOIN users passenger ON passenger.id = orders.passenger_id
+     LEFT JOIN drivers driver ON driver.id = orders.driver_id
+     LEFT JOIN users driver_user ON driver_user.id = driver.user_id
+     WHERE orders.id = ?${lock ? ' FOR UPDATE' : ''}`,
+    [orderId],
+  );
+  const row = rows[0];
+  if (!row) {
+    throw Object.assign(new Error('Заказ не найден'), {
+      statusCode: 404,
+      code: 'ORDER_NOT_FOUND',
+    });
+  }
+  if (!row.driver_id || !row.driver_user_id || !row.driver_name || !row.driver_updated_at) {
+    throw Object.assign(new Error('Чат станет доступен после назначения водителя'), {
+      statusCode: 409,
+      code: 'RIDE_CHAT_UNAVAILABLE',
+    });
+  }
+
+  if (row.passenger_id === session.id) {
+    return {
+      row,
+      viewerRole: 'passenger',
+      counterpart: {
+        id: row.driver_user_id,
+        name: row.driver_name,
+        role: 'driver',
+        avatarUrl: rideChatAvatarUrl(
+          row.driver_user_id,
+          row.driver_avatar_url,
+          row.driver_avatar_mime,
+          row.driver_updated_at,
+        ),
+      },
+    };
+  }
+  if (row.driver_user_id === session.id) {
+    return {
+      row,
+      viewerRole: 'driver',
+      counterpart: {
+        id: row.passenger_id,
+        name: row.passenger_name,
+        role: 'passenger',
+        avatarUrl: rideChatAvatarUrl(
+          row.passenger_id,
+          row.passenger_avatar_url,
+          row.passenger_avatar_mime,
+          row.passenger_updated_at,
+        ),
+      },
+    };
+  }
+
+  throw Object.assign(new Error('Нет доступа к чату этой поездки'), {
+    statusCode: 403,
+    code: 'RIDE_CHAT_FORBIDDEN',
+  });
 }
 
 function ratingViewerForOrder(
@@ -1025,6 +1147,65 @@ async function checkVkMiniAppMessagesPermission(
 
 type DriverAudience = 'all' | 'priority' | 'nonpriority' | 'available';
 
+type DriverQueuePromotion = {
+  id: string;
+  passengerId: string;
+} | null;
+
+async function rebalanceDriverOrderQueue(
+  connection: PoolConnection,
+  driverId: string,
+): Promise<DriverQueuePromotion> {
+  const [currentRows] = await connection.query<(RowDataPacket & { id: string })[]>(
+    `SELECT id FROM orders
+     WHERE driver_id = ? AND active_driver_id = ?
+       AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+     LIMIT 1 FOR UPDATE`,
+    [driverId, driverId],
+  );
+  if (currentRows[0]) {
+    await connection.execute(
+      "UPDATE drivers SET status = 'busy' WHERE id = ? AND status <> 'suspended'",
+      [driverId],
+    );
+    return null;
+  }
+
+  const [queuedRows] = await connection.query<
+    (RowDataPacket & { id: string; passenger_id: string })[]
+  >(
+    `SELECT id, passenger_id FROM orders
+     WHERE driver_id = ? AND active_driver_id IS NULL AND status = 'accepted'
+     ORDER BY created_at ASC, id ASC
+     LIMIT 1 FOR UPDATE`,
+    [driverId],
+  );
+  const queued = queuedRows[0];
+  if (!queued) {
+    await connection.execute(
+      "UPDATE drivers SET status = 'online' WHERE id = ? AND status = 'busy'",
+      [driverId],
+    );
+    return null;
+  }
+
+  await connection.execute(
+    'UPDATE orders SET active_driver_id = ? WHERE id = ? AND active_driver_id IS NULL',
+    [driverId, queued.id],
+  );
+  await connection.execute(
+    `INSERT INTO order_events
+      (order_id, event_type, from_status, to_status, payload)
+     VALUES (?, 'driver.queue.promoted', 'accepted', 'accepted', ?)`,
+    [queued.id, JSON.stringify({ driverId })],
+  );
+  await connection.execute(
+    "UPDATE drivers SET status = 'busy' WHERE id = ? AND status <> 'suspended'",
+    [driverId],
+  );
+  return { id: queued.id, passengerId: queued.passenger_id };
+}
+
 async function driverDispatchSettings(
   connection?: PoolConnection,
 ): Promise<DriverDispatchSettings> {
@@ -1067,20 +1248,20 @@ async function eligibleDriverIdsForOrder(
   const [rows] = await executor.query<(RowDataPacket & { id: string })[]>(
     `SELECT d.id
      FROM orders o
-     JOIN drivers d ON d.status = 'online'
+     JOIN drivers d ON d.status IN ('online', 'busy')
      WHERE o.id = ?
        AND (o.tariff <> 'child' OR d.has_child_seat = TRUE)
-       AND NOT EXISTS (
-         SELECT 1 FROM orders active_order
+       AND (
+         SELECT COUNT(*) FROM orders active_order
          WHERE active_order.driver_id = d.id
            AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-       )
+       ) < ?
        AND NOT EXISTS (
          SELECT 1 FROM driver_order_rejections rejected
          WHERE rejected.order_id = o.id AND rejected.driver_id = d.id
        )
        ${priorityClause}`,
-    [orderId],
+    [orderId, maximumAssignedDriverOrders],
   );
   return rows.map((row) => String(row.id));
 }
@@ -1173,6 +1354,46 @@ export async function registerRoutes(
         ),
       ),
       options.delayed ? 'order.priority-released.drivers' : 'order.available.drivers',
+    );
+  };
+  const announcePromotedDriverOrder = async (
+    promotion: DriverQueuePromotion,
+    driverId: string,
+  ): Promise<void> => {
+    if (!promotion) return;
+    const row = await getOrder(promotion.id);
+    if (!row) return;
+    const payload = presentOrder(row);
+    publish(`user:${promotion.passengerId}`, 'order:updated', payload);
+    publish(`driver:${driverId}`, 'order:updated', payload);
+    publish('admins', 'order:updated', payload);
+    void notifyUsers([promotion.passengerId], {
+      title: 'Водитель освободился',
+      body: 'Предыдущая поездка завершена — водитель может выезжать к вам.',
+      data: { orderId: promotion.id },
+      sound: 'taxi_found.wav',
+      channelId: 'ride-taxi-found-v2',
+    }).catch((error) => app.log.warn({ error }, 'promoted order push failed'));
+    void notifyDrivers([driverId], {
+      title: 'Следующий заказ стал текущим',
+      body: 'Откройте заказ и выезжайте к пассажиру.',
+      data: { orderId: promotion.id, role: 'driver' },
+      sound: 'new_order.wav',
+      channelId: 'driver-orders-v2',
+    }).catch((error) => app.log.warn({ error }, 'promoted driver push failed'));
+    notifyMessengers(
+      notifyUsersInMessengers([promotion.passengerId], passengerRideNotification(payload, {
+        title: 'Водитель освободился',
+        body: 'Предыдущая поездка завершена — водитель может выезжать к вам.',
+      })),
+      'order.queue-promoted.passenger',
+    );
+    notifyMessengers(
+      notifyDriversInMessengers([driverId], driverRideNotification(payload, {
+        title: 'Следующий заказ стал текущим',
+        body: 'Можно выезжать к пассажиру.',
+      })),
+      'order.queue-promoted.driver',
     );
   };
   const handleMessengerOrderAction = createMessengerOrderActionHandler(app);
@@ -2689,6 +2910,72 @@ export async function registerRoutes(
     return { data: user };
   });
 
+  const notificationChannelsForUser = async (userId: string) => {
+    const providers = notificationChannelProviderSchema.options;
+    const [rows] = await db.query<(RowDataPacket & {
+      provider: z.infer<typeof notificationChannelProviderSchema>;
+      bot_contact_available: number | boolean;
+      notifications_enabled: number | boolean;
+    })[]>(
+      `SELECT provider,
+         MAX(bot_contact_available) AS bot_contact_available,
+         MAX(notifications_enabled) AS notifications_enabled
+       FROM user_messenger_accounts
+       WHERE user_id = ? AND active = TRUE
+       GROUP BY provider`,
+      [userId],
+    );
+    const accountsByProvider = new Map(rows.map((row) => [row.provider, row]));
+    return providers.map((provider) => {
+      const account = accountsByProvider.get(provider);
+      return {
+        provider,
+        connected: Boolean(account),
+        available: Boolean(account?.bot_contact_available),
+        enabled: Boolean(account?.notifications_enabled),
+      };
+    });
+  };
+
+  app.get('/v1/me/notification-channels', async (request) => {
+    const session = await auth(request);
+    return { data: { channels: await notificationChannelsForUser(session.id) } };
+  });
+
+  app.put('/v1/me/notification-channels', async (request) => {
+    const session = await auth(request);
+    const input = parse(notificationChannelSchema, request.body);
+    await withTransaction(async (connection) => {
+      if (input.enabled) {
+        const [accounts] = await connection.query<RowDataPacket[]>(
+          `SELECT id FROM user_messenger_accounts
+           WHERE user_id = ? AND provider = ? AND active = TRUE
+             AND bot_contact_available = TRUE
+           LIMIT 1 FOR UPDATE`,
+          [session.id, input.provider],
+        );
+        if (!accounts.length) {
+          throw Object.assign(new Error('Этот источник уведомлений пока недоступен'), {
+            statusCode: 409,
+            code: 'NOTIFICATION_CHANNEL_UNAVAILABLE',
+          });
+        }
+      }
+      await connection.execute(
+        `UPDATE user_messenger_accounts
+         SET notifications_enabled = ?
+         WHERE user_id = ? AND provider = ? AND active = TRUE`,
+        [input.enabled, session.id, input.provider],
+      );
+      await connection.execute(
+        `UPDATE users SET notification_channels_configured_at = UTC_TIMESTAMP(3)
+         WHERE id = ? AND deleted_at IS NULL`,
+        [session.id],
+      );
+    });
+    return { data: { channels: await notificationChannelsForUser(session.id) } };
+  });
+
   app.put(
     '/v1/me/avatar',
     {
@@ -3337,6 +3624,91 @@ export async function registerRoutes(
     };
   });
 
+  app.get('/v1/orders/:id/messages', async (request) => {
+    const session = await auth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const query = parse(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(100),
+      }),
+      request.query,
+    );
+    const access = await getRideChatAccess(id, session);
+    const [rows] = await db.query<RideChatMessageRow[]>(
+      `${rideChatMessageSelect}
+       WHERE message.order_id = ?
+       ORDER BY message.created_at DESC, message.id DESC
+       LIMIT ?`,
+      [id, query.limit],
+    );
+
+    return {
+      data: {
+        orderId: id,
+        orderStatus: access.row.order_status,
+        viewerRole: access.viewerRole,
+        counterpart: access.counterpart,
+        messages: rows.reverse().map(presentRideChatMessage),
+        canSend: canSendRideChatMessage(access.row.order_status),
+      },
+    };
+  });
+
+  app.post('/v1/orders/:id/messages', async (request, reply) => {
+    const session = await auth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const input = parse(rideChatMessageSchema, request.body);
+    const result = await withTransaction(async (connection) => {
+      const access = await getRideChatAccess(id, session, connection, true);
+      if (!canSendRideChatMessage(access.row.order_status)) {
+        throw Object.assign(new Error('Чат закрыт: поездка уже завершена'), {
+          statusCode: 409,
+          code: 'RIDE_CHAT_CLOSED',
+        });
+      }
+
+      await connection.execute(
+        `INSERT IGNORE INTO ride_chat_messages (id, order_id, sender_user_id, body)
+         VALUES (?, ?, ?, ?)`,
+        [input.id, id, session.id, input.body],
+      );
+      const [messageRows] = await connection.query<RideChatMessageRow[]>(
+        `${rideChatMessageSelect} WHERE message.id = ? LIMIT 1`,
+        [input.id],
+      );
+      const messageRow = messageRows[0];
+      if (
+        !messageRow ||
+        messageRow.order_id !== id ||
+        messageRow.sender_user_id !== session.id ||
+        messageRow.body !== input.body
+      ) {
+        throw Object.assign(new Error('Не удалось сохранить сообщение'), {
+          statusCode: 409,
+          code: 'RIDE_CHAT_MESSAGE_CONFLICT',
+        });
+      }
+
+      return { access, message: presentRideChatMessage(messageRow) };
+    });
+
+    publish(`user:${result.access.row.passenger_id}`, 'ride-chat:message', result.message);
+    publish(`user:${result.access.row.driver_user_id}`, 'ride-chat:message', result.message);
+
+    const recipientUserId = result.access.viewerRole === 'passenger'
+      ? result.access.row.driver_user_id
+      : result.access.row.passenger_id;
+    const recipientRole: RideChatRole = result.access.viewerRole === 'passenger'
+      ? 'driver'
+      : 'passenger';
+    void notifyUsers([recipientUserId!], rideChatPush(result.message, recipientRole)).catch((error) =>
+      request.log.warn({ error, orderId: id }, 'ride chat push notification failed'),
+    );
+
+    reply.code(201);
+    return { data: result.message };
+  });
+
   app.post('/v1/orders/:id/search-price-increase', async (request) => {
     const session = await auth(request, 'passenger');
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
@@ -3600,12 +3972,9 @@ export async function registerRoutes(
          WHERE id = ?`,
         [adminCancellation ? 'admin' : 'passenger', reason ?? null, id],
       );
-      if (row.driver_id) {
-        await connection.execute(
-          "UPDATE drivers SET status = 'online' WHERE id = ? AND status = 'busy'",
-          [row.driver_id],
-        );
-      }
+      const promotion = row.driver_id
+        ? await rebalanceDriverOrderQueue(connection, row.driver_id)
+        : null;
       await connection.execute('DELETE FROM passenger_locations WHERE order_id = ?', [id]);
       await connection.execute(
         `INSERT INTO order_events
@@ -3671,6 +4040,7 @@ export async function registerRoutes(
         initiatedBy: row.passenger_id === session.id ? 'passenger' as const : 'admin' as const,
         passengerBlocked,
         passengerBlockHours,
+        promotion,
       };
     });
     const updated = await getOrder(id);
@@ -3679,6 +4049,9 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     if (participants.driverId) publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    if (participants.driverId) {
+      await announcePromotedDriverOrder(participants.promotion, participants.driverId);
+    }
     notifyAdmins({
       icon: participants.passengerBlocked ? '🚨' : '❌',
       title: participants.passengerBlocked
@@ -4069,9 +4442,10 @@ export async function registerRoutes(
     publish(`driver:${driver.id}`, 'driver:location', input);
     const activeOrder = await firstRow<RowDataPacket & { passenger_id: string }>(
       `SELECT passenger_id FROM orders
-       WHERE driver_id = ? AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-       ORDER BY created_at DESC LIMIT 1`,
-      [driver.id],
+       WHERE driver_id = ? AND active_driver_id = ?
+         AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+       LIMIT 1`,
+      [driver.id, driver.id],
     );
     if (activeOrder) publish(`user:${activeOrder.passenger_id}`, 'driver:location', input);
     return { data: { accepted: true } };
@@ -4090,6 +4464,12 @@ export async function registerRoutes(
       const order = await getOrder(id);
       if (!driver || !order || order.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
+      }
+      if (order.active_driver_id !== driver.id) {
+        throw Object.assign(new Error('Сначала завершите текущую поездку'), {
+          statusCode: 409,
+          code: 'DRIVER_ORDER_QUEUED',
+        });
       }
       const targetKind = driverRouteTarget(order.status);
       if (!targetKind) {
@@ -4118,7 +4498,7 @@ export async function registerRoutes(
     const session = await auth(request, 'driver');
     const driver = await getDriver(session.id);
     if (!driver) throw Object.assign(new Error('Профиль водителя не найден'), { statusCode: 404 });
-    if (driver.status !== 'online') return { data: [] };
+    if (!['online', 'busy'].includes(driver.status)) return { data: [] };
     const [rows] = await db.query<OrderRow[]>(
       `${orderSelect}
        WHERE o.status = 'searching' AND o.driver_id IS NULL
@@ -4131,11 +4511,11 @@ export async function registerRoutes(
               WHERE priority.driver_id = ? AND priority.scope = o.pricing_scope
             )
           )
-          AND NOT EXISTS (
-            SELECT 1 FROM orders active_order
+          AND (
+            SELECT COUNT(*) FROM orders active_order
             WHERE active_order.driver_id = ?
               AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-          )
+          ) < ?
           AND NOT EXISTS (
            SELECT 1 FROM driver_order_rejections rejected
            WHERE rejected.order_id = o.id AND rejected.driver_id = ?
@@ -4144,7 +4524,14 @@ export async function registerRoutes(
            SELECT 1 FROM drivers eligible WHERE eligible.id = ? AND eligible.has_child_seat = TRUE
          ))
        ORDER BY o.created_at ASC LIMIT 20`,
-      [config.ORDER_SEARCH_TTL_MINUTES, driver.id, driver.id, driver.id, driver.id],
+      [
+        config.ORDER_SEARCH_TTL_MINUTES,
+        driver.id,
+        driver.id,
+        maximumAssignedDriverOrders,
+        driver.id,
+        driver.id,
+      ],
     );
     return { data: rows.map(presentOrder) };
   });
@@ -4153,6 +4540,10 @@ export async function registerRoutes(
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
     const updated = await withTransaction(async (connection) => {
+      const driver = await getDriver(session.id, connection, true);
+      if (!driver?.vehicle_id) {
+        throw Object.assign(new Error('Добавьте активный автомобиль'), { statusCode: 409 });
+      }
       const [rows] = await connection.query<OrderRow[]>(
         'SELECT * FROM orders WHERE id = ? FOR UPDATE',
         [id],
@@ -4173,11 +4564,7 @@ export async function registerRoutes(
           code: 'ORDER_SEARCH_EXPIRED',
         });
       }
-      const driver = await getDriver(session.id, connection, true);
-      if (!driver?.vehicle_id) {
-        throw Object.assign(new Error('Добавьте активный автомобиль'), { statusCode: 409 });
-      }
-      if (driver.status !== 'online') {
+      if (!['online', 'busy'].includes(driver.status)) {
         throw Object.assign(new Error('Включите статус «На линии»'), { statusCode: 409 });
       }
       const [priorityRows] = await connection.query<(RowDataPacket & { assigned: number })[]>(
@@ -4198,17 +4585,20 @@ export async function registerRoutes(
           { statusCode: 403, code: 'ORDER_PRIORITY_DELAY' },
         );
       }
-      const [activeRows] = await connection.query<(RowDataPacket & { id: string })[]>(
-        `SELECT id FROM orders
+      const [activeRows] = await connection.query<
+        (RowDataPacket & { id: string; active_driver_id: string | null })[]
+      >(
+        `SELECT id, active_driver_id FROM orders
          WHERE driver_id = ?
            AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-         LIMIT 1 FOR UPDATE`,
-        [driver.id],
+         ORDER BY created_at ASC, id ASC
+         LIMIT ? FOR UPDATE`,
+        [driver.id, maximumAssignedDriverOrders],
       );
-      if (activeRows[0]) {
-        throw Object.assign(new Error('У вас уже есть активный заказ'), {
+      if (activeRows.length >= maximumAssignedDriverOrders) {
+        throw Object.assign(new Error('У вас уже есть текущий и следующий заказы'), {
           statusCode: 409,
-          code: 'ACTIVE_RIDE_IN_PROGRESS',
+          code: 'DRIVER_QUEUE_FULL',
         });
       }
       if (row.passenger_id === session.id) {
@@ -4242,11 +4632,13 @@ export async function registerRoutes(
       const rules = await pricingRules(connection);
       const commissionBps = driver.commission_bps ?? rules.serviceCommissionBps;
       const commissionMinor = calculateCommissionMinor(row.price_minor, commissionBps);
+      const queuePosition = activeRows.length === 0 ? 1 : 2;
+      const activeDriverId = queuePosition === 1 ? driver.id : null;
       await connection.execute(
         `UPDATE orders SET driver_id = ?, active_driver_id = ?, vehicle_id = ?, status = 'accepted',
           commission_minor = ?, commission_bps = ?
          WHERE id = ? AND status = 'searching'`,
-        [driver.id, driver.id, driver.vehicle_id, commissionMinor, commissionBps, id],
+        [driver.id, activeDriverId, driver.vehicle_id, commissionMinor, commissionBps, id],
       );
       await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
       await connection.execute(
@@ -4254,7 +4646,7 @@ export async function registerRoutes(
          VALUES (?, ?, 'order.accepted', 'searching', 'accepted')`,
         [id, session.id],
       );
-      return { passengerId: row.passenger_id, driverId: driver.id };
+      return { passengerId: row.passenger_id, driverId: driver.id, queuePosition };
     });
     const row = await getOrder(id);
     if (!row) throw new Error('Order disappeared');
@@ -4311,12 +4703,12 @@ export async function registerRoutes(
       request.body,
     );
     const participants = await withTransaction(async (connection) => {
+      const driver = await getDriver(session.id, connection, true);
       const [rows] = await connection.query<OrderRow[]>(
         'SELECT * FROM orders WHERE id = ? FOR UPDATE',
         [id],
       );
       const row = rows[0];
-      const driver = await getDriver(session.id, connection, true);
       if (!row || !driver || row.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
       }
@@ -4346,10 +4738,7 @@ export async function registerRoutes(
           id,
         ],
       );
-      await connection.execute(
-        `UPDATE drivers SET status = 'online' WHERE id = ? AND status = 'busy'`,
-        [driver.id],
-      );
+      const promotion = await rebalanceDriverOrderQueue(connection, driver.id);
       await connection.execute(
         `INSERT INTO order_events
           (order_id, actor_user_id, event_type, from_status, to_status, payload)
@@ -4371,13 +4760,16 @@ export async function registerRoutes(
         driverId: driver.id,
         fromStatus: row.status,
         initialDriverIds,
+        promotion,
       };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
     const payload = presentOrder(updated);
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
+    publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    await announcePromotedDriverOrder(participants.promotion, participants.driverId);
 
     const eligibleDriverIds = participants.initialDriverIds.filter(
       (driverId) => driverId !== participants.driverId,
@@ -4559,14 +4951,20 @@ export async function registerRoutes(
       request.body,
     );
     const participants = await withTransaction(async (connection) => {
+      const driver = await getDriver(session.id, connection, true);
       const [rows] = await connection.query<OrderRow[]>(
         'SELECT * FROM orders WHERE id = ? FOR UPDATE',
         [id],
       );
       const row = rows[0];
-      const driver = await getDriver(session.id, connection, true);
       if (!driver || !row || row.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
+      }
+      if (row.active_driver_id !== driver.id) {
+        throw Object.assign(new Error('Сначала завершите текущую поездку'), {
+          statusCode: 409,
+          code: 'DRIVER_ORDER_QUEUED',
+        });
       }
       if (!canTransitionRide(row.status, status)) {
         throw Object.assign(new Error('Недопустимый переход статуса'), {
@@ -4633,14 +5031,12 @@ export async function registerRoutes(
          VALUES (?, ?, 'order.transition', ?, ?)`,
         [id, session.id, row.status, status],
       );
+      let promotion: DriverQueuePromotion = null;
       if (status === 'completed') {
-        await connection.execute(
-          "UPDATE drivers SET status = 'online' WHERE id = ? AND status = 'busy'",
-          [driver.id],
-        );
+        promotion = await rebalanceDriverOrderQueue(connection, driver.id);
         await connection.execute('DELETE FROM passenger_locations WHERE order_id = ?', [id]);
       }
-      return { passengerId: row.passenger_id, driverId: driver.id };
+      return { passengerId: row.passenger_id, driverId: driver.id, promotion };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
@@ -4648,6 +5044,7 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    await announcePromotedDriverOrder(participants.promotion, participants.driverId);
     notifyAdmins({
       icon:
         status === 'completed'

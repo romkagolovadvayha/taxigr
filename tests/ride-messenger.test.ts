@@ -148,6 +148,25 @@ describe('ride messenger flow', () => {
     expect(completed.buttons?.[0]).toHaveLength(5);
   });
 
+  it('does not offer navigation or a status transition for the queued order', () => {
+    const queued = ride({
+      status: 'accepted',
+      driverId: 'driver-1',
+      driverQueuePosition: 2,
+      driver: assignedDriver,
+    });
+    const driverNotification = driverRideNotification(queued);
+    const passengerNotification = passengerRideNotification(queued);
+
+    expect(driverNotification.title).toBe('Следующий заказ принят');
+    expect(driverNotification.locations).toEqual([]);
+    expect(driverNotification.buttons?.flat()).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '🚗 Выехал к пассажиру' }),
+    ]));
+    expect(passengerNotification.title).toBe('Водитель завершает предыдущий заказ');
+    expect(passengerNotification.locations).toEqual([]);
+  });
+
   it('only exposes the rating submitted by the current participant', () => {
     const completed = ride({
       status: 'completed',

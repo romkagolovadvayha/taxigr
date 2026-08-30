@@ -8,6 +8,7 @@ import { TaxiMap } from '@/components/map/taxi-map';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
+import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
@@ -104,10 +105,13 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
   const [navigatorBusy, setNavigatorBusy] = useState(false);
   const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
+  const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
   const [completionConfirmVisible, setCompletionConfirmVisible] = useState(false);
   const {
     driverRide: currentRide,
+    nextDriverRide,
+    driverOffer,
     createDriverOffer: createRide,
     transitionDriverRide: transitionRide,
     startWaiting,
@@ -352,6 +356,114 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         !!passengerPhone && (
           <PhoneCallButton phone={passengerPhone} label="Позвонить клиенту" />
         )}
+      {!['completed', 'cancelled', 'searching'].includes(currentRide.status) &&
+        currentRide.passenger && (
+          <RideChatButton orderId={currentRide.id} label="Написать пассажиру" />
+        )}
+      {nextDriverRide ? (
+        <View
+          style={{
+            gap: spacing.x3,
+            padding: spacing.x4,
+            borderRadius: radius.lg,
+            borderCurve: 'continuous',
+            backgroundColor: colors.surfaceSecondary,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
+            <StatusChip label="Следующий заказ принят" tone="warning" />
+            <MoneyValue valueMinor={nextDriverRide.priceMinor} compact />
+          </View>
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+            {nextDriverRide.pickup.label}
+          </Text>
+          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
+            → {nextDriverRide.destination.label}
+          </Text>
+          <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
+            После завершения текущей поездки этот заказ автоматически станет текущим.
+          </Text>
+          {nextDriverRide.passenger && (
+            <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+              {!!nextDriverRide.passenger.phone && (
+                <PhoneCallButton
+                  phone={nextDriverRide.passenger.phone}
+                  label="Позвонить"
+                  compact
+                  fullWidth={false}
+                  containerStyle={{ flex: 1 }}
+                  buttonStyle={{ flex: 1 }}
+                />
+              )}
+              <RideChatButton
+                orderId={nextDriverRide.id}
+                label="Написать"
+                compact
+                fullWidth={false}
+                style={{ flex: 1 }}
+              />
+            </View>
+          )}
+          <AppButton
+            variant="quiet"
+            compact
+            disabled={busy}
+            onPress={() => {
+              setReleaseOrderId(nextDriverRide.id);
+              setReleaseReason('');
+              setReleaseConfirmVisible(true);
+            }}
+          >
+            Отказаться от следующего заказа
+          </AppButton>
+        </View>
+      ) : driverOffer ? (
+        <View
+          style={{
+            gap: spacing.x3,
+            padding: spacing.x4,
+            borderRadius: radius.lg,
+            borderCurve: 'continuous',
+            backgroundColor: colors.surfaceSecondary,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
+            <StatusChip label="Можно взять следующим" tone="warning" />
+            <MoneyValue valueMinor={driverOffer.priceMinor} compact />
+          </View>
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+            {driverOffer.pickup.label}
+          </Text>
+          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
+            → {driverOffer.destination.label}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+            <AppButton
+              variant="secondary"
+              compact
+              fullWidth={false}
+              disabled={busy}
+              style={{ flex: 1 }}
+              onPress={resetRide}
+            >
+              Пропустить
+            </AppButton>
+            <AppButton
+              compact
+              fullWidth={false}
+              loading={busy}
+              style={{ flex: 1.5 }}
+              onPress={() => void transitionRide('accepted')}
+            >
+              Взять следующим
+            </AppButton>
+          </View>
+        </View>
+      ) : demo && !['completed', 'cancelled'].includes(currentRide.status) ? (
+        <AppButton variant="secondary" compact loading={busy} onPress={() => void createRide()}>
+          Создать следующий демо-заказ
+        </AppButton>
+      ) : null}
       <WaitingBreakdown ride={currentRide} compact />
       {!!error && (
         <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
@@ -493,60 +605,57 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             variant="quiet"
             disabled={busy}
             onPress={() => {
+              setReleaseOrderId(currentRide.id);
               setReleaseReason('');
               setReleaseConfirmVisible(true);
             }}
           >
             Не могу выполнить заказ
           </AppButton>
-          <AppModal
-            visible={releaseConfirmVisible}
-            title="Отказаться от заказа?"
-            description="Пассажиру сразу будет найден другой водитель. Вернуться к этому заказу уже не получится."
-            onClose={() => setReleaseConfirmVisible(false)}
-          >
-            <TextInput
-              value={releaseReason}
-              onChangeText={(value) => setReleaseReason(value.slice(0, 500))}
-              placeholder="Кратко укажите причину"
-              placeholderTextColor={colors.inkMuted}
-              multiline
-              maxLength={500}
-              accessibilityLabel="Причина отказа от заказа"
-              style={{
-                ...typography.body,
-                minHeight: 88,
-                padding: spacing.x3,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.lg,
-                color: colors.ink,
-                backgroundColor: colors.surface,
-                textAlignVertical: 'top',
-              }}
-            />
-            <AppButton
-              variant="danger"
-              loading={busy}
-              disabled={releaseReason.trim().length < 3}
-              onPress={() => {
-                void releaseDriverRide(releaseReason.trim()).then((released) => {
-                  if (released) setReleaseConfirmVisible(false);
-                });
-              }}
-            >
-              Отказаться и продолжить поиск
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              disabled={busy}
-              onPress={() => setReleaseConfirmVisible(false)}
-            >
-              Остаться на заказе
-            </AppButton>
-          </AppModal>
         </>
       )}
+      <AppModal
+        visible={releaseConfirmVisible}
+        title={releaseOrderId === nextDriverRide?.id ? 'Отказаться от следующего заказа?' : 'Отказаться от заказа?'}
+        description="Пассажиру сразу будет найден другой водитель. Вернуться к этому заказу уже не получится."
+        onClose={() => setReleaseConfirmVisible(false)}
+      >
+        <TextInput
+          value={releaseReason}
+          onChangeText={(value) => setReleaseReason(value.slice(0, 500))}
+          placeholder="Кратко укажите причину"
+          placeholderTextColor={colors.inkMuted}
+          multiline
+          maxLength={500}
+          accessibilityLabel="Причина отказа от заказа"
+          style={{
+            ...typography.body,
+            minHeight: 88,
+            padding: spacing.x3,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            color: colors.ink,
+            backgroundColor: colors.surface,
+            textAlignVertical: 'top',
+          }}
+        />
+        <AppButton
+          variant="danger"
+          loading={busy}
+          disabled={releaseReason.trim().length < 3}
+          onPress={() => {
+            void releaseDriverRide(releaseReason.trim(), releaseOrderId ?? undefined).then((released) => {
+              if (released) setReleaseConfirmVisible(false);
+            });
+          }}
+        >
+          Отказаться и продолжить поиск
+        </AppButton>
+        <AppButton variant="secondary" disabled={busy} onPress={() => setReleaseConfirmVisible(false)}>
+          Остаться на заказе
+        </AppButton>
+      </AppModal>
     </View>
   );
 }

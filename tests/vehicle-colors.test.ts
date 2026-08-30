@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createVehicleColorPalette,
   fallbackVehicleColorHex,
   inferVehicleColorHex,
   normalizeVehicleColorHex,
@@ -27,5 +28,15 @@ describe('vehicle colors', () => {
   it('normalizes safe hex values and rejects arbitrary input', () => {
     expect(normalizeVehicleColorHex('#d64545')).toBe('#D64545');
     expect(normalizeVehicleColorHex('red')).toBe(fallbackVehicleColorHex);
+  });
+
+  it('creates visible highlight and shadow variants for every popular color', () => {
+    for (const option of vehicleColorOptions) {
+      const palette = createVehicleColorPalette(option.hex);
+      expect(palette.body).toBe(option.hex.toUpperCase());
+      expect(palette.highlight).toMatch(/^#[0-9A-F]{6}$/);
+      expect(palette.shadow).toMatch(/^#[0-9A-F]{6}$/);
+      expect(palette.highlight).not.toBe(palette.shadow);
+    }
   });
 });

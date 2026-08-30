@@ -68,6 +68,11 @@ describe('messenger platform delivery', () => {
 
     await notifyUsersInMessengers(['user-1'], notification);
 
+    expect(mocks.query).toHaveBeenCalledWith(
+      expect.stringContaining('notifications_enabled = TRUE'),
+      ['user-1'],
+    );
+
     expect(mocks.sendMaxMessage).toHaveBeenCalledWith(
       'max-user',
       expect.objectContaining({

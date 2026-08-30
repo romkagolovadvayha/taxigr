@@ -26,12 +26,44 @@ export const vehicleColorOptions: VehicleColorOption[] = [
 
 export const fallbackVehicleColorHex = '#777C84';
 
+export type VehicleColorPalette = {
+  body: string;
+  highlight: string;
+  shadow: string;
+};
+
 export function isVehicleColorHex(value: string | null | undefined): value is string {
   return typeof value === 'string' && /^#[0-9A-F]{6}$/i.test(value);
 }
 
 export function normalizeVehicleColorHex(value: string | null | undefined): string {
   return isVehicleColorHex(value) ? value.toUpperCase() : fallbackVehicleColorHex;
+}
+
+function mixHexColors(baseHex: string, mixHex: string, amount: number): string {
+  const base = normalizeVehicleColorHex(baseHex).slice(1);
+  const mix = normalizeVehicleColorHex(mixHex).slice(1);
+  const channel = (offset: number) => {
+    const baseValue = Number.parseInt(base.slice(offset, offset + 2), 16);
+    const mixValue = Number.parseInt(mix.slice(offset, offset + 2), 16);
+    return Math.round(baseValue + (mixValue - baseValue) * amount)
+      .toString(16)
+      .padStart(2, '0')
+      .toUpperCase();
+  };
+
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
+}
+
+export function createVehicleColorPalette(
+  value: string | null | undefined,
+): VehicleColorPalette {
+  const body = normalizeVehicleColorHex(value);
+  return {
+    body,
+    highlight: mixHexColors(body, '#FFFFFF', 0.32),
+    shadow: mixHexColors(body, '#000000', 0.28),
+  };
 }
 
 export function inferVehicleColorHex(name: string): string {

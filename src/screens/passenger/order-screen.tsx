@@ -7,6 +7,7 @@ import { BrandMark } from '@/components/brand-mark';
 import { useSession } from '@/auth/session-provider';
 import { getDemoPassengerProgression } from '@/domain/demo-flow';
 import { hasHouseNumber } from '@/domain/address-precision';
+import { estimatePickupEtaMinutes } from '@/domain/pickup-eta';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
@@ -36,7 +37,7 @@ function PassengerNav({ vertical = false }: { vertical?: boolean }) {
   );
 }
 
-function BookingPanel() {
+function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }) {
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
@@ -67,6 +68,7 @@ function BookingPanel() {
         )}
         <ActiveRidePanel
           ride={currentRide}
+          pickupEtaMinutes={pickupEtaMinutes}
           onCancel={cancelRide}
           onReset={resetRide}
           onRate={rateRide}
@@ -127,10 +129,17 @@ export function OrderScreen() {
   const { token } = useSession();
   const demoSession = token?.startsWith('demo:') ?? false;
   const trackedDriver = usePassengerDriverTracking(currentRide, demoSession);
+  const driverIsFinishingPreviousRide = currentRide?.driverQueuePosition === 2;
+  const livePickupEtaMinutes = estimatePickupEtaMinutes({
+    driver: driverIsFinishingPreviousRide ? null : trackedDriver.coordinates,
+    pickup: currentRide?.pickup.coordinates,
+    status: currentRide?.status,
+  });
   const rideInProgress = currentRide?.status === 'in_progress';
   const routeCompleted = currentRide?.status === 'completed';
   const followDriver =
-    currentRide?.status === 'driver_arriving' || rideInProgress;
+    !driverIsFinishingPreviousRide &&
+    (currentRide?.status === 'driver_arriving' || rideInProgress);
   const selectedPreviewTariff = tariffs.find((tariff) => tariff.code === selectedTariff);
   const mapViewportInsets = useMemo(
     () =>
@@ -174,9 +183,13 @@ export function OrderScreen() {
       destination={currentRide?.destination ?? destination}
       routeCoordinates={currentRide?.routeCoordinates ?? routeCoordinates}
       pickupEtaMinutes={
-        !currentRide && pickup && destination && quoteStatus === 'ready' && routeSummary
-          ? selectedPreviewTariff?.etaMinutes
-          : undefined
+        currentRide
+          ? livePickupEtaMinutes != null && livePickupEtaMinutes > 0
+            ? livePickupEtaMinutes
+            : undefined
+          : pickup && destination && quoteStatus === 'ready' && routeSummary
+            ? selectedPreviewTariff?.etaMinutes
+            : undefined
       }
       destinationArrivalLabel={
         !currentRide &&
@@ -192,7 +205,7 @@ export function OrderScreen() {
             )}`
           : undefined
       }
-      driver={trackedDriver.coordinates}
+      driver={driverIsFinishingPreviousRide ? null : trackedDriver.coordinates}
       driverHeading={trackedDriver.heading}
       followDriver={followDriver}
       followZoom={rideInProgress ? 17 : 16}
@@ -242,7 +255,7 @@ export function OrderScreen() {
             Куда поедем?
           </Text>
           <View style={{ flex: 1 }}>
-            <BookingPanel />
+            <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
           </View>
         </View>
         <View style={{ flex: 1 }}>{map}</View>
@@ -308,7 +321,7 @@ export function OrderScreen() {
           ...shadows.floating,
         }}
       >
-        <BookingPanel />
+        <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
       </DraggableSheet>
     </View>
   );

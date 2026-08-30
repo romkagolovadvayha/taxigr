@@ -10,6 +10,7 @@ async function configureAndroidChannels(): Promise<void> {
     ['ride-taxi-found-v2', 'Статусы поездки', Notifications.AndroidImportance.HIGH, 'taxi_found.wav'],
     ['ride-driver-arrived-v2', 'Водитель приехал', Notifications.AndroidImportance.HIGH, 'driver_arrived.wav'],
     ['driver-orders-v2', 'Новые заказы водителю', Notifications.AndroidImportance.MAX, 'new_order.wav'],
+    ['ride-chat-v1', 'Сообщения поездки', Notifications.AndroidImportance.HIGH, 'taxi_found.wav'],
     ['ride-complete-v2', 'Поездка завершена', Notifications.AndroidImportance.DEFAULT, 'ride_complete.wav'],
     ['ride-started-v2', 'Поездка началась', Notifications.AndroidImportance.HIGH, 'ride_started.wav'],
     ['ride-cancelled-v2', 'Поездка отменена', Notifications.AndroidImportance.HIGH, 'ride_cancelled.wav'],

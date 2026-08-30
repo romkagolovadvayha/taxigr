@@ -15,6 +15,15 @@ export function passengerRidePush(ride: RideOrder): PushMessage | null {
   const common = { data: { orderId: ride.id } };
   switch (ride.status) {
     case 'accepted':
+      if (ride.driverQueuePosition === 2) {
+        return {
+          ...common,
+          title: 'Водитель принял заказ заранее',
+          body: 'Сейчас водитель завершает предыдущую поездку. Сообщим, когда он освободится.',
+          sound: 'taxi_found.wav',
+          channelId: 'ride-taxi-found-v2',
+        };
+      }
       return {
         ...common,
         title: 'Найден водитель',

@@ -188,6 +188,7 @@ function RootNavigator() {
           />
           <Stack.Screen name="orders" />
           <Stack.Screen name="orders/[id]" />
+          <Stack.Screen name="chat/[id]" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="personal-data" />
           <Stack.Screen name="settings" />

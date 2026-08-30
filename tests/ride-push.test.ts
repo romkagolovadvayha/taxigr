@@ -78,4 +78,11 @@ describe('ride push copy', () => {
       body: 'Откройте приложение, чтобы посмотреть детали',
     });
   });
+
+  it('explains when the driver accepted the order as the next ride', () => {
+    expect(passengerRidePush({ ...ride, driverQueuePosition: 2 })).toMatchObject({
+      title: 'Водитель принял заказ заранее',
+      body: expect.stringContaining('завершает предыдущую поездку'),
+    });
+  });
 });

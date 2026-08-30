@@ -14,6 +14,7 @@ export type OrderRow = RowDataPacket & {
   id: string;
   passenger_id: string;
   driver_id: string | null;
+  active_driver_id: string | null;
   tariff: TariffCode;
   status: RideStatus;
   pricing_scope: PricingScope;
@@ -117,10 +118,14 @@ function address(
 }
 
 export function presentOrder(row: OrderRow): RideOrder {
+  const assigned =
+    Boolean(row.driver_id) &&
+    ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(row.status);
   return {
     id: row.id,
     passengerId: row.passenger_id,
     driverId: row.driver_id ?? undefined,
+    driverQueuePosition: assigned ? (row.active_driver_id ? 1 : 2) : undefined,
     pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
     destination: address(
       'destination',

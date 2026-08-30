@@ -16,6 +16,7 @@ export type PushMessage = {
     | 'ride-driver-arrived-v2'
     | 'ride-started-v2'
     | 'driver-orders-v2'
+    | 'ride-chat-v1'
     | 'ride-complete-v2'
     | 'ride-cancelled-v2';
 };
@@ -100,9 +101,11 @@ export async function notifyUsers(
     const vapid = getVapidConfig();
     webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
     const url = message.data?.orderId
-      ? message.data.role === 'driver'
-        ? `/driver/trips/${message.data.orderId}`
-        : `/orders/${message.data.orderId}`
+      ? message.data.chat === 'true'
+        ? `/chat/${message.data.orderId}`
+        : message.data.role === 'driver'
+          ? `/driver/trips/${message.data.orderId}`
+          : `/orders/${message.data.orderId}`
       : '/';
     for (const subscription of webRows) {
       try {

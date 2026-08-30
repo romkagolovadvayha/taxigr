@@ -102,6 +102,7 @@ export type RideOrder = {
   id: string;
   passengerId: string;
   driverId?: string;
+  driverQueuePosition?: 1 | 2;
   pickup: Address;
   destination: Address;
   tariff: TariffCode;
@@ -157,6 +158,32 @@ export type PassengerSummary = {
   phone?: string;
   rating: number;
   ratingCount: number;
+};
+
+export type RideChatRole = 'passenger' | 'driver';
+
+export type RideChatParticipant = {
+  id: string;
+  name: string;
+  role: RideChatRole;
+  avatarUrl?: string;
+};
+
+export type RideChatMessage = {
+  id: string;
+  orderId: string;
+  body: string;
+  createdAt: string;
+  sender: RideChatParticipant;
+};
+
+export type RideChatThread = {
+  orderId: string;
+  orderStatus: RideStatus;
+  viewerRole: RideChatRole;
+  counterpart: RideChatParticipant;
+  messages: RideChatMessage[];
+  canSend: boolean;
 };
 
 export type RideRatings = {

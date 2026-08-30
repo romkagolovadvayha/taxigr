@@ -414,7 +414,8 @@ export async function notifyUsersInMessengers(
     `SELECT id, user_id, provider, external_user_id, chat_id
      FROM user_messenger_accounts
      WHERE user_id IN (${placeholders})
-       AND active = TRUE AND bot_contact_available = TRUE`,
+       AND active = TRUE AND bot_contact_available = TRUE
+       AND notifications_enabled = TRUE`,
     uniqueUserIds,
   );
   if (!accounts.length) return;

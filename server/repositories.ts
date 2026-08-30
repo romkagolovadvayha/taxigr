@@ -131,6 +131,23 @@ export async function linkMessengerIdentity(
     ],
   );
 
+  await connection.execute(
+    `UPDATE user_messenger_accounts current_account
+     JOIN users owner ON owner.id = current_account.user_id
+     LEFT JOIN user_messenger_accounts enabled_account
+       ON enabled_account.user_id = current_account.user_id
+       AND enabled_account.active = TRUE
+       AND enabled_account.notifications_enabled = TRUE
+     SET current_account.notifications_enabled = TRUE
+     WHERE current_account.user_id = ? AND current_account.provider = ?
+       AND current_account.external_user_id = ?
+       AND current_account.active = TRUE
+       AND current_account.bot_contact_available = TRUE
+       AND owner.notification_channels_configured_at IS NULL
+       AND enabled_account.id IS NULL`,
+    [userId, identity.provider, identity.externalUserId],
+  );
+
   if (identity.profileName) {
     await connection.execute(
       `UPDATE users SET name = ?

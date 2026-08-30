@@ -6,6 +6,7 @@ export type AppIconName =
   | 'back'
   | 'ban'
   | 'car'
+  | 'chat'
   | 'child-seat'
   | 'chevron'
   | 'check'
@@ -20,6 +21,7 @@ export type AppIconName =
   | 'profile'
   | 'recenter'
   | 'search'
+  | 'send'
   | 'settings'
   | 'shield'
   | 'star'
@@ -66,6 +68,12 @@ export function AppIcon({
           <Path d="M3 15h18v4H3zM6 19v2M18 19v2" {...common} />
           <Circle cx="7" cy="16.5" r="1" fill={color} />
           <Circle cx="17" cy="16.5" r="1" fill={color} />
+        </>
+      )}
+      {name === 'chat' && (
+        <>
+          <Path d="M4 5.5h16v11H9l-5 4v-15z" {...common} />
+          <Path d="M8 10h8M8 13.5h5" {...common} />
         </>
       )}
       {name === 'child-seat' && (
@@ -130,6 +138,12 @@ export function AppIcon({
         <>
           <Circle cx="10.5" cy="10.5" r="6.5" {...common} />
           <Path d="M15.5 15.5L21 21" {...common} />
+        </>
+      )}
+      {name === 'send' && (
+        <>
+          <Path d="M3 11.5L21 3l-7.5 18-2.2-7.3L3 11.5z" {...common} />
+          <Path d="M11.3 13.7L21 3" {...common} />
         </>
       )}
       {name === 'settings' && (

@@ -5,8 +5,10 @@ import { Text, View } from 'react-native';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
+import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
+import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
 import { MoneyValue } from '@/components/ui/money-value';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -19,6 +21,7 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   ride: RideOrder;
+  pickupEtaMinutes?: number | null;
   onCancel: () => void;
   onReset: () => void;
   onRate: (score: number) => Promise<void>;
@@ -65,8 +68,57 @@ function SearchElapsedBadge({ startedAt }: { startedAt: string }) {
   );
 }
 
+function rideHeadline(ride: RideOrder, pickupEtaMinutes?: number | null): string {
+  if (ride.status === 'searching') return 'Ищем свободного водителя';
+  if (ride.driverQueuePosition === 2) return 'Водитель завершает предыдущий заказ';
+  if (ride.status === 'driver_waiting') return 'Водитель приехал';
+  if (ride.status === 'accepted' || ride.status === 'driver_arriving') {
+    return pickupEtaMinutes != null
+      ? `Через ~${Math.max(1, pickupEtaMinutes)} мин приедет`
+      : 'Водитель едет к вам';
+  }
+  if (ride.status === 'in_progress') return 'Поездка идёт';
+  if (ride.status === 'completed') return 'Спасибо за поездку';
+  if (ride.cancellationCode === 'search_timeout') return 'Свободный водитель не найден';
+  return 'Поездка отменена';
+}
+
+function VehiclePlate({ plate }: { plate: string }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Государственный номер ${plate}`}
+      style={{
+        alignSelf: 'flex-start',
+        minHeight: 34,
+        justifyContent: 'center',
+        paddingHorizontal: spacing.x2,
+        borderWidth: 1.5,
+        borderColor: colors.vehiclePlateInk,
+        borderRadius: radius.sm,
+        backgroundColor: colors.vehiclePlateSurface,
+      }}
+    >
+      <Text
+        selectable
+        style={{
+          fontSize: 18,
+          lineHeight: 22,
+          fontWeight: '600',
+          letterSpacing: 1.1,
+          color: colors.vehiclePlateInk,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {plate.toLocaleUpperCase('ru-RU')}
+      </Text>
+    </View>
+  );
+}
+
 export function ActiveRidePanel({
   ride,
+  pickupEtaMinutes,
   onCancel,
   onReset,
   onRate,
@@ -76,14 +128,36 @@ export function ActiveRidePanel({
   const terminal = ride.status === 'completed' || ride.status === 'cancelled';
   const cancellable = !terminal && ride.status !== 'in_progress';
   const driver = ride.driver;
+  const showProminentHeadline =
+    ride.status === 'accepted' ||
+    ride.status === 'driver_arriving' ||
+    ride.status === 'driver_waiting';
+
+  const openDetails = () => {
+    router.push({ pathname: '/orders/[id]', params: { id: ride.id } });
+  };
 
   return (
     <View style={{ gap: spacing.x4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.x3 }}>
-        <View style={{ flex: 1, gap: spacing.x2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: spacing.x3,
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, gap: spacing.x2 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: spacing.x2,
+            }}
+          >
             <StatusChip
-              label={rideStatusLabel[ride.status]}
+              label={ride.driverQueuePosition === 2 ? 'Ваш заказ следующий' : rideStatusLabel[ride.status]}
               tone={
                 ride.status === 'completed'
                   ? 'success'
@@ -96,16 +170,15 @@ export function ActiveRidePanel({
             />
             {ride.status === 'searching' && <SearchElapsedBadge startedAt={ride.createdAt} />}
           </View>
-          <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
-            {ride.status === 'searching'
-              ? 'Ищем свободного водителя'
-              : ride.status === 'cancelled'
-                ? ride.cancellationCode === 'search_timeout'
-                  ? 'Свободный водитель не найден'
-                  : 'Поездка отменена'
-                : ride.status === 'completed'
-                  ? 'Спасибо за поездку'
-                  : 'Водитель уже в пути'}
+          <Text
+            accessibilityRole="header"
+            selectable
+            style={{
+              ...(showProminentHeadline ? typography.pageTitle : typography.sectionTitle),
+              color: colors.ink,
+            }}
+          >
+            {rideHeadline(ride, pickupEtaMinutes)}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
             {formatRouteLabel(ride.pickup, ride.destination)}
@@ -114,11 +187,19 @@ export function ActiveRidePanel({
         <MoneyValue valueMinor={ride.priceMinor} compact />
       </View>
 
-      <WaitingBreakdown ride={ride} compact />
-
       {ride.status === 'cancelled' && !!ride.cancellationReason && (
-        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+        <Text
+          accessibilityRole="alert"
+          selectable
+          style={{ ...typography.caption, color: colors.inkSecondary }}
+        >
           {ride.cancellationReason}
+        </Text>
+      )}
+
+      {ride.driverQueuePosition === 2 && (
+        <Text selectable style={{ ...typography.body, color: colors.infoText }}>
+          Водитель принял заказ заранее. Сообщим сразу, как он освободится и сможет выехать к вам.
         </Text>
       )}
 
@@ -133,29 +214,66 @@ export function ActiveRidePanel({
             backgroundColor: colors.canvas,
           }}
         >
-          <VehicleIllustration
-            colorHex={driver.vehicle.colorHex}
-            width={64}
-            height={36}
-            framed
-          />
-          <View style={{ flex: 1 }}>
-            <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-              {driver.vehicle.color} {driver.vehicle.make} {driver.vehicle.model}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
-              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-                {driver.vehicle.plate} · {driver.name}
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.x2 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: spacing.x2,
+              }}
+            >
+              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+                {driver.name}
               </Text>
               <RatingBadge rating={driver.rating} count={driver.ratingCount} compact />
             </View>
+            <Text
+              selectable
+              numberOfLines={2}
+              style={{ ...typography.caption, color: colors.inkSecondary }}
+            >
+              {driver.vehicle.color} {driver.vehicle.make} {driver.vehicle.model}
+            </Text>
+            <VehiclePlate plate={driver.vehicle.plate} />
           </View>
+          <VehicleIllustration colorHex={driver.vehicle.colorHex} width={116} height={64} />
         </View>
       )}
 
-      {driver && !terminal && !!driver.phone && (
-        <PhoneCallButton phone={driver.phone} label="Позвонить водителю" />
+      {driver && !terminal && (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.x2 }}>
+          {!!driver.phone && (
+            <PhoneCallButton
+              phone={driver.phone}
+              label="Звонок"
+              accessibilityLabel="Позвонить водителю"
+              variant="secondary"
+              compact
+              containerStyle={{ flex: 1 }}
+            />
+          )}
+          <RideChatButton
+            orderId={ride.id}
+            label="Чат"
+            accessibilityLabel="Написать водителю"
+            compact
+            style={{ flex: 1 }}
+          />
+          <AppButton
+            variant="secondary"
+            compact
+            accessibilityLabel="Открыть детали поездки"
+            icon={<AppIcon name="orders" size={20} color={colors.ink} />}
+            onPress={openDetails}
+            style={{ flex: 1 }}
+          >
+            Детали
+          </AppButton>
+        </View>
       )}
+
+      <WaitingBreakdown ride={ride} compact />
 
       {ride.status === 'completed' && driver ? (
         <RideRatingCard
@@ -168,28 +286,31 @@ export function ActiveRidePanel({
           onSubmit={onRate}
           onContinue={onReset}
         />
+      ) : terminal ? (
+        <AppButton onPress={onReset}>Новая поездка</AppButton>
+      ) : driver ? (
+        cancellable ? (
+          <AppButton variant="quiet" onPress={() => setCancelConfirmVisible(true)}>
+            Отменить поездку
+          </AppButton>
+        ) : null
       ) : (
         <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
-          {terminal ? (
-            <AppButton onPress={onReset}>Новая поездка</AppButton>
-          ) : (
-          <>
-            {cancellable && (
-              <AppButton variant="secondary" onPress={() => setCancelConfirmVisible(true)} style={{ flex: 1 }}>
-                Отменить
-              </AppButton>
-            )}
+          {cancellable && (
             <AppButton
-              variant="quiet"
-              onPress={() => router.push({ pathname: '/orders/[id]', params: { id: ride.id } })}
+              variant="secondary"
+              onPress={() => setCancelConfirmVisible(true)}
               style={{ flex: 1 }}
             >
-              Детали
+              Отменить
             </AppButton>
-          </>
           )}
+          <AppButton variant="quiet" onPress={openDetails} style={{ flex: 1 }}>
+            Детали
+          </AppButton>
         </View>
       )}
+
       <AppModal
         visible={cancelConfirmVisible}
         title="Отменить заказ?"

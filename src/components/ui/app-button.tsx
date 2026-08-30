@@ -22,6 +22,7 @@ type Props = Omit<PressableProps, 'children' | 'onPress' | 'style'> & {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: ReactNode;
   foregroundColor?: string;
@@ -35,6 +36,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
     disabled = false,
     loading = false,
     fullWidth = true,
+    compact = false,
     style,
     accessibilityLabel,
     accessibilityRole = 'button',
@@ -79,9 +81,9 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
       onPress={handlePress}
       style={({ pressed }) => [
         {
-          minHeight: 56,
+          minHeight: compact ? 48 : 56,
           width: fullWidth ? '100%' : undefined,
-          paddingHorizontal: spacing.x6,
+          paddingHorizontal: compact ? spacing.x3 : spacing.x6,
           borderRadius: radius.lg,
           borderCurve: 'continuous',
           backgroundColor: backgrounds[variant],
@@ -97,10 +99,28 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
       ) : icon ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
           {icon}
-          <Text style={{ ...typography.bodyStrong, color: resolvedForeground }}>{children}</Text>
+          <Text
+            numberOfLines={1}
+            style={{
+              ...(compact ? typography.caption : typography.bodyStrong),
+              color: resolvedForeground,
+              fontWeight: '700',
+            }}
+          >
+            {children}
+          </Text>
         </View>
       ) : (
-        <Text style={{ ...typography.bodyStrong, color: resolvedForeground }}>{children}</Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            ...(compact ? typography.caption : typography.bodyStrong),
+            color: resolvedForeground,
+            fontWeight: '700',
+          }}
+        >
+          {children}
+        </Text>
       )}
     </AnimatedPressable>
   );

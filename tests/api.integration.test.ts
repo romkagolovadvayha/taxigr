@@ -7,6 +7,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type {
   AdminDriverDetail,
   AdminPassengerDetail,
+  RideChatMessage,
+  RideChatThread,
   RideOrder,
   VehicleChangeRequest,
 } from '../src/domain/models';
@@ -322,8 +324,13 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
 
   beforeEach(async () => {
     await connection.execute(
-      'DELETE FROM orders WHERE passenger_id IN (?, ?)',
-      [fixture.passengerId, fixture.outsiderId],
+      'DELETE FROM orders WHERE passenger_id IN (?, ?, ?, ?)',
+      [
+        fixture.passengerId,
+        fixture.outsiderId,
+        fixture.driverUserOneId,
+        fixture.driverUserTwoId,
+      ],
     );
     await connection.execute(
       `UPDATE users
@@ -1142,30 +1149,85 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(rows[0]?.status).toBe('online');
   }, 20_000);
 
-  it('prevents one driver from accepting two orders concurrently', async () => {
+  it('allows one current and one next order, promotes the next, and rejects a third', async () => {
     await setDriverStatus(driverOneToken, 'online');
-    const [firstOrder, secondOrder] = await Promise.all([
+    const [firstOrder, secondOrder, thirdOrder] = await Promise.all([
       createOrder(passengerToken),
       createOrder(outsiderToken),
+      createOrder(driverTwoToken),
     ]);
     expect(firstOrder.status, JSON.stringify(firstOrder.error)).toBe(201);
     expect(secondOrder.status, JSON.stringify(secondOrder.error)).toBe(201);
+    expect(thirdOrder.status, JSON.stringify(thirdOrder.error)).toBe(201);
 
-    const results = await Promise.all([
-      api(`/v1/driver/orders/${firstOrder.data!.id}/accept`, {
-        method: 'POST', token: driverOneToken, body: {},
-      }),
-      api(`/v1/driver/orders/${secondOrder.data!.id}/accept`, {
-        method: 'POST', token: driverOneToken, body: {},
-      }),
-    ]);
-    expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+    const firstAccepted = await api<RideOrder>(
+      `/v1/driver/orders/${firstOrder.data!.id}/accept`,
+      { method: 'POST', token: driverOneToken, body: {} },
+    );
+    expect(firstAccepted.status).toBe(200);
+    expect(firstAccepted.data?.driverQueuePosition).toBe(1);
 
-    await api(`/v1/orders/${firstOrder.data!.id}/cancel`, {
+    const secondAccepted = await api<RideOrder>(
+      `/v1/driver/orders/${secondOrder.data!.id}/accept`,
+      { method: 'POST', token: driverOneToken, body: {} },
+    );
+    expect(secondAccepted.status).toBe(200);
+    expect(secondAccepted.data?.driverQueuePosition).toBe(2);
+
+    const queuedTransition = await api(
+      `/v1/driver/orders/${secondOrder.data!.id}/transition`,
+      {
+        method: 'POST',
+        token: driverOneToken,
+        body: { status: 'driver_arriving' },
+      },
+    );
+    expect(queuedTransition.status).toBe(409);
+    expect(queuedTransition.error?.code).toBe('DRIVER_ORDER_QUEUED');
+
+    const thirdAccepted = await api(
+      `/v1/driver/orders/${thirdOrder.data!.id}/accept`,
+      { method: 'POST', token: driverOneToken, body: {} },
+    );
+    expect(thirdAccepted.status).toBe(409);
+    expect(thirdAccepted.error?.code).toBe('DRIVER_QUEUE_FULL');
+
+    const offersAtCapacity = await api<RideOrder[]>('/v1/driver/offers', {
+      token: driverOneToken,
+    });
+    expect(offersAtCapacity.status).toBe(200);
+    expect(offersAtCapacity.data?.some((order) => order.id === thirdOrder.data!.id)).toBe(false);
+
+    const queuedPassengerSocket = io(apiUrl, {
+      auth: { token: outsiderToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await socketEvent(queuedPassengerSocket, 'connect');
+    const promotedRealtimeEvent = socketEvent<RideOrder>(
+      queuedPassengerSocket,
+      'order:updated',
+    );
+    const firstCancelled = await api(`/v1/orders/${firstOrder.data!.id}/cancel`, {
       method: 'POST', token: passengerToken,
     });
+    expect(firstCancelled.status).toBe(200);
+    const promotedRealtime = await promotedRealtimeEvent;
+    queuedPassengerSocket.disconnect();
+    expect(promotedRealtime.id).toBe(secondOrder.data!.id);
+    expect(promotedRealtime.driverQueuePosition).toBe(1);
+
+    const promoted = await api<RideOrder>(`/v1/orders/${secondOrder.data!.id}`, {
+      token: outsiderToken,
+    });
+    expect(promoted.status).toBe(200);
+    expect(promoted.data?.driverQueuePosition).toBe(1);
+
     await api(`/v1/orders/${secondOrder.data!.id}/cancel`, {
       method: 'POST', token: outsiderToken,
+    });
+    await api(`/v1/orders/${thirdOrder.data!.id}/cancel`, {
+      method: 'POST', token: driverTwoToken,
     });
   }, 20_000);
 
@@ -1378,6 +1440,48 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       const accepted = await acceptedEvent;
       expect(accepted.status).toBe('accepted');
 
+      const driverChatEvent = socketEvent<RideChatMessage>(driverSocket, 'ride-chat:message');
+      const passengerMessageId = randomUUID();
+      const passengerMessage = await api<RideChatMessage>(
+        `/v1/orders/${order.data!.id}/messages`,
+        {
+          method: 'POST',
+          token: passengerToken,
+          body: { id: passengerMessageId, body: 'Я у подъезда' },
+        },
+      );
+      expect(passengerMessage.status).toBe(201);
+      expect(passengerMessage.data?.sender.role).toBe('passenger');
+      expect((await driverChatEvent).id).toBe(passengerMessageId);
+
+      const passengerChatEvent = socketEvent<RideChatMessage>(passengerSocket, 'ride-chat:message');
+      const driverMessageId = randomUUID();
+      const driverMessage = await api<RideChatMessage>(
+        `/v1/orders/${order.data!.id}/messages`,
+        {
+          method: 'POST',
+          token: driverOneToken,
+          body: { id: driverMessageId, body: 'Подъехал, белая машина' },
+        },
+      );
+      expect(driverMessage.status).toBe(201);
+      expect(driverMessage.data?.sender.role).toBe('driver');
+      expect((await passengerChatEvent).id).toBe(driverMessageId);
+
+      const chatHistory = await api<RideChatThread>(
+        `/v1/orders/${order.data!.id}/messages`,
+        { token: passengerToken },
+      );
+      expect(chatHistory.status).toBe(200);
+      expect(chatHistory.data?.counterpart.role).toBe('driver');
+      expect(chatHistory.data?.messages.map((item) => item.id)).toEqual([
+        passengerMessageId,
+        driverMessageId,
+      ]);
+      expect(
+        (await api(`/v1/orders/${order.data!.id}/messages`, { token: outsiderToken })).status,
+      ).toBe(403);
+
       const locationEvent = socketEvent<{ latitude: number; longitude: number }>(
         passengerSocket,
         'driver:location',
@@ -1481,6 +1585,15 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         method: 'POST',
         token: passengerToken,
       });
+      expect(
+        (
+          await api(`/v1/orders/${order.data!.id}/messages`, {
+            method: 'POST',
+            token: driverOneToken,
+            body: { id: randomUUID(), body: 'Позднее сообщение' },
+          })
+        ).status,
+      ).toBe(409);
     } finally {
       passengerSocket.disconnect();
       driverSocket.disconnect();

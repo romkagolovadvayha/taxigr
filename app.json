@@ -15,7 +15,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Геолокация нужна пассажиру для выбора точки подачи, а водителю — для маршрута и ведения по активной поездке.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Для водителя геолокация продолжает работать в фоне только во время смены и активных заказов.",
-        "NSUserNotificationsUsageDescription": "Уведомления сообщают о назначении и прибытии водителя."
+        "NSUserNotificationsUsageDescription": "Уведомления сообщают о статусе поездки и новых сообщениях водителя или пассажира."
       }
     },
     "android": {

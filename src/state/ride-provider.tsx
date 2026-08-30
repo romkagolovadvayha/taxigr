@@ -11,6 +11,10 @@ import {
   type DestinationHistoryItem,
 } from '@/domain/address-history';
 import { hasHouseNumber } from '@/domain/address-precision';
+import {
+  isAssignedDriverOrder,
+  selectDriverOrderQueue,
+} from '@/domain/driver-order-queue';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import { buildDemoDriverOffer, buildDemoRoute, placeDemoDriverNearPickup } from '@/domain/demo-flow';
 import type {
@@ -48,6 +52,8 @@ type RideContextValue = {
   selectedPaymentMethod: PaymentMethod;
   currentRide: RideOrder | null;
   driverRide: RideOrder | null;
+  nextDriverRide: RideOrder | null;
+  driverOffer: RideOrder | null;
   orders: RideOrder[];
   adminOrders: RideOrder[];
   passengerOrdersHasMore: boolean;
@@ -70,7 +76,7 @@ type RideContextValue = {
   transitionDriverRide: (status: RideStatus) => Promise<boolean>;
   startWaiting: () => Promise<void>;
   stopWaiting: () => Promise<void>;
-  releaseDriverRide: (reason: string) => Promise<boolean>;
+  releaseDriverRide: (reason: string, orderId?: string) => Promise<boolean>;
   cancelRide: () => Promise<void>;
   rateRide: (score: number) => Promise<void>;
   rateDriverRide: (score: number) => Promise<void>;
@@ -122,6 +128,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [currentRide, setCurrentRide] = useState<RideOrder | null>(null);
   const [driverRide, setDriverRide] = useState<RideOrder | null>(null);
+  const [nextDriverRide, setNextDriverRide] = useState<RideOrder | null>(null);
+  const [driverOffer, setDriverOffer] = useState<RideOrder | null>(null);
   const [orders, setOrders] = useState<RideOrder[]>([]);
   const [adminOrders, setAdminOrders] = useState<RideOrder[]>([]);
   const [passengerOrdersHasMore, setPassengerOrdersHasMore] = useState(false);
@@ -171,7 +179,22 @@ export function RideProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyDriverOrder = useCallback((ride: RideOrder) => {
-    setDriverRide(ride);
+    if (isAssignedDriverOrder(ride)) {
+      if (ride.driverQueuePosition === 2) {
+        setNextDriverRide(ride);
+      } else {
+        setDriverRide(ride);
+        setNextDriverRide((current) => (current?.id === ride.id ? null : current));
+      }
+      setDriverOffer((current) => (current?.id === ride.id ? null : current));
+    } else if (ride.status === 'searching') {
+      setDriverOffer(ride);
+      setDriverRide((current) => (current && isAssignedDriverOrder(current) ? current : ride));
+    } else {
+      setDriverRide((current) => (current?.id === ride.id ? ride : current));
+      setNextDriverRide((current) => (current?.id === ride.id ? null : current));
+      setDriverOffer((current) => (current?.id === ride.id ? null : current));
+    }
     setAdminOrders((previous) => upsertOrder(previous, ride));
   }, []);
 
@@ -188,6 +211,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setAdminOrdersHasMore(false);
         setCurrentRide(passengerOrders.find(isActive) ?? null);
         setDriverRide(null);
+        setNextDriverRide(null);
+        setDriverOffer(null);
         destinationDefaultToken.current = token;
         return;
       }
@@ -196,6 +221,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setAdminOrders((items) => items.filter((item) => item.passengerId !== 'demo-passenger'));
       setCurrentRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
       setDriverRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
+      setNextDriverRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
+      setDriverOffer((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
       setPickup((address) => (address && demoAddresses.some((item) => item.id === address.id) ? null : address));
       setDestination((address) => (address && demoAddresses.some((item) => item.id === address.id) ? null : address));
 
@@ -208,6 +235,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setAdminOrdersHasMore(false);
         setCurrentRide(null);
         setDriverRide(null);
+        setNextDriverRide(null);
+        setDriverOffer(null);
         destinationDefaultToken.current = null;
       }
     }, 0);
@@ -234,7 +263,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setOrders(passengerOrders);
       setPassengerOrdersHasMore(passengerOrders.length === 50);
       setCurrentRide(passengerOrders.find(isActive) ?? null);
-      setDriverRide(driverOrders.find(isActive) ?? offers[0] ?? null);
+      const driverQueue = selectDriverOrderQueue(driverOrders, offers);
+      setDriverRide(driverQueue.current ?? driverQueue.offer);
+      setNextDriverRide(driverQueue.next);
+      setDriverOffer(driverQueue.offer);
       setAdminOrders(allOrders);
       setAdminOrdersHasMore(allOrders.length === 50);
       if (destinationDefaultToken.current !== token) {
@@ -308,6 +340,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverRide((current) =>
         current ? updateDriverCoordinates(current, coordinates) : current,
       );
+      setNextDriverRide((current) =>
+        current ? updateDriverCoordinates(current, coordinates) : current,
+      );
     });
     socket.on(
       'passenger:location',
@@ -323,7 +358,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     );
     socket.on('order:available', (order: RideOrder) => {
       if (isDriver) {
-        setDriverRide((current) => (!current || current.id === order.id ? order : current));
+        setDriverOffer(order);
+        setDriverRide((current) =>
+          !current || !isAssignedDriverOrder(current) || current.id === order.id
+            ? order
+            : current,
+        );
       }
     });
     socket.on('application:updated', () => {
@@ -452,7 +492,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
         destination: demoAddresses[2]!,
         passenger: demoPassenger,
       });
-      applyDriverOrder(ride);
+      setDriverOffer(ride);
+      setDriverRide((current) =>
+        current && isAssignedDriverOrder(current) ? current : ride,
+      );
       return ride;
     } catch (reason) {
       setError(
@@ -464,7 +507,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [applyDriverOrder, demoSession, isDriver]);
+  }, [demoSession, isDriver]);
 
   const createRide = useCallback(
     async (comment?: string, legalAcceptance?: InitialLegalAcceptance) => {
@@ -634,9 +677,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const transitionDriverRide = useCallback(
     async (status: RideStatus) => {
       if (transitionInFlight.current) return false;
-      const current = driverRide;
+      const current =
+        status === 'accepted' && driverOffer?.status === 'searching'
+          ? driverOffer
+          : driverRide;
       if (!current || !canTransitionRide(current.status, status)) return false;
       if (demoSession) {
+        const acceptingAsNext = status === 'accepted' && Boolean(
+          driverRide && isAssignedDriverOrder(driverRide),
+        );
         let next: RideOrder = {
           ...current,
           status,
@@ -644,6 +693,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           ...(status === 'accepted'
             ? {
                 driverId: demoDriver.id,
+                driverQueuePosition: acceptingAsNext ? 2 : 1,
                 driver: placeDemoDriverNearPickup(demoDriver, current.pickup.coordinates),
               }
             : {}),
@@ -670,6 +720,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
           };
         }
         applyDriverOrder(next);
+        if (status === 'completed' && nextDriverRide) {
+          applyDriverOrder({
+            ...nextDriverRide,
+            driverQueuePosition: 1,
+            updatedAt: new Date().toISOString(),
+          });
+        }
         return true;
       }
       if (!token) return false;
@@ -691,6 +748,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           ),
         });
         applyDriverOrder(ride);
+        if (status === 'completed') await refresh();
         setError(null);
         return true;
       } catch (reason) {
@@ -702,7 +760,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setBusy(false);
       }
     },
-    [applyDriverOrder, demoSession, driverRide, refresh, token],
+    [applyDriverOrder, demoSession, driverOffer, driverRide, nextDriverRide, refresh, token],
   );
 
   const confirmSearchPriceIncrease = useCallback(async () => {
@@ -816,13 +874,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [applyDriverOrder, demoSession, driverRide, token]);
 
-  const releaseDriverRide = useCallback(async (reason: string) => {
-    const current = driverRide;
+  const releaseDriverRide = useCallback(async (reason: string, orderId?: string) => {
+    const current = [driverRide, nextDriverRide].find(
+      (ride) => ride && (!orderId || ride.id === orderId),
+    ) ?? null;
     if (!current || !['accepted', 'driver_arriving', 'driver_waiting'].includes(current.status)) {
       return false;
     }
     if (demoSession) {
-      setDriverRide(null);
+      if (current.id === nextDriverRide?.id) setNextDriverRide(null);
+      else if (nextDriverRide) {
+        setDriverRide({ ...nextDriverRide, driverQueuePosition: 1 });
+        setNextDriverRide(null);
+      } else setDriverRide(null);
       return true;
     }
     if (!token) return false;
@@ -834,7 +898,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         token,
         body: JSON.stringify({ reason }),
       });
-      setDriverRide(null);
+      if (current.id === nextDriverRide?.id) setNextDriverRide(null);
+      else setDriverRide(null);
       await refresh();
       return true;
     } catch (reason) {
@@ -843,7 +908,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [demoSession, driverRide, refresh, token]);
+  }, [demoSession, driverRide, nextDriverRide, refresh, token]);
 
   const cancelRide = useCallback(async () => {
     const current = currentRide;
@@ -940,7 +1005,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     pendingOrderCreation.current = null;
     setCurrentRide(null);
   }, []);
-  const resetDriverRide = useCallback(() => setDriverRide(null), []);
+  const resetDriverRide = useCallback(() => {
+    setDriverOffer(null);
+    setDriverRide((current) =>
+      current?.status === 'searching' ? null : current,
+    );
+  }, []);
   const destinationHistory = useMemo(
     () => buildDestinationHistory(orders, userId).items,
     [orders, userId],
@@ -957,6 +1027,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       selectedPaymentMethod,
       currentRide,
       driverRide,
+      nextDriverRide,
+      driverOffer,
       orders,
       adminOrders,
       passengerOrdersHasMore,
@@ -993,7 +1065,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       createDriverOffer,
       createRide,
       currentRide,
+      driverOffer,
       driverRide,
+      nextDriverRide,
       destination,
       destinationHistory,
       quoteStatus,

@@ -22,6 +22,33 @@ import { usePassengerPreferences } from '@/preferences/passenger-preferences-pro
 import { useAppTheme } from '@/theme/theme-provider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 
+type MessengerProvider = 'vk' | 'max' | 'telegram';
+
+type NotificationChannel = {
+  provider: MessengerProvider;
+  connected: boolean;
+  available: boolean;
+  enabled: boolean;
+};
+
+const notificationChannelDetails: Record<MessengerProvider, {
+  title: string;
+  subtitle: string;
+}> = {
+  vk: { title: 'ВКонтакте', subtitle: 'Сообщения от сообщества «Такси Грахово»' },
+  max: { title: 'MAX', subtitle: 'Сообщения от бота «Такси Грахово»' },
+  telegram: { title: 'Telegram', subtitle: 'Сообщения от бота «Такси Грахово»' },
+};
+
+const emptyNotificationChannels: NotificationChannel[] = (
+  Object.keys(notificationChannelDetails) as MessengerProvider[]
+).map((provider) => ({
+  provider,
+  connected: false,
+  available: false,
+  enabled: false,
+}));
+
 function SettingToggle({
   title,
   subtitle,
@@ -60,6 +87,10 @@ export function SettingsScreen() {
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [pushSettingsRequired, setPushSettingsRequired] = useState(false);
   const [pushTesting, setPushTesting] = useState(false);
+  const [notificationChannels, setNotificationChannels] = useState(emptyNotificationChannels);
+  const [notificationChannelsLoading, setNotificationChannelsLoading] = useState(true);
+  const [notificationChannelChanging, setNotificationChannelChanging] = useState<MessengerProvider | null>(null);
+  const [notificationChannelsError, setNotificationChannelsError] = useState<string | null>(null);
   const { token } = useSession();
   const { dark, setDark } = useAppTheme();
   const { previewFeedback } = useRideFeedback();
@@ -91,6 +122,56 @@ export function SettingsScreen() {
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!token) {
+      return () => {
+        active = false;
+      };
+    }
+    void apiRequest<{ channels: NotificationChannel[] }>('/v1/me/notification-channels', { token })
+      .then((result) => {
+        if (!active) return;
+        setNotificationChannels(result.channels);
+        setNotificationChannelsError(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setNotificationChannelsError(
+          error instanceof Error ? error.message : 'Не удалось загрузить источники уведомлений.',
+        );
+      })
+      .finally(() => {
+        if (active) setNotificationChannelsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  const changeNotificationChannel = async (provider: MessengerProvider, enabled: boolean) => {
+    if (!token || notificationChannelChanging) return;
+    setNotificationChannelChanging(provider);
+    setNotificationChannelsError(null);
+    try {
+      const result = await apiRequest<{ channels: NotificationChannel[] }>(
+        '/v1/me/notification-channels',
+        {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({ provider, enabled }),
+        },
+      );
+      setNotificationChannels(result.channels);
+    } catch (error) {
+      setNotificationChannelsError(
+        error instanceof Error ? error.message : 'Не удалось сохранить источник уведомлений.',
+      );
+    } finally {
+      setNotificationChannelChanging(null);
+    }
+  };
 
   const changePush = async (enabled: boolean) => {
     if (pushChanging) return;
@@ -199,8 +280,48 @@ export function SettingsScreen() {
           onValueChange={setShareLocationWithDriver}
         />
         <View style={{ height: 1, backgroundColor: colors.border }} />
+        <View style={{ paddingVertical: spacing.x3, gap: spacing.x1 }}>
+          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+            Куда уведомлять
+          </Text>
+          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+            Можно включить один или несколько подключённых источников
+          </Text>
+        </View>
+        {notificationChannels.map((channel, index) => {
+          const details = notificationChannelDetails[channel.provider];
+          const disabled = notificationChannelsLoading
+            || Boolean(notificationChannelChanging)
+            || !channel.connected
+            || !channel.available;
+          const subtitle = notificationChannelsLoading
+            ? 'Проверяем подключение…'
+            : !channel.connected
+              ? 'Не подключён к вашему аккаунту'
+              : !channel.available
+                ? 'Разрешите сообщения этому боту или сообществу'
+                : details.subtitle;
+          return (
+            <View key={channel.provider}>
+              {index > 0 && <View style={{ height: 1, backgroundColor: colors.border }} />}
+              <SettingToggle
+                title={details.title}
+                subtitle={subtitle}
+                value={channel.enabled}
+                disabled={disabled}
+                onValueChange={(value) => void changeNotificationChannel(channel.provider, value)}
+              />
+            </View>
+          );
+        })}
+        {!!notificationChannelsError && (
+          <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+            {notificationChannelsError}
+          </Text>
+        )}
+        <View style={{ height: 1, backgroundColor: colors.border }} />
         <SettingToggle
-          title="Уведомления"
+          title="Push-уведомления"
           subtitle="Новые заказы, назначение и прибытие водителя"
           value={push}
           disabled={pushChanging}

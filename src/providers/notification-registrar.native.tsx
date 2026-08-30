@@ -8,12 +8,12 @@ import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { syncPushRegistration } from '@/notifications/push-registration';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
+  handleNotification: async (notification) => ({
     shouldShowBanner: true,
     shouldShowList: true,
-    // Foreground sounds are played by RideFeedbackProvider to honor in-app preferences
-    // and avoid a duplicate sound when the same update also arrives through the socket.
-    shouldPlaySound: false,
+    // Ride status sounds are handled by RideFeedbackProvider. Chat has no separate
+    // in-app sound, so let its foreground push use the configured channel sound.
+    shouldPlaySound: notification.request.content.data?.chat === 'true',
     shouldSetBadge: false,
   }),
 });
@@ -29,6 +29,10 @@ export function NotificationRegistrar() {
       const data = response?.notification.request.content.data;
       const orderId = typeof data?.orderId === 'string' ? data.orderId : null;
       if (!orderId) return;
+      if (data?.chat === 'true') {
+        router.push({ pathname: '/chat/[id]', params: { id: orderId } } as never);
+        return;
+      }
       const role = data?.role === 'driver' ? 'driver' : 'passenger';
       router.push({
         pathname: role === 'driver' ? '/driver/trips/[id]' : '/orders/[id]',
