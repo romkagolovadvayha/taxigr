@@ -9,6 +9,7 @@ import { SearchPriceIncreaseModalHost } from '@/components/passenger/search-pric
 import { CriticalErrorMonitor } from '@/errors/critical-error-monitor';
 import { RideFeedbackProvider } from '@/feedback/ride-feedback-provider';
 import { FeedbackPreferencesProvider } from '@/preferences/feedback-preferences-provider';
+import { LocationPermissionRegistrar } from '@/providers/location-permission-registrar';
 import { NotificationRegistrar } from '@/providers/notification-registrar';
 import { PassengerLocationPublisher } from '@/providers/passenger-location-publisher';
 import { PassengerPreferencesProvider } from '@/preferences/passenger-preferences-provider';
@@ -58,6 +59,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <CriticalErrorMonitor />
+        <LocationPermissionRegistrar />
         <VkCommunityPromptHost />
         <PassengerPreferencesProvider>
           <FeedbackPreferencesProvider>

@@ -9,6 +9,7 @@ import {
 } from '@/domain/live-location';
 import type { Coordinates } from '@/domain/models';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
+import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 
 type DriverLocationState = {
   coordinates: Coordinates | null;
@@ -163,7 +164,7 @@ export function useDriverLocation({
     };
 
     void (async () => {
-      const permission = await Location.getForegroundPermissionsAsync();
+      const permission = await ensureForegroundLocationPermission();
       if (!permission.granted) {
         setState((current) => ({
           ...current,

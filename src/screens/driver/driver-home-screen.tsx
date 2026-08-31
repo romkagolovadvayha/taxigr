@@ -1,5 +1,4 @@
 import { router, useFocusEffect } from 'expo-router';
-import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
 
@@ -31,6 +30,7 @@ import { useDriverLocation } from '@/hooks/use-driver-location';
 import { useDriverNavigation } from '@/hooks/use-driver-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
+import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
 import { colors, radius, shadows, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
@@ -761,7 +761,7 @@ export function DriverHomeScreen() {
     }
     try {
       if (next) {
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const permission = await ensureForegroundLocationPermission();
         if (!permission.granted) {
           setStatusError('Разрешите геолокацию — без неё нельзя выйти на линию');
           return;
