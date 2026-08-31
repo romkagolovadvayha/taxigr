@@ -17,6 +17,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import type { Address } from '@/domain/models';
+import { routeDestinationTitle } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
 import { colors, layout, opacity, radius, shadows, spacing, typography } from '@/theme/tokens';
@@ -144,6 +145,9 @@ function StopRow({
           opacity: pressed ? opacity.pressed : opacity.visible,
         })}
       >
+        <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
+          {routeDestinationTitle(index, count)}
+        </Text>
         <Text selectable numberOfLines={2} style={{ ...typography.body, color: colors.ink }}>
           {address.label}
         </Text>

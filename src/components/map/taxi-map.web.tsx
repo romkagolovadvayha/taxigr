@@ -8,6 +8,7 @@ import {
   driverMarkerPngMarkup,
 } from '@/components/map/driver-marker';
 import { remainingRouteCoordinates } from '@/domain/route-tracking';
+import { routeDestinationMapLabel } from '@/domain/route-label';
 import {
   fitRouteLocation,
   routePointSizeForZoom,
@@ -50,13 +51,20 @@ function setRoutePointZoom(element: HTMLDivElement, zoom: number): void {
 }
 
 function routePointElement(
-  kind: 'pickup' | 'destination',
+  kind: 'pickup' | 'stop' | 'destination',
   calloutLabel: string | undefined,
   zoom: number,
 ): HTMLDivElement {
   const element = document.createElement('div');
   element.setAttribute('role', 'img');
-  element.setAttribute('aria-label', kind === 'pickup' ? 'Место подачи' : 'Место назначения');
+  element.setAttribute(
+    'aria-label',
+    kind === 'pickup'
+      ? 'Старт маршрута'
+      : kind === 'stop'
+        ? 'Промежуточная остановка'
+        : 'Финиш маршрута',
+  );
   element.style.position = 'relative';
   element.style.width = '1px';
   element.style.height = '1px';
@@ -70,8 +78,9 @@ function routePointElement(
   dot.style.width = `${ROUTE_POINT_BASE_SIZE}px`;
   dot.style.height = `${ROUTE_POINT_BASE_SIZE}px`;
   dot.style.borderRadius = '999px';
-  dot.style.background = colors.brandInk;
-  dot.style.border = '2px solid white';
+  dot.style.background =
+    kind === 'pickup' ? colors.brand : kind === 'stop' ? colors.surface : colors.brandInk;
+  dot.style.border = kind === 'stop' ? `2px solid ${colors.brandInk}` : '2px solid white';
   dot.style.boxSizing = 'border-box';
   dot.style.boxShadow = '0 1px 5px rgba(0,0,0,.24)';
   dot.style.transform = 'translate(-50%, -50%)';
@@ -81,7 +90,8 @@ function routePointElement(
   element.appendChild(dot);
 
   if (calloutLabel) {
-    const background = kind === 'pickup' ? colors.brand : colors.surface;
+    const background =
+      kind === 'pickup' ? colors.brand : kind === 'destination' ? colors.brandInk : colors.surface;
     const callout = document.createElement('div');
     callout.dataset.routeCallout = 'true';
     callout.textContent = calloutLabel;
@@ -92,7 +102,7 @@ function routePointElement(
     callout.style.padding = '5px 11px';
     callout.style.borderRadius = '12px';
     callout.style.background = background;
-    callout.style.color = colors.brandInk;
+    callout.style.color = kind === 'destination' ? '#FFFFFF' : colors.ink;
     callout.style.boxShadow = '0 2px 10px rgba(0,0,0,.16)';
     callout.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
     callout.style.fontSize = '15px';
@@ -252,7 +262,7 @@ export const TaxiMap = memo(function TaxiMap({
     };
     const margin = mapMargin(
       viewportInsets,
-      Boolean(pickupEtaMinutes || destinationArrivalLabel),
+      Boolean(pickup || destination || destinations?.length),
     );
     map.update({ margin });
     const renderedRouteCoordinates = trimCompletedRoute
@@ -268,7 +278,7 @@ export const TaxiMap = memo(function TaxiMap({
     if (pickup && pickupMarkerCoordinates) {
       const pickupElement = routePointElement(
         'pickup',
-        pickupEtaMinutes ? `${pickupEtaMinutes} мин` : undefined,
+        pickupEtaMinutes ? `Старт · ${pickupEtaMinutes} мин` : 'Старт',
         zoomRef.current,
       );
       routePointElementsRef.current.push(pickupElement);
@@ -296,8 +306,12 @@ export const TaxiMap = memo(function TaxiMap({
         ? destinationMarkerCoordinates
         : item.coordinates;
       const destinationElement = routePointElement(
-        'destination',
-        final ? destinationArrivalLabel ?? undefined : String(index + 1),
+        final ? 'destination' : 'stop',
+        routeDestinationMapLabel(
+          index,
+          orderedDestinations.length,
+          final ? destinationArrivalLabel : undefined,
+        ),
         zoomRef.current,
       );
       routePointElementsRef.current.push(destinationElement);
@@ -394,7 +408,7 @@ export const TaxiMap = memo(function TaxiMap({
       if (followDriver) {
         const margin = mapMargin(
           viewportInsets,
-          Boolean(pickupEtaMinutes || destinationArrivalLabel),
+          Boolean(pickup || destination || destinations?.length),
         );
         map.update({
           margin,
@@ -449,7 +463,10 @@ export const TaxiMap = memo(function TaxiMap({
     mapReady,
     navigationMode,
     passenger,
+    pickup,
     pickupEtaMinutes,
+    destination,
+    destinations,
     viewportInsets,
   ]);
 

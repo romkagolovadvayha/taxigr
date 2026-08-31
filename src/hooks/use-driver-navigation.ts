@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 
 import { apiRequest } from '@/api/client';
 import {
@@ -30,6 +31,9 @@ type DriverNavigationState = {
   error: string | null;
 };
 
+const NAVIGATION_RETRY_MS = 10_000;
+const ESTIMATED_ROUTE_RETRY_MS = 31_000;
+
 export function useDriverNavigation({
   ride,
   origin,
@@ -59,6 +63,16 @@ export function useDriverNavigation({
   const [coordinates, setCoordinates] = useState<Coordinates[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const routeKey = rideId && targetKind ? `${rideId}:${targetKind}` : null;
+  const routeKeyRef = useRef(routeKey);
+
+  useEffect(
+    () => onlineManager.subscribe((online) => {
+      if (online) setRetryKey((value) => value + 1);
+    }),
+    [],
+  );
 
   useEffect(() => {
     const requestOrigin = originRef.current;
@@ -73,6 +87,20 @@ export function useDriverNavigation({
     }
 
     const controller = new AbortController();
+    const routeChanged = routeKeyRef.current !== routeKey;
+    routeKeyRef.current = routeKey;
+    const resetTimer = routeChanged
+      ? setTimeout(() => {
+          setSummary(null);
+          setCoordinates([]);
+          setError(null);
+        }, 0)
+      : null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const retryAfter = (delay: number) => {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => setRetryKey((value) => value + 1), delay);
+    };
     setLoading(true);
     const request = demo
       ? apiRequest<{ route: RouteSummary } | RouteSummary>('/v1/routes/preview', {
@@ -97,28 +125,33 @@ export function useDriverNavigation({
 
     void request
       .then((route) => {
-        setSummary(route);
-        setCoordinates(
-          drawableNavigationRoute(
-            route.coordinates,
-            requestOrigin,
-            target.coordinates,
-          ),
-        );
-        setError(null);
+        const nextCoordinates = drawableNavigationRoute(route.coordinates);
+        if (nextCoordinates.length >= 2) {
+          setSummary(route);
+          setCoordinates(nextCoordinates);
+          setError(null);
+        } else {
+          setError('Дорожный маршрут временно недоступен. Повторяем запрос…');
+          retryAfter(ESTIMATED_ROUTE_RETRY_MS);
+        }
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
         setError(
           reason instanceof Error ? reason.message : 'Не удалось построить маршрут',
         );
+        retryAfter(NAVIGATION_RETRY_MS);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
 
-    return () => controller.abort();
-  }, [demo, positionBucket, rideId, target, targetKind, token]);
+    return () => {
+      controller.abort();
+      if (resetTimer) clearTimeout(resetTimer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [demo, positionBucket, retryKey, rideId, routeKey, target, targetKind, token]);
 
   return {
     active: Boolean(rideId && origin && targetKind),

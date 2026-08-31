@@ -41,7 +41,9 @@ describe('native map route overlays', () => {
     ];
 
     expect(html).toContain('destinations.forEach((destination,index)');
-    expect(html).toContain("isFinal?(state.destinationArrivalLabel||undefined):String(index+1)");
+    expect(html).toContain("isFinal?'destination':'stop'");
+    expect(html).toContain("destinations.length>1?(index+1)+' · Финиш':'Финиш'");
+    expect(html).toContain("?'Старт · '+Math.round(state.pickupEtaMinutes)+' мин'");
     expect(JSON.parse(serializeNativeMapState({ destinations })).destinations).toEqual(
       destinations,
     );

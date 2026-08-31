@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
+import {
+  canTransitionRide,
+  driverRoutePointState,
+  driverRouteTarget,
+} from '../src/domain/ride-state';
 
 describe('ride state machine', () => {
   it('allows only the ordered driver lifecycle', () => {
@@ -24,5 +28,23 @@ describe('ride state machine', () => {
     expect(driverRouteTarget('in_progress')).toBe('destination');
     expect(driverRouteTarget('searching')).toBeNull();
     expect(driverRouteTarget('completed')).toBeNull();
+  });
+
+  it('marks pickup, current destination, and upcoming route points', () => {
+    expect([0, 1, 2].map((index) => driverRoutePointState('accepted', index))).toEqual([
+      'current',
+      'pending',
+      'pending',
+    ]);
+    expect([0, 1, 2].map((index) => driverRoutePointState('in_progress', index))).toEqual([
+      'completed',
+      'current',
+      'pending',
+    ]);
+    expect([0, 1, 2].map((index) => driverRoutePointState('completed', index))).toEqual([
+      'completed',
+      'completed',
+      'completed',
+    ]);
   });
 });

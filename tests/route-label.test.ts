@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatRoutePointCount,
   formatMultiStopRouteAddresses,
   formatMultiStopRouteLabel,
   formatRouteAddresses,
   formatRouteLabel,
+  routeDestinationMapLabel,
+  routeDestinationTitle,
 } from '../src/domain/route-label';
 
 describe('route labels', () => {
@@ -60,5 +63,15 @@ describe('route labels', () => {
     expect(formatMultiStopRouteLabel(pickup, destinations)).toBe(
       'ул. Юбилейная, 5 → ул. Ачинцева, 2а → ул. 50 лет Победы, 19',
     );
+  });
+
+  it('distinguishes intermediate stops from the finish', () => {
+    expect(routeDestinationTitle(0, 3)).toBe('ОСТАНОВКА 1');
+    expect(routeDestinationTitle(2, 3)).toBe('ФИНИШ');
+    expect(routeDestinationMapLabel(0, 3)).toBe('1');
+    expect(routeDestinationMapLabel(2, 3)).toBe('3 · Финиш');
+    expect(routeDestinationMapLabel(0, 1)).toBe('Финиш');
+    expect(formatRoutePointCount(2)).toBe('2 точки');
+    expect(formatRoutePointCount(5)).toBe('5 точек');
   });
 });

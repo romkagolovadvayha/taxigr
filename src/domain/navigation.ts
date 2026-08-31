@@ -21,10 +21,8 @@ export function distanceBetweenCoordinates(
 
 export function drawableNavigationRoute(
   coordinates: Coordinates[] | null | undefined,
-  origin: Coordinates,
-  target: Coordinates,
 ): Coordinates[] {
-  return coordinates && coordinates.length >= 2 ? coordinates : [origin, target];
+  return coordinates && coordinates.length >= 2 ? coordinates : [];
 }
 
 export function navigationPositionBucket(coordinates: Coordinates): string {

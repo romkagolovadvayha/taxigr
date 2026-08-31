@@ -9,7 +9,11 @@ import {
   isPickupAddressComplete,
 } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
-import { colors, componentSizing, layout, spacing, typography } from '@/theme/tokens';
+import {
+  formatRoutePointCount,
+  routeDestinationTitle,
+} from '@/domain/route-label';
+import { colors, componentSizing, layout, radius, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   pickup: Address | null;
@@ -81,6 +85,9 @@ function AddressRow({
 }) {
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
   const addDestinationAction = kind === 'destination' && !!address && !!onAddDestination;
+  const routeDestinations = destinations ?? [];
+  const multipleDestinations =
+    kind === 'destination' && routeDestinations.length > 1;
   const needsAddressDetails = kind === 'destination' && destinations?.length
     ? destinations.some((item) => !isDestinationAddressComplete(item))
     : !!address && (
@@ -93,7 +100,13 @@ function AddressRow({
       <AnimatedPressable
         feedback="subtle"
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${address?.label ?? 'не указано'}${needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
+        accessibilityLabel={`${
+          multipleDestinations
+            ? `Маршрут: ${routeDestinations
+                .map((item, index) => `${routeDestinationTitle(index, routeDestinations.length)}: ${item.label}`)
+                .join('; ')}`
+            : `${label}: ${address?.label ?? 'не указано'}`
+        }${needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
         onPress={() => {
           if (kind === 'destination' && address) {
             router.push('/stops' as never);
@@ -107,38 +120,93 @@ function AddressRow({
         style={({ pressed }) => ({
           minHeight: compact ? 48 : 58,
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: multipleDestinations ? 'flex-start' : 'center',
           gap: spacing.x4,
+          paddingVertical: multipleDestinations ? spacing.x3 : 0,
           paddingRight: compactLocationAction || addDestinationAction ? 56 : 0,
           opacity: pressed ? 0.68 : 1,
         })}
       >
-        <View
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: kind === 'pickup' ? 999 : 2,
-            backgroundColor: kind === 'pickup' ? colors.ink : colors.brand,
-          }}
-        />
+        {!multipleDestinations && (
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: kind === 'pickup' ? 999 : 2,
+              backgroundColor: kind === 'pickup' ? colors.ink : colors.brand,
+            }}
+          />
+        )}
         <View style={{ flex: 1 }}>
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted, textTransform: 'uppercase' }}>
-            {label}
+            {multipleDestinations
+              ? `Маршрут · ${formatRoutePointCount(routeDestinations.length)}`
+              : label}
           </Text>
-          <Text
-            selectable
-            numberOfLines={1}
-            style={{ ...typography.body, color: address ? colors.ink : colors.inkSecondary }}
-          >
-            {kind === 'destination' && destinations && destinations.length > 1
-              ? destinations.map((item) => item.label).join(' → ')
-              : address?.label ??
-              (kind === 'pickup'
-                ? locationLoading
-                  ? 'Определяем местоположение…'
-                  : 'Моё местоположение'
-                : 'Куда поедем?')}
-          </Text>
+          {multipleDestinations ? (
+            <View style={{ gap: spacing.x2, marginTop: spacing.x2 }}>
+              {routeDestinations.map((item, index) => {
+                const final = index === routeDestinations.length - 1;
+                return (
+                  <View
+                    key={`${item.id}:${index}`}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}
+                  >
+                    <View
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: radius.pill,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: final ? colors.ink : colors.surfaceSecondary,
+                      }}
+                    >
+                      {final ? (
+                        <AppIcon name="flag" size={15} color={colors.surface} />
+                      ) : (
+                        <Text
+                          selectable
+                          style={{
+                            ...typography.caption,
+                            color: colors.ink,
+                            fontVariant: ['tabular-nums'],
+                          }}
+                        >
+                          {index + 1}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
+                        {routeDestinationTitle(index, routeDestinations.length)}
+                      </Text>
+                      <Text
+                        selectable
+                        numberOfLines={1}
+                        style={{ ...typography.body, color: colors.ink }}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text
+              selectable
+              numberOfLines={1}
+              style={{ ...typography.body, color: address ? colors.ink : colors.inkSecondary }}
+            >
+              {address?.label ??
+                (kind === 'pickup'
+                  ? locationLoading
+                    ? 'Определяем местоположение…'
+                    : 'Моё местоположение'
+                  : 'Куда поедем?')}
+            </Text>
+          )}
           {needsAddressDetails && (
             <Text selectable style={{ ...typography.micro, color: colors.warningText }}>
               Уточните адрес
@@ -146,7 +214,7 @@ function AddressRow({
           )}
         </View>
         {!compactLocationAction && !addDestinationAction ? (
-          <Text style={{ ...typography.sectionTitle, color: colors.inkMuted }}>›</Text>
+          <Text style={{ ...typography.sectionTitle, color: colors.inkMuted, alignSelf: 'center' }}>›</Text>
         ) : null}
       </AnimatedPressable>
       {addDestinationAction && (

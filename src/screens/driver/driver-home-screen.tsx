@@ -18,10 +18,14 @@ import { MoneyValue } from '@/components/ui/money-value';
 import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
+import type { Coordinates } from '@/domain/models';
 import {
+  formatRoutePointCount,
   formatMultiStopRouteAddresses,
+  routeDestinationTitle,
 } from '@/domain/route-label';
 import {
+  driverRoutePointState,
   driverRouteTarget,
   driverTransitionLabel,
   rideStatusLabel,
@@ -32,80 +36,23 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 import { openYandexNavigatorRoute } from '@/utils/open-yandex-navigator';
 
-function DriverNavigationBanner({
-  targetLabel,
-  targetKind,
-  distanceMeters,
-  durationSeconds,
-  loading,
+function DriverOrderCard({
+  demo,
+  remainingDistanceMeters,
+  remainingDurationSeconds,
+  navigationLoading,
+  navigationOrigin,
 }: {
-  targetLabel: string;
-  targetKind: 'pickup' | 'destination';
-  distanceMeters?: number;
-  durationSeconds?: number;
-  loading: boolean;
+  demo: boolean;
+  remainingDistanceMeters?: number;
+  remainingDurationSeconds?: number;
+  navigationLoading: boolean;
+  navigationOrigin?: Coordinates | null;
 }) {
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        pointerEvents: 'none',
-        top: spacing.x3,
-        left: spacing.x3,
-        right: spacing.x3,
-        padding: spacing.x4,
-        borderRadius: radius.card,
-        borderCurve: 'continuous',
-        backgroundColor: colors.surfaceRaised,
-        ...shadows.floating,
-        gap: spacing.x2,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: spacing.x3,
-        }}
-      >
-        <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
-          {targetKind === 'pickup' ? 'К ПАССАЖИРУ' : 'К МЕСТУ НАЗНАЧЕНИЯ'}
-        </Text>
-        <Text
-          selectable
-          style={{
-            ...typography.bodyStrong,
-            color: colors.ink,
-            fontVariant: ['tabular-nums'],
-          }}
-        >
-          {distanceMeters != null
-            ? formatNavigationDistance(distanceMeters)
-            : loading
-              ? 'Строим маршрут…'
-              : 'Маршрут'}
-          {durationSeconds != null
-            ? ` · ${Math.max(1, Math.round(durationSeconds / 60))} мин`
-            : ''}
-        </Text>
-      </View>
-      <Text
-        selectable
-        numberOfLines={2}
-        style={{ ...typography.bodyStrong, color: colors.ink }}
-      >
-        {targetLabel}
-      </Text>
-    </View>
-  );
-}
-
-function DriverOrderCard({ demo }: { demo: boolean }) {
   const [navigatorBusy, setNavigatorBusy] = useState(false);
   const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
@@ -178,16 +125,16 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>ПОДАЧА</Text>
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.pickup}</Text>
         </View>
-        <View>
-          <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>КУДА</Text>
+        <View style={{ gap: spacing.x2 }}>
           {routeAddresses.destinations.map((label, index) => (
-            <Text
-              key={`${label}:${index}`}
-              selectable
-              style={{ ...typography.bodyStrong, color: colors.ink }}
-            >
-              {rideDestinations.length > 1 ? `${index + 1}. ` : ''}{label}
-            </Text>
+            <View key={`${label}:${index}`}>
+              <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
+                {routeDestinationTitle(index, routeAddresses.destinations.length)}
+              </Text>
+              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+                {label}
+              </Text>
+            </View>
           ))}
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -242,12 +189,24 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             ? 'completed'
             : null;
   const routeTarget = driverRouteTarget(currentRide.status);
-  const nextAddress =
-    routeTarget === 'pickup' ? currentRide.pickup : currentRide.destination;
-  const navigatorTarget =
+  const routePointLabels = [routeAddresses.pickup, ...routeAddresses.destinations];
+  const routeMetricLabel =
+    remainingDistanceMeters != null
+      ? `${formatNavigationDistance(remainingDistanceMeters)}${
+          remainingDurationSeconds != null
+            ? ` · ${Math.max(1, Math.round(remainingDurationSeconds / 60))} мин`
+            : ''
+        }`
+      : navigationLoading
+        ? 'Строим маршрут…'
+        : `Всего ${formatNavigationDistance(currentRide.distanceMeters)} · ${Math.max(
+            1,
+            Math.round(currentRide.durationSeconds / 60),
+          )} мин`;
+  const navigatorTargets =
     routeTarget === 'pickup'
-      ? currentRide.passengerCoordinates ?? currentRide.pickup.coordinates
-      : currentRide.destination.coordinates;
+      ? [currentRide.passengerCoordinates ?? currentRide.pickup.coordinates]
+      : rideDestinations.map((destination) => destination.coordinates);
   const passengerPhone = currentRide.passenger?.phone;
   const paymentLabel =
     currentRide.paymentMethod === 'direct'
@@ -261,7 +220,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
     setNavigatorMessage(null);
 
     try {
-      const result = await openYandexNavigatorRoute(navigatorTarget);
+      const result = await openYandexNavigatorRoute(
+        navigatorTargets,
+        navigationOrigin ?? currentRide.driver?.coordinates,
+      );
       if (result === 'store') {
         setNavigatorMessage(
           'Яндекс Навигатор не установлен — открыли страницу установки.',
@@ -278,8 +240,14 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
     }
   };
 
+  const requestCurrentRideRelease = () => {
+    setReleaseOrderId(currentRide.id);
+    setReleaseReason('');
+    setReleaseConfirmVisible(true);
+  };
+
   return (
-    <View style={{ gap: spacing.x4 }}>
+    <View style={{ gap: spacing.x3 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -294,33 +262,111 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         />
         <MoneyValue valueMinor={currentRide.priceMinor} compact />
       </View>
-      {routeTarget ? (
+      <View
+        style={{
+          gap: spacing.x2,
+          padding: spacing.x3,
+          borderRadius: radius.lg,
+          backgroundColor: colors.surfaceSecondary,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: spacing.x2,
+          }}
+        >
+          <Text
+            selectable
+            numberOfLines={1}
+            style={{ ...typography.micro, color: colors.inkMuted, flexShrink: 1 }}
+          >
+            {routeTarget === 'pickup'
+              ? 'СЛЕДУЮЩАЯ ТОЧКА · ПОДАЧА'
+              : routeTarget === 'destination'
+                ? rideDestinations.length > 1
+                  ? `ПО МАРШРУТУ · ${formatRoutePointCount(rideDestinations.length)}`
+                  : 'СЛЕДУЮЩАЯ ТОЧКА · ФИНИШ'
+                : 'МАРШРУТ'}
+          </Text>
+          <Text
+            selectable
+            numberOfLines={1}
+            style={{
+              ...typography.caption,
+              color: colors.inkSecondary,
+              fontWeight: '700',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {routeMetricLabel}
+          </Text>
+        </View>
         <View style={{ gap: spacing.x1 }}>
-          <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
-            {routeTarget === 'pickup' ? 'СЛЕДУЮЩАЯ ТОЧКА · ПОДАЧА' : 'СЛЕДУЮЩАЯ ТОЧКА · ФИНИШ'}
-          </Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            {nextAddress.label}
-          </Text>
-          {routeTarget === 'pickup' && currentRide.passengerCoordinates && (
-            <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
-              Геопозиция пассажира отображается синей точкой на карте
-            </Text>
-          )}
+          {routePointLabels.map((label, index) => {
+            const pointState = driverRoutePointState(currentRide.status, index);
+            const current = pointState === 'current';
+            const dotColor =
+              pointState === 'completed'
+                ? colors.success
+                : current
+                  ? colors.brand
+                  : colors.inkMuted;
+            const stateLabel =
+              pointState === 'completed'
+                ? 'пройдена'
+                : current
+                  ? 'текущая'
+                  : 'впереди';
+
+            return (
+              <View
+                key={`${label}:${index}`}
+                accessible
+                accessibilityLabel={`${
+                  index === 0
+                    ? 'Подача'
+                    : routeDestinationTitle(index - 1, routeAddresses.destinations.length)
+                }: ${label}, ${stateLabel}`}
+                style={{
+                  minHeight: 22,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.x2,
+                }}
+              >
+                <View
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: radius.pill,
+                    backgroundColor: dotColor,
+                    borderWidth: pointState === 'pending' ? 1 : 0,
+                    borderColor: pointState === 'pending' ? colors.borderStrong : colors.transparent,
+                  }}
+                />
+                <Text
+                  selectable
+                  numberOfLines={1}
+                  style={{
+                    ...typography.caption,
+                    flex: 1,
+                    color: current ? colors.ink : colors.inkSecondary,
+                    fontWeight: current ? '700' : '500',
+                  }}
+                >
+                  {index === 0
+                    ? 'Подача · '
+                    : `${routeDestinationTitle(index - 1, routeAddresses.destinations.length)} · `}
+                  {label}
+                </Text>
+              </View>
+            );
+          })}
         </View>
-      ) : (
-        <View>
-          <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
-            МАРШРУТ
-          </Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            {routeAddresses.pickup}
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {routeAddresses.destinations.join(' → ')}
-          </Text>
-        </View>
-      )}
+      </View>
       {currentRide.status === 'completed' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -331,8 +377,8 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <View
             style={{
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               borderRadius: radius.md,
               backgroundColor: colors.canvas,
               alignItems: 'center',
@@ -352,16 +398,19 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
                 compact
               />
             </View>
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+            <Text
+              selectable
+              numberOfLines={1}
+              style={{ ...typography.caption, color: colors.inkSecondary }}
+            >
               {paymentLabel}
             </Text>
-            {!!passengerPhone && (
-              <Text selectable style={{ ...typography.caption, color: colors.ink }}>
-                {passengerPhone}
-              </Text>
-            )}
             {!!currentRide.comment && (
-              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+              <Text
+                selectable
+                numberOfLines={1}
+                style={{ ...typography.caption, color: colors.inkSecondary }}
+              >
                 {currentRide.comment}
               </Text>
             )}
@@ -444,11 +493,13 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {nextDriverRide.pickup.label}
           </Text>
-          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {formatMultiStopRouteAddresses(
+          <Text selectable numberOfLines={4} style={{ ...typography.caption, color: colors.inkSecondary }}>
+            {formatMultiStopRouteAddresses(
               nextDriverRide.pickup,
               nextDriverRide.destinations ?? [nextDriverRide.destination],
-            ).destinations.join(' → ')}
+            ).destinations.map((label, index, labels) =>
+              `${routeDestinationTitle(index, labels.length)}: ${label}`,
+            ).join('\n')}
           </Text>
           <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
             После завершения текущей поездки этот заказ автоматически станет текущим.
@@ -504,11 +555,13 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {driverOffer.pickup.label}
           </Text>
-          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            → {formatMultiStopRouteAddresses(
+          <Text selectable numberOfLines={4} style={{ ...typography.caption, color: colors.inkSecondary }}>
+            {formatMultiStopRouteAddresses(
               driverOffer.pickup,
               driverOffer.destinations ?? [driverOffer.destination],
-            ).destinations.join(' → ')}
+            ).destinations.map((label, index, labels) =>
+              `${routeDestinationTitle(index, labels.length)}: ${label}`,
+            ).join('\n')}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
             <AppButton
@@ -558,9 +611,10 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           }}
         />
       ) : currentRide.status === 'driver_waiting' ? (
-        <View style={{ gap: spacing.x3 }}>
+        <View style={{ gap: spacing.x2 }}>
           <AppButton
             variant={currentRide.waitingStartedAt ? 'danger' : 'secondary'}
+            compact
             loading={busy}
             onPress={() =>
               void (currentRide.waitingStartedAt ? stopWaiting() : startWaiting())
@@ -570,19 +624,33 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
               ? 'Завершить ожидание'
               : 'Начать ожидание'}
           </AppButton>
-          <AppButton
-            loading={busy}
-            disabled={busy}
-            onPress={() => void transitionRide('in_progress')}
-          >
-            {currentRide.waitingStartedAt
-              ? 'Начать поездку и завершить ожидание'
-              : 'Начать поездку'}
-          </AppButton>
+          <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+            <AppButton
+              variant="secondary"
+              compact
+              fullWidth={false}
+              disabled={busy}
+              style={{ flex: 1, minWidth: 0 }}
+              onPress={requestCurrentRideRelease}
+            >
+              Отменить
+            </AppButton>
+            <AppButton
+              compact
+              fullWidth={false}
+              loading={busy}
+              disabled={busy}
+              style={{ flex: 2, minWidth: 0 }}
+              onPress={() => void transitionRide('in_progress')}
+            >
+              Начать поездку
+            </AppButton>
+          </View>
         </View>
       ) : currentRide.status === 'in_progress' ? (
         <>
           <AppButton
+            compact
             loading={busy}
             disabled={busy}
             onPress={() => setCompletionConfirmVisible(true)}
@@ -618,13 +686,28 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
           </AppModal>
         </>
       ) : nextStatus ? (
-        <AppButton
-          loading={busy}
-          disabled={busy}
-          onPress={() => void transitionRide(nextStatus)}
-        >
-          {driverTransitionLabel[currentRide.status] ?? 'Продолжить'}
-        </AppButton>
+        <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+          <AppButton
+            variant="secondary"
+            compact
+            fullWidth={false}
+            disabled={busy}
+            style={{ flex: 1, minWidth: 0 }}
+            onPress={requestCurrentRideRelease}
+          >
+            Отменить
+          </AppButton>
+          <AppButton
+            compact
+            fullWidth={false}
+            loading={busy}
+            disabled={busy}
+            style={{ flex: 2, minWidth: 0 }}
+            onPress={() => void transitionRide(nextStatus)}
+          >
+            {driverTransitionLabel[currentRide.status] ?? 'Продолжить'}
+          </AppButton>
+        </View>
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x3 }}>
           <AppButton
@@ -644,21 +727,6 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
             Расчёты с сервисом
           </AppButton>
         </View>
-      )}
-      {['accepted', 'driver_arriving', 'driver_waiting'].includes(currentRide.status) && (
-        <>
-          <AppButton
-            variant="quiet"
-            disabled={busy}
-            onPress={() => {
-              setReleaseOrderId(currentRide.id);
-              setReleaseReason('');
-              setReleaseConfirmVisible(true);
-            }}
-          >
-            Не могу выполнить заказ
-          </AppButton>
-        </>
       )}
       <AppModal
         visible={releaseConfirmVisible}
@@ -820,11 +888,7 @@ export function DriverHomeScreen() {
         ? null
         : currentRide?.destination;
   const activeRouteCoordinates =
-    navigation.coordinates.length >= 2
-      ? navigation.coordinates
-      : navigation.active && driverCoordinates && navigation.target
-        ? [driverCoordinates, navigation.target.coordinates]
-        : currentRide?.routeCoordinates;
+    navigation.active ? navigation.coordinates : currentRide?.routeCoordinates;
   const visibleError = statusError ?? location.error ?? navigation.error;
   const panelContent = (
     <>
@@ -851,7 +915,13 @@ export function DriverHomeScreen() {
         </Text>
       )}
       {online ? (
-        <DriverOrderCard demo={demo} />
+        <DriverOrderCard
+          demo={demo}
+          remainingDistanceMeters={navigation.summary?.distanceMeters}
+          remainingDurationSeconds={navigation.summary?.durationSeconds}
+          navigationLoading={navigation.loading}
+          navigationOrigin={driverCoordinates}
+        />
       ) : (
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
           Включите статус «На линии», чтобы получать новые заказы.
@@ -860,8 +930,8 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    padding: activeTrip ? spacing.x4 : spacing.x5,
-    gap: activeTrip ? spacing.x4 : spacing.x5,
+    padding: activeTrip ? spacing.x3 : spacing.x5,
+    gap: activeTrip ? spacing.x3 : spacing.x5,
     flexGrow: 1,
   } as const;
 
@@ -870,7 +940,7 @@ export function DriverHomeScreen() {
       <View
         style={{
           flex: 1,
-          minHeight: isPhone ? (sheetExpanded ? 140 : activeTrip ? 360 : 260) : undefined,
+          minHeight: isPhone ? (sheetExpanded ? 64 : activeTrip ? 72 : 260) : undefined,
           position: 'relative',
         }}
       >
@@ -886,15 +956,6 @@ export function DriverHomeScreen() {
           followDriver={navigation.active || !currentRide}
           navigationMode={navigation.active}
         />
-        {navigation.active && navigation.target && navigation.targetKind && (
-          <DriverNavigationBanner
-            targetLabel={navigation.target.label}
-            targetKind={navigation.targetKind}
-            distanceMeters={navigation.summary?.distanceMeters}
-            durationSeconds={navigation.summary?.durationSeconds}
-            loading={navigation.loading}
-          />
-        )}
       </View>
       {isPhone ? (
         <DraggableSheet
@@ -906,7 +967,13 @@ export function DriverHomeScreen() {
           collapseHint="Свернуть панель водителя"
           style={{
             width: '100%',
-            maxHeight: sheetExpanded ? '80%' : activeTrip ? '48%' : '62%',
+            maxHeight: activeTrip
+              ? sheetExpanded
+                ? '92%'
+                : '90%'
+              : sheetExpanded
+                ? '80%'
+                : '62%',
             flexShrink: 1,
             overflow: 'hidden',
             backgroundColor: colors.surface,
@@ -917,6 +984,8 @@ export function DriverHomeScreen() {
         >
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            scrollEnabled={!activeTrip}
+            showsVerticalScrollIndicator={false}
             style={{ width: '100%', flexShrink: 1 }}
             contentContainerStyle={panelContentStyle}
           >

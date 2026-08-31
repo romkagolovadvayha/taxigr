@@ -13,20 +13,47 @@ function assertRouteCoordinates({ latitude, longitude }: Coordinates): void {
   }
 }
 
-export function buildYandexNavigatorRouteUrl(target: Coordinates): string {
-  assertRouteCoordinates(target);
-
-  return (
-    'yandexnavi://build_route_on_map' +
-    `?lat_to=${target.latitude}&lon_to=${target.longitude}`
-  );
+function routeTargets(target: Coordinates | readonly Coordinates[]): readonly Coordinates[] {
+  const targets = Array.isArray(target) ? target : [target];
+  if (!targets.length) throw new Error('Добавьте хотя бы одну точку маршрута.');
+  targets.forEach(assertRouteCoordinates);
+  return targets;
 }
 
-export function buildYandexMapsRouteUrl(target: Coordinates): string {
-  assertRouteCoordinates(target);
+export function buildYandexNavigatorRouteUrl(
+  target: Coordinates | readonly Coordinates[],
+  origin?: Coordinates,
+): string {
+  const targets = routeTargets(target);
+  if (origin) assertRouteCoordinates(origin);
+  const finalTarget = targets.at(-1)!;
+  const parameters = [
+    ...(origin
+      ? [`lat_from=${origin.latitude}`, `lon_from=${origin.longitude}`]
+      : []),
+    `lat_to=${finalTarget.latitude}`,
+    `lon_to=${finalTarget.longitude}`,
+    ...targets.slice(0, -1).flatMap((point, index) => [
+      `lat_via_${index}=${point.latitude}`,
+      `lon_via_${index}=${point.longitude}`,
+    ]),
+  ];
 
-  return (
-    'https://yandex.ru/maps/' +
-    `?rtext=~${target.latitude}%2C${target.longitude}&rtt=auto`
-  );
+  return `yandexnavi://build_route_on_map?${parameters.join('&')}`;
+}
+
+export function buildYandexMapsRouteUrl(
+  target: Coordinates | readonly Coordinates[],
+  origin?: Coordinates,
+): string {
+  const targets = routeTargets(target);
+  if (origin) assertRouteCoordinates(origin);
+  const targetPoints = targets
+    .map((point) => `${point.latitude}%2C${point.longitude}`)
+    .join('~');
+  const routeText = origin
+    ? `${origin.latitude}%2C${origin.longitude}~${targetPoints}`
+    : `~${targetPoints}`;
+
+  return `https://yandex.ru/maps/?rtext=${routeText}&rtt=auto`;
 }

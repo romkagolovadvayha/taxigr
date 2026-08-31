@@ -19,10 +19,10 @@ describe('driver navigation helpers', () => {
     ).toBe(navigationPositionBucket(origin));
   });
 
-  it('keeps road geometry and falls back to a drawable direct segment', () => {
+  it('keeps road geometry and never presents a direct segment as a road route', () => {
     const road = [origin, { latitude: 56.05, longitude: 51.959 }, target];
-    expect(drawableNavigationRoute(road, origin, target)).toBe(road);
-    expect(drawableNavigationRoute([], origin, target)).toEqual([origin, target]);
+    expect(drawableNavigationRoute(road)).toBe(road);
+    expect(drawableNavigationRoute([])).toEqual([]);
   });
 
   it('formats remaining distance for a quick glance', () => {

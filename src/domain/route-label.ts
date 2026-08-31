@@ -12,6 +12,35 @@ type MultiStopRouteAddressLabels = {
   sameLocality: boolean;
 };
 
+export function routeDestinationTitle(index: number, count: number): string {
+  return index === count - 1 ? 'ФИНИШ' : `ОСТАНОВКА ${index + 1}`;
+}
+
+export function routeDestinationMapLabel(
+  index: number,
+  count: number,
+  arrivalLabel?: string | null,
+): string {
+  if (index === count - 1) {
+    return arrivalLabel ?? (count > 1 ? `${index + 1} · Финиш` : 'Финиш');
+  }
+  return String(index + 1);
+}
+
+export function formatRoutePointCount(count: number): string {
+  const lastTwoDigits = Math.abs(count) % 100;
+  const lastDigit = lastTwoDigits % 10;
+  const word =
+    lastTwoDigits >= 11 && lastTwoDigits <= 14
+      ? 'точек'
+      : lastDigit === 1
+        ? 'точка'
+        : lastDigit >= 2 && lastDigit <= 4
+          ? 'точки'
+          : 'точек';
+  return `${count} ${word}`;
+}
+
 const LOCALITY_SEGMENT = /^(село|с\.?|деревня|д\.?|город|г\.?|пос(?:е|ё)лок|пос\.?|пгт\.?|п\.?)\s+(.+)$/iu;
 
 function localityKey(segment: string): string | null {

@@ -15,15 +15,16 @@ const navigatorStoreUrl =
     : 'https://play.google.com/store/apps/details?id=ru.yandex.yandexnavi';
 
 export async function openYandexNavigatorRoute(
-  target: Coordinates,
+  targets: Coordinates | readonly Coordinates[],
+  origin?: Coordinates,
 ): Promise<YandexNavigationOpenResult> {
   if (Platform.OS === 'web') {
-    await Linking.openURL(buildYandexMapsRouteUrl(target));
+    await Linking.openURL(buildYandexMapsRouteUrl(targets, origin));
     return 'maps';
   }
 
   try {
-    await Linking.openURL(buildYandexNavigatorRouteUrl(target));
+    await Linking.openURL(buildYandexNavigatorRouteUrl(targets, origin));
     return 'navigator';
   } catch {
     await Linking.openURL(navigatorStoreUrl);
