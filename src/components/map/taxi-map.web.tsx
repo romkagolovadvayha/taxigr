@@ -7,7 +7,6 @@ import {
   DRIVER_MARKER_WIDTH,
   driverMarkerPngMarkup,
 } from '@/components/map/driver-marker';
-import { smoothRouteCoordinates } from '@/components/map/route-geometry';
 import { remainingRouteCoordinates } from '@/domain/route-tracking';
 import {
   fitRouteLocation,
@@ -256,11 +255,9 @@ export const TaxiMap = memo(function TaxiMap({
       Boolean(pickupEtaMinutes || destinationArrivalLabel),
     );
     map.update({ margin });
-    const renderedRouteCoordinates = smoothRouteCoordinates(
-      trimCompletedRoute
-        ? remainingRouteCoordinates(routeCoordinates, routeDriver)
-        : routeCoordinates,
-    );
+    const renderedRouteCoordinates = trimCompletedRoute
+      ? remainingRouteCoordinates(routeCoordinates, routeDriver)
+      : routeCoordinates ?? [];
     const pickupMarkerCoordinates =
       (routeTarget === 'pickup'
         ? renderedRouteCoordinates.at(-1)

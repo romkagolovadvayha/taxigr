@@ -3,7 +3,6 @@ import { Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { buildNativeMapHtml, serializeNativeMapState } from '@/components/map/native-map-html';
-import { smoothRouteCoordinates } from '@/components/map/route-geometry';
 import type { TaxiMapProps } from '@/components/map/types';
 import { remainingRouteCoordinates } from '@/domain/route-tracking';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -26,11 +25,9 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
             pickup: props.pickup,
             destinations: props.destinations,
             destination: props.destination,
-            routeCoordinates: smoothRouteCoordinates(
-              props.trimCompletedRoute
-                ? remainingRouteCoordinates(props.routeCoordinates, props.driver)
-                : props.routeCoordinates,
-            ),
+            routeCoordinates: props.trimCompletedRoute
+              ? remainingRouteCoordinates(props.routeCoordinates, props.driver)
+              : props.routeCoordinates,
             pickupEtaMinutes: props.pickupEtaMinutes,
             destinationArrivalLabel: props.destinationArrivalLabel,
             driver: props.driver,

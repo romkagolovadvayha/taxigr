@@ -6,7 +6,12 @@ function safeTarget(value) {
     const path = decodeURIComponent(url.pathname);
     if (
       url.origin === self.location.origin &&
-      (/^\/$/.test(path) || /^\/orders\/[0-9a-f-]{36}$/.test(path) || /^\/driver(?:\/trips\/[0-9a-f-]{36})?$/.test(path))
+      (
+        /^\/$/.test(path) ||
+        /^\/orders\/[0-9a-f-]{36}$/.test(path) ||
+        /^\/chat\/[0-9a-f-]{36}$/.test(path) ||
+        /^\/driver(?:\/trips\/[0-9a-f-]{36})?$/.test(path)
+      )
     ) {
       return `${url.pathname}${url.search}${url.hash}`;
     }

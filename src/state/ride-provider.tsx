@@ -23,6 +23,7 @@ import type {
   Address,
   Coordinates,
   PaymentMethod,
+  RideChatMessage,
   RideOrder,
   RideOrderSummary,
   RideStatus,
@@ -48,6 +49,8 @@ import {
 import { activeWaitingSeconds } from '@/domain/waiting';
 import { getInstallationId } from '@/storage/device-id';
 
+const ESTIMATED_ROUTE_RETRY_MS = 31_000;
+
 type RideContextValue = {
   pickup: Address | null;
   destinations: Address[];
@@ -72,6 +75,7 @@ type RideContextValue = {
   quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
   busy: boolean;
   error: string | null;
+  chatUnreadCounts: Record<string, number>;
   setPickup: (address: Address) => void;
   setDestination: (address: Address) => void;
   setDestinationAt: (index: number, address: Address) => void;
@@ -98,6 +102,7 @@ type RideContextValue = {
   resetRide: () => void;
   resetDriverRide: () => void;
   refresh: () => Promise<void>;
+  markRideChatRead: (orderId: string) => Promise<void>;
   loadPassengerOrders: () => Promise<void>;
   loadAdminOrders: () => Promise<void>;
   loadMorePassengerOrders: () => Promise<void>;
@@ -112,6 +117,7 @@ type RideBootstrap = {
     next: RideOrder | null;
     offer: RideOrder | null;
   };
+  chatUnreadCounts: Record<string, number>;
 };
 
 const RideContext = createContext<RideContextValue | null>(null);
@@ -229,6 +235,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const quoteRequestController = useRef<AbortController | null>(null);
   const quoteRequestId = useRef(0);
   const completedHistoryOrderIds = useRef(new Set<string>());
@@ -362,6 +369,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDriverRide(null);
         setNextDriverRide(null);
         setDriverOffer(null);
+        setChatUnreadCounts({});
         setBootstrappedToken(token);
         return;
       }
@@ -392,6 +400,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDriverRide(null);
         setNextDriverRide(null);
         setDriverOffer(null);
+        setChatUnreadCounts({});
         setBootstrappedToken(null);
       }
     }, 0);
@@ -409,11 +418,29 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setNextDriverRide(bootstrap.driverQueue.next);
       setDriverOffer(bootstrap.driverQueue.offer);
       setDestinationHistory(bootstrap.destinationHistory);
+      setChatUnreadCounts(bootstrap.chatUnreadCounts);
     } catch (reason) {
       if (sessionUserIdRef.current !== sessionUserId) return;
       setError(reason instanceof Error ? reason.message : 'Не удалось обновить заказы');
     }
   }, [demoSession, token, userId]);
+
+  const markRideChatRead = useCallback(async (orderId: string) => {
+    setChatUnreadCounts((current) => {
+      if (!current[orderId]) return current;
+      return { ...current, [orderId]: 0 };
+    });
+    if (!token || demoSession) return;
+    try {
+      await apiRequest(`/v1/orders/${orderId}/messages/read`, {
+        method: 'POST',
+        token,
+      });
+    } catch (reason) {
+      void refresh();
+      throw reason;
+    }
+  }, [demoSession, refresh, token]);
 
   useEffect(() => {
     if (!token || demoSession) return;
@@ -542,6 +569,23 @@ export function RideProvider({ children }: { children: ReactNode }) {
         );
       }
     });
+    socket.on('ride-chat:message', (message: RideChatMessage) => {
+      if (message.sender.id === userId) return;
+      setChatUnreadCounts((current) => ({
+        ...current,
+        [message.orderId]: (current[message.orderId] ?? 0) + 1,
+      }));
+    });
+    socket.on(
+      'ride-chat:read',
+      (payload: { orderId: string; userId: string; unreadCount: number }) => {
+        if (payload.userId !== userId) return;
+        setChatUnreadCounts((current) => ({
+          ...current,
+          [payload.orderId]: payload.unreadCount,
+        }));
+      },
+    );
     socket.on('application:updated', () => {
       void refreshSession().catch(() => {
         setError('Статус заявки обновлён. Перезапустите приложение, чтобы обновить доступ.');
@@ -707,6 +751,21 @@ export function RideProvider({ children }: { children: ReactNode }) {
     requestQuote,
     token,
   ]);
+
+  useEffect(() => {
+    if (
+      demoSession ||
+      currentRide ||
+      quoteStatus !== 'ready' ||
+      routeSummary?.source !== 'estimate'
+    ) return;
+
+    const timer = setTimeout(() => {
+      void requestQuote();
+    }, ESTIMATED_ROUTE_RETRY_MS);
+
+    return () => clearTimeout(timer);
+  }, [currentRide, demoSession, quoteStatus, requestQuote, routeSummary?.source]);
 
   useEffect(
     () => () => {
@@ -1277,6 +1336,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       quoteStatus,
       busy,
       error,
+      chatUnreadCounts,
       setPickup: selectPickup,
       setDestination: selectDestination,
       setDestinationAt,
@@ -1300,6 +1360,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       resetRide,
       resetDriverRide,
       refresh,
+      markRideChatRead,
       loadPassengerOrders,
       loadAdminOrders,
       loadMorePassengerOrders,
@@ -1330,6 +1391,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       reorderDestinations,
       requestQuote,
       error,
+      chatUnreadCounts,
       adminOrders,
       passengerOrdersHasMore,
       adminOrdersHasMore,
@@ -1338,6 +1400,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       orders,
       pickup,
       refresh,
+      markRideChatRead,
       loadPassengerOrders,
       loadAdminOrders,
       loadMorePassengerOrders,

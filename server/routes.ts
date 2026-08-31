@@ -109,6 +109,7 @@ import {
   presentRideChatMessage,
   RIDE_CHAT_UPLOAD_BODY_MAX_BYTES,
   rideChatAvatarUrl,
+  rideChatMessengerNotification,
   rideChatMessageSelect,
   rideChatPush,
   type RideChatMessageRow,
@@ -879,6 +880,37 @@ async function getRideChatAccess(
     statusCode: 403,
     code: 'RIDE_CHAT_FORBIDDEN',
   });
+}
+
+type RideChatUnreadCountRow = RowDataPacket & {
+  order_id: string;
+  unread_count: number | string;
+};
+
+async function getRideChatUnreadCounts(userId: string): Promise<Record<string, number>> {
+  const [rows] = await db.query<RideChatUnreadCountRow[]>(
+    `SELECT message.order_id, COUNT(*) AS unread_count
+     FROM ride_chat_messages message
+     JOIN orders ON orders.id = message.order_id
+     LEFT JOIN drivers driver ON driver.id = orders.driver_id
+     LEFT JOIN ride_chat_reads read_state
+       ON read_state.order_id = message.order_id AND read_state.user_id = ?
+     WHERE (orders.passenger_id = ? OR driver.user_id = ?)
+       AND message.sender_user_id <> ?
+       AND (
+         read_state.user_id IS NULL
+         OR message.created_at > read_state.last_read_created_at
+         OR (
+           message.created_at = read_state.last_read_created_at
+           AND message.id > read_state.last_read_message_id
+         )
+       )
+     GROUP BY message.order_id`,
+    [userId, userId, userId, userId],
+  );
+  return Object.fromEntries(
+    rows.map((row) => [row.order_id, Number(row.unread_count)]),
+  );
 }
 
 function ratingViewerForOrder(
@@ -3733,7 +3765,7 @@ export async function registerRoutes(
 
   app.get('/v1/bootstrap', async (request) => {
     const session = await auth(request);
-    const [activePassengerResult, historyResult, driver] = await Promise.all([
+    const [activePassengerResult, historyResult, driver, chatUnreadCounts] = await Promise.all([
       db.query<OrderRow[]>(
         `${orderSelect}
          WHERE o.passenger_id = ?
@@ -3748,6 +3780,7 @@ export async function registerRoutes(
         [session.id],
       ),
       session.roles.includes('driver') ? getDriver(session.id) : Promise.resolve(null),
+      getRideChatUnreadCounts(session.id),
     ]);
     const activePassengerRow = activePassengerResult[0][0];
     const destinationHistory = buildDestinationHistory(
@@ -3785,6 +3818,7 @@ export async function registerRoutes(
           : null,
         destinationHistory: destinationHistory.items.slice(0, 20),
         driverQueue,
+        chatUnreadCounts,
       },
     };
   });
@@ -3922,6 +3956,55 @@ export async function registerRoutes(
     };
   });
 
+  app.post('/v1/orders/:id/messages/read', async (request) => {
+    const session = await auth(request);
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const access = await getRideChatAccess(id, session);
+    if (access.viewerRole === 'admin') {
+      throw Object.assign(new Error('Статус прочтения доступен только участникам поездки'), {
+        statusCode: 403,
+        code: 'ADMIN_RIDE_CHAT_READ_ONLY',
+      });
+    }
+    const [latestRows] = await db.query<
+      (RowDataPacket & { id: string; created_at: Date | string })[]
+    >(
+      `SELECT id, created_at
+       FROM ride_chat_messages
+       WHERE order_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [id],
+    );
+    const latest = latestRows[0];
+    if (latest) {
+      await db.execute(
+        `INSERT INTO ride_chat_reads
+          (order_id, user_id, last_read_message_id, last_read_created_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           last_read_message_id = CASE
+             WHEN VALUES(last_read_created_at) > last_read_created_at
+               OR (
+                 VALUES(last_read_created_at) = last_read_created_at
+                 AND VALUES(last_read_message_id) > last_read_message_id
+               )
+             THEN VALUES(last_read_message_id)
+             ELSE last_read_message_id
+           END,
+           last_read_created_at = GREATEST(
+             last_read_created_at,
+             VALUES(last_read_created_at)
+           ),
+           updated_at = UTC_TIMESTAMP(3)`,
+        [id, session.id, latest.id, latest.created_at],
+      );
+    }
+    const payload = { orderId: id, userId: session.id, unreadCount: 0 };
+    publish(`user:${session.id}`, 'ride-chat:read', payload);
+    return { data: payload };
+  });
+
   app.get('/v1/orders/:id/messages/:messageId/image', async (request, reply) => {
     const session = await auth(request);
     const { id, messageId } = parse(
@@ -4049,6 +4132,13 @@ export async function registerRoutes(
           : 'passenger';
         void notifyUsers([recipientUserId!], rideChatPush(result.message, recipientRole)).catch((error) =>
           request.log.warn({ error, orderId: id }, 'ride chat push notification failed'),
+        );
+        notifyMessengers(
+          notifyUsersInMessengers(
+            [recipientUserId!],
+            rideChatMessengerNotification(result.message, appUrl(`/chat/${id}`)),
+          ),
+          'ride.chat.message',
         );
       }
 

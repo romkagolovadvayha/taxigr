@@ -53,6 +53,16 @@ type CacheEntry = {
 
 const routeCache = new Map<string, CacheEntry>();
 let routerUnavailableUntil = 0;
+const OSRM_REQUEST_ATTEMPTS = 2;
+const OSRM_RETRY_DELAY_MS = 200;
+
+class OsrmRouteError extends Error {}
+
+class OsrmTransportError extends Error {
+  constructor(message: string, readonly retryable = true) {
+    super(message);
+  }
+}
 
 type OsrmResponse = {
   code?: string;
@@ -134,7 +144,7 @@ export function parseOsrmRoute(body: OsrmResponse): RouteMetrics {
     route.geometry?.type !== 'LineString' ||
     routeCoordinates.length < 2
   ) {
-    throw new Error(`OSRM route is unavailable: ${body.code ?? 'unknown'}`);
+    throw new OsrmRouteError(`OSRM route is unavailable: ${body.code ?? 'unknown'}`);
   }
   return {
     distanceMeters: Math.round(route.distance!),
@@ -150,41 +160,65 @@ async function requestOsrm(origin: Point, destination: Point): Promise<RouteMetr
     `${destination.longitude},${destination.latitude}`,
   ].join(';');
   const baseUrl = config.ROUTER_BASE_URL.replace(/\/$/, '');
-  const response = await fetch(
-    `${baseUrl}/route/v1/driving/${coordinates}?overview=simplified&geometries=geojson&steps=false&alternatives=false`,
-    {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(config.ROUTER_TIMEOUT_MS),
-    },
-  );
-  if (!response.ok) throw new Error(`OSRM returned ${response.status}`);
-  return parseOsrmRoute((await response.json()) as OsrmResponse);
+  const url =
+    `${baseUrl}/route/v1/driving/${coordinates}` +
+    '?overview=full&geometries=geojson&steps=false&alternatives=false';
+
+  for (let attempt = 1; attempt <= OSRM_REQUEST_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(config.ROUTER_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        throw new OsrmTransportError(
+          `OSRM returned ${response.status}`,
+          response.status === 429 || response.status >= 500,
+        );
+      }
+
+      let body: OsrmResponse;
+      try {
+        body = (await response.json()) as OsrmResponse;
+      } catch {
+        throw new OsrmTransportError('OSRM returned invalid JSON');
+      }
+      return parseOsrmRoute(body);
+    } catch (reason) {
+      const error =
+        reason instanceof OsrmRouteError || reason instanceof OsrmTransportError
+          ? reason
+          : new OsrmTransportError(
+              reason instanceof Error ? reason.message : 'OSRM request failed',
+            );
+      const retryable = !(error instanceof OsrmRouteError) && error.retryable;
+      if (!retryable || attempt === OSRM_REQUEST_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, OSRM_RETRY_DELAY_MS * attempt));
+    }
+  }
+
+  throw new OsrmTransportError('OSRM request failed');
 }
 
 export async function getRouteMetrics(origin: Point, destination: Point): Promise<RouteMetrics> {
   const key = cacheKey(origin, destination);
   const cached = routeCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  if (cached) routeCache.delete(key);
 
   if (!config.ROUTER_BASE_URL || routerUnavailableUntil > Date.now()) {
-    return remember(key, estimateRoute(origin, destination));
+    return cached?.value ?? estimateRoute(origin, destination);
   }
 
   try {
-    return remember(key, await requestOsrm(origin, destination));
-  } catch {
-    routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
-    return remember(key, estimateRoute(origin, destination));
+    const route = await requestOsrm(origin, destination);
+    routerUnavailableUntil = 0;
+    return remember(key, route);
+  } catch (reason) {
+    if (reason instanceof OsrmTransportError && reason.retryable) {
+      routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
+    }
+    return cached?.value ?? estimateRoute(origin, destination);
   }
-}
-
-function routeCoordinatesForSegment(
-  origin: Point,
-  destination: Point,
-  route: RouteMetrics,
-): Point[] {
-  return route.coordinates.length >= 2 ? route.coordinates : [origin, destination];
 }
 
 export async function getMultiStopRouteMetrics(
@@ -207,14 +241,14 @@ export async function getMultiStopRouteMetrics(
     scope: classifyPricingScope(origin, destination),
     route: routes[index]!,
   }));
-  const coordinates = segments.flatMap((segment, index) => {
-    const points = routeCoordinatesForSegment(
-      segment.origin.coordinates,
-      segment.destination.coordinates,
-      segment.route,
-    );
-    return index === 0 ? points : points.slice(1);
-  });
+  const hasCompleteRoadGeometry = routes.every(
+    (route) => route.source === 'osrm' && route.coordinates.length >= 2,
+  );
+  const coordinates = hasCompleteRoadGeometry
+    ? routes.flatMap((route, index) =>
+        index === 0 ? route.coordinates : route.coordinates.slice(1),
+      )
+    : [];
   return {
     segments,
     tripRoute: {

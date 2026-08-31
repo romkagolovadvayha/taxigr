@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   estimateRoute,
   GRAHOVO_DRIVER_BASE,
+  getRouteMetrics,
   getPricedRouteMetrics,
   getMultiStopRouteMetrics,
   haversineMeters,
@@ -12,6 +13,10 @@ import {
 
 const grahovo = { latitude: 56.04758, longitude: 51.95842 };
 const mozhga = { latitude: 56.4439, longitude: 52.2274 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('open routing fallback', () => {
   it('calculates a plausible direct distance', () => {
@@ -75,6 +80,47 @@ describe('open routing fallback', () => {
     ).toThrow('OSRM route is unavailable');
   });
 
+  it('requests full road geometry and does not cache an unavailable route', async () => {
+    const origin = { latitude: 56.04111, longitude: 51.95111 };
+    const destination = { latitude: 56.05222, longitude: 51.97222 };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 400 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: 'Ok',
+            routes: [
+              {
+                distance: 2_400,
+                duration: 300,
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [origin.longitude, origin.latitude],
+                    [51.96, 56.047],
+                    [destination.longitude, destination.latitude],
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const unavailable = await getRouteMetrics(origin, destination);
+    const recovered = await getRouteMetrics(origin, destination);
+
+    expect(unavailable.source).toBe('estimate');
+    expect(unavailable.coordinates).toEqual([]);
+    expect(recovered.source).toBe('osrm');
+    expect(recovered.coordinates).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('overview=full');
+  });
+
   it('builds one ordered route through every destination', async () => {
     const pickup = {
       id: 'pickup',
@@ -114,11 +160,47 @@ describe('open routing fallback', () => {
     ]);
     expect(result.tripRoute.distanceMeters).toBe(3_000);
     expect(result.tripRoute.durationSeconds).toBe(300);
-    expect(result.tripRoute.coordinates).toEqual([
-      pickup.coordinates,
-      first.coordinates,
-      second.coordinates,
-    ]);
+    expect(result.tripRoute.coordinates).toEqual([]);
+  });
+
+  it('does not connect road segments with a direct line when one segment is unavailable', async () => {
+    const pickup = {
+      id: 'pickup',
+      label: 'с. Грахово, ул. Ачинцева, 5',
+      coordinates: grahovo,
+    };
+    const first = {
+      id: 'first',
+      label: 'с. Грахово, ул. Советская, 10',
+      coordinates: { latitude: 56.05, longitude: 51.96 },
+    };
+    const second = {
+      id: 'second',
+      label: 'д. Поршур, ул. Бабаева, 32',
+      coordinates: { latitude: 56.0248, longitude: 51.839 },
+    };
+
+    const result = await getMultiStopRouteMetrics(
+      pickup,
+      [first, second],
+      async (_origin, destination) =>
+        destination === first.coordinates
+          ? {
+              distanceMeters: 1_000,
+              durationSeconds: 100,
+              source: 'osrm',
+              coordinates: [pickup.coordinates, first.coordinates],
+            }
+          : {
+              distanceMeters: 2_000,
+              durationSeconds: 200,
+              source: 'estimate',
+              coordinates: [],
+            },
+    );
+
+    expect(result.tripRoute.source).toBe('estimate');
+    expect(result.tripRoute.coordinates).toEqual([]);
   });
 });
 

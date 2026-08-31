@@ -1518,6 +1518,30 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(passengerMessage.data?.sender.role).toBe('passenger');
       expect((await driverChatEvent).id).toBe(passengerMessageId);
       expect((await adminChatEvent).id).toBe(passengerMessageId);
+      const driverBootstrapWithUnread = await api<{
+        chatUnreadCounts: Record<string, number>;
+      }>('/v1/bootstrap', { token: driverOneToken });
+      expect(driverBootstrapWithUnread.data?.chatUnreadCounts[order.data!.id]).toBe(1);
+
+      const driverReadEvent = socketEvent<{
+        orderId: string;
+        userId: string;
+        unreadCount: number;
+      }>(driverSocket, 'ride-chat:read');
+      const driverRead = await api(`/v1/orders/${order.data!.id}/messages/read`, {
+        method: 'POST',
+        token: driverOneToken,
+      });
+      expect(driverRead.status).toBe(200);
+      expect(await driverReadEvent).toMatchObject({
+        orderId: order.data!.id,
+        userId: fixture.driverUserOneId,
+        unreadCount: 0,
+      });
+      const driverBootstrapAfterRead = await api<{
+        chatUnreadCounts: Record<string, number>;
+      }>('/v1/bootstrap', { token: driverOneToken });
+      expect(driverBootstrapAfterRead.data?.chatUnreadCounts[order.data!.id]).toBeUndefined();
 
       const passengerChatEvent = socketEvent<RideChatMessage>(passengerSocket, 'ride-chat:message');
       const driverMessageId = randomUUID();
@@ -1532,6 +1556,18 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       expect(driverMessage.status).toBe(201);
       expect(driverMessage.data?.sender.role).toBe('driver');
       expect((await passengerChatEvent).id).toBe(driverMessageId);
+      const passengerBootstrapWithUnread = await api<{
+        chatUnreadCounts: Record<string, number>;
+      }>('/v1/bootstrap', { token: passengerToken });
+      expect(passengerBootstrapWithUnread.data?.chatUnreadCounts[order.data!.id]).toBe(1);
+      expect((await api(`/v1/orders/${order.data!.id}/messages/read`, {
+        method: 'POST',
+        token: outsiderToken,
+      })).status).toBe(403);
+      expect((await api(`/v1/orders/${order.data!.id}/messages/read`, {
+        method: 'POST',
+        token: adminToken,
+      })).status).toBe(403);
 
       const onePixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
       const driverPhotoEvent = socketEvent<RideChatMessage>(driverSocket, 'ride-chat:message');

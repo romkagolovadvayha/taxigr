@@ -5,6 +5,7 @@ import type {
   RideChatMessage,
   RideChatRole,
 } from '../src/domain/models';
+import type { PersonalMessengerNotification } from './messenger-notifications';
 import type { PushMessage } from './push';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '../src/domain/ride-chat';
 
@@ -134,5 +135,20 @@ export function rideChatPush(
     },
     sound: 'taxi_found.wav',
     channelId: 'ride-chat-v1',
+  };
+}
+
+export function rideChatMessengerNotification(
+  message: RideChatMessage,
+  chatUrl: string,
+): PersonalMessengerNotification {
+  return {
+    icon: '💬',
+    title: `Сообщение от ${message.sender.name}`,
+    body: message.body || (message.attachment ? 'Фотография' : 'Новое сообщение'),
+    action: {
+      label: 'Открыть чат',
+      url: chatUrl,
+    },
   };
 }

@@ -25,6 +25,7 @@ type Props = Omit<PressableProps, 'children' | 'onPress' | 'style'> & {
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: ReactNode;
+  badge?: ReactNode;
   foregroundColor?: string;
 };
 
@@ -41,6 +42,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
     accessibilityLabel,
     accessibilityRole = 'button',
     icon,
+    badge,
     foregroundColor,
     ...pressableProps
   },
@@ -96,6 +98,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
               : backgrounds[variant],
           borderWidth: variant === 'call' ? 1 : 0,
           borderColor: variant === 'call' ? colors.callBorder : colors.transparent,
+          position: 'relative',
           alignItems: 'center',
           justifyContent: 'center',
           opacity: disabled || loading ? 0.42 : pressed && variant !== 'call' ? 0.88 : 1,
@@ -131,6 +134,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
           {children}
         </Text>
       )}
+      {badge}
     </AnimatedPressable>
   );
 });

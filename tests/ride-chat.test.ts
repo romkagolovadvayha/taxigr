@@ -10,6 +10,7 @@ import {
   decodeRideChatImage,
   MAX_RIDE_CHAT_IMAGE_BYTES,
   presentRideChatMessage,
+  rideChatMessengerNotification,
   rideChatPush,
   type RideChatMessageRow,
 } from '../server/ride-chat';
@@ -87,6 +88,18 @@ describe('ride chat', () => {
         chat: 'true',
       },
     });
+    expect(rideChatMessengerNotification(
+      presented,
+      `https://taxigr.ru/chat/${presented.orderId}`,
+    )).toMatchObject({
+      icon: '💬',
+      title: 'Сообщение от Иван',
+      body: 'Я уже подъехал',
+      action: {
+        label: 'Открыть чат',
+        url: `https://taxigr.ru/chat/${presented.orderId}`,
+      },
+    });
     expect(formatRideChatTime(presented.createdAt)).toMatch(/^\d{2}:\d{2}$/u);
   });
 
@@ -121,7 +134,7 @@ describe('ride chat', () => {
       expect(error).toMatchObject({ statusCode: 413, code: 'RIDE_CHAT_IMAGE_TOO_LARGE' });
     }
 
-    expect(rideChatPush({
+    const photoMessage = {
       ...message('photo', '2026-08-30T12:00:00.000Z', ''),
       attachment: {
         type: 'image',
@@ -129,6 +142,9 @@ describe('ride chat', () => {
         mimeType: 'image/png',
         sizeBytes: 68,
       },
-    }, 'driver').body).toBe('Фотография');
+    } as const;
+    expect(rideChatPush(photoMessage, 'driver').body).toBe('Фотография');
+    expect(rideChatMessengerNotification(photoMessage, 'https://taxigr.ru/chat/order-1').body)
+      .toBe('Фотография');
   });
 });

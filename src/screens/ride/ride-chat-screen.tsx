@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'react-native-reanimated';
 import {
@@ -29,6 +29,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import type { RideChatMessage } from '@/domain/models';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
 import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
+import { useRide } from '@/state/ride-provider';
 import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
 import { base64ByteLength, imageResizeToFit } from '@/utils/image-data';
 
@@ -99,6 +100,7 @@ export function RideChatScreen() {
   const listRef = useRef<FlatList<RideChatMessage>>(null);
   const attachmentButtonRef = useRef<View>(null);
   const previousMessageCount = useRef(0);
+  const chatFocused = useRef(false);
   const [draft, setDraft] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedChatImage | null>(null);
@@ -114,8 +116,30 @@ export function RideChatScreen() {
     reload,
     sendMessage,
   } = useRideChat(id);
+  const { markRideChatRead } = useRide();
 
   const messages = thread?.messages ?? [];
+
+  useFocusEffect(useCallback(() => {
+    chatFocused.current = true;
+    if (id) void markRideChatRead(id).catch(() => undefined);
+    return () => {
+      chatFocused.current = false;
+    };
+  }, [id, markRideChatRead]));
+
+  const latestMessage = messages.at(-1);
+  useEffect(() => {
+    if (
+      !chatFocused.current ||
+      !id ||
+      !latestMessage ||
+      latestMessage.sender.id === user?.id
+    ) {
+      return;
+    }
+    void markRideChatRead(id).catch(() => undefined);
+  }, [id, latestMessage, markRideChatRead, user?.id]);
 
   const acceptPickerResult = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled) return;

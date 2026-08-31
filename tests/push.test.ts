@@ -101,4 +101,31 @@ describe('Expo push delivery', () => {
       expect.objectContaining({ urgency: 'high' }),
     );
   });
+
+  it('keeps chat message text and the chat deep link in browser push payloads', async () => {
+    mocks.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[
+        { endpoint: 'https://push.example.test/chat', p256dh: 'key', auth_secret: 'secret' },
+      ]]);
+    mocks.sendNotification.mockResolvedValue({ statusCode: 201 });
+
+    await notifyUsers(['user-1'], {
+      title: 'Сообщение от Иван',
+      body: 'Я уже подъехал',
+      data: {
+        chat: 'true',
+        role: 'passenger',
+        orderId: '11111111-1111-1111-1111-111111111111',
+      },
+      channelId: 'ride-chat-v1',
+    });
+
+    const payload = JSON.parse(String(mocks.sendNotification.mock.calls[0]?.[1]));
+    expect(payload).toMatchObject({
+      title: 'Сообщение от Иван',
+      body: 'Я уже подъехал',
+      url: '/chat/11111111-1111-1111-1111-111111111111',
+    });
+  });
 });
