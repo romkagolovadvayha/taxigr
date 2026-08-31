@@ -271,3 +271,13 @@ export const layout = {
   fullInset: 0,
   stopRowHeight: 76,
 } as const;
+
+export const componentSizing = {
+  addressFieldAction: {
+    touchTarget: 44,
+    rowTopInset: 2,
+    visualScale: 0.6,
+    addIcon: 22,
+    locationIcon: 20,
+  },
+} as const;

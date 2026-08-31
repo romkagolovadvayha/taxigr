@@ -1,4 +1,5 @@
 import { router, type Href } from 'expo-router';
+import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform, Text, View } from 'react-native';
 
@@ -91,6 +92,7 @@ export function SettingsScreen() {
   const [notificationChannelsLoading, setNotificationChannelsLoading] = useState(true);
   const [notificationChannelChanging, setNotificationChannelChanging] = useState<MessengerProvider | null>(null);
   const [notificationChannelsError, setNotificationChannelsError] = useState<string | null>(null);
+  const [locationSharingChanging, setLocationSharingChanging] = useState(false);
   const { token } = useSession();
   const { dark, setDark } = useAppTheme();
   const { previewFeedback } = useRideFeedback();
@@ -101,6 +103,20 @@ export function SettingsScreen() {
     setVibrationEnabled,
   } = useFeedbackPreferences();
   const { shareLocationWithDriver, setShareLocationWithDriver } = usePassengerPreferences();
+
+  const changeLocationSharing = async (enabled: boolean) => {
+    if (!enabled) {
+      setShareLocationWithDriver(false);
+      return;
+    }
+    setLocationSharingChanging(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      setShareLocationWithDriver(permission.granted);
+    } finally {
+      setLocationSharingChanging(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -277,7 +293,8 @@ export function SettingsScreen() {
           title="Показывать водителю, где я"
           subtitle="Только во время активного заказа"
           value={shareLocationWithDriver}
-          onValueChange={setShareLocationWithDriver}
+          disabled={locationSharingChanging}
+          onValueChange={(enabled) => void changeLocationSharing(enabled)}
         />
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <View style={{ paddingVertical: spacing.x3, gap: spacing.x1 }}>

@@ -12,11 +12,17 @@ import { FeedbackPreferencesProvider } from '@/preferences/feedback-preferences-
 import { NotificationRegistrar } from '@/providers/notification-registrar';
 import { PassengerLocationPublisher } from '@/providers/passenger-location-publisher';
 import { PassengerPreferencesProvider } from '@/preferences/passenger-preferences-provider';
-import { RideProvider } from '@/state/ride-provider';
+import { RideProvider, useRide } from '@/state/ride-provider';
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
 );
+
+function PostBootstrapServices() {
+  const { bootstrapReady } = useRide();
+  if (!bootstrapReady) return null;
+  return <NotificationRegistrar />;
+}
 
 function SessionScopedRideProviders({ children }: { children: ReactNode }) {
   const { user } = useSession();
@@ -24,6 +30,7 @@ function SessionScopedRideProviders({ children }: { children: ReactNode }) {
 
   return (
     <RideProvider key={sessionOwner}>
+      <PostBootstrapServices />
       <RideFeedbackProvider>
         <PassengerLocationPublisher />
         <SearchPriceIncreaseModalHost />
@@ -54,7 +61,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <VkCommunityPromptHost />
         <PassengerPreferencesProvider>
           <FeedbackPreferencesProvider>
-            <NotificationRegistrar />
             <SessionScopedRideProviders>{children}</SessionScopedRideProviders>
           </FeedbackPreferencesProvider>
         </PassengerPreferencesProvider>

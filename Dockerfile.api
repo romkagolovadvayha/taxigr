@@ -9,6 +9,9 @@ RUN npm ci --omit=dev
 COPY tsconfig.json ./
 COPY server ./server
 COPY src/domain ./src/domain
+COPY src/data ./src/data
+COPY src/legal ./src/legal
+COPY src/utils ./src/utils
 
 EXPOSE 4100
 CMD ["./node_modules/.bin/tsx", "server/index.ts"]

@@ -12,36 +12,40 @@ import { colors, spacing, typography } from '@/theme/tokens';
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const { colorScheme } = useAppTheme();
   const webViewRef = useRef<WebView>(null);
+  const [canMountWebView, setCanMountWebView] = useState(false);
   const [ready, setReady] = useState(false);
   const apiKey = process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY;
   const html = useMemo(
-    () => (apiKey ? buildNativeMapHtml(apiKey, colorScheme) : ''),
-    [apiKey, colorScheme],
+    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, colorScheme) : ''),
+    [apiKey, canMountWebView, colorScheme],
   );
   const state = useMemo(
     () =>
-      serializeNativeMapState({
-        pickup: props.pickup,
-        destinations: props.destinations,
-        destination: props.destination,
-        routeCoordinates: smoothRouteCoordinates(
-          props.trimCompletedRoute
-            ? remainingRouteCoordinates(props.routeCoordinates, props.driver)
-            : props.routeCoordinates,
-        ),
-        pickupEtaMinutes: props.pickupEtaMinutes,
-        destinationArrivalLabel: props.destinationArrivalLabel,
-        driver: props.driver,
-        driverHeading: props.driverHeading,
-        passenger: props.passenger,
-        followDriver: props.followDriver,
-        followZoom: props.followZoom,
-        navigationMode: props.navigationMode,
-        routeTarget: props.routeTarget,
-        viewportInsets: props.viewportInsets,
-        colorScheme,
-      }),
+      canMountWebView
+        ? serializeNativeMapState({
+            pickup: props.pickup,
+            destinations: props.destinations,
+            destination: props.destination,
+            routeCoordinates: smoothRouteCoordinates(
+              props.trimCompletedRoute
+                ? remainingRouteCoordinates(props.routeCoordinates, props.driver)
+                : props.routeCoordinates,
+            ),
+            pickupEtaMinutes: props.pickupEtaMinutes,
+            destinationArrivalLabel: props.destinationArrivalLabel,
+            driver: props.driver,
+            driverHeading: props.driverHeading,
+            passenger: props.passenger,
+            followDriver: props.followDriver,
+            followZoom: props.followZoom,
+            navigationMode: props.navigationMode,
+            routeTarget: props.routeTarget,
+            viewportInsets: props.viewportInsets,
+            colorScheme,
+          })
+        : '',
     [
+      canMountWebView,
       props.destination,
       props.destinations,
       props.destinationArrivalLabel,
@@ -60,6 +64,11 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
       colorScheme,
     ],
   );
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setCanMountWebView(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const pushState = useCallback(() => {
     if (!ready) return;
@@ -91,6 +100,10 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
         </Text>
       </View>
     );
+  }
+
+  if (!canMountWebView) {
+    return <View style={{ flex: 1, backgroundColor: colors.mapFallback }} />;
   }
 
   return (

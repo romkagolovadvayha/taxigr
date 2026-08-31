@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
@@ -17,8 +17,20 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
 
 export function OrdersScreen() {
-  const { orders, passengerOrdersHasMore, loadMorePassengerOrders } = useRide();
+  const {
+    orders,
+    passengerOrdersHasMore,
+    passengerOrdersLoaded,
+    loadPassengerOrders,
+    loadMorePassengerOrders,
+    error,
+  } = useRide();
   const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    void loadPassengerOrders();
+  }, [loadPassengerOrders]);
+
   return (
     <Screen contentStyle={{ maxWidth: 900 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -33,7 +45,20 @@ export function OrdersScreen() {
         </View>
       </View>
       <View style={{ gap: spacing.x3 }}>
-        {orders.length === 0 && (
+        {!passengerOrdersLoaded && (
+          <View style={{ padding: spacing.x6, alignItems: 'center', gap: spacing.x3 }}>
+            <ActivityIndicator color={colors.ink} />
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+              Загружаем поездки…
+            </Text>
+          </View>
+        )}
+        {passengerOrdersLoaded && !!error && (
+          <Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
+            {error}
+          </Text>
+        )}
+        {passengerOrdersLoaded && !error && orders.length === 0 && (
           <View
             style={{
               padding: spacing.x6,
@@ -59,7 +84,7 @@ export function OrdersScreen() {
             </AppButton>
           </View>
         )}
-        {orders.map((order) => (
+        {passengerOrdersLoaded && orders.map((order) => (
           <AnimatedPressable
             feedback="subtle"
             key={order.id}

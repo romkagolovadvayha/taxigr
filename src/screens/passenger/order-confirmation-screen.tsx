@@ -30,6 +30,7 @@ export function OrderConfirmationScreen() {
     selectedPaymentMethod,
     setSelectedPaymentMethod,
     quoteStatus,
+    requestQuote,
     createRide,
     busy,
     error,
@@ -58,7 +59,9 @@ export function OrderConfirmationScreen() {
           ? 'Рассчитываем маршрут, стоимость и время подачи…'
           : quoteStatus === 'error'
             ? 'Не удалось рассчитать маршрут. Проверьте адреса и попробуйте ещё раз.'
-            : null;
+            : quoteStatus === 'idle'
+              ? 'Нажмите «Рассчитать стоимость», когда адреса будут проверены.'
+              : null;
 
   const confirm = async () => {
     if (!canSubmit) return;
@@ -241,16 +244,28 @@ export function OrderConfirmationScreen() {
             )}
 
             <AppButton
-              disabled={!canSubmit}
-              loading={busy}
-              onPress={() => void confirm()}
+              disabled={!addressesArePrecise || quoteStatus === 'loading' || busy}
+              loading={busy || quoteStatus === 'loading'}
+              onPress={() => {
+                if (routeReady) {
+                  void confirm();
+                  return;
+                }
+                void requestQuote();
+              }}
               accessibilityLabel={
                 routeReady
                   ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
-                  : 'Подтвердить заказ, сначала укажите маршрут'
+                  : addressesArePrecise
+                    ? 'Рассчитать стоимость поездки'
+                    : 'Подтвердить заказ, сначала укажите маршрут'
               }
             >
-              {routeReady ? `Подтвердить · ${selected.priceMinor / 100} ₽` : 'Укажите маршрут'}
+              {routeReady
+                ? `Подтвердить · ${selected.priceMinor / 100} ₽`
+                : addressesArePrecise
+                  ? 'Рассчитать стоимость'
+                  : 'Укажите маршрут'}
             </AppButton>
           </>
         )}

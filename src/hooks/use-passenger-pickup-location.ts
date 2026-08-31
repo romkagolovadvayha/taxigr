@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -7,11 +7,10 @@ import { hasHouseNumber } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
 import { useRide } from '@/state/ride-provider';
 
-export function usePassengerPickupLocation({ auto = true }: { auto?: boolean } = {}) {
+export function usePassengerPickupLocation() {
   const { token } = useSession();
-  const { pickup, currentRide, setPickup } = useRide();
+  const { setPickup } = useRide();
   const [locationLoading, setLocationLoading] = useState(false);
-  const autoLocationToken = useRef<string | null>(null);
 
   const selectCurrentLocation = useCallback(async () => {
     if (!token || locationLoading) return;
@@ -45,20 +44,6 @@ export function usePassengerPickupLocation({ auto = true }: { auto?: boolean } =
       setLocationLoading(false);
     }
   }, [locationLoading, setPickup, token]);
-
-  useEffect(() => {
-    if (
-      !auto ||
-      !token ||
-      pickup ||
-      currentRide ||
-      autoLocationToken.current === token
-    ) {
-      return;
-    }
-    autoLocationToken.current = token;
-    void selectCurrentLocation();
-  }, [auto, currentRide, pickup, selectCurrentLocation, token]);
 
   return { locationLoading, selectCurrentLocation };
 }

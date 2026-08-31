@@ -14,7 +14,7 @@ import { formatMoney } from '@/utils/format';
 
 export function AdminDashboardScreen() {
   const { token } = useSession();
-  const { adminOrders: orders } = useRide();
+  const { adminOrders: orders, loadAdminOrders } = useRide();
   const [metrics, setMetrics] = useState<AdminMetrics>({
     activeOrders: 0,
     onlineDrivers: 0,
@@ -24,6 +24,10 @@ export function AdminDashboardScreen() {
   });
   const [error, setError] = useState<string | null>(null);
   const recent = orders.slice(0, 4);
+
+  useEffect(() => {
+    void loadAdminOrders();
+  }, [loadAdminOrders]);
 
   useEffect(() => {
     if (!token) return;

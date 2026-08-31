@@ -485,7 +485,15 @@ export function AddressSearchScreen() {
           }}
           placeholder="Адрес, магазин, кафе или место"
           placeholderTextColor={colors.inkMuted}
-          style={{ ...typography.body, color: colors.ink, flex: 1, minHeight: 56, outlineWidth: 0 }}
+          underlineColorAndroid={colors.transparent}
+          style={{
+            ...typography.body,
+            color: colors.ink,
+            flex: 1,
+            minHeight: 56,
+            outlineColor: colors.transparent,
+            outlineWidth: 0,
+          }}
           returnKeyType="search"
           onSubmitEditing={runRemoteSearch}
           accessibilityLabel="Поиск адреса или места"

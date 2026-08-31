@@ -1,5 +1,10 @@
 import type { Address, RideOrder } from '@/domain/models';
 
+type DestinationHistoryOrder = Pick<
+  RideOrder,
+  'passengerId' | 'status' | 'destination' | 'updatedAt'
+>;
+
 export type DestinationHistoryItem = {
   address: Address;
   tripCount: number;
@@ -25,7 +30,7 @@ function timestamp(value: string): number {
 }
 
 export function buildDestinationHistory(
-  orders: RideOrder[],
+  orders: DestinationHistoryOrder[],
   passengerId: string | undefined,
 ): DestinationHistory {
   if (!passengerId) return { items: [], lastDestination: null };

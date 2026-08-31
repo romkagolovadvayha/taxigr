@@ -16,6 +16,7 @@ import {
   type PricingScope,
 } from '../src/domain/pricing';
 import { hasHouseNumber } from '../src/domain/address-precision';
+import { buildDestinationHistory } from '../src/domain/address-history';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
@@ -23,7 +24,10 @@ import {
 } from '../src/domain/live-location';
 import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
 import { canSendRideChatMessage } from '../src/domain/ride-chat';
-import { maximumAssignedDriverOrders } from '../src/domain/driver-order-queue';
+import {
+  maximumAssignedDriverOrders,
+  selectDriverOrderQueue,
+} from '../src/domain/driver-order-queue';
 import { searchPriceIncreaseSlotAt } from '../src/domain/search-price-increase';
 import {
   canDriverReceivePriorityOrder,
@@ -86,11 +90,17 @@ import {
   notifyUsersInMessengers,
 } from './messenger-notifications';
 import {
+  destinationHistorySelect,
   limitOrderRatings,
   orderSelect,
+  orderSummarySelect,
+  presentDestinationHistoryOrder,
   presentOrder,
+  presentOrderSummary,
+  type DestinationHistoryRow,
   type OrderRatingViewer,
   type OrderRow,
+  type OrderSummaryRow,
 } from './presenters';
 import { driverRideNotification, passengerRideNotification } from './ride-messenger';
 import {
@@ -942,6 +952,49 @@ async function getDriver(userId: string, connection?: PoolConnection, lock = fal
     [userId],
   );
   return rows[0] ?? null;
+}
+
+async function loadDriverOfferRows(
+  driver: { id: string; status: string },
+  limit = 20,
+): Promise<OrderRow[]> {
+  if (!['online', 'busy'].includes(driver.status)) return [];
+  const [rows] = await db.query<OrderRow[]>(
+    `${orderSelect}
+     WHERE o.status = 'searching' AND o.driver_id IS NULL
+        AND o.created_at > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)
+        AND (
+          o.priority_release_at IS NULL
+          OR o.priority_release_at <= UTC_TIMESTAMP(3)
+          OR EXISTS (
+            SELECT 1 FROM driver_priority_assignments priority
+            WHERE priority.driver_id = ? AND priority.scope = o.pricing_scope
+          )
+        )
+        AND (
+          SELECT COUNT(*) FROM orders active_order
+          WHERE active_order.driver_id = ?
+            AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+        ) < ?
+        AND NOT EXISTS (
+          SELECT 1 FROM driver_order_rejections rejected
+          WHERE rejected.order_id = o.id AND rejected.driver_id = ?
+        )
+        AND (o.tariff <> 'child' OR EXISTS (
+          SELECT 1 FROM drivers eligible WHERE eligible.id = ? AND eligible.has_child_seat = TRUE
+        ))
+     ORDER BY o.created_at ASC LIMIT ?`,
+    [
+      config.ORDER_SEARCH_TTL_MINUTES,
+      driver.id,
+      driver.id,
+      maximumAssignedDriverOrders,
+      driver.id,
+      driver.id,
+      Math.min(20, Math.max(1, limit)),
+    ],
+  );
+  return rows;
 }
 
 async function openDriverShift(driverId: string, connection?: PoolConnection): Promise<void> {
@@ -3678,6 +3731,64 @@ export async function registerRoutes(
     return { data: result.order };
   });
 
+  app.get('/v1/bootstrap', async (request) => {
+    const session = await auth(request);
+    const [activePassengerResult, historyResult, driver] = await Promise.all([
+      db.query<OrderRow[]>(
+        `${orderSelect}
+         WHERE o.passenger_id = ?
+           AND o.status NOT IN ('completed', 'cancelled')
+         ORDER BY o.created_at DESC LIMIT 1`,
+        [session.id],
+      ),
+      db.query<DestinationHistoryRow[]>(
+        `${destinationHistorySelect}
+         WHERE o.passenger_id = ? AND o.status = 'completed'
+         ORDER BY o.updated_at DESC LIMIT 100`,
+        [session.id],
+      ),
+      session.roles.includes('driver') ? getDriver(session.id) : Promise.resolve(null),
+    ]);
+    const activePassengerRow = activePassengerResult[0][0];
+    const destinationHistory = buildDestinationHistory(
+      historyResult[0].map(presentDestinationHistoryOrder),
+      session.id,
+    );
+    let driverQueue: ReturnType<typeof selectDriverOrderQueue> = {
+      current: null,
+      next: null,
+      offer: null,
+    };
+
+    if (driver) {
+      const [assignedResult, offerRows] = await Promise.all([
+        db.query<OrderRow[]>(
+          `${orderSelect}
+           WHERE o.driver_id = ?
+             AND o.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+           ORDER BY o.created_at ASC LIMIT ?`,
+          [driver.id, maximumAssignedDriverOrders],
+        ),
+        loadDriverOfferRows(driver, 1),
+      ]);
+      const assignedOrders = assignedResult[0].map((row) =>
+        limitOrderRatings(presentOrder(row), 'driver'),
+      );
+      const offers = offerRows.map((row) => limitOrderRatings(presentOrder(row), 'driver'));
+      driverQueue = selectDriverOrderQueue(assignedOrders, offers);
+    }
+
+    return {
+      data: {
+        activePassengerOrder: activePassengerRow
+          ? limitOrderRatings(presentOrder(activePassengerRow), 'passenger')
+          : null,
+        destinationHistory: destinationHistory.items.slice(0, 20),
+        driverQueue,
+      },
+    };
+  });
+
   app.get('/v1/orders', async (request) => {
     const session = await auth(request);
     const query = parse(
@@ -3697,6 +3808,7 @@ export async function registerRoutes(
         before: z.iso.datetime({ offset: true }).optional(),
         beforeId: z.string().uuid().optional(),
         limit: z.coerce.number().int().min(1).max(100).default(100),
+        view: z.enum(['detail', 'summary']).default('detail'),
       }),
       request.query,
     );
@@ -3740,8 +3852,16 @@ export async function registerRoutes(
       }
     }
     values.push(query.limit);
+    const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
+    if (query.view === 'summary') {
+      const [rows] = await db.query<OrderSummaryRow[]>(
+        `${orderSummarySelect}${where} ORDER BY o.created_at DESC, o.id DESC LIMIT ?`,
+        values,
+      );
+      return { data: rows.map(presentOrderSummary) };
+    }
     const [rows] = await db.query<OrderRow[]>(
-      `${orderSelect}${clauses.length ? ` WHERE ${clauses.join(' AND ')}` : ''} ORDER BY o.created_at DESC, o.id DESC LIMIT ?`,
+      `${orderSelect}${where} ORDER BY o.created_at DESC, o.id DESC LIMIT ?`,
       values,
     );
     return {
@@ -4738,41 +4858,7 @@ export async function registerRoutes(
     const session = await auth(request, 'driver');
     const driver = await getDriver(session.id);
     if (!driver) throw Object.assign(new Error('Профиль водителя не найден'), { statusCode: 404 });
-    if (!['online', 'busy'].includes(driver.status)) return { data: [] };
-    const [rows] = await db.query<OrderRow[]>(
-      `${orderSelect}
-       WHERE o.status = 'searching' AND o.driver_id IS NULL
-          AND o.created_at > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)
-          AND (
-            o.priority_release_at IS NULL
-            OR o.priority_release_at <= UTC_TIMESTAMP(3)
-            OR EXISTS (
-              SELECT 1 FROM driver_priority_assignments priority
-              WHERE priority.driver_id = ? AND priority.scope = o.pricing_scope
-            )
-          )
-          AND (
-            SELECT COUNT(*) FROM orders active_order
-            WHERE active_order.driver_id = ?
-              AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-          ) < ?
-          AND NOT EXISTS (
-           SELECT 1 FROM driver_order_rejections rejected
-           WHERE rejected.order_id = o.id AND rejected.driver_id = ?
-         )
-         AND (o.tariff <> 'child' OR EXISTS (
-           SELECT 1 FROM drivers eligible WHERE eligible.id = ? AND eligible.has_child_seat = TRUE
-         ))
-       ORDER BY o.created_at ASC LIMIT 20`,
-      [
-        config.ORDER_SEARCH_TTL_MINUTES,
-        driver.id,
-        driver.id,
-        maximumAssignedDriverOrders,
-        driver.id,
-        driver.id,
-      ],
-    );
+    const rows = await loadDriverOfferRows(driver);
     return { data: rows.map(presentOrder) };
   });
 

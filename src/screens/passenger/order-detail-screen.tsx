@@ -1,14 +1,20 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 
+import { apiRequest } from '@/api/client';
+import { useSession } from '@/auth/session-provider';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
+import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { IconButton } from '@/components/ui/icon-button';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { demoOrders } from '@/data/demo';
+import type { RideOrder } from '@/domain/models';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { pricingScopeLabel } from '@/domain/pricing';
 import { formatMultiStopRouteAddresses } from '@/domain/route-label';
@@ -20,8 +26,43 @@ import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
 
 export function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { orders, error } = useRide();
-  const order = orders.find((item) => item.id === id);
+  const { token } = useSession();
+  const { currentRide } = useRide();
+  const [loadedOrder, setLoadedOrder] = useState<RideOrder>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const demoSession = token?.startsWith('demo:') ?? false;
+  const activeOrder = currentRide?.id === id ? currentRide : undefined;
+  const order = activeOrder ?? (demoSession ? demoOrders.find((item) => item.id === id) : loadedOrder);
+
+  const loadOrder = useCallback(async () => {
+    if (!token || demoSession || activeOrder) return;
+    setLoading(true);
+    try {
+      setLoadedOrder(await apiRequest<RideOrder>(`/v1/orders/${id}`, { token }));
+      setError(undefined);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заказ');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeOrder, demoSession, id, token]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => void loadOrder(), 0);
+    return () => clearTimeout(timer);
+  }, [loadOrder]);
+
+  if (loading && !demoSession && !order) {
+    return (
+      <Screen contentStyle={{ maxWidth: 760, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.ink} />
+        <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Загружаем поездку…
+        </Text>
+      </Screen>
+    );
+  }
 
   if (!order) {
     return (
@@ -30,6 +71,16 @@ export function OrderDetailScreen() {
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
           Заказ не найден
         </Text>
+        {!!error && (
+          <Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
+            {error}
+          </Text>
+        )}
+        {!demoSession && (
+          <AppButton variant="secondary" loading={loading} onPress={() => void loadOrder()}>
+            Повторить загрузку
+          </AppButton>
+        )}
       </Screen>
     );
   }

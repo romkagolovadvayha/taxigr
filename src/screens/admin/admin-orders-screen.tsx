@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
@@ -8,7 +8,7 @@ import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
 import { MoneyValue } from '@/components/ui/money-value';
 import { StatusChip } from '@/components/ui/status-chip';
-import type { RideOrder } from '@/domain/models';
+import type { RideOrderSummary } from '@/domain/models';
 import { formatRouteAddresses } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { useRide } from '@/state/ride-provider';
@@ -16,12 +16,22 @@ import { colors, radius, spacing, typography } from '@/theme/tokens';
 
 export function AdminOrdersScreen() {
   const { token } = useSession();
-  const { adminOrders: orders, adminOrdersHasMore, loadMoreAdminOrders, refresh } = useRide();
-  const [selectedOrder, setSelectedOrder] = useState<RideOrder | null>(null);
+  const {
+    adminOrders: orders,
+    adminOrdersHasMore,
+    loadAdminOrders,
+    loadMoreAdminOrders,
+  } = useRide();
+  const [selectedOrder, setSelectedOrder] = useState<RideOrderSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    void loadAdminOrders();
+  }, [loadAdminOrders]);
+
   const cancelSelectedOrder = async () => {
     if (!selectedOrder || !token) return;
     setBusy(true);
@@ -34,7 +44,7 @@ export function AdminOrdersScreen() {
       });
       setSelectedOrder(null);
       setCancellationReason('');
-      await refresh();
+      await loadAdminOrders();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось отменить заказ');
     } finally {

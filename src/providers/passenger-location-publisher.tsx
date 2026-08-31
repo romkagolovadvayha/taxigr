@@ -110,7 +110,7 @@ export function PassengerLocationPublisher() {
     };
 
     void (async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await Location.getForegroundPermissionsAsync();
       if (!permission.granted || cancelled) return;
       publishPosition(
         await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),

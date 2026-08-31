@@ -138,6 +138,19 @@ export type RideOrder = {
   passengerCoordinates?: Coordinates;
 };
 
+export type RideOrderSummary = Pick<
+  RideOrder,
+  | 'id'
+  | 'passengerId'
+  | 'pickup'
+  | 'destination'
+  | 'tariff'
+  | 'status'
+  | 'priceMinor'
+  | 'createdAt'
+  | 'updatedAt'
+>;
+
 export type DriverSummary = {
   id: string;
   name: string;

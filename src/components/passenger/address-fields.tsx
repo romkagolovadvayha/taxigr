@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { AppIcon } from '@/components/ui/app-icon';
+import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { hasHouseNumber } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { colors, componentSizing, layout, spacing, typography } from '@/theme/tokens';
 
 type Props = {
   pickup: Address | null;
@@ -15,7 +15,45 @@ type Props = {
   onUseLocation?: () => void;
   locationLoading?: boolean;
   compact?: boolean;
+  reducedActions?: boolean;
 };
+
+const addressActionSizing = componentSizing.addressFieldAction;
+
+function AddressActionVisual({
+  icon,
+  iconSize,
+  color,
+  reduced,
+}: {
+  icon: AppIconName;
+  iconSize: number;
+  color: string;
+  reduced: boolean;
+}) {
+  const scale = reduced ? addressActionSizing.visualScale : 1;
+  const visualSize = addressActionSizing.touchTarget * scale;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        width: visualSize,
+        height: visualSize,
+        borderRadius: visualSize / 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.surfaceSecondary,
+      }}
+    >
+      <AppIcon
+        name={icon}
+        size={iconSize * scale}
+        color={color}
+      />
+    </View>
+  );
+}
 
 function AddressRow({
   kind,
@@ -26,6 +64,7 @@ function AddressRow({
   locationLoading,
   destinations,
   onAddDestination,
+  reducedActions,
 }: {
   kind: 'pickup' | 'destination';
   label: string;
@@ -35,6 +74,7 @@ function AddressRow({
   locationLoading?: boolean;
   destinations?: Address[];
   onAddDestination?: () => void;
+  reducedActions: boolean;
 }) {
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
   const addDestinationAction = kind === 'destination' && !!address && !!onAddDestination;
@@ -112,17 +152,22 @@ function AddressRow({
           style={({ pressed }) => ({
             position: 'absolute',
             right: -2,
-            top: 2,
-            width: 44,
-            height: 44,
-            borderRadius: 999,
+            ...(reducedActions
+              ? { bottom: layout.fullInset }
+              : { top: addressActionSizing.rowTopInset }),
+            width: addressActionSizing.touchTarget,
+            height: addressActionSizing.touchTarget,
             alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.surfaceSecondary,
+            justifyContent: reducedActions ? 'flex-end' : 'center',
             opacity: pressed ? 0.68 : 1,
           })}
         >
-          <AppIcon name="plus" size={22} color={colors.ink} />
+          <AddressActionVisual
+            icon="plus"
+            iconSize={addressActionSizing.addIcon}
+            color={colors.ink}
+            reduced={reducedActions}
+          />
         </AnimatedPressable>
       )}
       {compactLocationAction && (
@@ -137,17 +182,22 @@ function AddressRow({
           style={({ pressed }) => ({
             position: 'absolute',
             right: -2,
-            top: 2,
-            width: 44,
-            height: 44,
-            borderRadius: 999,
+            ...(reducedActions
+              ? { bottom: layout.fullInset }
+              : { top: addressActionSizing.rowTopInset }),
+            width: addressActionSizing.touchTarget,
+            height: addressActionSizing.touchTarget,
             alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.surfaceSecondary,
+            justifyContent: reducedActions ? 'flex-end' : 'center',
             opacity: pressed || locationLoading ? 0.55 : 1,
           })}
         >
-          <AppIcon name="recenter" size={20} color={colors.inkSecondary} />
+          <AddressActionVisual
+            icon="recenter"
+            iconSize={addressActionSizing.locationIcon}
+            color={colors.inkSecondary}
+            reduced={reducedActions}
+          />
         </AnimatedPressable>
       )}
     </View>
@@ -161,6 +211,7 @@ export function AddressFields({
   onUseLocation,
   locationLoading,
   compact = false,
+  reducedActions = false,
 }: Props) {
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -180,6 +231,7 @@ export function AddressFields({
         compact={compact}
         onUseLocation={onUseLocation}
         locationLoading={locationLoading}
+        reducedActions={reducedActions}
       />
       {!!onUseLocation && !compact && (
         <AnimatedPressable
@@ -216,6 +268,7 @@ export function AddressFields({
             ? () => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })
             : undefined
         }
+        reducedActions={reducedActions}
       />
     </View>
   );

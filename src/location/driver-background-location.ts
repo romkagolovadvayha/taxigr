@@ -52,7 +52,10 @@ TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
   }
 });
 
-export async function syncDriverBackgroundLocation(enabled: boolean): Promise<boolean> {
+export async function syncDriverBackgroundLocation(
+  enabled: boolean,
+  requestPermissions = true,
+): Promise<boolean> {
   if (Platform.OS === 'web') return true;
   const available = await TaskManager.isAvailableAsync();
   if (!available) return false;
@@ -66,6 +69,7 @@ export async function syncDriverBackgroundLocation(enabled: boolean): Promise<bo
   if (!foreground.granted) return false;
   const currentBackground = await Location.getBackgroundPermissionsAsync();
   if (!currentBackground.granted) {
+    if (!requestPermissions) return false;
     const accepted = await confirmBackgroundLocationDisclosure();
     if (!accepted) return false;
   }

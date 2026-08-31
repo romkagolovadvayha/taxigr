@@ -4,6 +4,7 @@ import type {
   Address,
   Coordinates,
   RideOrder,
+  RideOrderSummary,
   RideStatus,
   TariffCode,
 } from '../src/domain/models';
@@ -71,6 +72,34 @@ export type OrderRow = RowDataPacket & {
   longitude?: number | null;
   passenger_latitude?: number | null;
   passenger_longitude?: number | null;
+};
+
+export type OrderSummaryRow = RowDataPacket & {
+  id: string;
+  passenger_id: string;
+  tariff: TariffCode;
+  status: RideStatus;
+  pickup_label: string;
+  pickup_details: string | null;
+  pickup_lat: number;
+  pickup_lon: number;
+  destination_label: string;
+  destination_details: string | null;
+  destination_lat: number;
+  destination_lon: number;
+  price_minor: number;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+export type DestinationHistoryRow = RowDataPacket & {
+  passenger_id: string;
+  status: RideStatus;
+  destination_label: string;
+  destination_details: string | null;
+  destination_lat: number;
+  destination_lon: number;
+  updated_at: Date | string;
 };
 
 function routeCoordinates(value: unknown): Coordinates[] | undefined {
@@ -248,6 +277,41 @@ export function presentOrder(row: OrderRow): RideOrder {
   };
 }
 
+export function presentOrderSummary(row: OrderSummaryRow): RideOrderSummary {
+  return {
+    id: row.id,
+    passengerId: row.passenger_id,
+    pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
+    destination: address(
+      'destination',
+      row.destination_label,
+      row.destination_details,
+      row.destination_lat,
+      row.destination_lon,
+    ),
+    tariff: row.tariff,
+    status: row.status,
+    priceMinor: row.price_minor,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+export function presentDestinationHistoryOrder(row: DestinationHistoryRow) {
+  return {
+    passengerId: row.passenger_id,
+    status: row.status,
+    destination: address(
+      'destination',
+      row.destination_label,
+      row.destination_details,
+      row.destination_lat,
+      row.destination_lon,
+    ),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
 export type OrderRatingViewer = 'passenger' | 'driver' | 'admin';
 
 export function limitOrderRatings(
@@ -293,4 +357,19 @@ export const orderSelect = `
     ON rr_passenger.order_id = o.id AND rr_passenger.rater_role = 'passenger'
   LEFT JOIN ride_ratings rr_driver
     ON rr_driver.order_id = o.id AND rr_driver.rater_role = 'driver'
+`;
+
+export const orderSummarySelect = `
+  SELECT o.id, o.passenger_id, o.tariff, o.status,
+    o.pickup_label, o.pickup_details, o.pickup_lat, o.pickup_lon,
+    o.destination_label, o.destination_details, o.destination_lat, o.destination_lon,
+    o.price_minor, o.created_at, o.updated_at
+  FROM orders o
+`;
+
+export const destinationHistorySelect = `
+  SELECT o.passenger_id, o.status,
+    o.destination_label, o.destination_details, o.destination_lat, o.destination_lon,
+    o.updated_at
+  FROM orders o
 `;

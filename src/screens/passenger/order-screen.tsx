@@ -51,12 +51,14 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
     rateRide,
     resetRide,
     quoteStatus,
+    requestQuote,
     busy,
     error,
   } = useRide();
   const selected = tariffs.find((item) => item.code === selectedTariff)!;
   const routeIsPrecise =
     hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
+  const routeAddressesSelected = !!pickup && !!destination;
   const quoteLoading = routeIsPrecise && quoteStatus === 'loading';
   const quoteReady = routeIsPrecise && quoteStatus === 'ready';
 
@@ -89,15 +91,18 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
         onUseLocation={() => void selectCurrentLocation()}
         locationLoading={locationLoading}
         compact
+        reducedActions
       />
-      <TariffSelector
-        tariffs={tariffs}
-        selected={selectedTariff}
-        onSelect={setSelectedTariff}
-        compact
-        loading={quoteLoading}
-        estimateAvailable={quoteReady}
-      />
+      {routeAddressesSelected && (
+        <TariffSelector
+          tariffs={tariffs}
+          selected={selectedTariff}
+          onSelect={setSelectedTariff}
+          compact
+          loading={quoteLoading}
+          estimateAvailable={quoteReady}
+        />
+      )}
       {!!error && (
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
           {error}
@@ -106,10 +111,17 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
       <BookingSubmitButton
         priceMinor={selected.priceMinor}
         etaMinutes={selected.etaMinutes}
-        disabled={!quoteReady}
+        disabled={!routeIsPrecise}
         loading={quoteLoading}
         estimateAvailable={quoteReady}
-        onPress={() => router.push('/order-confirmation')}
+        canEstimate={routeIsPrecise && !quoteReady}
+        onPress={() => {
+          if (quoteReady) {
+            router.push('/order-confirmation');
+            return;
+          }
+          void requestQuote();
+        }}
       />
     </View>
   );

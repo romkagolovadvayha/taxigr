@@ -1,6 +1,7 @@
 import {
+  createAudioPlayer,
   setAudioModeAsync,
-  useAudioPlayer,
+  type AudioPlayer,
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import type { ReactNode } from 'react';
@@ -10,7 +11,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import { AppState } from 'react-native';
 
@@ -29,9 +29,6 @@ type RideFeedbackContextValue = {
 };
 
 const RideFeedbackContext = createContext<RideFeedbackContextValue | null>(null);
-const inactiveFeedback: RideFeedbackContextValue = {
-  previewFeedback: async () => undefined,
-};
 
 const hapticTypes = {
   success: Haptics.NotificationFeedbackType.Success,
@@ -57,20 +54,31 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
   } = useFeedbackPreferences();
   const previousRide = useRef(currentRide);
   const previousDriverRide = useRef(driverRide);
-  const player = useAudioPlayer(null);
-  const playerRef = useRef(player);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const audioModePromiseRef = useRef<Promise<void> | null>(null);
 
-  useEffect(() => {
-    void setAudioModeAsync({
-      playsInSilentMode: false,
-      interruptionMode: 'mixWithOthers',
-      allowsRecording: false,
-      shouldPlayInBackground: false,
-      shouldRouteThroughEarpiece: false,
-    }).catch(() => {
-      // Audio feedback remains optional if a platform cannot configure its session.
-    });
+  const getAudioPlayer = useCallback(async () => {
+    if (!audioModePromiseRef.current) {
+      audioModePromiseRef.current = setAudioModeAsync({
+        playsInSilentMode: false,
+        interruptionMode: 'mixWithOthers',
+        allowsRecording: false,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+      }).catch(() => undefined);
+    }
+    await audioModePromiseRef.current;
+    if (!playerRef.current) playerRef.current = createAudioPlayer(null);
+    return playerRef.current;
   }, []);
+
+  useEffect(
+    () => () => {
+      playerRef.current?.release();
+      playerRef.current = null;
+    },
+    [],
+  );
 
   const performFeedback = useCallback(
     async (feedback: RideFeedback, allowWebSound = false) => {
@@ -82,7 +90,7 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
       if (soundEnabled && feedback.sound && soundAllowedByPlatform) {
         actions.push(
           (async () => {
-            const audioPlayer = playerRef.current;
+            const audioPlayer = await getAudioPlayer();
             audioPlayer.pause();
             audioPlayer.replace(soundSources[feedback.sound!]);
             audioPlayer.volume = 0.82;
@@ -95,7 +103,7 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
       }
       await Promise.allSettled(actions);
     },
-    [soundEnabled, vibrationEnabled],
+    [getAudioPlayer, soundEnabled, vibrationEnabled],
   );
 
   useEffect(() => {
@@ -142,22 +150,6 @@ function AudioRideFeedbackProvider({ children }: { children: ReactNode }) {
 }
 
 export function RideFeedbackProvider({ children }: { children: ReactNode }) {
-  const [audioReady, setAudioReady] = useState(process.env.EXPO_OS !== 'web');
-
-  useEffect(() => {
-    if (process.env.EXPO_OS !== 'web') return;
-    const timer = setTimeout(() => setAudioReady(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!audioReady) {
-    return (
-      <RideFeedbackContext.Provider value={inactiveFeedback}>
-        {children}
-      </RideFeedbackContext.Provider>
-    );
-  }
-
   return <AudioRideFeedbackProvider>{children}</AudioRideFeedbackProvider>;
 }
 

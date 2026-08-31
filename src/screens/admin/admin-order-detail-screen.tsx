@@ -14,6 +14,7 @@ import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
 import { pricingScopeLabel } from '@/domain/pricing';
 import { rideStatusLabel } from '@/domain/ride-state';
@@ -21,7 +22,6 @@ import { formatWaitingDuration } from '@/domain/waiting';
 import { useRideChat } from '@/hooks/use-ride-chat';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { goBackOrReplace } from '@/navigation/back';
-import { useRide } from '@/state/ride-provider';
 import { colors, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
 
@@ -78,7 +78,6 @@ function DetailRows({ rows }: { rows: [string, string][] }) {
 
 export function AdminOrderDetailScreen({ id }: Props) {
   const { token } = useSession();
-  const { adminOrders } = useRide();
   const { isDesktop } = useResponsiveLayout();
   const [loadedOrder, setLoadedOrder] = useState<RideOrder>();
   const [loading, setLoading] = useState(true);
@@ -105,7 +104,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
     return () => clearTimeout(timer);
   }, [loadOrder]);
 
-  const order = adminOrders.find((item) => item.id === id) ?? loadedOrder;
+  const order = demoSession ? demoOrders.find((item) => item.id === id) : loadedOrder;
 
   const destinations = useMemo(
     () => order?.destinations?.length ? order.destinations : order ? [order.destination] : [],

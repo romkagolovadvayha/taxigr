@@ -163,7 +163,7 @@ export function useDriverLocation({
     };
 
     void (async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await Location.getForegroundPermissionsAsync();
       if (!permission.granted) {
         setState((current) => ({
           ...current,
@@ -172,7 +172,7 @@ export function useDriverLocation({
         return;
       }
 
-      const backgroundEnabled = await syncDriverBackgroundLocation(true);
+      const backgroundEnabled = await syncDriverBackgroundLocation(true, false);
       if (!backgroundEnabled) {
         backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы заказы и маршрут работали при свёрнутом приложении';
         setState((current) => ({
