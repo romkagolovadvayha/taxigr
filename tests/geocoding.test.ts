@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildNominatimQueries,
@@ -6,6 +6,10 @@ import {
   prioritizeGrahovoDistrict,
   searchAddresses,
 } from '../server/geocoding';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('local address directory', () => {
   it('finds Grahovo addresses without an external request', async () => {
@@ -23,6 +27,42 @@ describe('local address directory', () => {
     expect(results[0]?.details).toContain('Граховский район');
     expect(results[0]?.coordinates.latitude).toBeCloseTo(55.9995786, 6);
     expect(results[0]?.coordinates.longitude).toBeCloseTo(51.8684492, 6);
+  });
+
+  it('keeps Grahovo district results first and still includes an outside settlement', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      const payload = url.searchParams.get('q') === 'Алнаши'
+        ? [
+            {
+              place_id: 123,
+              display_name: 'Алнаши, Алнашский район, Удмуртия, Россия',
+              name: 'Алнаши',
+              lat: '56.1848812',
+              lon: '52.4755309',
+              type: 'town',
+              address: {
+                town: 'Алнаши',
+                county: 'Алнашский район',
+                state: 'Удмуртия',
+                country: 'Россия',
+              },
+            },
+          ]
+        : [];
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const results = await searchAddresses('Алнаши');
+    const settlementIndex = results.findIndex((address) => address.label === 'Алнаши');
+
+    expect(results[0]?.label).toContain('Автодорога Алнаши-Грахово');
+    expect(settlementIndex).toBeGreaterThan(0);
+    expect(results[settlementIndex]?.details).toContain('Алнашский район');
   });
 
   it('prioritizes Grahovo for a short street query and keeps a Russia-wide fallback', () => {

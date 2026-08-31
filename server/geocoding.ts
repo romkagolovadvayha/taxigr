@@ -62,6 +62,27 @@ const memoryCache = new Map<string, MemoryEntry>();
 let geocoderQueue: Promise<void> = Promise.resolve();
 let lastExternalRequestAt = 0;
 
+// Address routes prepend up to 12 local places and return 30 items. Nine district
+// addresses leave room for one full scoped Nominatim page plus an outside locality.
+const LOCAL_RESULTS_BEFORE_EXTERNAL = 9;
+const LOCAL_ENTITY_PREFIXES = new Set([
+  'г',
+  'город',
+  'д',
+  'деревня',
+  'п',
+  'поселок',
+  'посёлок',
+  'с',
+  'село',
+  'тер',
+  'территория',
+  'ул',
+  'улица',
+  'пер',
+  'переулок',
+]);
+
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase('ru').replace(/\s+/g, ' ');
 }
@@ -70,6 +91,32 @@ function normalizeForSearch(value: string): string {
   return normalize(value)
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
+}
+
+function entityTokens(value: string): string[] {
+  return normalizeForSearch(value)
+    .split(' ')
+    .filter((token) => token.length > 1 && !LOCAL_ENTITY_PREFIXES.has(token));
+}
+
+function tokensStartWith(candidate: string[], query: string[]): boolean {
+  return (
+    query.length > 0 &&
+    candidate.length >= query.length &&
+    query.every((token, index) => candidate[index]?.startsWith(token))
+  );
+}
+
+function hasStrongLocalMatch(query: string, addresses: GeocodedAddress[]): boolean {
+  if (trailingHouseNumber(query)) return addresses.length > 0;
+
+  const queryTokens = entityTokens(query);
+  return addresses.some((address) => {
+    if (address.houseNumber) return false;
+    const lastLabelPart = address.label.split(',').at(-1) ?? address.label;
+    if (tokensStartWith(entityTokens(lastLabelPart), queryTokens)) return true;
+    return queryTokens.length > 1 && tokensStartWith(entityTokens(address.label), queryTokens);
+  });
 }
 
 function grahovoPriority(address: GeocodedAddress): number {
@@ -362,6 +409,19 @@ function deduplicateAddresses(addresses: GeocodedAddress[]): GeocodedAddress[] {
   });
 }
 
+function mergeLocalAndExternalResults(
+  local: GeocodedAddress[],
+  external: GeocodedAddress[],
+): GeocodedAddress[] {
+  if (!external.length) return prioritizeGrahovoDistrict(local);
+  return prioritizeGrahovoDistrict(
+    deduplicateAddresses([
+      ...local.slice(0, LOCAL_RESULTS_BEFORE_EXTERNAL),
+      ...external,
+    ]),
+  );
+}
+
 async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
   const combined: GeocodedAddress[] = [];
   let successfulRequests = 0;
@@ -380,11 +440,15 @@ async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
 
 export async function searchAddresses(query: string): Promise<GeocodedAddress[]> {
   const local = localMatches(query);
-  if (local.length) return prioritizeGrahovoDistrict(local);
+  if (local.length && hasStrongLocalMatch(query, local)) {
+    return prioritizeGrahovoDistrict(local);
+  }
 
   const key = `v8:${normalize(query)}`;
   const memory = memoryCache.get(key);
-  if (memory && memory.expiresAt > Date.now()) return prioritizeGrahovoDistrict(memory.value);
+  if (memory && memory.expiresAt > Date.now()) {
+    return mergeLocalAndExternalResults(local, memory.value);
+  }
   if (memory) memoryCache.delete(key);
 
   const persisted = await readPersistentCache(key);
@@ -393,14 +457,20 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
       value: persisted,
       expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
     });
-    return prioritizeGrahovoDistrict(persisted);
+    return mergeLocalAndExternalResults(local, persisted);
   }
 
-  const results = await requestNominatim(query);
+  let results: GeocodedAddress[];
+  try {
+    results = await requestNominatim(query);
+  } catch (error) {
+    if (local.length) return prioritizeGrahovoDistrict(local);
+    throw error;
+  }
   memoryCache.set(key, {
     value: results,
     expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
   });
   await writePersistentCache(key, results);
-  return prioritizeGrahovoDistrict(results);
+  return mergeLocalAndExternalResults(local, results);
 }
