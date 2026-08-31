@@ -188,7 +188,7 @@ function AddressRow({
             width: addressActionSizing.touchTarget,
             height: addressActionSizing.touchTarget,
             alignItems: 'center',
-            justifyContent: reducedActions ? 'flex-end' : 'center',
+            justifyContent: 'center',
             opacity: pressed || locationLoading ? 0.55 : 1,
           })}
         >

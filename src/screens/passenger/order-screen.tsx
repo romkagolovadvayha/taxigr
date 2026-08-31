@@ -59,7 +59,8 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
   const routeIsPrecise =
     hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
   const routeAddressesSelected = !!pickup && !!destination;
-  const quoteLoading = routeIsPrecise && quoteStatus === 'loading';
+  const quotePending =
+    routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
   const quoteReady = routeIsPrecise && quoteStatus === 'ready';
 
   if (currentRide) {
@@ -99,7 +100,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
           selected={selectedTariff}
           onSelect={setSelectedTariff}
           compact
-          loading={quoteLoading}
+          loading={quotePending}
           estimateAvailable={quoteReady}
         />
       )}
@@ -112,9 +113,9 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
         priceMinor={selected.priceMinor}
         etaMinutes={selected.etaMinutes}
         disabled={!routeIsPrecise}
-        loading={quoteLoading}
+        loading={quotePending}
         estimateAvailable={quoteReady}
-        canEstimate={routeIsPrecise && !quoteReady}
+        canRetry={routeIsPrecise && quoteStatus === 'error'}
         onPress={() => {
           if (quoteReady) {
             router.push('/order-confirmation');

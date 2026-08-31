@@ -43,6 +43,8 @@ export function OrderConfirmationScreen() {
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
   const addressesArePrecise =
     hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
+  const quotePending =
+    addressesArePrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
   const routeReady = addressesArePrecise && quoteStatus === 'ready';
   const canSubmit =
     !!pickup &&
@@ -55,13 +57,11 @@ export function OrderConfirmationScreen() {
       ? null
       : !addressesArePrecise
         ? 'Для места подачи и назначения обязательно укажите номер дома.'
-        : quoteStatus === 'loading'
+        : quotePending
           ? 'Рассчитываем маршрут, стоимость и время подачи…'
           : quoteStatus === 'error'
             ? 'Не удалось рассчитать маршрут. Проверьте адреса и попробуйте ещё раз.'
-            : quoteStatus === 'idle'
-              ? 'Нажмите «Рассчитать стоимость», когда адреса будут проверены.'
-              : null;
+            : null;
 
   const confirm = async () => {
     if (!canSubmit) return;
@@ -186,7 +186,7 @@ export function OrderConfirmationScreen() {
                 selected={selectedTariff}
                 onSelect={setSelectedTariff}
                 compact
-                loading={quoteStatus === 'loading'}
+                loading={quotePending}
                 estimateAvailable={routeReady}
               />
               {selectedTariff === 'child' && (
@@ -244,8 +244,8 @@ export function OrderConfirmationScreen() {
             )}
 
             <AppButton
-              disabled={!addressesArePrecise || quoteStatus === 'loading' || busy}
-              loading={busy || quoteStatus === 'loading'}
+              disabled={!addressesArePrecise || quotePending || busy}
+              loading={busy || quotePending}
               onPress={() => {
                 if (routeReady) {
                   void confirm();
@@ -257,14 +257,14 @@ export function OrderConfirmationScreen() {
                 routeReady
                   ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
                   : addressesArePrecise
-                    ? 'Рассчитать стоимость поездки'
+                    ? 'Повторить расчёт стоимости поездки'
                     : 'Подтвердить заказ, сначала укажите маршрут'
               }
             >
               {routeReady
                 ? `Подтвердить · ${selected.priceMinor / 100} ₽`
                 : addressesArePrecise
-                  ? 'Рассчитать стоимость'
+                  ? 'Повторить расчёт'
                   : 'Укажите маршрут'}
             </AppButton>
           </>

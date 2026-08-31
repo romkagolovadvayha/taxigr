@@ -676,6 +676,38 @@ export function RideProvider({ children }: { children: ReactNode }) {
     token,
   ]);
 
+  useEffect(() => {
+    const routeIsPrecise =
+      !!pickup &&
+      !!destination &&
+      hasHouseNumber(pickup) &&
+      destinations.length > 0 &&
+      destinations.every(hasHouseNumber);
+
+    if (
+      !bootstrapReady ||
+      !token ||
+      currentRide ||
+      quoteStatus !== 'idle' ||
+      !routeIsPrecise
+    ) return;
+
+    const timer = setTimeout(() => {
+      void requestQuote();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    bootstrapReady,
+    currentRide,
+    destination,
+    destinations,
+    pickup,
+    quoteStatus,
+    requestQuote,
+    token,
+  ]);
+
   useEffect(
     () => () => {
       quoteRequestController.current?.abort();

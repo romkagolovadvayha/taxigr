@@ -11,7 +11,7 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   estimateAvailable: boolean;
-  canEstimate?: boolean;
+  canRetry?: boolean;
   onPress: () => void;
 };
 
@@ -21,7 +21,7 @@ export function BookingSubmitButton({
   disabled = false,
   loading = false,
   estimateAvailable,
-  canEstimate = false,
+  canRetry = false,
   onPress,
 }: Props) {
   const unavailable = disabled || loading;
@@ -34,8 +34,8 @@ export function BookingSubmitButton({
           ? 'Рассчитываем стоимость и время подачи'
           : estimateAvailable
             ? `Перейти к подтверждению заказа за ${priceMinor / 100} рублей`
-            : canEstimate
-              ? 'Рассчитать стоимость поездки'
+            : canRetry
+              ? 'Повторить расчёт стоимости поездки'
               : 'Укажите маршрут, чтобы рассчитать стоимость поездки'
       }
       aria-disabled={unavailable}
@@ -76,7 +76,7 @@ export function BookingSubmitButton({
           </>
         ) : (
           <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>
-            {canEstimate ? 'Рассчитать стоимость' : 'Укажите маршрут'}
+            {canRetry ? 'Повторить расчёт' : 'Укажите маршрут'}
           </Text>
         )}
       </View>
