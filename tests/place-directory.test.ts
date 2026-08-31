@@ -11,7 +11,7 @@ describe('place directory', () => {
   it('finds places by aliases, categories, partial words and a one-letter typo', () => {
     const place = {
       name: 'Пятёрочка',
-      aliases: ['Пятерочка', '5ка'],
+      aliases: ['Пятерочка', '5ка', 'магазин на Советской'],
       category: 'shopping',
       description: 'Супермаркет',
       addressLabel: 'ул. Советская, 15А',
@@ -22,6 +22,19 @@ describe('place directory', () => {
     expect(placeSearchScore(place, 'пятер')).toBeGreaterThan(0);
     expect(placeSearchScore(place, 'пятерочка')).toBeGreaterThan(0);
     expect(placeSearchScore(place, 'аптека')).toBe(0);
+    expect(placeSearchScore(place, 'Алнаши')).toBe(0);
+  });
+
+  it('does not match a town name by short words embedded inside it', () => {
+    const place = {
+      name: 'Наш магазин',
+      aliases: ['продукты', 'магазин на Колпакова'],
+      category: 'shopping',
+      description: 'Местный магазин',
+      addressLabel: 'ул. Колпакова, 4А',
+    } satisfies Pick<PlaceDirectoryEntry, 'name' | 'aliases' | 'category' | 'description' | 'addressLabel'>;
+
+    expect(placeSearchScore(place, 'Алнаши')).toBe(0);
   });
 
   it('shows closing time for a regular and overnight interval', () => {

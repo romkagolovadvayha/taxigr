@@ -93,6 +93,13 @@ function normalizeForSearch(value: string): string {
     .trim();
 }
 
+function normalizeNamedPlace(value: string): string {
+  return normalizeForSearch(value).replace(
+    /^(?:г|город|д|деревня|п|поселок|посёлок|пгт|с|село)\s+/u,
+    '',
+  );
+}
+
 function entityTokens(value: string): string[] {
   return normalizeForSearch(value)
     .split(' ')
@@ -149,6 +156,9 @@ function trailingHouseNumber(value: string): { houseNumber: string; streetPart: 
 }
 
 function containsHouseNumber(address: GeocodedAddress, houseNumber: string): boolean {
+  if (address.houseNumber) {
+    return normalizeForSearch(address.houseNumber) === normalizeForSearch(houseNumber);
+  }
   const tokens = `${address.label} ${address.details ?? ''}`.match(
     /\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?/giu,
   );
@@ -410,16 +420,22 @@ function deduplicateAddresses(addresses: GeocodedAddress[]): GeocodedAddress[] {
 }
 
 function mergeLocalAndExternalResults(
+  query: string,
   local: GeocodedAddress[],
   external: GeocodedAddress[],
 ): GeocodedAddress[] {
   if (!external.length) return prioritizeGrahovoDistrict(local);
-  return prioritizeGrahovoDistrict(
+  const merged = prioritizeGrahovoDistrict(
     deduplicateAddresses([
       ...local.slice(0, LOCAL_RESULTS_BEFORE_EXTERNAL),
       ...external,
     ]),
   );
+  const normalizedQuery = normalizeNamedPlace(query);
+  const exactNamedPlaces = merged.filter(
+    (address) => normalizeNamedPlace(address.label) === normalizedQuery,
+  );
+  return exactNamedPlaces.length ? exactNamedPlaces : merged;
 }
 
 async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
@@ -444,10 +460,10 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
     return prioritizeGrahovoDistrict(local);
   }
 
-  const key = `v8:${normalize(query)}`;
+  const key = `v10:${normalize(query)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) {
-    return mergeLocalAndExternalResults(local, memory.value);
+    return mergeLocalAndExternalResults(query, local, memory.value);
   }
   if (memory) memoryCache.delete(key);
 
@@ -457,7 +473,7 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
       value: persisted,
       expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
     });
-    return mergeLocalAndExternalResults(local, persisted);
+    return mergeLocalAndExternalResults(query, local, persisted);
   }
 
   let results: GeocodedAddress[];
@@ -472,5 +488,5 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
     expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
   });
   await writePersistentCache(key, results);
-  return mergeLocalAndExternalResults(local, results);
+  return mergeLocalAndExternalResults(query, local, results);
 }

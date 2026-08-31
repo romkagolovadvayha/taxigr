@@ -20,6 +20,13 @@ const IGNORED_TOKENS = new Set([
   'район',
 ]);
 
+const INFRASTRUCTURE_TOKENS = new Set([
+  'автодорога',
+  'дорога',
+  'трасса',
+  'шоссе',
+]);
+
 function tokens(value: string): string[] {
   return value
     .toLocaleLowerCase('ru')
@@ -48,6 +55,13 @@ function searchIndex(address: SearchableAddress): SearchIndex {
 function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): number {
   if (!queryTokens.length) return 0;
   const index = searchIndex(address);
+  if (
+    queryTokens.length === 1 &&
+    !INFRASTRUCTURE_TOKENS.has(queryTokens[0]!) &&
+    index.labelTokens.some((token) => INFRASTRUCTURE_TOKENS.has(token))
+  ) {
+    return 0;
+  }
   let score = 0;
 
   for (const queryToken of queryTokens) {

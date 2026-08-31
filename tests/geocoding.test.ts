@@ -29,11 +29,25 @@ describe('local address directory', () => {
     expect(results[0]?.coordinates.longitude).toBeCloseTo(51.8684492, 6);
   });
 
-  it('keeps Grahovo district results first and still includes an outside settlement', async () => {
+  it('prefers an exact outside settlement over roads that contain its name', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input));
       const payload = url.searchParams.get('q') === 'Алнаши'
         ? [
+            {
+              place_id: 122,
+              display_name: 'Алнаши — Грахово, Старый Утчан, Алнашский район, Удмуртия, Россия',
+              name: 'Алнаши — Грахово',
+              lat: '56.1300000',
+              lon: '52.2000000',
+              type: 'road',
+              address: {
+                village: 'Старый Утчан',
+                county: 'Алнашский район',
+                state: 'Удмуртия',
+                country: 'Россия',
+              },
+            },
             {
               place_id: 123,
               display_name: 'Алнаши, Алнашский район, Удмуртия, Россия',
@@ -49,7 +63,22 @@ describe('local address directory', () => {
               },
             },
           ]
-        : [];
+        : [
+            {
+              place_id: 121,
+              display_name: 'Алнаши — Грахово, Грахово, Граховский район, Удмуртия, Россия',
+              name: 'Алнаши — Грахово',
+              lat: '56.0500000',
+              lon: '51.9600000',
+              type: 'road',
+              address: {
+                village: 'Грахово',
+                county: 'Граховский район',
+                state: 'Удмуртия',
+                country: 'Россия',
+              },
+            },
+          ];
       return new Response(JSON.stringify(payload), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -58,11 +87,10 @@ describe('local address directory', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const results = await searchAddresses('Алнаши');
-    const settlementIndex = results.findIndex((address) => address.label === 'Алнаши');
 
-    expect(results[0]?.label).toContain('Автодорога Алнаши-Грахово');
-    expect(settlementIndex).toBeGreaterThan(0);
-    expect(results[settlementIndex]?.details).toContain('Алнашский район');
+    expect(results).toHaveLength(1);
+    expect(results[0]?.label).toBe('Алнаши');
+    expect(results[0]?.details).toContain('Алнашский район');
   });
 
   it('prioritizes Grahovo for a short street query and keeps a Russia-wide fallback', () => {
@@ -87,6 +115,20 @@ describe('local address directory', () => {
         label: 'улица 50 лет Победы',
         details: 'Грахово',
         coordinates: { latitude: 56.0548205, longitude: 51.9581126 },
+      },
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it('does not treat a building suffix as the requested house number', () => {
+    const results = filterExactHouseResults('Набережные Челны проспект Мира 1', [
+      {
+        id: 'wrong-building',
+        label: 'проспект Мира, 86 ст1',
+        details: 'Набережные Челны, Татарстан',
+        houseNumber: '86 ст1',
+        coordinates: { latitude: 55.7545, longitude: 52.4278 },
       },
     ]);
 

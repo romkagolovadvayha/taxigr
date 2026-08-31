@@ -109,7 +109,14 @@ function editDistance(left: string, right: string): number {
 function tokenScore(queryToken: string, candidateToken: string): number {
   if (candidateToken === queryToken) return 30;
   if (candidateToken.startsWith(queryToken)) return 18;
-  if (candidateToken.includes(queryToken) || queryToken.includes(candidateToken)) return 10;
+  if (queryToken.length >= 3 && candidateToken.includes(queryToken)) return 10;
+  if (
+    candidateToken.length >= 4 &&
+    candidateToken.length / queryToken.length >= 0.75 &&
+    queryToken.includes(candidateToken)
+  ) {
+    return 10;
+  }
   if (queryToken.length >= 4 && candidateToken.length >= 4 && editDistance(queryToken, candidateToken) <= 1) {
     return 7;
   }

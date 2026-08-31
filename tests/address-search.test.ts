@@ -31,6 +31,13 @@ const addresses: Address[] = [
   },
 ];
 
+const alnashiRoad: Address = {
+  id: 'alnashi-road',
+  label: 'с. Грахово, тер. Автодорога Алнаши-Грахово',
+  details: 'Граховский район · территория',
+  coordinates: { latitude: 56.05, longitude: 51.96 },
+};
+
 describe('address search ranking', () => {
   it('keeps the existing scores and deterministic order', () => {
     const legacy = [...addresses]
@@ -72,6 +79,11 @@ describe('address search ranking', () => {
 
   it('honors the result limit without changing relevance', () => {
     expect(rankAddressSearchResults(addresses, 'ачин', 1)).toEqual([addresses[0]]);
+  });
+
+  it('does not treat a town name as a search for a road containing that name', () => {
+    expect(addressSearchScore(alnashiRoad, 'Алнаши')).toBe(0);
+    expect(addressSearchScore(alnashiRoad, 'Алнаши Грахово')).toBeGreaterThan(0);
   });
 
   it('deduplicates labels in linear first-match order', () => {
