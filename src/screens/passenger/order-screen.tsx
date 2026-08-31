@@ -96,6 +96,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
         onSelect={setSelectedTariff}
         compact
         loading={quoteLoading}
+        estimateAvailable={quoteReady}
       />
       {!!error && (
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
@@ -107,6 +108,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
         etaMinutes={selected.etaMinutes}
         disabled={!quoteReady}
         loading={quoteLoading}
+        estimateAvailable={quoteReady}
         onPress={() => router.push('/order-confirmation')}
       />
     </View>

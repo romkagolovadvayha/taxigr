@@ -184,6 +184,7 @@ export function OrderConfirmationScreen() {
                 onSelect={setSelectedTariff}
                 compact
                 loading={quoteStatus === 'loading'}
+                estimateAvailable={routeReady}
               />
               {selectedTariff === 'child' && (
                 <View

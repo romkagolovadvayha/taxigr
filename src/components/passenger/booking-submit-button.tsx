@@ -10,6 +10,7 @@ type Props = {
   etaMinutes: number;
   disabled?: boolean;
   loading?: boolean;
+  estimateAvailable: boolean;
   onPress: () => void;
 };
 
@@ -18,6 +19,7 @@ export function BookingSubmitButton({
   etaMinutes,
   disabled = false,
   loading = false,
+  estimateAvailable,
   onPress,
 }: Props) {
   const unavailable = disabled || loading;
@@ -28,7 +30,9 @@ export function BookingSubmitButton({
       accessibilityLabel={
         loading
           ? 'Рассчитываем стоимость и время подачи'
-          : `Перейти к подтверждению заказа за ${priceMinor / 100} рублей`
+          : estimateAvailable
+            ? `Перейти к подтверждению заказа за ${priceMinor / 100} рублей`
+            : 'Укажите маршрут, чтобы рассчитать стоимость поездки'
       }
       aria-disabled={unavailable}
       aria-busy={loading}
@@ -45,22 +49,36 @@ export function BookingSubmitButton({
         opacity: loading ? 0.78 : disabled ? 0.42 : pressed ? 0.88 : 1,
       })}
     >
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: spacing.x2 }}>
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          justifyContent: estimateAvailable || loading ? 'flex-start' : 'center',
+          gap: spacing.x2,
+        }}
+      >
         {loading ? (
           <>
             <SkeletonBlock width={80} height={24} color={colors.brandInk} opacity={0.16} />
             <SkeletonBlock width={42} height={14} color={colors.brandInk} opacity={0.16} />
           </>
-        ) : (
+        ) : estimateAvailable ? (
           <>
             <MoneyValue valueMinor={priceMinor} color={colors.brandInk} />
             <Text selectable style={{ ...typography.caption, color: colors.brandInkSecondary }}>
               ~{etaMinutes} мин
             </Text>
           </>
+        ) : (
+          <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>
+            Укажите маршрут
+          </Text>
         )}
       </View>
-      <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Заказать</Text>
+      {(estimateAvailable || loading) && (
+        <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Заказать</Text>
+      )}
     </AnimatedPressable>
   );
 }

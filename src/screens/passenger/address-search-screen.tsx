@@ -24,10 +24,11 @@ import {
   hasHouseNumber,
   queryHasHouseNumber,
 } from '@/domain/address-precision';
+import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
 import { buildStreetSuggestions } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address } from '@/domain/models';
-import { getPlaceOpenStatus, placeCategoryLabels } from '@/domain/place-directory';
+import { getPlaceOpenStatus } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
 import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
@@ -135,6 +136,7 @@ function AddressResult({
 }) {
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
+  const displayLines = formatAddressSuggestionLines(address);
   const precise = hasHouseNumber(address) || Boolean(place);
   const refinement = !precise && !history;
   return (
@@ -188,29 +190,19 @@ function AddressResult({
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>
-          {place?.name ?? address.label}
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          {displayLines.primary}
         </Text>
-        {!!place && (
+        {!!displayLines.secondary && (
           <Text
             selectable
-            numberOfLines={1}
             style={{ ...typography.caption, color: colors.inkSecondary }}
           >
-            {placeCategoryLabels[place.category]} · {place.addressLabel}
-          </Text>
-        )}
-        {!!address.details && !place && (
-          <Text
-            selectable
-            numberOfLines={1}
-            style={{ ...typography.caption, color: colors.inkSecondary }}
-          >
-            {address.details}
+            {displayLines.secondary}
           </Text>
         )}
         {!!place?.description && (
-          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkMuted }}>
+          <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
             {place.description}
           </Text>
         )}
@@ -493,7 +485,7 @@ export function AddressSearchScreen() {
           }}
           placeholder="Адрес, магазин, кафе или место"
           placeholderTextColor={colors.inkMuted}
-          style={{ ...typography.body, color: colors.ink, flex: 1, minHeight: 56 }}
+          style={{ ...typography.body, color: colors.ink, flex: 1, minHeight: 56, outlineWidth: 0 }}
           returnKeyType="search"
           onSubmitEditing={runRemoteSearch}
           accessibilityLabel="Поиск адреса или места"

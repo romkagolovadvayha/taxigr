@@ -13,6 +13,7 @@ type Props = {
   onSelect: (tariff: TariffCode) => void;
   compact?: boolean;
   loading?: boolean;
+  estimateAvailable: boolean;
 };
 
 export function TariffSelector({
@@ -21,6 +22,7 @@ export function TariffSelector({
   onSelect,
   compact = false,
   loading = false,
+  estimateAvailable,
 }: Props) {
   return (
     <View
@@ -40,7 +42,9 @@ export function TariffSelector({
             accessibilityLabel={
               loading
                 ? `${tariff.title}, рассчитываем стоимость и время подачи`
-                : `${tariff.title}, ${tariff.etaMinutes} минут, ${tariff.priceMinor / 100} рублей`
+                : estimateAvailable
+                  ? `${tariff.title}, ${tariff.etaMinutes} минут, ${tariff.priceMinor / 100} рублей`
+                  : tariff.title
             }
             onPress={() => onSelect(tariff.code)}
             style={({ pressed }) => ({
@@ -73,11 +77,11 @@ export function TariffSelector({
               {compact && <View />}
               {loading ? (
                 <SkeletonBlock width={38} height={14} />
-              ) : (
+              ) : estimateAvailable ? (
                 <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
                   {tariff.etaMinutes} мин
                 </Text>
-              )}
+              ) : null}
             </View>
             {compact ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -86,9 +90,9 @@ export function TariffSelector({
                 </Text>
                 {loading ? (
                   <SkeletonBlock width={56} height={18} />
-                ) : (
+                ) : estimateAvailable ? (
                   <MoneyValue valueMinor={tariff.priceMinor} compact />
-                )}
+                ) : null}
               </View>
             ) : (
               <>
@@ -97,9 +101,9 @@ export function TariffSelector({
                 </Text>
                 {loading ? (
                   <SkeletonBlock width={56} height={18} />
-                ) : (
+                ) : estimateAvailable ? (
                   <MoneyValue valueMinor={tariff.priceMinor} compact />
-                )}
+                ) : null}
               </>
             )}
           </AnimatedPressable>
