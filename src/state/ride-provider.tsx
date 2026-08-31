@@ -10,7 +10,10 @@ import {
   buildDestinationHistory,
   type DestinationHistoryItem,
 } from '@/domain/address-history';
-import { hasHouseNumber } from '@/domain/address-precision';
+import {
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
+} from '@/domain/address-precision';
 import { isAssignedDriverOrder } from '@/domain/driver-order-queue';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import {
@@ -638,12 +641,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
       !token ||
       !pickup ||
       !destination ||
-      !hasHouseNumber(pickup) ||
+      !isPickupAddressComplete(pickup) ||
       destinations.length === 0 ||
-      !destinations.every(hasHouseNumber)
+      !destinations.every(isDestinationAddressComplete)
     ) {
       invalidateQuote();
-      setError('Укажите номер дома для места подачи и всех точек назначения');
+      setError('Уточните место подачи. Для назначения можно выбрать точный адрес или населённый пункт');
       return;
     }
 
@@ -724,9 +727,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
     const routeIsPrecise =
       !!pickup &&
       !!destination &&
-      hasHouseNumber(pickup) &&
+      isPickupAddressComplete(pickup) &&
       destinations.length > 0 &&
-      destinations.every(hasHouseNumber);
+      destinations.every(isDestinationAddressComplete);
 
     if (
       !bootstrapReady ||
@@ -808,11 +811,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
       if (
         !pickup ||
         !destination ||
-        !hasHouseNumber(pickup) ||
+        !isPickupAddressComplete(pickup) ||
         !destinations.length ||
-        !destinations.every(hasHouseNumber)
+        !destinations.every(isDestinationAddressComplete)
       ) {
-        setError('Укажите номер дома для места подачи и всех точек назначения');
+        setError('Уточните место подачи. Для назначения можно выбрать точный адрес или населённый пункт');
         return null;
       }
       if (quoteStatus !== 'ready' || !routeSummary) {

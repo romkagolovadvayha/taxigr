@@ -13,7 +13,10 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useRide } from '@/state/ride-provider';
-import { hasHouseNumber } from '@/domain/address-precision';
+import {
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
+} from '@/domain/address-precision';
 import { useSession } from '@/auth/session-provider';
 import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
@@ -42,7 +45,9 @@ export function OrderConfirmationScreen() {
   const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
   const addressesArePrecise =
-    hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
+    isPickupAddressComplete(pickup) &&
+    destinations.length > 0 &&
+    destinations.every(isDestinationAddressComplete);
   const quotePending =
     addressesArePrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
   const routeReady = addressesArePrecise && quoteStatus === 'ready';
@@ -56,7 +61,7 @@ export function OrderConfirmationScreen() {
     !pickup || !destination
       ? null
       : !addressesArePrecise
-        ? 'Для места подачи и назначения обязательно укажите номер дома.'
+        ? 'Для места подачи укажите номер дома. Назначением может быть точный адрес или населённый пункт.'
         : quotePending
           ? 'Рассчитываем маршрут, стоимость и время подачи…'
           : quoteStatus === 'error'

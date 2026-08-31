@@ -91,6 +91,7 @@ describe('local address directory', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.label).toBe('Алнаши');
     expect(results[0]?.details).toContain('Алнашский район');
+    expect(results[0]?.kind).toBe('settlement');
   });
 
   it('prioritizes Grahovo for a short street query and keeps a Russia-wide fallback', () => {

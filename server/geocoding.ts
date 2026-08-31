@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
 import { addressSearchScore } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
+import type { AddressKind } from '../src/domain/models';
 import { config } from './config';
 import { db } from './db';
 
@@ -11,6 +12,7 @@ export type GeocodedAddress = {
   label: string;
   details?: string;
   houseNumber?: string;
+  kind?: AddressKind;
   coordinates: { latitude: number; longitude: number };
 };
 
@@ -81,6 +83,13 @@ const LOCAL_ENTITY_PREFIXES = new Set([
   'улица',
   'пер',
   'переулок',
+]);
+const NOMINATIM_SETTLEMENT_TYPES = new Set([
+  'city',
+  'town',
+  'village',
+  'hamlet',
+  'isolated_dwelling',
 ]);
 
 function normalize(value: string): string {
@@ -340,6 +349,7 @@ function fromNominatim(item: {
   lat?: string;
   lon?: string;
   type?: string;
+  addresstype?: string;
   address?: {
     house_number?: string;
     road?: string;
@@ -361,6 +371,14 @@ function fromNominatim(item: {
   const [displayLabel, ...displayDetails] = display.split(',').map((part) => part.trim());
   const road = item.address?.road ?? item.address?.pedestrian;
   const houseNumber = item.address?.house_number;
+  const nominatimType = item.addresstype ?? item.type;
+  const kind: AddressKind | undefined = houseNumber
+    ? 'house'
+    : nominatimType && NOMINATIM_SETTLEMENT_TYPES.has(nominatimType)
+      ? 'settlement'
+      : road
+        ? 'street'
+        : undefined;
   const label = road && houseNumber ? `${road}, ${houseNumber}` : item.name?.trim() || displayLabel;
   const structuredDetails = [
     item.address?.village ?? item.address?.town ?? item.address?.city,
@@ -374,6 +392,7 @@ function fromNominatim(item: {
     label: label || display,
     details: structuredDetails.join(', ') || displayDetails.join(', ') || item.type,
     houseNumber,
+    kind,
     coordinates: { latitude, longitude },
   };
 }
@@ -460,7 +479,7 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
     return prioritizeGrahovoDistrict(local);
   }
 
-  const key = `v10:${normalize(query)}`;
+  const key = `v11:${normalize(query)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) {
     return mergeLocalAndExternalResults(query, local, memory.value);

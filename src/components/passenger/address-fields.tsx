@@ -4,7 +4,10 @@ import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
-import { hasHouseNumber } from '@/domain/address-precision';
+import {
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
+} from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
 import { colors, componentSizing, layout, spacing, typography } from '@/theme/tokens';
 
@@ -78,15 +81,19 @@ function AddressRow({
 }) {
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
   const addDestinationAction = kind === 'destination' && !!address && !!onAddDestination;
-  const needsHouseNumber = kind === 'destination' && destinations?.length
-    ? destinations.some((item) => !hasHouseNumber(item))
-    : !!address && !hasHouseNumber(address);
+  const needsAddressDetails = kind === 'destination' && destinations?.length
+    ? destinations.some((item) => !isDestinationAddressComplete(item))
+    : !!address && (
+        kind === 'pickup'
+          ? !isPickupAddressComplete(address)
+          : !isDestinationAddressComplete(address)
+      );
   return (
     <View style={{ position: 'relative' }}>
       <AnimatedPressable
         feedback="subtle"
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${address?.label ?? 'не указано'}${needsHouseNumber ? ', требуется номер дома' : ''}`}
+        accessibilityLabel={`${label}: ${address?.label ?? 'не указано'}${needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
         onPress={() => {
           if (kind === 'destination' && address) {
             router.push('/stops' as never);
@@ -132,9 +139,9 @@ function AddressRow({
                   : 'Моё местоположение'
                 : 'Куда поедем?')}
           </Text>
-          {needsHouseNumber && (
+          {needsAddressDetails && (
             <Text selectable style={{ ...typography.micro, color: colors.warningText }}>
-              Укажите номер дома
+              Уточните адрес
             </Text>
           )}
         </View>

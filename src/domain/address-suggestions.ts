@@ -26,6 +26,7 @@ export function toStreetSuggestion(address: Address): Address | null {
     id: suggestionId(label),
     label,
     details: location ? `${location} · улица` : 'Улица',
+    kind: 'street',
     coordinates: address.coordinates,
   };
 }

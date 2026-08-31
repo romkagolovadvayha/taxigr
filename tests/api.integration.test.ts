@@ -735,9 +735,26 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         },
       },
     });
+    const settlementDestination = {
+      id: 'osm-alnashi',
+      label: 'Алнаши',
+      details: 'Алнашский район, Удмуртия, Россия',
+      kind: 'settlement',
+      coordinates: { latitude: 56.1848812, longitude: 52.4755309 },
+    };
+    const settlementQuote = await api<{
+      pricingScope: string;
+      route: { distanceMeters: number; durationSeconds: number };
+      tariffs: { code: string; priceMinor: number }[];
+    }>('/v1/routes/preview', {
+      method: 'POST',
+      body: { pickup, destination: settlementDestination },
+    });
     expect(demoNearQuote.status).toBe(200);
     expect(demoFarQuote.status).toBe(200);
+    expect(settlementQuote.status).toBe(200);
     expect(demoFarQuote.data?.pricingScope).toBe('intercity');
+    expect(settlementQuote.data?.pricingScope).toBe('intercity');
     expect(demoNearQuote.data?.tariffs.map((tariff) => tariff.code)).toEqual([
       'economy',
       'child',
@@ -748,6 +765,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(demoFarQuote.data?.tariffs[0]?.priceMinor).toBeGreaterThan(
       demoNearQuote.data?.tariffs[0]?.priceMinor ?? 0,
     );
+    expect(settlementQuote.data?.route.distanceMeters).toBeGreaterThan(30_000);
 
     for (const routeCase of [
       {
@@ -803,6 +821,16 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
     expect(missingHouse.status).toBe(400);
     expect(missingHouse.error?.code).toBe('VALIDATION_ERROR');
+
+    const settlementPickup = await api('/v1/routes/preview', {
+      method: 'POST',
+      body: {
+        pickup: settlementDestination,
+        destination,
+      },
+    });
+    expect(settlementPickup.status).toBe(400);
+    expect(settlementPickup.error?.code).toBe('VALIDATION_ERROR');
 
     const multiStopOrder = await api<RideOrder>('/v1/orders', {
       method: 'POST',

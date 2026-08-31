@@ -15,6 +15,7 @@ describe('official Grahovo GAR address directory', () => {
     const streets = parents.filter((address) => address.details?.includes('улица из ГАР'));
 
     expect(settlements).toHaveLength(41);
+    expect(settlements.every((address) => address.kind === 'settlement')).toBe(true);
     expect(planningObjects).toHaveLength(37);
     expect(streets).toHaveLength(194);
     expect(houses).toHaveLength(4266);

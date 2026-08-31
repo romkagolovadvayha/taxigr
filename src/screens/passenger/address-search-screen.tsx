@@ -22,6 +22,7 @@ import {
   extractHouseNumber,
   extractQueryHouseNumber,
   hasHouseNumber,
+  isDestinationAddressComplete,
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
@@ -123,12 +124,14 @@ function SectionTitle({ children }: { children: string }) {
 
 function AddressResult({
   address,
+  directSelectionAllowed = false,
   history,
   manual = false,
   now,
   onPress,
 }: {
   address: Address;
+  directSelectionAllowed?: boolean;
   history?: DestinationHistoryItem;
   manual?: boolean;
   now: Date;
@@ -137,7 +140,7 @@ function AddressResult({
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
   const displayLines = formatAddressSuggestionLines(address);
-  const precise = hasHouseNumber(address) || Boolean(place);
+  const precise = hasHouseNumber(address) || Boolean(place) || directSelectionAllowed;
   const refinement = !precise && !history;
   return (
     <AnimatedPressable
@@ -331,6 +334,8 @@ export function AddressSearchScreen() {
       (Boolean(address.place) || showHouseSuggestions || !hasHouseNumber(address)),
   );
   const hasPlaceResults = results.some((address) => Boolean(address.place));
+  const hasCompleteDestinationResult =
+    field === 'destination' && results.some(isDestinationAddressComplete);
   const requestedHouseNumber = extractQueryHouseNumber(query);
   const hasExactHouseResult =
     !!requestedHouseNumber &&
@@ -407,7 +412,11 @@ export function AddressSearchScreen() {
   }, []);
 
   const selectAddress = (address: Address) => {
-    if (!hasHouseNumber(address) && !address.placeId) {
+    if (
+      !hasHouseNumber(address) &&
+      !address.placeId &&
+      !(field === 'destination' && address.kind === 'settlement')
+    ) {
       const street = { ...address, label: address.label.replace(/[,\s]+$/u, '') };
       const refinedQuery = `${street.label}, `;
       searchAbortController.current?.abort();
@@ -521,7 +530,11 @@ export function AddressSearchScreen() {
           </AnimatedPressable>
         )}
       </View>
-      {edited && query.trim().length >= 2 && !queryHasHouseNumber(query) && !hasPlaceResults && (
+      {edited &&
+        query.trim().length >= 2 &&
+        !queryHasHouseNumber(query) &&
+        !hasPlaceResults &&
+        !hasCompleteDestinationResult && (
         <View
           accessibilityRole="alert"
           style={{
@@ -564,6 +577,7 @@ export function AddressSearchScreen() {
                 <AddressResult
                   key={addressKey(item.address)}
                   address={item.address}
+                  directSelectionAllowed={item.address.kind === 'settlement'}
                   history={item}
                   now={now}
                   onPress={() => selectAddress(item.address)}
@@ -580,6 +594,7 @@ export function AddressSearchScreen() {
                   <AddressResult
                     key={address.id}
                     address={address}
+                    directSelectionAllowed={address.kind === 'settlement'}
                     now={now}
                     onPress={() => selectAddress(address)}
                   />
@@ -597,6 +612,7 @@ export function AddressSearchScreen() {
               <AddressResult
                 key={addressKey(address)}
                 address={address}
+                directSelectionAllowed={field === 'destination' && address.kind === 'settlement'}
                 history={historyByKey.get(addressKey(address))}
                 now={now}
                 onPress={() => selectAddress(address)}

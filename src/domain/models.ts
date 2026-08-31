@@ -59,6 +59,8 @@ export type PlaceDirectoryEntry = {
   updatedAt: string;
 };
 
+export type AddressKind = 'house' | 'street' | 'settlement' | 'place';
+
 export type Address = {
   id: string;
   label: string;
@@ -66,6 +68,7 @@ export type Address = {
   houseNumber?: string;
   placeId?: string;
   place?: PlaceDirectoryEntry;
+  kind?: AddressKind;
   coordinates: Coordinates;
 };
 

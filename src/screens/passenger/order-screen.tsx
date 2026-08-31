@@ -6,7 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '@/components/brand-mark';
 import { useSession } from '@/auth/session-provider';
 import { getDemoPassengerProgression } from '@/domain/demo-flow';
-import { hasHouseNumber } from '@/domain/address-precision';
+import {
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
+} from '@/domain/address-precision';
 import { estimatePickupEtaMinutes } from '@/domain/pickup-eta';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
@@ -57,7 +60,9 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
   } = useRide();
   const selected = tariffs.find((item) => item.code === selectedTariff)!;
   const routeIsPrecise =
-    hasHouseNumber(pickup) && destinations.length > 0 && destinations.every(hasHouseNumber);
+    isPickupAddressComplete(pickup) &&
+    destinations.length > 0 &&
+    destinations.every(isDestinationAddressComplete);
   const routeAddressesSelected = !!pickup && !!destination;
   const quotePending =
     routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');

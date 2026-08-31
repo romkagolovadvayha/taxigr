@@ -302,6 +302,7 @@ export const grahovoDirectoryAddresses: Address[] = directory.flatMap(
       id: 'gar:' + slug(label),
       label,
       details: nodeDetails(level),
+      kind: level === 6 ? 'settlement' : level === 8 ? 'street' : undefined,
       coordinates,
     };
     const houses = (encodedHouses ? encodedHouses.split('|') : []).map((encodedHouse) => {
@@ -325,6 +326,7 @@ export const grahovoDirectoryAddresses: Address[] = directory.flatMap(
           id: 'gar:' + slug(label) + ':' + slug(encodedHouse),
           label: `${label}, ${displayedHouse}`,
           houseNumber,
+          kind: 'house',
           details: `Граховский район, Удмуртская Республика · активный адрес из ГАР (${objectType}), точка приблизительная`,
           coordinates,
         };

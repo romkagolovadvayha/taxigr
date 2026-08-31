@@ -4,6 +4,8 @@ import {
   extractQueryHouseNumber,
   extractHouseNumber,
   hasHouseNumber,
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
   queryHasHouseNumber,
 } from '../src/domain/address-precision';
 
@@ -29,5 +31,17 @@ describe('address precision', () => {
     expect(queryHasHouseNumber('ул. 50 лет Победы, 19')).toBe(true);
     expect(queryHasHouseNumber('Ачинцева 5')).toBe(true);
     expect(extractQueryHouseNumber('Поршур, Бабаева, 99А')).toBe('99А');
+  });
+
+  it('allows settlements only as destinations', () => {
+    const settlement = {
+      label: 'Алнаши',
+      details: 'Алнашский район, Удмуртия, Россия',
+      kind: 'settlement' as const,
+    };
+
+    expect(isDestinationAddressComplete(settlement)).toBe(true);
+    expect(isPickupAddressComplete(settlement)).toBe(false);
+    expect(isDestinationAddressComplete({ label: 'улица Советская', kind: 'street' })).toBe(false);
   });
 });

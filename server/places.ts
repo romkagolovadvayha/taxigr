@@ -112,6 +112,7 @@ export function placeToAddress(place: PlaceDirectoryEntry): Address {
     label: `${place.name}, с. Грахово, ${place.addressLabel}`,
     details: `${placeCategoryLabels[place.category]} · с. Грахово, ${place.addressLabel}`,
     houseNumber: place.houseNumber,
+    kind: 'place',
     coordinates: place.coordinates,
     place,
   };

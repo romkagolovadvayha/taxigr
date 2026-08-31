@@ -2,6 +2,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 
 import type {
   Address,
+  AddressKind,
   Coordinates,
   RideOrder,
   RideOrderSummary,
@@ -136,13 +137,16 @@ function address(
   details: string | null,
   latitude: number,
   longitude: number,
+  kind?: AddressKind,
 ): Address {
   const normalizedDetails = details ?? undefined;
+  const houseNumber = extractHouseNumber({ label, details: normalizedDetails }) ?? undefined;
   return {
     id,
     label,
     details: normalizedDetails,
-    houseNumber: extractHouseNumber({ label, details: normalizedDetails }) ?? undefined,
+    houseNumber,
+    kind: kind ?? (houseNumber ? 'house' : id.startsWith('destination') ? 'settlement' : undefined),
     coordinates: { latitude, longitude },
   };
 }
@@ -173,6 +177,7 @@ function destinations(value: unknown): Address[] {
       candidate.details ?? null,
       Number(latitude),
       Number(longitude),
+      candidate.kind,
     )];
   });
 }

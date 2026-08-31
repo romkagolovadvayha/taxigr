@@ -15,7 +15,10 @@ import {
   type PricingRules,
   type PricingScope,
 } from '../src/domain/pricing';
-import { hasHouseNumber } from '../src/domain/address-precision';
+import {
+  isDestinationAddressComplete,
+  isPickupAddressComplete,
+} from '../src/domain/address-precision';
 import { buildDestinationHistory } from '../src/domain/address-history';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import {
@@ -179,19 +182,23 @@ const passengerLocationSchema = pointSchema.extend({
   orderId: z.string().uuid(),
   accuracyMeters: z.number().min(0).max(10_000).optional(),
 });
-const addressSchema = z
-  .object({
-    id: z.string().max(80).default('address'),
-    label: z.string().trim().min(2).max(255),
-    details: z.string().trim().max(255).optional(),
-    houseNumber: z.string().trim().min(1).max(24).optional(),
-    placeId: z.string().uuid().optional(),
-    coordinates: pointSchema,
-  })
-  .refine((address) => hasHouseNumber(address) || Boolean(address.placeId), {
-    message: 'Укажите адрес с номером дома или выберите место из справочника',
-    path: ['label'],
-  });
+const addressSchema = z.object({
+  id: z.string().max(80).default('address'),
+  label: z.string().trim().min(2).max(255),
+  details: z.string().trim().max(255).optional(),
+  houseNumber: z.string().trim().min(1).max(24).optional(),
+  placeId: z.string().uuid().optional(),
+  kind: z.enum(['house', 'street', 'settlement', 'place']).optional(),
+  coordinates: pointSchema,
+});
+const pickupAddressSchema = addressSchema.refine(isPickupAddressComplete, {
+  message: 'Для места подачи укажите адрес с номером дома или выберите место из справочника',
+  path: ['label'],
+});
+const destinationAddressSchema = addressSchema.refine(isDestinationAddressComplete, {
+  message: 'Укажите адрес с номером дома, место из справочника или населённый пункт',
+  path: ['label'],
+});
 const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u);
 const openingIntervalSchema = z.object({
   opensAt: clockTimeSchema,
@@ -249,9 +256,9 @@ const rideStatusLabels: Record<RideStatus, string> = {
   cancelled: 'заказ отменён',
 };
 const quoteSchema = z.object({
-  pickup: addressSchema,
-  destination: addressSchema,
-  destinations: z.array(addressSchema).min(1).max(5).optional(),
+  pickup: pickupAddressSchema,
+  destination: destinationAddressSchema,
+  destinations: z.array(destinationAddressSchema).min(1).max(5).optional(),
 });
 const createOrderSchema = quoteSchema.extend({
   tariff: tariffSchema,
@@ -706,6 +713,7 @@ async function resolveTrustedAddress(address: Address): Promise<Address> {
     details: canonical.details,
     houseNumber: canonical.houseNumber,
     placeId: canonical.placeId,
+    kind: canonical.kind,
     coordinates: canonical.coordinates,
   };
 }
@@ -740,6 +748,7 @@ function addressesMatch(left: Address, right: Address): boolean {
     (left.details ?? '') === (right.details ?? '') &&
     (left.houseNumber ?? '') === (right.houseNumber ?? '') &&
     (left.placeId ?? '') === (right.placeId ?? '') &&
+    (left.kind ?? '') === (right.kind ?? '') &&
     Math.abs(left.coordinates.latitude - right.coordinates.latitude) < 0.000_001 &&
     Math.abs(left.coordinates.longitude - right.coordinates.longitude) < 0.000_001;
 }

@@ -2,6 +2,8 @@ type AddressLike = {
   label: string;
   details?: string;
   houseNumber?: string;
+  placeId?: string;
+  kind?: 'house' | 'street' | 'settlement' | 'place';
 };
 
 const HOUSE_NUMBER = String.raw`\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?`;
@@ -25,6 +27,16 @@ export function extractHouseNumber(address: AddressLike): string | null {
 
 export function hasHouseNumber(address: AddressLike | null | undefined): boolean {
   return !!address && extractHouseNumber(address) !== null;
+}
+
+export function isPickupAddressComplete(address: AddressLike | null | undefined): boolean {
+  return !!address && (hasHouseNumber(address) || Boolean(address.placeId));
+}
+
+export function isDestinationAddressComplete(
+  address: AddressLike | null | undefined,
+): boolean {
+  return isPickupAddressComplete(address) || address?.kind === 'settlement';
 }
 
 export function queryHasHouseNumber(query: string): boolean {
