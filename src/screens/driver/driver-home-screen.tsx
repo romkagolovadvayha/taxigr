@@ -369,13 +369,64 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         </View>
       )}
       {!['completed', 'cancelled'].includes(currentRide.status) &&
-        !!passengerPhone && (
-          <PhoneCallButton phone={passengerPhone} label="Позвонить клиенту" />
+        (!!passengerPhone || currentRide.passenger || routeTarget) && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: spacing.x2,
+            }}
+          >
+            {!!passengerPhone && (
+              <PhoneCallButton
+                phone={passengerPhone}
+                label="Звонок"
+                accessibilityLabel="Позвонить пассажиру"
+                compact
+                fullWidth={false}
+                containerStyle={{ flex: 1, minWidth: 0 }}
+                buttonStyle={{ flex: 1, minWidth: 0 }}
+              />
+            )}
+            {currentRide.passenger && (
+              <RideChatButton
+                orderId={currentRide.id}
+                label="Чат"
+                accessibilityLabel="Написать пассажиру"
+                compact
+                fullWidth={false}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+            )}
+            {routeTarget && (
+              <AppButton
+                variant="secondary"
+                compact
+                fullWidth={false}
+                loading={navigatorBusy}
+                accessibilityLabel={
+                  routeTarget === 'pickup'
+                    ? 'Открыть маршрут к пассажиру в Яндекс Навигаторе'
+                    : 'Открыть маршрут до места назначения в Яндекс Навигаторе'
+                }
+                icon={<AppIcon name="location" size={20} color={colors.ink} />}
+                style={{ flex: 1, minWidth: 0 }}
+                onPress={() => void openNavigator()}
+              >
+                Маршрут
+              </AppButton>
+            )}
+          </View>
         )}
-      {!['completed', 'cancelled', 'searching'].includes(currentRide.status) &&
-        currentRide.passenger && (
-          <RideChatButton orderId={currentRide.id} label="Написать пассажиру" />
-        )}
+      {!!navigatorMessage && (
+        <Text
+          accessibilityRole="alert"
+          selectable
+          style={{ ...typography.caption, color: colors.inkSecondary }}
+        >
+          {navigatorMessage}
+        </Text>
+      )}
       {nextDriverRide ? (
         <View
           style={{
@@ -491,33 +542,6 @@ function DriverOrderCard({ demo }: { demo: boolean }) {
         <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
           {error}
         </Text>
-      )}
-      {routeTarget && (
-        <View style={{ gap: spacing.x2 }}>
-          <AppButton
-            variant="secondary"
-            loading={navigatorBusy}
-            accessibilityLabel={
-              routeTarget === 'pickup'
-                ? 'Открыть маршрут к пассажиру в Яндекс Навигаторе'
-                : 'Открыть маршрут до места назначения в Яндекс Навигаторе'
-            }
-            onPress={() => void openNavigator()}
-          >
-            {routeTarget === 'pickup'
-              ? 'Яндекс Навигатор · к пассажиру'
-              : 'Яндекс Навигатор · до назначения'}
-          </AppButton>
-          {!!navigatorMessage && (
-            <Text
-              accessibilityRole="alert"
-              selectable
-              style={{ ...typography.caption, color: colors.inkSecondary }}
-            >
-              {navigatorMessage}
-            </Text>
-          )}
-        </View>
       )}
       {currentRide.status === 'completed' ? (
         <RideRatingCard

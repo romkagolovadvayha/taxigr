@@ -61,6 +61,7 @@ export function AppIcon({
         source={carPng}
         style={{ width: size, height: size }}
         contentFit="contain"
+        tintColor={color}
         alt=""
         accessible={false}
       />

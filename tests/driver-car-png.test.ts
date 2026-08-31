@@ -17,6 +17,7 @@ describe('driver car PNG rendering', () => {
     expect(vehicleIllustration).not.toContain('react-native-svg');
     expect(appIcon).toContain("if (name === 'car')");
     expect(appIcon).toContain('driver-map-car.png');
+    expect(appIcon).toContain('tintColor={color}');
     expect(appIcon).not.toContain("{name === 'car' &&");
     expect(driverMarker).toContain('data:image/png;base64,iVBORw0KGgo');
     expect(driverMarker).not.toContain('<svg');
