@@ -15,6 +15,7 @@ import {
   initializeVkMiniApp,
   requestVkMiniAppPhone,
   requestVkMiniAppProfile,
+  type VkMiniAppProfileIdentity,
 } from '@/vk-mini-app/bridge';
 
 export function VkMiniAppScreen() {
@@ -31,11 +32,14 @@ export function VkMiniAppScreen() {
   } = useSession();
   const [sessionVerified, setSessionVerified] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
+  const [phonePermissionRequired, setPhonePermissionRequired] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const pendingIdentity = useRef<VkMiniAppProfileIdentity | null>(null);
   const started = useRef(false);
 
   const authorize = useCallback(async () => {
     setAuthorizing(true);
+    setPhonePermissionRequired(false);
     setBridgeError(null);
     clearAuthError();
     try {
@@ -53,16 +57,18 @@ export function VkMiniAppScreen() {
       }
 
       const identity = await requestVkMiniAppProfile();
+      pendingIdentity.current = identity;
       try {
         await signInWithVkMiniApp({ ...identity, messagesPermissionGranted: false });
       } catch (error) {
         if (!(error instanceof ApiError) || error.code !== 'VK_MINI_APP_PHONE_REQUIRED') {
           throw error;
         }
-        const phone = await requestVkMiniAppPhone();
-        const messagesPermissionGranted = await allowVkCommunityMessages();
-        await signInWithVkMiniApp({ ...identity, ...phone, messagesPermissionGranted });
+        clearAuthError();
+        setPhonePermissionRequired(true);
+        return;
       }
+      pendingIdentity.current = null;
       setSessionVerified(true);
     } catch (error) {
       setBridgeError(error instanceof Error ? error.message : 'Не удалось выполнить вход через VK.');
@@ -77,6 +83,28 @@ export function VkMiniAppScreen() {
     user,
     verifyVkMiniAppSession,
   ]);
+
+  const authorizeWithPhone = useCallback(async () => {
+    setAuthorizing(true);
+    setBridgeError(null);
+    clearAuthError();
+    try {
+      const identity = pendingIdentity.current;
+      if (!identity) {
+        throw new Error('Данные профиля VK устарели. Попробуйте открыть приложение заново.');
+      }
+      const phone = await requestVkMiniAppPhone();
+      const messagesPermissionGranted = await allowVkCommunityMessages();
+      await signInWithVkMiniApp({ ...identity, ...phone, messagesPermissionGranted });
+      pendingIdentity.current = null;
+      setPhonePermissionRequired(false);
+      setSessionVerified(true);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : 'Не удалось выполнить вход через VK.');
+    } finally {
+      setAuthorizing(false);
+    }
+  }, [clearAuthError, signInWithVkMiniApp]);
 
   useEffect(() => {
     if (!sessionReady || started.current) return;
@@ -100,7 +128,29 @@ export function VkMiniAppScreen() {
     >
       <View style={{ width: '100%', maxWidth: 360, gap: spacing.x4, alignItems: 'center' }}>
         <BrandMark size={56} />
-        {!visibleError ? (
+        {phonePermissionRequired ? (
+          <>
+            <Text selectable style={{ ...typography.body, color: colors.ink, textAlign: 'center' }}>
+              Вам нужно разрешить доступ к номеру телефона, чтобы мы смогли вас идентифицировать.
+            </Text>
+            {visibleError ? (
+              <Text
+                accessibilityRole="alert"
+                selectable
+                style={{ ...typography.body, color: colors.danger, textAlign: 'center' }}
+              >
+                {visibleError}
+              </Text>
+            ) : null}
+            <AppButton
+              loading={authorizing || authenticating}
+              onPress={() => void authorizeWithPhone()}
+              style={{ alignSelf: 'stretch' }}
+            >
+              Авторизоваться через VK
+            </AppButton>
+          </>
+        ) : !visibleError ? (
           <>
             <ActivityIndicator size="small" color={colors.inkSecondary} />
             <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
