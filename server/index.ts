@@ -8,9 +8,9 @@ import { pruneAuthAbuseData } from './auth-abuse';
 import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
+import { closeGatewayDispatcher } from './gateway-proxy';
 import { registerRoutes } from './routes';
 import { verifySession } from './security';
-import { startTelegramPolling } from './telegram-polling';
 
 const app = Fastify({
   logger: {
@@ -23,6 +23,8 @@ const app = Fastify({
       'req.body.access_token',
       'req.body.code',
       'req.body.exchangeToken',
+      'req.body.proxyPassword',
+      'req.body.webhookSecret',
     ],
   },
   trustProxy: config.trustProxy,
@@ -233,13 +235,11 @@ app.setErrorHandler((error, request, reply) => {
   });
 });
 
-let stopTelegramPolling: (() => Promise<void>) | null = null;
-
 app.addHook('onClose', async () => {
   clearInterval(authAbusePruneTimer);
   clearInterval(staleOrderTimer);
   clearInterval(priorityReleaseTimer);
-  await stopTelegramPolling?.();
+  await closeGatewayDispatcher();
   io.close();
   await db.end();
 });
@@ -280,9 +280,3 @@ process.on('uncaughtException', (error, origin) => {
 });
 
 await app.listen({ port: config.PORT, host: config.HOST });
-if (config.TELEGRAM_UPDATE_MODE === 'polling') {
-  stopTelegramPolling = startTelegramPolling(
-    app.log,
-    routeHandlers.handleMessengerOrderAction,
-  );
-}

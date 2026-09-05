@@ -35,10 +35,10 @@ Web откроется по адресу Expo, API слушает `http://localh
 `https://<ваш-домен>/v1/webhooks/max` на события `bot_started`,
 `message_created` и `message_callback`.
 Для входа через Telegram задайте `TELEGRAM_BOT_USERNAME`, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_WEBHOOK_SECRET` и установите webhook Bot API на
-`https://<ваш-домен>/v1/webhooks/telegram` с
-`allowed_updates=["message","callback_query"]` и тем же
-`secret_token`. Операционные уведомления для администраторов отправляются тем же ботом
+`TELEGRAM_WEBHOOK_SECRET`. Прокси и шлюз вебхуков настройте в панели супер администратора,
+затем нажмите «Зарегистрировать вебхук». Настройки хранятся в MySQL и применяются
+без перезапуска. Подробнее: [прокси и вебхуки](docs/GATEWAY.md).
+Операционные уведомления для администраторов отправляются тем же ботом
 в `TELEGRAM_ADMIN_CHAT_ID` (по умолчанию `-1004215180973`). Критические ошибки API,
 серверного процесса и Expo-клиента отправляются в `TELEGRAM_CRITICAL_CHAT_ID`
 (по умолчанию `-1004442605510`); Telegram-токен в клиентскую сборку не включается.

@@ -85,6 +85,7 @@
     "check": "npm run typecheck && npm run test && npm run lint && npm run build:web",
     "db:migrate": "tsx server/scripts/migrate.ts",
     "db:seed": "tsx server/scripts/seed.ts",
+    "telegram:webhook:register": "node scripts/run-server-with-ca.mjs server/scripts/register-telegram-webhook.ts",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
     "vk:callback:configure": "node scripts/configure-vk-callback.mjs",
     "sounds:generate": "node scripts/generate-notification-sounds.mjs"

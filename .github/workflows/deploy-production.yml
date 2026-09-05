@@ -58,7 +58,7 @@ jobs:
               exit 1
             fi
           done
-          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY TELEGRAM_PROXY_URL VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION VK_MINI_APP_SECRET; do
+          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY YANDEX_MAPS_API_KEY VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION VK_MINI_APP_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "Missing GitHub Environment secret: $name" >&2
               exit 1
@@ -69,7 +69,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
           NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
-          TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
           YANDEX_MAPS_API_KEY: ${{ secrets.YANDEX_MAPS_API_KEY }}
           VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
@@ -79,7 +78,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -102,10 +101,8 @@ jobs:
           MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
           MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
           TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
-          TELEGRAM_UPDATE_MODE: ${{ vars.TELEGRAM_UPDATE_MODE }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          TELEGRAM_PROXY_URL: ${{ secrets.TELEGRAM_PROXY_URL }}
           VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
@@ -143,10 +140,8 @@ jobs:
               'MAX_BOT_TOKEN': os.environ.get('MAX_BOT_TOKEN', ''),
               'MAX_WEBHOOK_SECRET': os.environ.get('MAX_WEBHOOK_SECRET', ''),
               'TELEGRAM_BOT_USERNAME': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
-              'TELEGRAM_UPDATE_MODE': os.environ.get('TELEGRAM_UPDATE_MODE') or 'polling',
               'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
               'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
-              'TELEGRAM_PROXY_URL': os.environ.get('TELEGRAM_PROXY_URL', ''),
               'VK_APP_ID': os.environ['VK_APP_ID'],
               'VK_REDIRECT_URI': f"https://{os.environ['API_DOMAIN']}/v1/auth/vk/callback",
               'VK_MINI_APP_ID': os.environ['VK_MINI_APP_ID'],
@@ -205,6 +200,8 @@ jobs:
 
       - name: Upload and activate release
         shell: bash
+        env:
+          GATEWAY_BOOTSTRAP_JSON: ${{ secrets.GATEWAY_BOOTSTRAP_JSON }}
         run: |
           set -euo pipefail
           SSH=(ssh -i ~/.ssh/taxigr_deploy -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes)
@@ -216,6 +213,12 @@ jobs:
           archive_sha256="$(cat "$RUNNER_TEMP/archive.sha256")"
 
           "${SSH[@]}" "$target" "install -d -m 0755 '$DEPLOY_PATH/incoming'"
+          if [[ -n "${GATEWAY_BOOTSTRAP_JSON:-}" ]]; then
+            umask 077
+            printf '%s' "$GATEWAY_BOOTSTRAP_JSON" > "$RUNNER_TEMP/gateway-project.json"
+            "${SCP[@]}" "$RUNNER_TEMP/gateway-project.json" "$target:$DEPLOY_PATH/incoming/gateway-project.json"
+            rm -f "$RUNNER_TEMP/gateway-project.json"
+          fi
           "${SCP[@]}" "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" "$target:$remote_archive"
           "${SCP[@]}" .taxigr.env "$target:$remote_env"
           "${SCP[@]}" deploy/remote-deploy.sh "$target:$remote_script"

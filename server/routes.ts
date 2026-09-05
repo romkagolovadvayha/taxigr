@@ -66,6 +66,8 @@ import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db, firstRow, withTransaction } from './db';
 import { searchAddresses } from './geocoding';
+import { telegramDispatcher } from './gateway-proxy';
+import { registerGatewayRoutes } from './gateway-routes';
 import {
   driverLegalAcceptanceSchema,
   hasCurrentInitialConsents,
@@ -2713,7 +2715,7 @@ export async function registerRoutes(
       try {
         const avatarUrl = await getTelegramProfilePhotoUrl(result.telegramUserId);
         await syncUserAvatarFromRemoteUrlIfEmpty(result.userId, avatarUrl, {
-          proxyUrl: config.TELEGRAM_PROXY_URL || undefined,
+          dispatcher: await telegramDispatcher(),
         });
       } catch (error) {
         request.log.warn({ error }, 'Telegram profile avatar sync failed');
@@ -6640,6 +6642,8 @@ export async function registerRoutes(
     await auth(request, 'admin');
     return { data: await pricingRules() };
   });
+
+  registerGatewayRoutes(app, (request) => auth(request, 'admin'));
 
   app.get('/v1/admin/driver-dispatch-settings', async (request) => {
     await auth(request, 'admin');

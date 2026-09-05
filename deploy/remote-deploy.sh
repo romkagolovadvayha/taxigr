@@ -129,6 +129,11 @@ SQL
 cd "$release_path"
 npm ci --omit=dev --prefix server --no-audit --no-fund
 ./server/node_modules/.bin/tsx server/scripts/migrate.ts
+if [[ -f "$DEPLOY_PATH/incoming/gateway-project.json" ]]; then
+  ./server/node_modules/.bin/tsx server/scripts/import-gateway-settings.ts \
+    "$DEPLOY_PATH/incoming/gateway-project.json" 'https://api.taxigr.ru'
+  rm -f "$DEPLOY_PATH/incoming/gateway-project.json"
+fi
 chgrp -R taxigr "$release_path"
 chmod -R g+rX "$release_path"
 
@@ -192,6 +197,8 @@ if [[ -f /etc/letsencrypt/live/taxigr.ru/fullchain.pem ]]; then
   fi
   [[ -z "$previous_nginx" ]] || rm -f "$previous_nginx"
 fi
+
+./server/node_modules/.bin/tsx server/scripts/register-telegram-webhook.ts
 
 rm -f "$ARCHIVE" "$ENV_UPLOAD"
 

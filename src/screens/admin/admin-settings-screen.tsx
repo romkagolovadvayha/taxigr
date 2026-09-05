@@ -3,6 +3,7 @@ import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import { GatewaySettingsCard } from '@/components/admin/gateway-settings-card';
 import { AppButton } from '@/components/ui/app-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
@@ -153,6 +154,7 @@ export function AdminSettingsScreen() {
         </Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
+      <GatewaySettingsCard token={token} demo={demo} />
       <SurfaceCard>
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Приоритетная раздача заказов

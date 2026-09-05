@@ -1,5 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import { fetch as undiciFetch, type Dispatcher } from 'undici';
 
 import { db, firstRow } from './db';
 
@@ -53,11 +53,10 @@ function detectImageMime(bytes: Buffer): 'image/jpeg' | 'image/png' | 'image/web
 
 async function downloadAvatar(
   url: string,
-  proxyUrl?: string,
+  dispatcher?: Dispatcher,
 ): Promise<{ data: Buffer; mimeType: string } | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7_000);
-  const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
   try {
     const response = await undiciFetch(url, {
       headers: { Accept: 'image/avif,image/webp,image/png,image/jpeg' },
@@ -74,7 +73,6 @@ async function downloadAvatar(
     return mimeType ? { data, mimeType } : null;
   } finally {
     clearTimeout(timeout);
-    await dispatcher?.close();
   }
 }
 
@@ -92,11 +90,11 @@ export async function userHasNoAvatar(userId: string): Promise<boolean> {
 export async function syncUserAvatarFromRemoteUrlIfEmpty(
   userId: string,
   value: unknown,
-  options: { proxyUrl?: string } = {},
+  options: { dispatcher?: Dispatcher } = {},
 ): Promise<boolean> {
   const url = safeRemoteAvatarUrl(value);
   if (!url || !(await userHasNoAvatar(userId))) return false;
-  const avatar = await downloadAvatar(url, options.proxyUrl);
+  const avatar = await downloadAvatar(url, options.dispatcher);
   if (!avatar) return false;
   const [result] = await db.execute<ResultSetHeader>(
     `UPDATE users

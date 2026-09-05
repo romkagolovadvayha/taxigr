@@ -1,6 +1,7 @@
-import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import { fetch as undiciFetch } from 'undici';
 
 import { config } from './config';
+import { telegramDispatcher } from './gateway-proxy';
 import { normalizeRussianPhone } from './phone-verification';
 
 type TelegramApiResponse<T = unknown> = {
@@ -14,11 +15,7 @@ type TelegramContact = {
   user_id?: unknown;
 };
 
-const telegramProxyAgent = config.TELEGRAM_PROXY_URL
-  ? new ProxyAgent(config.TELEGRAM_PROXY_URL)
-  : undefined;
-
-async function callTelegramApi<T>(
+export async function callTelegramApi<T>(
   method: string,
   body: Record<string, unknown>,
 ): Promise<T> {
@@ -35,7 +32,7 @@ async function callTelegramApi<T>(
         },
         body: JSON.stringify(body),
         signal: controller.signal,
-        dispatcher: telegramProxyAgent,
+        dispatcher: await telegramDispatcher(),
       },
     );
     const result = (await response.json().catch(() => ({}))) as TelegramApiResponse<T>;
