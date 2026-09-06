@@ -26,7 +26,10 @@ function publicHttpsUrl(value: string): boolean {
 const httpsUrl = z.string().trim().max(2_000).refine(publicHttpsUrl, 'Укажите публичный HTTPS-адрес без параметров и пароля');
 const fields = {
   proxyEnabled: z.boolean(),
-  proxyUrl: httpsUrl.refine((value) => new URL(value).pathname === '/', 'У адреса прокси не должно быть пути'),
+  proxyUrl: httpsUrl.refine((value) => {
+    try { return new URL(value).pathname === '/'; }
+    catch { return false; }
+  }, 'У адреса прокси не должно быть пути'),
   proxyUsername: z.string().trim().max(128).regex(/^[A-Za-z0-9_-]*$/u),
   webhooksEnabled: z.boolean(),
   webhookUrl: httpsUrl,

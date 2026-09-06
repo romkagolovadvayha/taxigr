@@ -61,7 +61,7 @@ describe('Prostoj gateway', () => {
 
   it('rejects unsafe addresses and unknown configuration fields', () => {
     const { hasProxyPassword: _password, hasWebhookSecret: _secret, ...input } = presentGatewaySettings(settings);
-    for (const proxyUrl of ['http://proxy.prostoj.store', 'https://user:pass@proxy.prostoj.store', 'https://127.0.0.1', 'https://[::1]', 'https://localhost', 'https://proxy.prostoj.store/path', 'https://proxy.prostoj.store?token=x']) {
+    for (const proxyUrl of ['not a url', 'https://', 'http://proxy.prostoj.store', 'https://user:pass@proxy.prostoj.store', 'https://127.0.0.1', 'https://[::1]', 'https://localhost', 'https://proxy.prostoj.store/path', 'https://proxy.prostoj.store?token=x']) {
       expect(gatewayUpdateSchema.safeParse({ ...input, proxyUrl }).success).toBe(false);
     }
     expect(gatewayUpdateSchema.safeParse({ ...input, adminToken: 'never-store' }).success).toBe(false);

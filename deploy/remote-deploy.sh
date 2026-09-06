@@ -134,6 +134,7 @@ if [[ -f "$DEPLOY_PATH/incoming/gateway-project.json" ]]; then
     "$DEPLOY_PATH/incoming/gateway-project.json" 'https://api.taxigr.ru'
   rm -f "$DEPLOY_PATH/incoming/gateway-project.json"
 fi
+./server/node_modules/.bin/tsx server/scripts/check-gateway-settings.ts
 chgrp -R taxigr "$release_path"
 chmod -R g+rX "$release_path"
 
