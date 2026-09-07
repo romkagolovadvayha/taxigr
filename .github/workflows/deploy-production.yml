@@ -84,6 +84,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify API service survives database maintenance
+        run: sudo python3 deploy/check-service-dependency.py
+
       - name: Verify and build
         run: npm run check
 
@@ -216,6 +219,9 @@ jobs:
           "${SCP[@]}" deploy/remote-deploy.sh "$target:$remote_script"
           "${SSH[@]}" "$target" \
             "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_ID='$GITHUB_SHA' ARCHIVE='$remote_archive' ENV_UPLOAD='$remote_env' ARCHIVE_SHA256='$archive_sha256' bash '$remote_script'"
+
+      - name: Verify store review login
+        run: npm run check:store-review -- "https://${API_DOMAIN}"
 
       - name: Verify public endpoints
         shell: bash

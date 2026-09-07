@@ -23,6 +23,7 @@
       }
     },
     "rustore": {
+      "autoIncrement": true,
       "channel": "production",
       "environment": "production",
       "android": {

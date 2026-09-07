@@ -36,6 +36,7 @@
 - [ ] В GitHub Environment `production` заданы секреты `VK_BOT_TOKEN`, `VK_CALLBACK_SECRET`, `VK_CALLBACK_CONFIRMATION`.
 - [ ] Callback API VK подтверждается по адресу `https://api.taxigr.ru/v1/webhooks/vk`; включены события `message_new` и `message_event`.
 - [ ] Реальный SMS-вход на web/iOS/Android.
+- [ ] `npm run check:store-review -- https://api.taxigr.ru`: вход тестового пассажира, профиль и восстановление сессии перед отправкой в магазин.
 - [ ] Реальный маршрут в Грахово, в Можгу и обратный маршрут.
 - [ ] Гонка принятия одного заказа двумя водителями.
 - [ ] Все переходы статусов и push в фоне.

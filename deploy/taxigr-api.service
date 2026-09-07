@@ -1,8 +1,9 @@
 [Unit]
 Description=TaxiGR API
 After=network-online.target mysql.service
-Wants=network-online.target
-Requires=mysql.service
+# Keep the API running through MySQL package stop/start cycles. The pool reconnects.
+# Requires=mysql.service stopped the API until the next deployment after an upgrade.
+Wants=network-online.target mysql.service
 
 [Service]
 Type=simple

@@ -1,7 +1,7 @@
 {
   "name": "taxi-grahovo",
   "main": "expo-router/entry",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "dependencies": {
     "@expo/ui": "~57.0.14",
     "@fastify/cors": "^11.3.0",
@@ -77,6 +77,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
+    "check:store-review": "tsx server/scripts/check-store-review-auth.ts",
     "test": "vitest run",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:watch": "vitest",
