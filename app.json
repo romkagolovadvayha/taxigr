@@ -55,6 +55,16 @@
       "expo-router",
       "expo-asset",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/with-android-app-optimization",
+      [
         "expo-audio",
         {
           "microphonePermission": false,
