@@ -10,8 +10,9 @@ const user = {
 const json = (data: unknown) => new Response(JSON.stringify({ data }), {
   headers: { 'Content-Type': 'application/json' },
 });
+type FetchRequest = (input: string, init?: RequestInit) => Promise<Response>;
 function passingFetch() {
-  return vi.fn<typeof fetch>()
+  return vi.fn<FetchRequest>()
     .mockResolvedValueOnce(json({ status: 'ready' }))
     .mockResolvedValueOnce(json({ retryAfterSeconds: 180 }))
     .mockResolvedValueOnce(json({ token: 'private-session-token', user }))
@@ -39,7 +40,7 @@ describe('store review release check', () => {
   });
 
   it('fails at the phone step on a proxy 502 even when health is green', async () => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi.fn<FetchRequest>()
       .mockResolvedValueOnce(json({ status: 'ready' }))
       .mockResolvedValueOnce(new Response('<html>Bad Gateway</html>', { status: 502 }));
     await expect(checkStoreReviewAuth('https://api.example.test', fetchMock))
@@ -48,7 +49,7 @@ describe('store review release check', () => {
   });
 
   it('does not retry phone mutations or expose an upstream error body', async () => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi.fn<FetchRequest>()
       .mockResolvedValueOnce(json({ status: 'ready' }))
       .mockResolvedValueOnce(new Response('private-provider-credential', { status: 429 }));
     await expect(checkStoreReviewAuth('https://api.example.test', fetchMock))
@@ -61,7 +62,7 @@ describe('store review release check', () => {
     { ...user, profileComplete: false },
     { ...user, phone: '+79123456789' },
   ])('rejects an unsuitable review account (%j)', async (invalidUser) => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi.fn<FetchRequest>()
       .mockResolvedValueOnce(json({ status: 'ready' }))
       .mockResolvedValueOnce(json({ retryAfterSeconds: 180 }))
       .mockResolvedValueOnce(json({ token: 'private-token', user: invalidUser }));
@@ -70,13 +71,13 @@ describe('store review release check', () => {
   });
 
   it('rejects an HTML success page in place of the API', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('<html>Home</html>'));
+    const fetchMock = vi.fn<FetchRequest>().mockResolvedValue(new Response('<html>Home</html>'));
     await expect(checkStoreReviewAuth('https://api.example.test', fetchMock))
       .rejects.toThrow('/health/ready: expected an API JSON response');
   });
 
   it('does not expose credentials from connection failures', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error('private-proxy-credential'));
+    const fetchMock = vi.fn<FetchRequest>().mockRejectedValue(new Error('private-proxy-credential'));
     await expect(checkStoreReviewAuth('https://api.example.test', fetchMock))
       .rejects.toThrow('/health/ready: connection failed or timed out');
   });

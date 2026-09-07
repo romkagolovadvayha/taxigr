@@ -10,9 +10,11 @@ type ReviewUser = {
   profileComplete?: boolean;
 };
 
+type FetchRequest = (input: string, init?: RequestInit) => Promise<Response>;
+
 export async function checkStoreReviewAuth(
   apiUrl: string,
-  fetchRequest: typeof fetch = fetch,
+  fetchRequest: FetchRequest = fetch,
 ): Promise<string[]> {
   const url = new URL(apiUrl);
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password ||
