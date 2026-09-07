@@ -26,6 +26,12 @@ type ExpoPushTicket =
   | { status: 'error'; message?: string; details?: { error?: string } };
 
 const expoPushBatchSize = 100;
+const rustorePushBatchSize = 20;
+
+type NativePushTokenRow = RowDataPacket & {
+  token: string;
+  provider: 'expo' | 'rustore';
+};
 
 function endpointHash(endpoint: string): string {
   return createHash('sha256').update(endpoint).digest('hex');
@@ -38,6 +44,67 @@ function chunks<T>(items: T[], size: number): T[][] {
   );
 }
 
+function pushDeepLink(data?: Record<string, string>): string {
+  const orderId = data?.orderId ? encodeURIComponent(data.orderId) : null;
+  if (!orderId) return 'taxigrahovo:///';
+  if (data?.chat === 'true') return `taxigrahovo:///chat/${orderId}`;
+  return data?.role === 'driver'
+    ? `taxigrahovo:///driver/trips/${orderId}`
+    : `taxigrahovo:///orders/${orderId}`;
+}
+
+async function sendRuStorePush(token: string, message: PushMessage): Promise<'sent' | 'removed'> {
+  const response = await fetch(
+    `https://vkpns.rustore.ru/v1/projects/${encodeURIComponent(config.RUSTORE_PUSH_PROJECT_ID)}/messages:send`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${config.RUSTORE_PUSH_SERVICE_TOKEN}`,
+      },
+      body: JSON.stringify({
+        message: {
+          token,
+          data: message.data,
+          notification: {
+            title: message.title,
+            body: message.body,
+          },
+          android: {
+            ttl: '86400s',
+            notification: {
+              title: message.title,
+              body: message.body,
+              icon: 'notification_icon',
+              color: '#FFD600',
+              channel_id: message.channelId ?? 'ride-taxi-found-v2',
+              click_action: pushDeepLink(message.data),
+              click_action_type: 1,
+            },
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(8_000),
+    },
+  );
+  const payload = await response.json().catch(() => ({})) as {
+    error?: { message?: string; status?: string };
+  };
+  if (response.ok) return 'sent';
+  if (
+    response.status === 404 ||
+    payload.error?.status === 'NOT_FOUND' ||
+    payload.error?.status === 'UNREGISTERED'
+  ) {
+    await db.execute('DELETE FROM push_tokens WHERE token = ?', [token]);
+    return 'removed';
+  }
+  throw new Error(
+    payload.error?.message ?? payload.error?.status ?? `RuStore Push API returned ${response.status}`,
+  );
+}
+
 export async function notifyUsers(
   userIds: string[],
   message: PushMessage,
@@ -45,12 +112,14 @@ export async function notifyUsers(
   const uniqueUserIds = [...new Set(userIds)];
   if (!uniqueUserIds.length) return { nativeSubscriptions: 0, webSubscriptions: 0 };
   const placeholders = uniqueUserIds.map(() => '?').join(',');
-  const [rows] = await db.query<(RowDataPacket & { token: string })[]>(
-    `SELECT token FROM push_tokens WHERE user_id IN (${placeholders})`,
+  const [rows] = await db.query<NativePushTokenRow[]>(
+    `SELECT token, provider FROM push_tokens WHERE user_id IN (${placeholders})`,
     uniqueUserIds,
   );
+  const expoRows = rows.filter((row) => row.provider !== 'rustore');
+  const rustoreRows = rows.filter((row) => row.provider === 'rustore');
   const errors: Error[] = [];
-  for (const batch of chunks(rows, expoPushBatchSize)) {
+  for (const batch of chunks(expoRows, expoPushBatchSize)) {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
@@ -88,6 +157,24 @@ export async function notifyUsers(
         continue;
       }
       errors.push(new Error(ticket.message ?? ticket.details?.error ?? 'Expo push ticket error'));
+    }
+  }
+  if (rustoreRows.length && (!config.RUSTORE_PUSH_PROJECT_ID || !config.RUSTORE_PUSH_SERVICE_TOKEN)) {
+    errors.push(new Error('RuStore push tokens exist, but the RuStore Push API is not configured'));
+  } else {
+    for (const batch of chunks(rustoreRows, rustorePushBatchSize)) {
+      const results = await Promise.allSettled(
+        batch.map(({ token }) => sendRuStorePush(token, message)),
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          errors.push(
+            result.reason instanceof Error
+              ? result.reason
+              : new Error('RuStore push delivery failed'),
+          );
+        }
+      }
     }
   }
   const [webRows] = await db.query<(

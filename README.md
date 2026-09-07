@@ -89,6 +89,13 @@ npx eas-cli@latest build --profile production
 
 Production Android создаётся как AAB, iOS — как App Store build; номера увеличиваются EAS автоматически. Облачные сборки и аккаунты магазинов могут требовать оплаты.
 
+Для APK RuStore с собственным каналом push создайте production-проект для
+`ru.grahovo.taxi` и release SHA-256 в RuStore Консоли. В EAS production
+environment задайте `RUSTORE_PUSH_ENABLED=true` и публичный
+`RUSTORE_PUSH_PROJECT_ID`. На сервере задайте тот же project ID и секретный
+`RUSTORE_PUSH_SERVICE_TOKEN`, затем собирайте профиль `rustore`. Сервисный токен
+нельзя включать в приложение или хранить в Git.
+
 ## Карты, маршруты и адреса
 
 Предоставленный JavaScript API key Яндекса используется только для отображения

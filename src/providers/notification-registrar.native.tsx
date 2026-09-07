@@ -6,6 +6,10 @@ import { AppState } from 'react-native';
 import { useSession } from '@/auth/session-provider';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { syncPushRegistration } from '@/notifications/push-registration';
+import {
+  addRuStorePushTokenListener,
+  isRuStorePushEnabled,
+} from '@/notifications/rustore-push';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -64,8 +68,10 @@ export function NotificationRegistrar() {
       });
       // Registration is retried when the app becomes active again.
     });
+    const pushTokenSubscription = isRuStorePushEnabled()
+      ? addRuStorePushTokenListener(() => retryRegistration())
+      : Notifications.addPushTokenListener(retryRegistration);
     retryRegistration();
-    const pushTokenSubscription = Notifications.addPushTokenListener(retryRegistration);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') retryRegistration();
     });

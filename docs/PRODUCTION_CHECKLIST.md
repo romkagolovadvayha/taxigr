@@ -8,6 +8,7 @@
 - [ ] Проверить лицензионную атрибуцию OpenStreetMap и работу кэша Nominatim.
 - [ ] Ограничить JavaScript‑ключ Яндекс Карт доменом, Android package `ru.grahovo.taxi` и iOS bundle `ru.grahovo.taxi`.
 - [ ] Создать EAS project и заполнить `EAS_PROJECT_ID`; добавить production variables в EAS.
+- [ ] Для RuStore Push создать production-проект под release SHA-256, добавить `RUSTORE_PUSH_ENABLED` и `RUSTORE_PUSH_PROJECT_ID` в EAS, а `RUSTORE_PUSH_PROJECT_ID` и `RUSTORE_PUSH_SERVICE_TOKEN` — только в окружение API.
 - [ ] Создать Apple Developer и Google Play Console приложения.
 - [ ] Заполнить все `EXPO_PUBLIC_OPERATOR_*` и `EXPO_PUBLIC_TAXI_REGISTRY_NUMBER`; проверить реквизиты на `/legal`.
 - [ ] Подтвердить включение службы заказа легкового такси в региональный реестр и соответствие модели работы 580‑ФЗ.

@@ -3277,15 +3277,17 @@ export async function registerRoutes(
     const session = await auth(request);
     const input = parse(
       z.object({
-        token: z.string().min(20).max(255),
+        token: z.string().min(20).max(512),
         platform: z.enum(['ios', 'android']),
+        provider: z.enum(['expo', 'rustore']).default('expo'),
       }),
       request.body,
     );
     await db.execute(
-      `INSERT INTO push_tokens (token, user_id, platform) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), platform = VALUES(platform)`,
-      [input.token, session.id, input.platform],
+      `INSERT INTO push_tokens (token, user_id, platform, provider) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), platform = VALUES(platform),
+         provider = VALUES(provider)`,
+      [input.token, session.id, input.platform, input.provider],
     );
     return { data: { registered: true } };
   });

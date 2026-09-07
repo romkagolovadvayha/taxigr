@@ -18,6 +18,8 @@ const schema = z.object({
   GEOCODER_CACHE_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   SUPERADMIN_PHONES: z.string().default(''),
   EXPO_ACCESS_TOKEN: z.string().default(''),
+  RUSTORE_PUSH_PROJECT_ID: z.string().default(''),
+  RUSTORE_PUSH_SERVICE_TOKEN: z.string().default(''),
   VAPID_PUBLIC_KEY: z.string().default(''),
   VAPID_PRIVATE_KEY: z.string().default(''),
   VAPID_SUBJECT: z.string().default('mailto:support@taxigr.ru'),

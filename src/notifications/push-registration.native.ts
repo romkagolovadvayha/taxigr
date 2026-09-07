@@ -3,6 +3,10 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { apiRequest } from '@/api/client';
+import {
+  getRuStorePushToken,
+  isRuStorePushEnabled,
+} from '@/notifications/rustore-push';
 
 async function configureAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -40,13 +44,21 @@ export async function syncPushRegistration(
       ? await Notifications.requestPermissionsAsync()
       : current;
   if (permission.status !== 'granted') return false;
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) throw new Error('В сборке отсутствует EAS projectId для push-уведомлений.');
-  const pushToken = await Notifications.getExpoPushTokenAsync({ projectId });
+  const provider = isRuStorePushEnabled() ? 'rustore' : 'expo';
+  let pushToken: string;
+  if (provider === 'rustore') {
+    const rustoreToken = await getRuStorePushToken();
+    if (!rustoreToken) return false;
+    pushToken = rustoreToken;
+  } else {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    if (!projectId) throw new Error('В сборке отсутствует EAS projectId для push-уведомлений.');
+    pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  }
   await apiRequest('/v1/push-tokens', {
     method: 'PUT',
     token: sessionToken,
-    body: JSON.stringify({ token: pushToken.data, platform: Platform.OS }),
+    body: JSON.stringify({ token: pushToken, platform: Platform.OS, provider }),
   });
   return true;
 }

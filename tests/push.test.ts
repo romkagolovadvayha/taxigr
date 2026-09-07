@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../server/config', () => ({
   config: {
     EXPO_ACCESS_TOKEN: 'expo-access-token',
+    RUSTORE_PUSH_PROJECT_ID: 'rustore-project-id',
+    RUSTORE_PUSH_SERVICE_TOKEN: 'rustore-service-token',
     VAPID_PUBLIC_KEY: 'public-key',
     VAPID_PRIVATE_KEY: 'private-key',
     VAPID_SUBJECT: 'mailto:support@taxigr.ru',
@@ -38,8 +40,8 @@ describe('Expo push delivery', () => {
   it('checks Expo tickets and removes a token rejected as unregistered', async () => {
     mocks.query
       .mockResolvedValueOnce([[
-        { token: 'ExponentPushToken[stale]' },
-        { token: 'ExponentPushToken[active]' },
+        { token: 'ExponentPushToken[stale]', provider: 'expo' },
+        { token: 'ExponentPushToken[active]', provider: 'expo' },
       ]])
       .mockResolvedValueOnce([[]]);
     const fetchMock = vi.fn().mockResolvedValue({
@@ -73,6 +75,70 @@ describe('Expo push delivery', () => {
     expect(mocks.execute).toHaveBeenCalledWith(
       'DELETE FROM push_tokens WHERE token = ?',
       ['ExponentPushToken[stale]'],
+    );
+  });
+
+  it('sends RuStore tokens through the RuStore API with the matching channel and deep link', async () => {
+    mocks.query
+      .mockResolvedValueOnce([[
+        { token: 'rustore-device-token-1234567890', provider: 'rustore' },
+      ]])
+      .mockResolvedValueOnce([[]]);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await notifyUsers(['user-1'], {
+      title: 'Сообщение от Иван',
+      body: 'Я уже подъехал',
+      data: {
+        chat: 'true',
+        role: 'passenger',
+        orderId: '11111111-1111-1111-1111-111111111111',
+      },
+      channelId: 'ride-chat-v1',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://vkpns.rustore.ru/v1/projects/rustore-project-id/messages:send',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer rustore-service-token',
+        }),
+      }),
+    );
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const payload = JSON.parse(String(request.body));
+    expect(payload.message.android.notification).toMatchObject({
+      channel_id: 'ride-chat-v1',
+      click_action: 'taxigrahovo:///chat/11111111-1111-1111-1111-111111111111',
+      click_action_type: 1,
+    });
+  });
+
+  it('removes a RuStore token rejected as no longer registered', async () => {
+    mocks.query
+      .mockResolvedValueOnce([[
+        { token: 'rustore-expired-token-1234567890', provider: 'rustore' },
+      ]])
+      .mockResolvedValueOnce([[]]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: { status: 'NOT_FOUND' } }),
+    }));
+
+    await notifyUsers(['user-1'], {
+      title: 'Статус поездки',
+      body: 'Водитель приехал',
+    });
+
+    expect(mocks.execute).toHaveBeenCalledWith(
+      'DELETE FROM push_tokens WHERE token = ?',
+      ['rustore-expired-token-1234567890'],
     );
   });
 
