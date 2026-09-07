@@ -4,7 +4,9 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { BrandMark } from '@/components/brand-mark';
+import { VkLogo } from '@/components/auth/vk-logo';
 import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { Screen } from '@/components/ui/screen';
 import { BlockedAccountScreen } from '@/screens/blocked-account-screen';
 import { OrderScreen } from '@/screens/passenger/order-screen';
@@ -33,8 +35,11 @@ export function VkMiniAppScreen() {
   const [sessionVerified, setSessionVerified] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
   const [phonePermissionRequired, setPhonePermissionRequired] = useState(false);
+  const [communityPermissionRequired, setCommunityPermissionRequired] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const pendingIdentity = useRef<VkMiniAppProfileIdentity | null>(null);
+  const pendingPhone = useRef<Awaited<ReturnType<typeof requestVkMiniAppPhone>> | null>(null);
+  const finishingAuthorization = useRef(false);
   const started = useRef(false);
 
   const authorize = useCallback(async () => {
@@ -94,14 +99,40 @@ export function VkMiniAppScreen() {
         throw new Error('Данные профиля VK устарели. Попробуйте открыть приложение заново.');
       }
       const phone = await requestVkMiniAppPhone();
-      const messagesPermissionGranted = await allowVkCommunityMessages();
+      pendingPhone.current = phone;
+      setPhonePermissionRequired(false);
+      setCommunityPermissionRequired(true);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : 'Не удалось выполнить вход через VK.');
+    } finally {
+      setAuthorizing(false);
+    }
+  }, [clearAuthError]);
+
+  const finishAuthorization = useCallback(async (requestCommunityMessages: boolean) => {
+    if (finishingAuthorization.current) return;
+    finishingAuthorization.current = true;
+    setAuthorizing(true);
+    setCommunityPermissionRequired(false);
+    setBridgeError(null);
+    clearAuthError();
+    try {
+      const identity = pendingIdentity.current;
+      const phone = pendingPhone.current;
+      if (!identity || !phone) {
+        throw new Error('Данные входа VK устарели. Попробуйте открыть приложение заново.');
+      }
+      const messagesPermissionGranted = requestCommunityMessages
+        ? await allowVkCommunityMessages()
+        : false;
       await signInWithVkMiniApp({ ...identity, ...phone, messagesPermissionGranted });
       pendingIdentity.current = null;
-      setPhonePermissionRequired(false);
+      pendingPhone.current = null;
       setSessionVerified(true);
     } catch (error) {
       setBridgeError(error instanceof Error ? error.message : 'Не удалось выполнить вход через VK.');
     } finally {
+      finishingAuthorization.current = false;
       setAuthorizing(false);
     }
   }, [clearAuthError, signInWithVkMiniApp]);
@@ -112,70 +143,100 @@ export function VkMiniAppScreen() {
     void authorize();
   }, [authorize, sessionReady]);
 
-  if (user && sessionVerified) {
-    return user.blockedAt ? <BlockedAccountScreen /> : <OrderScreen />;
-  }
-
   const visibleError = bridgeError ?? authError;
   return (
-    <Screen
-      contentStyle={{
-        minHeight: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: spacing.x8,
-      }}
-    >
-      <View style={{ width: '100%', maxWidth: 360, gap: spacing.x4, alignItems: 'center' }}>
-        <BrandMark size={56} />
-        {phonePermissionRequired ? (
-          <>
-            <Text selectable style={{ ...typography.body, color: colors.ink, textAlign: 'center' }}>
-              Вам нужно разрешить доступ к номеру телефона, чтобы мы смогли вас идентифицировать.
-            </Text>
-            {visibleError ? (
-              <Text
-                accessibilityRole="alert"
-                selectable
-                style={{ ...typography.body, color: colors.danger, textAlign: 'center' }}
-              >
-                {visibleError}
-              </Text>
-            ) : null}
-            <AppButton
-              loading={authorizing || authenticating}
-              onPress={() => void authorizeWithPhone()}
-              style={{ alignSelf: 'stretch' }}
-            >
-              Авторизоваться через VK
-            </AppButton>
-          </>
-        ) : !visibleError ? (
-          <>
-            <ActivityIndicator size="small" color={colors.inkSecondary} />
-            <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-              Входим через VK…
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text
-              accessibilityRole="alert"
-              selectable
-              style={{ ...typography.body, color: colors.danger, textAlign: 'center' }}
-            >
-              {visibleError}
-            </Text>
-            <AppButton
-              loading={authorizing || authenticating}
-              onPress={() => void authorize()}
-              style={{ alignSelf: 'stretch' }}
-            >
-              Повторить
-            </AppButton>
-          </>
-        )}
-      </View>
-    </Screen>
+    <>
+      {user && sessionVerified ? (
+        user.blockedAt ? <BlockedAccountScreen /> : <OrderScreen />
+      ) : (
+        <Screen
+          contentStyle={{
+            minHeight: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: spacing.x8,
+          }}
+        >
+          <View style={{ width: '100%', maxWidth: 360, gap: spacing.x4, alignItems: 'center' }}>
+            <BrandMark size={56} />
+            {phonePermissionRequired ? (
+              <>
+                <Text selectable style={{ ...typography.body, color: colors.ink, textAlign: 'center' }}>
+                  Вам нужно разрешить доступ к номеру телефона, чтобы мы смогли вас идентифицировать.
+                </Text>
+                {visibleError ? (
+                  <Text
+                    accessibilityRole="alert"
+                    selectable
+                    style={{ ...typography.body, color: colors.danger, textAlign: 'center' }}
+                  >
+                    {visibleError}
+                  </Text>
+                ) : null}
+                <AppButton
+                  loading={authorizing || authenticating}
+                  onPress={() => void authorizeWithPhone()}
+                  style={{ alignSelf: 'stretch' }}
+                >
+                  Авторизоваться через VK
+                </AppButton>
+              </>
+            ) : !visibleError ? (
+              <>
+                <ActivityIndicator size="small" color={colors.inkSecondary} />
+                <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
+                  Входим через VK…
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text
+                  accessibilityRole="alert"
+                  selectable
+                  style={{ ...typography.body, color: colors.danger, textAlign: 'center' }}
+                >
+                  {visibleError}
+                </Text>
+                <AppButton
+                  loading={authorizing || authenticating}
+                  onPress={() => void authorize()}
+                  style={{ alignSelf: 'stretch' }}
+                >
+                  Повторить
+                </AppButton>
+              </>
+            )}
+          </View>
+        </Screen>
+      )}
+      <AppModal
+        visible={communityPermissionRequired}
+        title="Получать статусы поездок в VK?"
+        description="Разрешите сообщения сообщества, чтобы не пропустить назначение водителя, его прибытие и изменения заказа."
+        onClose={() => void finishAuthorization(false)}
+      >
+        <View style={{ gap: spacing.x3 }}>
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+            Разрешение не требуется для входа и заказа такси. Его можно не выдавать.
+          </Text>
+          <AppButton
+            loading={authorizing || authenticating}
+            foregroundColor="#FFFFFF"
+            icon={<VkLogo />}
+            onPress={() => void finishAuthorization(true)}
+            style={{ backgroundColor: '#0077FF' }}
+          >
+            Разрешить сообщения
+          </AppButton>
+          <AppButton
+            disabled={authorizing || authenticating}
+            variant="quiet"
+            onPress={() => void finishAuthorization(false)}
+          >
+            Не сейчас
+          </AppButton>
+        </View>
+      </AppModal>
+    </>
   );
 }
