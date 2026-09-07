@@ -74,6 +74,8 @@ jobs:
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
           VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
+          RUSTORE_PUSH_PROJECT_ID: ${{ vars.RUSTORE_PUSH_PROJECT_ID }}
+          RUSTORE_PUSH_SERVICE_TOKEN: ${{ secrets.RUSTORE_PUSH_SERVICE_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -155,6 +157,8 @@ jobs:
               'VK_CALLBACK_SECRET': os.environ['VK_CALLBACK_SECRET'],
               'VK_CALLBACK_CONFIRMATION': os.environ['VK_CALLBACK_CONFIRMATION'],
               'VK_API_VERSION': os.environ.get('VK_API_VERSION') or '5.199',
+              'RUSTORE_PUSH_PROJECT_ID': os.environ.get('RUSTORE_PUSH_PROJECT_ID', ''),
+              'RUSTORE_PUSH_SERVICE_TOKEN': os.environ.get('RUSTORE_PUSH_SERVICE_TOKEN', ''),
               'PHONE_CODE_TTL_MINUTES': '10',
               'PHONE_CODE_RESEND_SECONDS': '180',
               'TRUST_PROXY_HOPS': '1',
