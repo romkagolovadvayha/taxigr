@@ -178,6 +178,8 @@ export const TaxiMap = memo(function TaxiMap({
   viewportInsets,
   onMapReady,
   onMapError,
+  selectionCenter,
+  onCoordinateSelect,
 }: TaxiMapProps) {
   const { colorScheme } = useAppTheme();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -192,6 +194,14 @@ export const TaxiMap = memo(function TaxiMap({
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const routeDriver = trimCompletedRoute ? driver : null;
+  const coordinateSelectRef = useRef(onCoordinateSelect);
+  useEffect(() => { coordinateSelectRef.current = onCoordinateSelect; }, [onCoordinateSelect]);
+
+  useEffect(() => {
+    if (mapReady && selectionCenter) mapRef.current?.update({
+      location: { center: [selectionCenter.longitude, selectionCenter.latitude], zoom: 17 },
+    });
+  }, [mapReady, selectionCenter]);
 
   useEffect(() => {
     let active = true;
@@ -216,6 +226,9 @@ export const TaxiMap = memo(function TaxiMap({
         mapRef.current.addChild(
           new api.YMapListener({
             layer: 'any',
+            onClick: (_object, event) => coordinateSelectRef.current?.({
+              latitude: event.coordinates[1], longitude: event.coordinates[0],
+            }),
             onUpdate: ({ location }) => {
               zoomRef.current = location.zoom;
               routePointElementsRef.current.forEach((element) =>

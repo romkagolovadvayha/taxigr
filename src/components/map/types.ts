@@ -26,4 +26,6 @@ export type TaxiMapProps = {
   viewportInsets?: MapViewportInsets;
   onMapReady?: () => void;
   onMapError?: (message: string) => void;
+  selectionCenter?: Coordinates;
+  onCoordinateSelect?: (coordinates: Coordinates) => void;
 };

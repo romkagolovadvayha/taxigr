@@ -1,0 +1,2 @@
+ALTER TABLE orders
+  ADD COLUMN next_destination_index TINYINT UNSIGNED NOT NULL DEFAULT 0;

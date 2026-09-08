@@ -7,6 +7,11 @@ import {
 } from '../src/domain/ride-state';
 
 describe('ride state machine', () => {
+  it('advances the current point after a confirmed intermediate stop', () => {
+    expect([0, 1, 2, 3].map(index => driverRoutePointState('in_progress', index, 1))).toEqual([
+      'completed', 'completed', 'current', 'pending',
+    ]);
+  });
   it('allows only the ordered driver lifecycle', () => {
     expect(canTransitionRide('searching', 'accepted')).toBe(true);
     expect(canTransitionRide('accepted', 'driver_arriving')).toBe(true);

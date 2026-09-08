@@ -21,6 +21,8 @@ type State = {
   routeTarget?: DriverRouteTarget | null;
   viewportInsets?: MapViewportInsets;
   colorScheme?: AppColorScheme;
+  selectionCenter?: Coordinates;
+  coordinateSelectionEnabled?: boolean;
 };
 
 export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme = 'light'): string {
@@ -56,6 +58,8 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
   <script>
     let map;
     let entities = [];
+    let coordinateSelectionEnabled = false;
+    let selectionCenterKey = '';
     const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const apiReady = async () => {
       await ymaps3.ready;
@@ -68,6 +72,9 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
       }, [new YMapDefaultSchemeLayer({}),new YMapDefaultFeaturesLayer({})]);
       map.addChild(new YMapListener({
         layer:'any',
+        onClick:(_object,event)=>{
+          if(coordinateSelectionEnabled) ReactNativeWebView.postMessage(JSON.stringify({type:'coordinate',coordinates:{latitude:event.coordinates[1],longitude:event.coordinates[0]}}));
+        },
         onUpdate:({location})=>document.documentElement.classList.toggle('close-route-zoom',location.zoom>=15.5)
       }));
       ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
@@ -144,6 +151,12 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
       entities.forEach((entity)=>map.removeChild(entity));
       entities=[];
       const add=(entity)=>{map.addChild(entity);entities.push(entity)};
+      coordinateSelectionEnabled=Boolean(state.coordinateSelectionEnabled);
+      const nextCenterKey=JSON.stringify(state.selectionCenter||null);
+      if(state.selectionCenter&&nextCenterKey!==selectionCenterKey){
+        map.update({location:{center:[state.selectionCenter.longitude,state.selectionCenter.latitude],zoom:17}});
+      }
+      selectionCenterKey=nextCenterKey;
       const {YMapMarker,YMapFeature}=ymaps3;
       const insets=state.viewportInsets||{};
       const padding=18;

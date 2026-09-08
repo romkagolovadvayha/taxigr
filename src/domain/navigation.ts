@@ -30,6 +30,7 @@ export function navigationPositionBucket(coordinates: Coordinates): string {
 }
 
 export function formatNavigationDistance(distanceMeters: number): string {
+  if (distanceMeters <= 0) return '0 м';
   if (distanceMeters < 1_000) {
     return `${Math.max(10, Math.round(distanceMeters / 10) * 10)} м`;
   }

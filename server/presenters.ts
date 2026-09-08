@@ -31,6 +31,7 @@ export type OrderRow = RowDataPacket & {
   destination_lat: number;
   destination_lon: number;
   destinations_json: unknown;
+  next_destination_index: number;
   distance_meters: number;
   duration_seconds: number;
   route_geometry: unknown;
@@ -202,6 +203,8 @@ export function presentOrder(row: OrderRow): RideOrder {
     driverQueuePosition: assigned ? (row.active_driver_id ? 1 : 2) : undefined,
     pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
     destinations: orderedDestinations.length ? orderedDestinations : [legacyDestination],
+    nextDestinationIndex: Math.max(0, Math.min(Number(row.next_destination_index ?? 0),
+      Math.max(0, orderedDestinations.length - 1))),
     destination: finalDestination,
     tariff: row.tariff,
     status: row.status,

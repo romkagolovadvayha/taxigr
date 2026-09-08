@@ -77,7 +77,8 @@ export function buildManualAddress(query: string, anchor: Address | null): Addre
     id: manualId(label),
     label,
     houseNumber,
-    details: 'Введено вручную · точка приблизительная, водитель уточнит адрес',
+    coordinatePrecision: 'approximate',
+    details: `${anchor.label}, ${anchor.details?.split('·')[0]?.trim() ?? ''} · Введено вручную · точка приблизительная`,
     coordinates: anchor.coordinates,
   };
 }

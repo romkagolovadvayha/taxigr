@@ -45,6 +45,7 @@ import {
   isGrahovoAddress,
 } from '@/domain/pricing';
 import { canTransitionRide } from '@/domain/ride-state';
+import { normalizeRouteStops } from '@/domain/route-stops';
 import {
   searchPriceIncreaseOfferSlot,
   SEARCH_PRICE_INCREASE_MINOR,
@@ -96,6 +97,7 @@ type RideContextValue = {
   confirmSearchPriceIncrease: () => Promise<void>;
   transitionRide: (status: RideStatus) => Promise<void>;
   transitionDriverRide: (status: RideStatus) => Promise<boolean>;
+  completeDriverStop: () => Promise<void>;
   startWaiting: () => Promise<void>;
   stopWaiting: () => Promise<void>;
   releaseDriverRide: (reason: string, orderId?: string) => Promise<boolean>;
@@ -263,21 +265,22 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const selectPickup = useCallback((address: Address) => {
     invalidateQuote();
     setPickup(address);
+    setDestinations((current) => normalizeRouteStops(address, current));
   }, [invalidateQuote]);
 
   const selectDestination = useCallback((address: Address) => {
     invalidateQuote();
     setDestinations((current) =>
-      current.length ? current.map((item, index) => index === current.length - 1 ? address : item) : [address],
+      normalizeRouteStops(pickup, current.length ? current.map((item, index) => index === current.length - 1 ? address : item) : [address]),
     );
-  }, [invalidateQuote]);
+  }, [invalidateQuote, pickup]);
 
   const updateDestinations = useCallback(
     (update: (current: Address[]) => Address[]) => {
       invalidateQuote();
-      setDestinations(update);
+      setDestinations((current) => normalizeRouteStops(pickup, update(current)));
     },
-    [invalidateQuote],
+    [invalidateQuote, pickup],
   );
 
   const setDestinationAt = useCallback(
@@ -1066,6 +1069,33 @@ export function RideProvider({ children }: { children: ReactNode }) {
     [applyDriverOrder, demoSession, driverOffer, driverRide, nextDriverRide, refresh, token],
   );
 
+  const completeDriverStop = useCallback(async () => {
+    const current = driverRide;
+    if (!current || current.status !== 'in_progress' || transitionInFlight.current) return;
+    const destinationIndex = current.nextDestinationIndex ?? 0;
+    if (destinationIndex >= (current.destinations?.length ?? 1) - 1) return;
+    if (demoSession) {
+      applyDriverOrder({ ...current, nextDestinationIndex: destinationIndex + 1, updatedAt: new Date().toISOString() });
+      return;
+    }
+    if (!token) return;
+    transitionInFlight.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const ride = await apiRequest<RideOrder>(`/v1/driver/orders/${current.id}/stops/complete`, {
+        method: 'POST', token, body: JSON.stringify({ destinationIndex }),
+      });
+      applyDriverOrder(ride);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Не удалось подтвердить остановку');
+      await refresh();
+    } finally {
+      transitionInFlight.current = false;
+      setBusy(false);
+    }
+  }, [applyDriverOrder, demoSession, driverRide, refresh, token]);
+
   const confirmSearchPriceIncrease = useCallback(async () => {
     const current = currentRide;
     if (!current) return;
@@ -1354,6 +1384,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       confirmSearchPriceIncrease,
       transitionRide,
       transitionDriverRide,
+      completeDriverStop,
       startWaiting,
       stopWaiting,
       releaseDriverRide,
@@ -1419,6 +1450,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       releaseDriverRide,
       tariffs,
       transitionDriverRide,
+      completeDriverStop,
       transitionRide,
     ],
   );

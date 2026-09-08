@@ -21,6 +21,7 @@ import {
 } from '../src/domain/address-precision';
 import { buildDestinationHistory } from '../src/domain/address-history';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
+import { normalizeRouteStops } from '../src/domain/route-stops';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
   liveLocationUpdateDelay,
@@ -192,13 +193,14 @@ const addressSchema = z.object({
   placeId: z.string().uuid().optional(),
   kind: z.enum(['house', 'street', 'settlement', 'place']).optional(),
   coordinates: pointSchema,
+  coordinatePrecision: z.enum(['approximate', 'precise']).optional(),
 });
 const pickupAddressSchema = addressSchema.refine(isPickupAddressComplete, {
-  message: 'Для места подачи укажите адрес с номером дома или выберите место из справочника',
+  message: 'Для места подачи укажите дом или место и уточните приблизительную точку на карте',
   path: ['label'],
 });
 const destinationAddressSchema = addressSchema.refine(isDestinationAddressComplete, {
-  message: 'Укажите адрес с номером дома, место из справочника или населённый пункт',
+  message: 'Выберите населённый пункт или точный адрес. Приблизительную точку дома уточните на карте',
   path: ['label'],
 });
 const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u);
@@ -742,7 +744,13 @@ async function resolveTrustedAddresses(input: {
     resolveTrustedAddress(input.pickup),
     ...requestedDestinations.map(resolveTrustedAddress),
   ]);
-  return { pickup, destinations, destination: destinations.at(-1)! };
+  const orderedDestinations = normalizeRouteStops(pickup, destinations);
+  if (!orderedDestinations.length) {
+    throw Object.assign(new Error('Место подачи и назначение совпадают. Выберите другой адрес'), {
+      statusCode: 422, code: 'IDENTICAL_ROUTE_POINTS',
+    });
+  }
+  return { pickup, destinations: orderedDestinations, destination: orderedDestinations.at(-1)! };
 }
 
 function addressesMatch(left: Address, right: Address): boolean {
@@ -4944,7 +4952,7 @@ export async function registerRoutes(
             label: 'Текущее положение водителя',
             coordinates: origin,
           },
-          presentedOrder.destinations ?? [presentedOrder.destination],
+          (presentedOrder.destinations ?? [presentedOrder.destination]).slice(presentedOrder.nextDestinationIndex ?? 0),
         );
         return { data: { ...tripRoute, target: targetKind } };
       }
@@ -5369,6 +5377,46 @@ export async function registerRoutes(
     return { data: payload };
   });
 
+  app.post('/v1/driver/orders/:id/stops/complete', async (request) => {
+    const session = await auth(request, 'driver');
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const { destinationIndex } = parse(z.object({ destinationIndex: z.number().int().min(0).max(4) }), request.body);
+    await withTransaction(async (connection) => {
+      const driver = await getDriver(session.id, connection, true);
+      const [rows] = await connection.query<OrderRow[]>('SELECT * FROM orders WHERE id = ? FOR UPDATE', [id]);
+      const row = rows[0];
+      if (!driver || !row || row.driver_id !== driver.id) {
+        throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
+      }
+      if (row.active_driver_id !== driver.id || row.status !== 'in_progress') {
+        throw Object.assign(new Error('Остановку можно пройти только во время текущей поездки'), {
+          statusCode: 409, code: 'STOP_NOT_AVAILABLE',
+        });
+      }
+      const currentIndex = Number(row.next_destination_index ?? 0);
+      if (destinationIndex < currentIndex) return; // Retry of an already confirmed stop.
+      const order = presentOrder(row);
+      if (destinationIndex !== currentIndex || currentIndex >= (order.destinations?.length ?? 1) - 1) {
+        throw Object.assign(new Error('Подтвердите текущую промежуточную остановку'), {
+          statusCode: 409, code: 'INVALID_STOP_INDEX',
+        });
+      }
+      await connection.execute('UPDATE orders SET next_destination_index = ?, updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [currentIndex + 1, id]);
+      await connection.execute(
+        `INSERT INTO order_events (order_id, actor_user_id, event_type, payload)
+         VALUES (?, ?, 'order.stop_completed', ?)`,
+        [id, session.id, JSON.stringify({ destinationIndex })],
+      );
+    });
+    const row = await getOrder(id);
+    if (!row) throw new Error('Order disappeared');
+    const order = presentOrder(row);
+    publish(`user:${order.passengerId}`, 'order:updated', order);
+    publish(`driver:${order.driverId}`, 'order:updated', order);
+    publish('admins', 'order:updated', order);
+    return { data: order };
+  });
+
   app.post('/v1/driver/orders/:id/transition', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
@@ -5405,6 +5453,12 @@ export async function registerRoutes(
         throw Object.assign(new Error('Подтвердите получение оплаты перед завершением поездки'), {
           statusCode: 409,
           code: 'PAYMENT_CONFIRMATION_REQUIRED',
+        });
+      }
+      if (status === 'completed' && Number(row.next_destination_index ?? 0) <
+        (presentOrder(row).destinations?.length ?? 1) - 1) {
+        throw Object.assign(new Error('Сначала подтвердите промежуточные остановки'), {
+          statusCode: 409, code: 'STOPS_NOT_COMPLETED',
         });
       }
       if (status === 'driver_waiting') {

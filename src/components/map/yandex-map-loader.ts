@@ -10,6 +10,7 @@ declare global {
       YMapListener: new (props: {
         layer: 'any';
         onUpdate?: (event: { location: { zoom: number } }) => void;
+        onClick?: (object: unknown, event: { coordinates: [number, number] }) => void;
       }) => unknown;
     };
   }

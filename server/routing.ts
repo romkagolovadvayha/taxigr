@@ -5,6 +5,7 @@ import {
   isGrahovoAddress,
   type PricingScope,
 } from '../src/domain/pricing';
+import { normalizeRouteStops } from '../src/domain/route-stops';
 import { config } from './config';
 
 export type Point = { latitude: number; longitude: number };
@@ -88,6 +89,7 @@ export function haversineMeters(a: Point, b: Point): number {
 
 export function estimateRoute(origin: Point, destination: Point): RouteMetrics {
   const direct = haversineMeters(origin, destination);
+  if (direct < 0.01) return { distanceMeters: 0, durationSeconds: 0, source: 'estimate', coordinates: [] };
   const distanceMeters = Math.max(800, Math.round(direct * 1.28));
   const averageMetersPerSecond = distanceMeters < 20_000 ? 10 : 16;
   return {
@@ -139,8 +141,8 @@ export function parseOsrmRoute(body: OsrmResponse): RouteMetrics {
     !route ||
     !Number.isFinite(route.distance) ||
     !Number.isFinite(route.duration) ||
-    route.distance! <= 0 ||
-    route.duration! <= 0 ||
+    route.distance! < 0 ||
+    route.duration! < 0 ||
     route.geometry?.type !== 'LineString' ||
     routeCoordinates.length < 2
   ) {
@@ -226,8 +228,9 @@ export async function getMultiStopRouteMetrics(
   destinations: readonly Address[],
   resolveRoute: RouteMetricsResolver = getRouteMetrics,
 ): Promise<{ tripRoute: RouteMetrics; segments: MultiStopRouteSegment[] }> {
-  const addressPairs = destinations.map((destination, index) => ({
-    origin: index === 0 ? pickup : destinations[index - 1]!,
+  const orderedDestinations = normalizeRouteStops(pickup, destinations);
+  const addressPairs = orderedDestinations.map((destination, index) => ({
+    origin: index === 0 ? pickup : orderedDestinations[index - 1]!,
     destination,
   }));
   const routes = await Promise.all(

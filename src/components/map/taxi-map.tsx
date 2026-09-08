@@ -39,6 +39,8 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
             routeTarget: props.routeTarget,
             viewportInsets: props.viewportInsets,
             colorScheme,
+            selectionCenter: props.selectionCenter,
+            coordinateSelectionEnabled: Boolean(props.onCoordinateSelect),
           })
         : '',
     [
@@ -58,6 +60,8 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
       props.routeTarget,
       props.trimCompletedRoute,
       props.viewportInsets,
+      props.selectionCenter,
+      props.onCoordinateSelect,
       colorScheme,
     ],
   );
@@ -78,7 +82,12 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
 
   const onMessage = (event: WebViewMessageEvent) => {
     try {
-      const message = JSON.parse(event.nativeEvent.data) as { type: string; message?: string };
+      const message = JSON.parse(event.nativeEvent.data) as { type: string; message?: string; coordinates?: {latitude: number; longitude: number} };
+      if (message.type === 'coordinate' && message.coordinates &&
+        Number.isFinite(message.coordinates.latitude) && Math.abs(message.coordinates.latitude) <= 90 &&
+        Number.isFinite(message.coordinates.longitude) && Math.abs(message.coordinates.longitude) <= 180) {
+        props.onCoordinateSelect?.(message.coordinates);
+      }
       if (message.type === 'ready') {
         setReady(true);
         props.onMapReady?.();

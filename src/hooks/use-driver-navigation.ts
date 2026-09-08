@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 
 import { apiRequest } from '@/api/client';
@@ -47,11 +47,18 @@ export function useDriverNavigation({
   const rideId = ride?.id ?? null;
   const rideStatus = ride?.status ?? null;
   const targetKind = rideStatus ? driverRouteTarget(rideStatus) : null;
+  const nextDestinationIndex = ride?.nextDestinationIndex ?? 0;
+  const destinations = ride?.destinations;
+  const destination = ride?.destination;
+  const remainingDestinations = useMemo(
+    () => (destinations ?? (destination ? [destination] : [])).slice(nextDestinationIndex),
+    [destinations, destination, nextDestinationIndex],
+  );
   const targetSource =
     ride && targetKind
       ? targetKind === 'pickup'
         ? ride.pickup
-        : ride.destination
+        : ride.destinations?.[nextDestinationIndex] ?? ride.destination
       : null;
   const target = targetSource;
   const positionBucket = origin ? navigationPositionBucket(origin) : null;
@@ -64,7 +71,7 @@ export function useDriverNavigation({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const routeKey = rideId && targetKind ? `${rideId}:${targetKind}` : null;
+  const routeKey = rideId && targetKind ? `${rideId}:${targetKind}:${nextDestinationIndex}` : null;
   const routeKeyRef = useRef(routeKey);
 
   useEffect(
@@ -113,7 +120,8 @@ export function useDriverNavigation({
               houseNumber: '1',
               coordinates: requestOrigin,
             },
-            destination: target,
+            destination: targetKind === 'pickup' ? target : remainingDestinations.at(-1),
+            destinations: targetKind === 'pickup' ? [target] : remainingDestinations,
           }),
         }).then((response) => ('coordinates' in response ? response : response.route))
       : apiRequest<NavigationRouteResponse>(`/v1/driver/orders/${rideId}/route`, {
@@ -125,8 +133,9 @@ export function useDriverNavigation({
 
     void request
       .then((route) => {
+        if (controller.signal.aborted) return;
         const nextCoordinates = drawableNavigationRoute(route.coordinates);
-        if (nextCoordinates.length >= 2) {
+        if (nextCoordinates.length >= 2 || (route.distanceMeters === 0 && route.durationSeconds === 0)) {
           setSummary(route);
           setCoordinates(nextCoordinates);
           setError(null);
@@ -151,7 +160,7 @@ export function useDriverNavigation({
       if (resetTimer) clearTimeout(resetTimer);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [demo, positionBucket, retryKey, rideId, routeKey, target, targetKind, token]);
+  }, [demo, positionBucket, remainingDestinations, retryKey, rideId, routeKey, target, targetKind, token]);
 
   return {
     active: Boolean(rideId && origin && targetKind),

@@ -21,6 +21,7 @@ import {
 } from '../src/legal/documents';
 import { signSession } from '../server/security';
 import { buildAuthIdentity, consumeAuthRateLimits } from '../server/auth-abuse';
+import { confirmAddressPoint } from '../src/domain/route-stops';
 
 const runIntegration = process.env.RUN_API_INTEGRATION === '1';
 const apiUrl = process.env.INTEGRATION_API_URL ?? 'http://127.0.0.1:4100';
@@ -482,6 +483,69 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(rejected.status).toBe(400);
     expect(rejected.error?.code).toBe('VALIDATION_ERROR');
   });
+
+  it('rejects approximate house points and identical endpoints, and prices duplicate stops once', async () => {
+    const approximate = { ...pickup, id: 'gar:legacy-house', details: 'Граховский район · точка приблизительная' };
+    const body = { pickup: approximate, destination };
+    expect((await api('/v1/quotes', { token: passengerToken, method: 'POST', body })).status).toBe(400);
+    expect((await api('/v1/quotes', { token: passengerToken, method: 'POST', body: {
+      pickup, destination: { ...destination, coordinatePrecision: 'approximate' },
+    } })).status).toBe(400);
+    const confirmed = confirmAddressPoint(approximate, pickup.coordinates);
+    expect((await api('/v1/quotes', { token: passengerToken, method: 'POST', body: { pickup: confirmed, destination } })).status).toBe(200);
+    const identical = await api('/v1/quotes', { token: passengerToken, method: 'POST', body: { pickup, destination: pickup } });
+    expect(identical.status).toBe(422);
+    expect(identical.error?.code).toBe('IDENTICAL_ROUTE_POINTS');
+    const quoteBody = { pickup, destination: pickup, destinations: [destination, pickup] };
+    const direct = await api<{ route: unknown; tariffs: unknown }>('/v1/quotes', { token: passengerToken, method: 'POST', body: quoteBody });
+    const repeated = await api<{ route: unknown; tariffs: unknown }>('/v1/quotes', { token: passengerToken, method: 'POST', body: {
+      ...quoteBody, destinations: [destination, destination, pickup],
+    } });
+    expect(direct.status).toBe(200);
+    expect(repeated.status).toBe(200);
+    expect(repeated.data?.route).toEqual(direct.data?.route);
+    expect(repeated.data?.tariffs).toEqual(direct.data?.tariffs);
+  });
+
+  it('persists stop progress, prevents skipped stops, and routes only through remaining destinations', async () => {
+    await setDriverStatus(driverOneToken, 'online');
+    const final = { ...pickup, id: 'final', label: 'с. Грахово, ул. 50 лет Победы, 19',
+      coordinates: { latitude: 56.055332, longitude: 51.960263 } };
+    const routeBody = { pickup, destination: final, destinations: [destination, destination, final] };
+    const quote = await api<{ quoteToken: string }>('/v1/quotes', { method: 'POST', token: passengerToken, body: routeBody });
+    expect(quote.status).toBe(200);
+    const created = await api<RideOrder>('/v1/orders', { method: 'POST', token: passengerToken, body: {
+      ...routeBody, tariff: 'economy', quoteToken: quote.data!.quoteToken, paymentMethod: 'cash',
+      idempotencyKey: randomUUID(), deviceId: 'stop-progress-integration-device',
+    } });
+    expect(created.status).toBe(201);
+    expect(created.data?.destinations).toHaveLength(2);
+    const orderId = created.data!.id;
+    const stopPath = `/v1/driver/orders/${orderId}/stops/complete`;
+    await api(`/v1/driver/orders/${orderId}/accept`, { method: 'POST', token: driverOneToken, body: {} });
+    expect((await api(stopPath, { method: 'POST', token: driverOneToken, body: { destinationIndex: 0 } })).status).toBe(409);
+    await api('/v1/driver/location', { method: 'PUT', token: driverOneToken, body: { ...pickup.coordinates, accuracyMeters: 8 } });
+    for (const status of ['driver_arriving', 'driver_waiting', 'in_progress']) {
+      expect((await api(`/v1/driver/orders/${orderId}/transition`, { method: 'POST', token: driverOneToken, body: { status } })).status).toBe(200);
+    }
+    const premature = await api(`/v1/driver/orders/${orderId}/transition`, { method: 'POST', token: driverOneToken, body: { status: 'completed', paymentReceived: true } });
+    expect(premature.error?.code).toBe('STOPS_NOT_COMPLETED');
+    expect((await api(stopPath, { method: 'POST', token: driverTwoToken, body: { destinationIndex: 0 } })).status).toBe(404);
+    expect((await api(stopPath, { method: 'POST', token: driverOneToken, body: { destinationIndex: 1 } })).status).toBe(409);
+    const confirmations = await Promise.all([0, 0].map(destinationIndex => api<RideOrder>(stopPath, {
+      method: 'POST', token: driverOneToken, body: { destinationIndex },
+    })));
+    expect(confirmations.map(result => result.data?.nextDestinationIndex)).toEqual([1, 1]);
+    const [persisted] = await connection.query<mysql.RowDataPacket[]>('SELECT next_destination_index FROM orders WHERE id = ?', [orderId]);
+    expect(persisted[0]?.next_destination_index).toBe(1);
+    const remaining = await api<{ distanceMeters: number; durationSeconds: number }>(`/v1/driver/orders/${orderId}/route`, {
+      method: 'POST', token: driverOneToken, body: final.coordinates,
+    });
+    expect(remaining.data?.distanceMeters).toBe(0);
+    expect(remaining.data?.durationSeconds).toBe(0);
+    expect((await api(`/v1/driver/orders/${orderId}/transition`, { method: 'POST', token: driverOneToken,
+      body: { status: 'completed', paymentReceived: true } })).status).toBe(200);
+  }, 20_000);
 
   it('lists account details and enforces reasoned account blocks', async () => {
     const passengers = await api<Array<{ id: string; blockedAt?: string }>>(

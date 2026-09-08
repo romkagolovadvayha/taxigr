@@ -6,6 +6,8 @@ import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { ApiError, apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { AppButton } from '@/components/ui/app-button';
+import { TaxiMap } from '@/components/map/taxi-map';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
@@ -22,13 +24,15 @@ import {
   extractHouseNumber,
   extractQueryHouseNumber,
   hasHouseNumber,
+  hasApproximateCoordinates,
   isDestinationAddressComplete,
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
 import { buildStreetSuggestions } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
-import type { Address } from '@/domain/models';
+import type { Address, Coordinates } from '@/domain/models';
+import { confirmAddressPoint } from '@/domain/route-stops';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
@@ -140,6 +144,7 @@ function AddressResult({
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
   const displayLines = formatAddressSuggestionLines(address);
+  const needsMapPoint = hasHouseNumber(address) && hasApproximateCoordinates(address);
   const precise = hasHouseNumber(address) || Boolean(place) || directSelectionAllowed;
   const refinement = !precise && !history;
   return (
@@ -202,6 +207,11 @@ function AddressResult({
             style={{ ...typography.caption, color: colors.inkSecondary }}
           >
             {displayLines.secondary}
+          </Text>
+        )}
+        {needsMapPoint && (
+          <Text style={{ ...typography.caption, color: colors.warningText }}>
+            Укажите точку дома на карте
           </Text>
         )}
         {!!place?.description && (
@@ -277,6 +287,9 @@ export function AddressSearchScreen() {
   const [query, setQuery] = useState(initialQueryValue);
   const [edited, setEdited] = useState(false);
   const [selectedStreet, setSelectedStreet] = useState<Address | null>(null);
+  const [pendingAddress, setPendingAddress] = useState<Address | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<Coordinates | null>(null);
+  const [pointMapError, setPointMapError] = useState<string | null>(null);
   const [remoteResults, setRemoteResults] = useState<Address[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -412,6 +425,14 @@ export function AddressSearchScreen() {
   }, []);
 
   const selectAddress = (address: Address) => {
+    if (hasApproximateCoordinates(address) &&
+      (hasHouseNumber(address) || address.placeId) &&
+      !(field === 'destination' && address.kind === 'settlement')) {
+      setPendingAddress(address);
+      setSelectedPoint(null);
+      setPointMapError(null);
+      return;
+    }
     if (
       !hasHouseNumber(address) &&
       !address.placeId &&
@@ -446,6 +467,37 @@ export function AddressSearchScreen() {
     }
     goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
   };
+
+  if (pendingAddress) {
+    return (
+      <Screen contentStyle={{ maxWidth: 760 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
+          <IconButton icon="back" label="Назад к адресам" onPress={() => setPendingAddress(null)} />
+          <Text accessibilityRole="header" style={{ ...typography.pageTitle, color: colors.ink }}>
+            Укажите точку дома
+          </Text>
+        </View>
+        <Text style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
+        <Text style={{ ...typography.body, color: colors.inkSecondary }}>
+          Точное расположение дома пока неизвестно. Нажмите на карте на дом или удобный подъезд к нему.
+        </Text>
+        <View style={{ height: 360, overflow: 'hidden', borderRadius: radius.lg }}>
+          <TaxiMap
+            selectionCenter={pendingAddress.coordinates}
+            pickup={selectedPoint ? { ...pendingAddress, coordinates: selectedPoint } : null}
+            onCoordinateSelect={setSelectedPoint}
+            onMapError={setPointMapError}
+          />
+        </View>
+        {pointMapError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pointMapError}</Text>}
+        <AppButton disabled={!selectedPoint || Boolean(pointMapError)} onPress={() => {
+          if (selectedPoint) selectAddress(confirmAddressPoint(pendingAddress, selectedPoint));
+        }}>
+          Подтвердить точку
+        </AppButton>
+      </Screen>
+    );
+  }
 
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>

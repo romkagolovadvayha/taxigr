@@ -1,0 +1,1221 @@
+{
+  "date": "2026-09-08",
+  "environment": {
+    "app": "http://localhost:8090",
+    "api": "http://127.0.0.1:4110",
+    "database": "taxi_route_audit_20260908",
+    "router": "https://router.project-osrm.org",
+    "productionRouterTested": false
+  },
+  "points": [
+    {
+      "id": "grahovo-center",
+      "label": "с. Грахово, ул. Ачинцева, 5",
+      "houseNumber": "5",
+      "details": "МФЦ Граховского района",
+      "coordinates": {
+        "latitude": 56.0477,
+        "longitude": 51.9586
+      }
+    },
+    {
+      "id": "grahovo-church",
+      "label": "с. Грахово, ул. Колпакова, 1Б",
+      "houseNumber": "1Б",
+      "details": "Христорождественская церковь",
+      "coordinates": {
+        "latitude": 56.04576,
+        "longitude": 51.96165
+      }
+    },
+    {
+      "id": "blagodatnoe",
+      "label": "д. Благодатное, ул. Благодатновская, 53А",
+      "details": "Граховский район, Удмуртская Республика · точка дома",
+      "houseNumber": "53А",
+      "coordinates": {
+        "latitude": 55.9995786,
+        "longitude": 51.8684492
+      }
+    },
+    {
+      "id": "mozhga",
+      "label": "г. Можга, Привокзальная ул., 6",
+      "details": "Железнодорожный вокзал, Удмуртская Республика · точка дома",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.445658,
+        "longitude": 52.1972249
+      }
+    },
+    {
+      "id": "grahovo-50-let-pobedy-19",
+      "label": "ул. 50 лет Победы, 19",
+      "houseNumber": "19",
+      "details": "с. Грахово, Граховский район, Удмуртская Республика · точка дома",
+      "coordinates": {
+        "latitude": 56.055332,
+        "longitude": 51.960263
+      }
+    },
+    {
+      "id": "porshur-audit",
+      "label": "д. Поршур, ул. Бабаева, 32",
+      "houseNumber": "32",
+      "details": "Граховский район, Удмуртская Республика",
+      "coordinates": {
+        "latitude": 56.0248498,
+        "longitude": 51.839
+      }
+    }
+  ],
+  "matrix": [
+    {
+      "name": "0 → 0",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 576,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 800,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "0 → 1",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 61,
+      "source": "osrm",
+      "distanceMeters": 455,
+      "durationSeconds": 75,
+      "geometryPoints": 13,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 31,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 455,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "0 → 2",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 15,
+      "source": "osrm",
+      "distanceMeters": 9529,
+      "durationSeconds": 1028,
+      "geometryPoints": 67,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 20,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9529,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 580,
+      "childRub": 650
+    },
+    {
+      "name": "0 → 3",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 28,
+      "source": "osrm",
+      "distanceMeters": 56416,
+      "durationSeconds": 3999,
+      "geometryPoints": 372,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 56416,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 1700,
+      "childRub": 1770
+    },
+    {
+      "name": "0 → 4",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 367,
+      "source": "osrm",
+      "distanceMeters": 1463,
+      "durationSeconds": 164,
+      "geometryPoints": 31,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 21,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 1463,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "0 → 5",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 106,
+      "source": "osrm",
+      "distanceMeters": 9072,
+      "durationSeconds": 824,
+      "geometryPoints": 69,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 287,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9072,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 550,
+      "childRub": 620
+    },
+    {
+      "name": "1 → 0",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 131,
+      "source": "osrm",
+      "distanceMeters": 455,
+      "durationSeconds": 69,
+      "geometryPoints": 13,
+      "originSnapMeters": 31,
+      "destinationSnapMeters": 5,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 455,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "1 → 1",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 135,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 800,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "1 → 2",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 114,
+      "source": "osrm",
+      "distanceMeters": 9264,
+      "durationSeconds": 1014,
+      "geometryPoints": 61,
+      "originSnapMeters": 31,
+      "destinationSnapMeters": 20,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9264,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 560,
+      "childRub": 630
+    },
+    {
+      "name": "1 → 3",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 129,
+      "source": "osrm",
+      "distanceMeters": 56835,
+      "durationSeconds": 4059,
+      "geometryPoints": 380,
+      "originSnapMeters": 31,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 56835,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 1710,
+      "childRub": 1780
+    },
+    {
+      "name": "1 → 4",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 65,
+      "source": "osrm",
+      "distanceMeters": 1882,
+      "durationSeconds": 224,
+      "geometryPoints": 39,
+      "originSnapMeters": 31,
+      "destinationSnapMeters": 21,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 1882,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "1 → 5",
+      "pickup": "с. Грахово, ул. Колпакова, 1Б",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 319,
+      "source": "osrm",
+      "distanceMeters": 8806,
+      "durationSeconds": 811,
+      "geometryPoints": 63,
+      "originSnapMeters": 31,
+      "destinationSnapMeters": 287,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 8806,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 530,
+      "childRub": 600
+    },
+    {
+      "name": "2 → 0",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 318,
+      "source": "osrm",
+      "distanceMeters": 9529,
+      "durationSeconds": 1025,
+      "geometryPoints": 67,
+      "originSnapMeters": 20,
+      "destinationSnapMeters": 5,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9529,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 580,
+      "childRub": 650
+    },
+    {
+      "name": "2 → 1",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 157,
+      "source": "osrm",
+      "distanceMeters": 9264,
+      "durationSeconds": 1015,
+      "geometryPoints": 61,
+      "originSnapMeters": 20,
+      "destinationSnapMeters": 31,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9264,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 560,
+      "childRub": 630
+    },
+    {
+      "name": "2 → 2",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 127,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 800,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 50,
+      "childRub": 120
+    },
+    {
+      "name": "2 → 3",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 144,
+      "source": "osrm",
+      "distanceMeters": 65910,
+      "durationSeconds": 5016,
+      "geometryPoints": 434,
+      "originSnapMeters": 20,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 75423,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 2270,
+      "childRub": 2340
+    },
+    {
+      "name": "2 → 4",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 123,
+      "source": "osrm",
+      "distanceMeters": 10956,
+      "durationSeconds": 1181,
+      "geometryPoints": 93,
+      "originSnapMeters": 20,
+      "destinationSnapMeters": 21,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 10956,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 660,
+      "childRub": 730
+    },
+    {
+      "name": "2 → 5",
+      "pickup": "д. Благодатное, ул. Благодатновская, 53А",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 121,
+      "source": "osrm",
+      "distanceMeters": 6893,
+      "durationSeconds": 780,
+      "geometryPoints": 47,
+      "originSnapMeters": 20,
+      "destinationSnapMeters": 287,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 6893,
+      "driverApproachDistanceMeters": 9513,
+      "economyRub": 420,
+      "childRub": 490
+    },
+    {
+      "name": "3 → 0",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 336,
+      "source": "osrm",
+      "distanceMeters": 56402,
+      "durationSeconds": 4006,
+      "geometryPoints": 374,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 5,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 112802,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 3390,
+      "childRub": 3460
+    },
+    {
+      "name": "3 → 1",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 122,
+      "source": "osrm",
+      "distanceMeters": 56821,
+      "durationSeconds": 4066,
+      "geometryPoints": 382,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 31,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 113221,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 3400,
+      "childRub": 3470
+    },
+    {
+      "name": "3 → 2",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 107,
+      "source": "osrm",
+      "distanceMeters": 65896,
+      "durationSeconds": 5019,
+      "geometryPoints": 436,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 20,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 122296,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 3670,
+      "childRub": 3740
+    },
+    {
+      "name": "3 → 3",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 115,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 57200,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 1720,
+      "childRub": 1790
+    },
+    {
+      "name": "3 → 4",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 121,
+      "source": "osrm",
+      "distanceMeters": 55925,
+      "durationSeconds": 3993,
+      "geometryPoints": 366,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 21,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 112325,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 3370,
+      "childRub": 3440
+    },
+    {
+      "name": "3 → 5",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 118,
+      "source": "osrm",
+      "distanceMeters": 65438,
+      "durationSeconds": 4816,
+      "geometryPoints": 438,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 287,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 121838,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 3660,
+      "childRub": 3730
+    },
+    {
+      "name": "4 → 0",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 115,
+      "source": "osrm",
+      "distanceMeters": 1302,
+      "durationSeconds": 165,
+      "geometryPoints": 34,
+      "originSnapMeters": 21,
+      "destinationSnapMeters": 5,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 1302,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "4 → 1",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 117,
+      "source": "osrm",
+      "distanceMeters": 1721,
+      "durationSeconds": 225,
+      "geometryPoints": 42,
+      "originSnapMeters": 21,
+      "destinationSnapMeters": 31,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 1721,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "4 → 2",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 120,
+      "source": "osrm",
+      "distanceMeters": 10795,
+      "durationSeconds": 1178,
+      "geometryPoints": 96,
+      "originSnapMeters": 21,
+      "destinationSnapMeters": 20,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 10795,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 650,
+      "childRub": 720
+    },
+    {
+      "name": "4 → 3",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 103,
+      "source": "osrm",
+      "distanceMeters": 55939,
+      "durationSeconds": 3990,
+      "geometryPoints": 364,
+      "originSnapMeters": 21,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 55939,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 1680,
+      "childRub": 1750
+    },
+    {
+      "name": "4 → 4",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 120,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 800,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 150,
+      "childRub": 220
+    },
+    {
+      "name": "4 → 5",
+      "pickup": "ул. 50 лет Победы, 19",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 118,
+      "source": "osrm",
+      "distanceMeters": 10338,
+      "durationSeconds": 975,
+      "geometryPoints": 98,
+      "originSnapMeters": 21,
+      "destinationSnapMeters": 287,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 10338,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 630,
+      "childRub": 700
+    },
+    {
+      "name": "5 → 0",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 305,
+      "source": "osrm",
+      "distanceMeters": 9072,
+      "durationSeconds": 824,
+      "geometryPoints": 69,
+      "originSnapMeters": 287,
+      "destinationSnapMeters": 5,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 9072,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 550,
+      "childRub": 620
+    },
+    {
+      "name": "5 → 1",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 118,
+      "source": "osrm",
+      "distanceMeters": 8806,
+      "durationSeconds": 814,
+      "geometryPoints": 63,
+      "originSnapMeters": 287,
+      "destinationSnapMeters": 31,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 8806,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 530,
+      "childRub": 600
+    },
+    {
+      "name": "5 → 2",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 200,
+      "elapsedMs": 210,
+      "source": "osrm",
+      "distanceMeters": 6893,
+      "durationSeconds": 777,
+      "geometryPoints": 47,
+      "originSnapMeters": 287,
+      "destinationSnapMeters": 20,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 6893,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 420,
+      "childRub": 490
+    },
+    {
+      "name": "5 → 3",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 118,
+      "source": "osrm",
+      "distanceMeters": 65452,
+      "durationSeconds": 4815,
+      "geometryPoints": 436,
+      "originSnapMeters": 287,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 74507,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 2240,
+      "childRub": 2310
+    },
+    {
+      "name": "5 → 4",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 116,
+      "source": "osrm",
+      "distanceMeters": 10499,
+      "durationSeconds": 979,
+      "geometryPoints": 95,
+      "originSnapMeters": 287,
+      "destinationSnapMeters": 21,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 10499,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 630,
+      "childRub": 700
+    },
+    {
+      "name": "5 → 5",
+      "pickup": "д. Поршур, ул. Бабаева, 32",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32"
+      ],
+      "status": 200,
+      "elapsedMs": 116,
+      "source": "estimate",
+      "distanceMeters": 800,
+      "durationSeconds": 300,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 800,
+      "driverApproachDistanceMeters": 9055,
+      "economyRub": 50,
+      "childRub": 120
+    },
+    {
+      "name": "local two legs",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 20,
+      "source": "osrm",
+      "distanceMeters": 2337,
+      "durationSeconds": 299,
+      "geometryPoints": 51,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 21,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 2337,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 240,
+      "childRub": 310
+    },
+    {
+      "name": "local return",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 19,
+      "source": "osrm",
+      "distanceMeters": 910,
+      "durationSeconds": 144,
+      "geometryPoints": 25,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 5,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 910,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 240,
+      "childRub": 310
+    },
+    {
+      "name": "district round trip",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32",
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 200,
+      "elapsedMs": 33,
+      "source": "osrm",
+      "distanceMeters": 18144,
+      "durationSeconds": 1648,
+      "geometryPoints": 137,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 5,
+      "pricingScope": "district",
+      "pricingDistanceMeters": 18144,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 1100,
+      "childRub": 1170
+    },
+    {
+      "name": "mixed route",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "д. Поршур, ул. Бабаева, 32",
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 23,
+      "source": "osrm",
+      "distanceMeters": 74713,
+      "durationSeconds": 5701,
+      "geometryPoints": 510,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 74713,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 2650,
+      "childRub": 2720
+    },
+    {
+      "name": "intercity pickup with stops",
+      "pickup": "г. Можга, Привокзальная ул., 6",
+      "destinations": [
+        "д. Поршур, ул. Бабаева, 32",
+        "с. Грахово, ул. Ачинцева, 5",
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 200,
+      "elapsedMs": 26,
+      "source": "osrm",
+      "distanceMeters": 74965,
+      "durationSeconds": 5715,
+      "geometryPoints": 518,
+      "originSnapMeters": 0,
+      "destinationSnapMeters": 31,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 131365,
+      "driverApproachDistanceMeters": 56400,
+      "economyRub": 4360,
+      "childRub": 4430
+    },
+    {
+      "name": "five destinations",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "ул. 50 лет Победы, 19",
+        "д. Поршур, ул. Бабаева, 32",
+        "д. Благодатное, ул. Благодатновская, 53А",
+        "г. Можга, Привокзальная ул., 6"
+      ],
+      "status": 200,
+      "elapsedMs": 23,
+      "source": "osrm",
+      "distanceMeters": 85478,
+      "durationSeconds": 7067,
+      "geometryPoints": 627,
+      "originSnapMeters": 5,
+      "destinationSnapMeters": 0,
+      "pricingScope": "intercity",
+      "pricingDistanceMeters": 85478,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 3330,
+      "childRub": 3400
+    },
+    {
+      "name": "duplicate intermediate stop",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "с. Грахово, ул. Колпакова, 1Б",
+        "ул. 50 лет Победы, 19"
+      ],
+      "status": 200,
+      "elapsedMs": 321,
+      "source": "estimate",
+      "distanceMeters": 3137,
+      "durationSeconds": 599,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "pricingScope": "grahovo",
+      "pricingDistanceMeters": 3137,
+      "driverApproachDistanceMeters": 0,
+      "economyRub": 330,
+      "childRub": 400
+    },
+    {
+      "name": "six destinations rejected",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б",
+        "ул. 50 лет Победы, 19",
+        "д. Поршур, ул. Бабаева, 32",
+        "д. Благодатное, ул. Благодатновская, 53А",
+        "г. Можга, Привокзальная ул., 6",
+        "с. Грахово, ул. Ачинцева, 5"
+      ],
+      "status": 400,
+      "elapsedMs": 20,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "economyRub": null,
+      "childRub": null,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Проверьте заполненные данные",
+        "details": {
+          "formErrors": [],
+          "fieldErrors": {
+            "destinations": [
+              "Too big: expected array to have <=5 items"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "mismatched final destination",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "д. Благодатное, ул. Благодатновская, 53А"
+      ],
+      "status": 422,
+      "elapsedMs": 18,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "economyRub": null,
+      "childRub": null,
+      "error": {
+        "code": "DESTINATION_ORDER_MISMATCH",
+        "message": "Последняя точка маршрута не совпадает с адресом назначения"
+      }
+    },
+    {
+      "name": "pickup without house",
+      "pickup": "с. Грахово",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 400,
+      "elapsedMs": 19,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "economyRub": null,
+      "childRub": null,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Проверьте заполненные данные",
+        "details": {
+          "formErrors": [],
+          "fieldErrors": {
+            "pickup": [
+              "Для места подачи укажите адрес с номером дома или выберите место из справочника"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "invalid coordinates",
+      "pickup": "с. Грахово, ул. Ачинцева, 5",
+      "destinations": [
+        "с. Грахово, ул. Колпакова, 1Б"
+      ],
+      "status": 400,
+      "elapsedMs": 19,
+      "geometryPoints": 0,
+      "originSnapMeters": null,
+      "destinationSnapMeters": null,
+      "economyRub": null,
+      "childRub": null,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Проверьте заполненные данные",
+        "details": {
+          "formErrors": [],
+          "fieldErrors": {
+            "pickup": [
+              "Too big: expected number to be <=90"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "addressSearch": [
+    {
+      "query": "Грахово Советская 1",
+      "status": 200,
+      "results": [
+        {
+          "id": "gar:с-грахово-ул-советская:д-1",
+          "label": "с. Грахово, ул. Советская, 1",
+          "houseNumber": "1",
+          "kind": "house",
+          "details": "Граховский район, Удмуртская Республика · активный адрес из ГАР (д.), точка приблизительная",
+          "coordinates": {
+            "latitude": 56.0457978,
+            "longitude": 51.9607416
+          }
+        }
+      ]
+    },
+    {
+      "query": "Грахово Береговая 32",
+      "status": 200,
+      "results": [
+        {
+          "id": "gar:с-грахово-ул-береговая:д-32",
+          "label": "с. Грахово, ул. Береговая, 32",
+          "houseNumber": "32",
+          "kind": "house",
+          "details": "Граховский район, Удмуртская Республика · активный адрес из ГАР (д.), точка приблизительная",
+          "coordinates": {
+            "latitude": 56.0457978,
+            "longitude": 51.9607416
+          }
+        }
+      ]
+    },
+    {
+      "query": "Можга",
+      "status": 200,
+      "results": [
+        {
+          "id": "osm-199211406",
+          "label": "Можга",
+          "details": "Можга, Удмуртия, Россия",
+          "kind": "settlement",
+          "coordinates": {
+            "latitude": 56.4426833,
+            "longitude": 52.2138722
+          }
+        },
+        {
+          "id": "osm-199581664",
+          "label": "Можга",
+          "details": "Можга, Можгинский район, Удмуртия, Россия",
+          "kind": "settlement",
+          "coordinates": {
+            "latitude": 56.3751696,
+            "longitude": 52.2563076
+          }
+        }
+      ]
+    },
+    {
+      "query": "Алнаши",
+      "status": 200,
+      "results": [
+        {
+          "id": "osm-199458427",
+          "label": "Алнаши",
+          "details": "Алнаши, Алнашский район, Удмуртия, Россия",
+          "kind": "settlement",
+          "coordinates": {
+            "latitude": 56.1848812,
+            "longitude": 52.4755309
+          }
+        }
+      ]
+    },
+    {
+      "query": "Ижевск",
+      "status": 200,
+      "results": [
+        {
+          "id": "osm-199005555",
+          "label": "Ижевск",
+          "details": "Ижевск, Удмуртия, Россия",
+          "kind": "settlement",
+          "coordinates": {
+            "latitude": 56.8605175,
+            "longitude": 53.1977307
+          }
+        }
+      ]
+    },
+    {
+      "name": "different GAR houses",
+      "status": 200,
+      "data": {
+        "route": {
+          "distanceMeters": 800,
+          "durationSeconds": 300,
+          "source": "estimate",
+          "coordinates": []
+        },
+        "pricingScope": "grahovo",
+        "pricingDistanceMeters": 800,
+        "driverApproachDistanceMeters": 0,
+        "tariffs": [
+          {
+            "code": "economy",
+            "title": "Эконом",
+            "description": "Фиксированная цена по Грахово · С 07:00 до 22:00",
+            "childSeatIncluded": false,
+            "etaMinutes": 10,
+            "priceMinor": 15000
+          },
+          {
+            "code": "child",
+            "title": "Детский",
+            "description": "Подходящее детское кресло без выбора типа",
+            "childSeatIncluded": true,
+            "etaMinutes": 15,
+            "priceMinor": 22000
+          }
+        ],
+        "currency": "RUB"
+      }
+    }
+  ],
+  "driverNavigation": [
+    {
+      "name": "at pickup",
+      "source": "osrm",
+      "distanceMeters": 2337,
+      "durationSeconds": 299,
+      "geometryPoints": 51
+    },
+    {
+      "name": "at first stop",
+      "source": "estimate",
+      "distanceMeters": 2682,
+      "durationSeconds": 524,
+      "geometryPoints": 0
+    },
+    {
+      "name": "already at final stop",
+      "source": "osrm",
+      "distanceMeters": 3603,
+      "durationSeconds": 449,
+      "geometryPoints": 80
+    }
+  ],
+  "longRoutes": [
+    {
+      "destination": "Алнаши",
+      "status": 200,
+      "source": "osrm",
+      "distanceMeters": 42894,
+      "durationSeconds": 2864,
+      "geometryPoints": 354,
+      "economyRub": 1290,
+      "childRub": 1360
+    },
+    {
+      "destination": "Ижевск",
+      "status": 200,
+      "source": "osrm",
+      "distanceMeters": 149542,
+      "durationSeconds": 8988,
+      "geometryPoints": 1274,
+      "economyRub": 4490,
+      "childRub": 4560
+    }
+  ]
+}

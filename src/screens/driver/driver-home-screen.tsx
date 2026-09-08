@@ -65,6 +65,7 @@ function DriverOrderCard({
     driverOffer,
     createDriverOffer: createRide,
     transitionDriverRide: transitionRide,
+    completeDriverStop,
     startWaiting,
     stopWaiting,
     releaseDriverRide,
@@ -189,12 +190,14 @@ function DriverOrderCard({
             ? 'completed'
             : null;
   const routeTarget = driverRouteTarget(currentRide.status);
+  const nextDestinationIndex = currentRide.nextDestinationIndex ?? 0;
+  const hasIntermediateStop = nextDestinationIndex < rideDestinations.length - 1;
   const routePointLabels = [routeAddresses.pickup, ...routeAddresses.destinations];
   const routeMetricLabel =
     remainingDistanceMeters != null
       ? `${formatNavigationDistance(remainingDistanceMeters)}${
           remainingDurationSeconds != null
-            ? ` · ${Math.max(1, Math.round(remainingDurationSeconds / 60))} мин`
+            ? remainingDurationSeconds === 0 ? ' · на месте' : ` · ${Math.max(1, Math.round(remainingDurationSeconds / 60))} мин`
             : ''
         }`
       : navigationLoading
@@ -206,7 +209,7 @@ function DriverOrderCard({
   const navigatorTargets =
     routeTarget === 'pickup'
       ? [currentRide.passengerCoordinates ?? currentRide.pickup.coordinates]
-      : rideDestinations.map((destination) => destination.coordinates);
+      : rideDestinations.slice(nextDestinationIndex).map((destination) => destination.coordinates);
   const passengerPhone = currentRide.passenger?.phone;
   const paymentLabel =
     currentRide.paymentMethod === 'direct'
@@ -306,7 +309,7 @@ function DriverOrderCard({
         </View>
         <View style={{ gap: spacing.x1 }}>
           {routePointLabels.map((label, index) => {
-            const pointState = driverRoutePointState(currentRide.status, index);
+            const pointState = driverRoutePointState(currentRide.status, index, nextDestinationIndex);
             const current = pointState === 'current';
             const dotColor =
               pointState === 'completed'
@@ -653,9 +656,9 @@ function DriverOrderCard({
             compact
             loading={busy}
             disabled={busy}
-            onPress={() => setCompletionConfirmVisible(true)}
+            onPress={() => hasIntermediateStop ? void completeDriverStop() : setCompletionConfirmVisible(true)}
           >
-            Завершить поездку
+            {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : 'Завершить поездку'}
           </AppButton>
           <AppModal
             visible={completionConfirmVisible}
@@ -883,7 +886,7 @@ export function DriverHomeScreen() {
         : currentRide?.pickup;
   const mapDestination =
     navigation.targetKind === 'destination'
-      ? navigation.target
+      ? currentRide?.destination
       : navigation.active
         ? null
         : currentRide?.destination;
@@ -946,7 +949,7 @@ export function DriverHomeScreen() {
       >
         <TaxiMap
           pickup={mapPickup}
-          destinations={currentRide?.destinations}
+          destinations={currentRide?.destinations?.slice(currentRide.nextDestinationIndex ?? 0)}
           destination={mapDestination}
           routeCoordinates={activeRouteCoordinates}
           routeTarget={navigation.targetKind}

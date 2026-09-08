@@ -1,9 +1,11 @@
 type AddressLike = {
+  id?: string;
   label: string;
   details?: string;
   houseNumber?: string;
   placeId?: string;
   kind?: 'house' | 'street' | 'settlement' | 'place';
+  coordinatePrecision?: 'approximate' | 'precise';
 };
 
 const HOUSE_NUMBER = String.raw`\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?`;
@@ -30,7 +32,14 @@ export function hasHouseNumber(address: AddressLike | null | undefined): boolean
 }
 
 export function isPickupAddressComplete(address: AddressLike | null | undefined): boolean {
-  return !!address && (hasHouseNumber(address) || Boolean(address.placeId));
+  return !!address && !hasApproximateCoordinates(address) &&
+    (hasHouseNumber(address) || Boolean(address.placeId));
+}
+
+export function hasApproximateCoordinates(address: AddressLike): boolean {
+  return address.coordinatePrecision === 'approximate' ||
+    /^(?:gar|manual):/u.test(address.id ?? '') ||
+    /точка приблизительная/iu.test(address.details ?? '');
 }
 
 export function isDestinationAddressComplete(

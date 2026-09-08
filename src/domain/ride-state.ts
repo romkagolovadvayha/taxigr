@@ -41,14 +41,10 @@ export function driverRouteTarget(status: RideStatus): DriverRouteTarget | null 
 
 export type DriverRoutePointState = 'completed' | 'current' | 'pending';
 
-/**
- * The order model tracks progress for pickup and the trip as a whole, but not
- * for each intermediate drop-off. Until per-stop transitions are stored, the
- * first destination remains the current point throughout the trip.
- */
 export function driverRoutePointState(
   status: RideStatus,
   pointIndex: number,
+  nextDestinationIndex = 0,
 ): DriverRoutePointState {
   if (status === 'completed') return 'completed';
 
@@ -56,7 +52,7 @@ export function driverRoutePointState(
     status === 'accepted' || status === 'driver_arriving'
       ? 0
       : status === 'driver_waiting' || status === 'in_progress'
-        ? 1
+        ? 1 + nextDestinationIndex
         : null;
 
   if (currentPointIndex === null) return 'pending';

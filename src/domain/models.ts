@@ -69,6 +69,7 @@ export type Address = {
   placeId?: string;
   place?: PlaceDirectoryEntry;
   kind?: AddressKind;
+  coordinatePrecision?: 'approximate' | 'precise';
   coordinates: Coordinates;
 };
 
@@ -109,6 +110,8 @@ export type RideOrder = {
   pickup: Address;
   /** Ordered drop-off points. `destination` remains the final point for compatibility. */
   destinations?: Address[];
+  /** Index of the next destination; advanced when the driver confirms a stop. */
+  nextDestinationIndex?: number;
   destination: Address;
   tariff: TariffCode;
   status: RideStatus;

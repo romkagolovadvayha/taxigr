@@ -19,6 +19,23 @@ afterEach(() => {
 });
 
 describe('open routing fallback', () => {
+  it('accepts a real zero-length OSRM leg', () => {
+    expect(parseOsrmRoute({ code: 'Ok', routes: [{ distance: 0, duration: 0,
+      geometry: { type: 'LineString', coordinates: [[51.95, 56.04], [51.95, 56.04]] },
+    }] })).toMatchObject({ source: 'osrm', distanceMeters: 0, durationSeconds: 0 });
+  });
+  it('preserves geometry and metrics when a destination is accidentally repeated', async () => {
+    const a = { id: 'a', label: 'Грахово, Ачинцева, 5', coordinates: grahovo };
+    const b = { id: 'b', label: 'Грахово, Колпакова, 1Б', coordinates: { latitude: 56.04576, longitude: 51.96165 } };
+    const resolver = vi.fn(async (origin, destination): Promise<RouteMetrics> => ({
+      distanceMeters: 455, durationSeconds: 73, source: 'osrm', coordinates: [origin, destination],
+    }));
+    const result = await getMultiStopRouteMetrics(a, [b, b, a], resolver);
+    expect(resolver).toHaveBeenCalledTimes(2);
+    expect(result.tripRoute).toMatchObject({ source: 'osrm', distanceMeters: 910, durationSeconds: 146 });
+    expect(result.tripRoute.coordinates).toEqual([a.coordinates, b.coordinates, a.coordinates]);
+    expect(result.segments).toHaveLength(2);
+  });
   it('calculates a plausible direct distance', () => {
     const distance = haversineMeters(grahovo, mozhga);
     expect(distance).toBeGreaterThan(45_000);
@@ -34,10 +51,10 @@ describe('open routing fallback', () => {
     expect(route.coordinates).toEqual([]);
   });
 
-  it('keeps very short rides above the operational minimum', () => {
+  it('does not invent distance or travel time for a stationary leg', () => {
     const route = estimateRoute(grahovo, grahovo);
-    expect(route.distanceMeters).toBe(800);
-    expect(route.durationSeconds).toBe(300);
+    expect(route.distanceMeters).toBe(0);
+    expect(route.durationSeconds).toBe(0);
   });
 
   it('converts OSRM GeoJSON into latitude/longitude points in road order', () => {
