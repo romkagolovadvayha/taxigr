@@ -726,6 +726,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* Animating the shared parent's opacity isolates the image from the card backdrop. */
+.lp-tariff-art img,
+.lp-tariff-backdrop {
   animation: lp-art-in 0.45s ease-out;
 }
 .lp-tariff-art img {
