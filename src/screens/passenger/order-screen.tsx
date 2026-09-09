@@ -19,6 +19,7 @@ import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
+import { UserAvatar } from '@/components/user-avatar';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-tracking';
@@ -233,8 +234,14 @@ export function OrderScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
           {!isDesktop && <IconButton icon="orders" size={44} label="Мои поездки" onPress={() => router.push('/orders')} />}
           <AnimatedPressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={() => router.push('/profile')}
-            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ ...typography.caption, color: colors.infoText }}>{user?.name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('') || 'Я'}</Text>
+            style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+            <UserAvatar
+              name={user?.name ?? 'Профиль'}
+              avatarUrl={user?.avatarUrl}
+              size={44}
+              tone="brand"
+              accessible={false}
+            />
           </AnimatedPressable>
         </View>
       </View>

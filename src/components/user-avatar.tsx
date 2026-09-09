@@ -13,6 +13,7 @@ type Props = {
   avatarUrl?: string;
   size?: number;
   tone?: UserAvatarTone;
+  accessible?: boolean;
 };
 
 function initials(name: string): string {
@@ -29,6 +30,7 @@ export function UserAvatar({
   avatarUrl,
   size = 48,
   tone = 'info',
+  accessible = true,
 }: Props) {
   const colors = useThemeColors();
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string>();
@@ -56,7 +58,8 @@ export function UserAvatar({
     return (
       <Image
         source={resolveApiUrl(avatarUrl)}
-        accessibilityLabel={`Аватар: ${name}`}
+        accessible={accessible}
+        accessibilityLabel={accessible ? `Аватар: ${name}` : undefined}
         contentFit="cover"
         recyclingKey={avatarUrl}
         transition={motion.duration.quick}
@@ -68,8 +71,8 @@ export function UserAvatar({
 
   return (
     <View
-      accessible
-      accessibilityLabel={`Аватар: ${name}`}
+      accessible={accessible}
+      accessibilityLabel={accessible ? `Аватар: ${name}` : undefined}
       style={{
         ...commonStyle,
         alignItems: 'center',

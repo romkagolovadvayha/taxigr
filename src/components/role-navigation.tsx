@@ -2,9 +2,11 @@ import { Link, usePathname } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useSession } from '@/auth/session-provider';
 import { BrandMark } from '@/components/brand-mark';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
+import { UserAvatar } from '@/components/user-avatar';
 import { isNavItemActive } from '@/domain/role-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { radius, spacing, typography } from '@/theme/tokens';
@@ -23,6 +25,7 @@ type Props = {
 
 export function RoleNavigation({ items, title }: Props) {
   const colors = useThemeColors();
+  const { user } = useSession();
   const pathname = usePathname();
   const { isDesktop } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
@@ -82,12 +85,22 @@ export function RoleNavigation({ items, title }: Props) {
                       backgroundColor: colors.transparent,
                     }}
                   >
-                    <AppIcon
-                      name={item.icon}
-                      size={20}
-                      color={active ? colors.infoText : colors.inkSecondary}
-                      strokeWidth={active ? 2 : 1.6}
-                    />
+                    {item.icon === 'profile' ? (
+                      <UserAvatar
+                        name={user?.name ?? item.label}
+                        avatarUrl={user?.avatarUrl}
+                        size={24}
+                        tone={active ? 'brand' : 'info'}
+                        accessible={false}
+                      />
+                    ) : (
+                      <AppIcon
+                        name={item.icon}
+                        size={20}
+                        color={active ? colors.infoText : colors.inkSecondary}
+                        strokeWidth={active ? 2 : 1.6}
+                      />
+                    )}
                   </View>
                   <Text
                     numberOfLines={1}
@@ -146,7 +159,17 @@ export function RoleNavigation({ items, title }: Props) {
                   opacity: pressed ? 0.65 : 1,
                 })}
               >
-                <AppIcon name={item.icon} color={active ? colors.infoText : colors.inkSecondary} />
+                {item.icon === 'profile' ? (
+                  <UserAvatar
+                    name={user?.name ?? item.label}
+                    avatarUrl={user?.avatarUrl}
+                    size={24}
+                    tone={active ? 'brand' : 'info'}
+                    accessible={false}
+                  />
+                ) : (
+                  <AppIcon name={item.icon} color={active ? colors.infoText : colors.inkSecondary} />
+                )}
                 <Text style={{ ...typography.bodyStrong, color: active ? colors.infoText : colors.inkSecondary }}>{item.label}</Text>
               </AnimatedPressable>
             </Link>
