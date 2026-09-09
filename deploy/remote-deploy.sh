@@ -35,6 +35,8 @@ if [[ "$actual_sha256" != "$ARCHIVE_SHA256" ]]; then
   exit 1
 fi
 
+echo 'Release archive checksum verified'
+
 if ! id -u taxigr >/dev/null 2>&1; then
   useradd --system --home-dir "$DEPLOY_PATH" --shell /usr/sbin/nologin taxigr
 fi
@@ -56,7 +58,7 @@ install_ca() {
   local temporary
   local actual_fingerprint
   temporary="$(mktemp "$ca_directory/.certificate.XXXXXX")"
-  curl --fail --silent --show-error --location "$url" --output "$temporary"
+  curl --fail --silent --show-error --location --connect-timeout 10 --max-time 60 "$url" --output "$temporary"
   actual_fingerprint="$(
     openssl x509 -in "$temporary" -noout -fingerprint -sha256 |
       cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]'
@@ -70,6 +72,7 @@ install_ca() {
   rm -f "$temporary"
 }
 
+echo 'Updating verified CA certificates'
 install_ca \
   https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
   "$root_ca" \
@@ -95,6 +98,7 @@ fi
 if [[ -d "$release_path" ]]; then
   echo "Reusing existing release $RELEASE_ID"
 else
+  echo 'Extracting release archive'
   mkdir -m 0755 "$release_path"
   tar -xzf "$ARCHIVE" -C "$release_path"
 fi
@@ -127,7 +131,9 @@ FLUSH PRIVILEGES;
 SQL
 
 cd "$release_path"
+echo 'Installing API dependencies'
 npm ci --omit=dev --prefix server --no-audit --no-fund
+echo 'Running database migrations'
 ./server/node_modules/.bin/tsx server/scripts/migrate.ts
 if [[ -f "$DEPLOY_PATH/incoming/gateway-project.json" ]]; then
   ./server/node_modules/.bin/tsx server/scripts/import-gateway-settings.ts \
@@ -146,6 +152,7 @@ previous_release=""
 if [[ -L "$DEPLOY_PATH/current" ]]; then
   previous_release="$(readlink -f "$DEPLOY_PATH/current")"
 fi
+echo 'Activating release and restarting API'
 ln -sfn "$release_path" "$DEPLOY_PATH/current.next"
 mv -Tf "$DEPLOY_PATH/current.next" "$DEPLOY_PATH/current"
 
@@ -160,7 +167,7 @@ fi
 
 ready=0
 for _ in {1..30}; do
-  if curl --fail --silent --show-error http://127.0.0.1:4100/health/ready >/dev/null; then
+  if curl --fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:4100/health/ready >/dev/null; then
     ready=1
     break
   fi
@@ -199,6 +206,7 @@ if [[ -f /etc/letsencrypt/live/taxigr.ru/fullchain.pem ]]; then
   [[ -z "$previous_nginx" ]] || rm -f "$previous_nginx"
 fi
 
+echo 'Registering Telegram webhook'
 ./server/node_modules/.bin/tsx server/scripts/register-telegram-webhook.ts
 
 rm -f "$ARCHIVE" "$ENV_UPLOAD"

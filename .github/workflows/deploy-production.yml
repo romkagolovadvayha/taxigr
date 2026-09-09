@@ -89,6 +89,9 @@ jobs:
       - name: Verify API service survives database maintenance
         run: sudo python3 deploy/check-service-dependency.py
 
+      - name: Verify release packaging and transfer recovery
+        run: python3 deploy/test-release-tools.py
+
       - name: Verify and build
         run: npm run check
 
@@ -178,22 +181,11 @@ jobs:
         shell: bash
         run: |
           archive="$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz"
-          tar \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.expo' \
-            --exclude='.env' \
-            --exclude='.env.local' \
-            --exclude='.env.production' \
-            --exclude='.taxigr.env' \
-            --exclude='node_modules' \
-            --exclude='server/node_modules' \
-            --exclude='tmp' \
-            --exclude='*.aab' \
-            -czf "$archive" .
+          bash deploy/package-release.sh "$archive"
           sha256sum "$archive" | awk '{print $1}' > "$RUNNER_TEMP/archive.sha256"
 
       - name: Setup SSH
+        timeout-minutes: 2
         shell: bash
         env:
           SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
@@ -203,25 +195,56 @@ jobs:
           echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/taxigr_deploy
           chmod 600 ~/.ssh/taxigr_deploy
           ssh-keygen -y -f ~/.ssh/taxigr_deploy >/dev/null
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 15 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          cat > ~/.ssh/config <<EOF
+          Host taxigr-production
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile ~/.ssh/taxigr_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
 
-      - name: Upload and activate release
+      - name: Prepare server upload directory
+        timeout-minutes: 2
         shell: bash
         run: |
           set -euo pipefail
-          SSH=(ssh -i ~/.ssh/taxigr_deploy -p "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes)
-          SCP=(scp -i ~/.ssh/taxigr_deploy -P "$SSH_PORT" -o BatchMode=yes -o IdentitiesOnly=yes)
-          target="${SSH_USER}@${SSH_HOST}"
+          ssh taxigr-production "install -d -m 0755 '$DEPLOY_PATH/incoming'"
+
+      - name: Upload release archive
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          bash deploy/upload-file.sh "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" \
+            "taxigr-production:$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
+
+      - name: Upload deployment configuration
+        timeout-minutes: 5
+        shell: bash
+        env:
+          UPLOAD_TIMEOUT_SECONDS: '60'
+        run: |
+          bash deploy/upload-file.sh .taxigr.env "taxigr-production:$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
+          bash deploy/upload-file.sh deploy/remote-deploy.sh \
+            "taxigr-production:$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
+
+      - name: Activate release on server
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
           remote_archive="$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
           remote_env="$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
           remote_script="$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
           archive_sha256="$(cat "$RUNNER_TEMP/archive.sha256")"
-
-          "${SSH[@]}" "$target" "install -d -m 0755 '$DEPLOY_PATH/incoming'"
-          "${SCP[@]}" "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" "$target:$remote_archive"
-          "${SCP[@]}" .taxigr.env "$target:$remote_env"
-          "${SCP[@]}" deploy/remote-deploy.sh "$target:$remote_script"
-          "${SSH[@]}" "$target" \
+          ssh taxigr-production \
             "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_ID='$GITHUB_SHA' ARCHIVE='$remote_archive' ENV_UPLOAD='$remote_env' ARCHIVE_SHA256='$archive_sha256' bash '$remote_script'"
 
       - name: Verify store review login
