@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
@@ -16,6 +16,7 @@ import {
   isPickupAddressComplete,
 } from '@/domain/address-precision';
 import { isAssignedDriverOrder } from '@/domain/driver-order-queue';
+import { driverRatingQueueReducer, emptyDriverRatingQueue } from '@/domain/driver-rating-queue';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import {
   buildDemoDriverOffer,
@@ -67,6 +68,10 @@ type RideContextValue = {
   driverRide: RideOrder | null;
   nextDriverRide: RideOrder | null;
   driverOffer: RideOrder | null;
+  driverRatingRide: RideOrder | null;
+  driverRatingBusy: boolean;
+  driverRatingError: string | null;
+  dismissDriverRating: () => void;
   orders: RideOrderSummary[];
   adminOrders: RideOrderSummary[];
   passengerOrdersHasMore: boolean;
@@ -225,6 +230,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [driverRide, setDriverRide] = useState<RideOrder | null>(null);
   const [nextDriverRide, setNextDriverRide] = useState<RideOrder | null>(null);
   const [driverOffer, setDriverOffer] = useState<RideOrder | null>(null);
+  const [driverRatings, dispatchDriverRating] = useReducer(driverRatingQueueReducer, emptyDriverRatingQueue);
+  const driverRatingRide = driverRatings.pending[0] ?? null;
+  const [driverRatingBusy, setDriverRatingBusy] = useState(false);
+  const [driverRatingError, setDriverRatingError] = useState<string | null>(null);
+  const driverRatingInFlight = useRef(false);
   const [orders, setOrders] = useState<RideOrderSummary[]>([]);
   const [adminOrders, setAdminOrders] = useState<RideOrderSummary[]>([]);
   const [passengerOrdersHasMore, setPassengerOrdersHasMore] = useState(false);
@@ -347,6 +357,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const applyDriverOrder = useCallback((ride: RideOrder) => {
     emitRideUpdate(ride);
+    dispatchDriverRating({ type: 'updated', ride });
     if (isAssignedDriverOrder(ride)) {
       if (ride.driverQueuePosition === 2) {
         setNextDriverRide(ride);
@@ -359,7 +370,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverOffer(ride);
       setDriverRide((current) => (current && isAssignedDriverOrder(current) ? current : ride));
     } else {
-      setDriverRide((current) => (current?.id === ride.id ? ride : current));
+      setDriverRide((current) => (current?.id === ride.id ? (ride.status === 'completed' ? null : ride) : current));
       setNextDriverRide((current) => (current?.id === ride.id ? null : current));
       setDriverOffer((current) => (current?.id === ride.id ? null : current));
     }
@@ -1350,8 +1361,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const rateDriverRide = useCallback(
     async (score: number) => {
-      const current = driverRide;
-      if (!current || current.status !== 'completed' || score < 1 || score > 5) return;
+      const current = driverRatingRide;
+      if (!current || current.ratings?.byDriver || !Number.isInteger(score) || score < 1 || score > 5 || driverRatingInFlight.current) return;
       if (demoSession) {
         applyDriverOrder({
           ...current,
@@ -1361,8 +1372,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!token) return;
-      setBusy(true);
-      setError(null);
+      driverRatingInFlight.current = true;
+      setDriverRatingBusy(true);
+      setDriverRatingError(null);
       try {
         const ride = await apiRequest<RideOrder>(`/v1/orders/${current.id}/rating`, {
           method: 'POST',
@@ -1371,13 +1383,29 @@ export function RideProvider({ children }: { children: ReactNode }) {
         });
         applyDriverOrder(ride);
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Не удалось отправить оценку');
+        if (reason instanceof ApiError && reason.code === 'RATING_ALREADY_SUBMITTED') {
+          try {
+            const ride = await apiRequest<RideOrder>(`/v1/orders/${current.id}`, { token });
+            if (ride.ratings?.byDriver) {
+              applyDriverOrder(ride);
+              return;
+            }
+          } catch { /* Keep the form available when the saved score cannot be loaded. */ }
+        }
+        setDriverRatingError(reason instanceof Error ? reason.message : 'Не удалось отправить оценку');
       } finally {
-        setBusy(false);
+        driverRatingInFlight.current = false;
+        setDriverRatingBusy(false);
       }
     },
-    [applyDriverOrder, demoSession, driverRide, token],
+    [applyDriverOrder, demoSession, driverRatingRide, token],
   );
+
+  const dismissDriverRating = useCallback(() => {
+    if (!driverRatingRide || driverRatingInFlight.current) return;
+    dispatchDriverRating({ type: 'dismiss', orderId: driverRatingRide.id });
+    setDriverRatingError(null);
+  }, [driverRatingRide]);
 
   const resetRide = useCallback(() => {
     pendingOrderCreation.current = null;
@@ -1403,6 +1431,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       driverRide,
       nextDriverRide,
       driverOffer,
+      driverRatingRide,
+      driverRatingBusy,
+      driverRatingError,
+      dismissDriverRating,
       orders,
       adminOrders,
       passengerOrdersHasMore,
@@ -1457,6 +1489,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       currentRide,
       destinations,
       driverOffer,
+      driverRatingRide,
+      driverRatingBusy,
+      driverRatingError,
+      dismissDriverRating,
       driverRide,
       nextDriverRide,
       destination,

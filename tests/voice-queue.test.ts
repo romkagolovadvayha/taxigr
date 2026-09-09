@@ -48,4 +48,47 @@ describe('voice queue', () => {
     expect(player.play.mock.calls.map(call => call[0])).toEqual([1, 2]);
     queue.release();
   });
+  it('stops a dismissed price suggestion and continues a waiting chat message', async () => {
+    const { player, queue, endings } = setup();
+    await queue.play(1, 'ride-1');
+    await queue.play(2, 'chat-message');
+    queue.cancel('ride-1', 1);
+    expect(player.stop).toHaveBeenCalledOnce();
+    expect(player.play.mock.calls.map(call => call[0])).toEqual([1, 2]);
+    endings[0]!();
+    expect(player.play).toHaveBeenCalledTimes(2);
+    queue.release();
+  });
+  it('removes a suggestion that has not started yet without interrupting another order', async () => {
+    const { player, queue, endings } = setup();
+    await queue.play(2, 'ride-2');
+    await queue.play(1, 'ride-1');
+    queue.cancel('ride-1', 1);
+    endings[0]!();
+    expect(player.play.mock.calls.map(call => call[0])).toEqual([2]);
+    expect(player.stop).not.toHaveBeenCalled();
+    queue.release();
+  });
+  it('does not stop driver-found speech when the obsolete price modal closes', async () => {
+    const { player, queue } = setup();
+    await queue.play(1, 'ride-1');
+    await queue.play(3, 'ride-1');
+    const stops = player.stop.mock.calls.length;
+    queue.cancel('ride-1', 1);
+    expect(player.stop).toHaveBeenCalledTimes(stops);
+    expect(player.play.mock.calls.map(call => call[0])).toEqual([1, 3]);
+    queue.release();
+  });
+  it('gives an incoming order priority when the update prompt is dismissed', async () => {
+    const { player, queue, endings } = setup();
+    await queue.play(4, 'app-update:version-32');
+    await queue.play(2, 'ride-2');
+    queue.cancel('app-update:version-32', 4);
+    expect(player.play.mock.calls.map(call => call[0])).toEqual([4, 2]);
+    expect(player.stop).toHaveBeenCalledOnce();
+    // A late completion from the stopped update recording cannot interrupt the order.
+    endings[0]!();
+    expect(player.play).toHaveBeenCalledTimes(2);
+    queue.release();
+  });
 });

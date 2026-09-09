@@ -98,6 +98,13 @@ describe('feedbackForRideChange', () => {
     expect(feedbackForRideChange(ride('searching'), ride('searching', { priceMinor: 40_000 }), 'passenger-1', false)).toBeNull();
   });
 
+  it('announces the passenger price increase even when the previous offer is no longer known', () => {
+    const increased = ride('searching', { searchPriceIncreaseMinor: 3_000, priceMinor: 38_000 });
+    expect(feedbackForRideChange(null, increased, 'driver-user', true)?.sound).toBe('order-updated');
+    expect(feedbackForRideChange(ride('searching', { id: 'other-order' }), increased, 'driver-user', true)?.sound).toBe('order-updated');
+    expect(feedbackForRideChange(null, increased, 'passenger-1', false)?.sound).toBe('searching');
+  });
+
   it('plays a dedicated sound when the trip starts', () => {
     expect(
       feedbackForRideChange(
@@ -162,6 +169,24 @@ describe('ride feedback tracking across concurrent orders', () => {
     expect(tracker.observe(ride('searching'), 'driver-user', true)?.feedback.sound).toBe('new-order');
     expect(tracker.observe(ride('searching'), 'driver-user', true)).toBeNull();
     expect(tracker.observe(ride('searching', { updatedAt: '2026-07-30T08:01:00.000Z' }), 'driver-user', true)?.feedback.sound).toBe('new-order');
+  });
+
+  it('announces each actual increase once across offer replacement, duplicates and stale events', () => {
+    const tracker = createRideFeedbackTracker();
+    tracker.seed([ride('searching')]);
+    tracker.observe(ride('searching', { id: 'other-order' }), 'driver-user', true);
+    const increased = ride('searching', {
+      priceMinor: 38_000, searchPriceIncreaseMinor: 3_000,
+      updatedAt: '2026-07-30T08:04:00.000Z',
+    });
+    expect(tracker.observe(increased, 'driver-user', true)?.feedback.sound).toBe('order-updated');
+    expect(tracker.observe({ ...increased }, 'driver-user', true)).toBeNull();
+    expect(tracker.observe(ride('searching'), 'driver-user', true)).toBeNull();
+    expect(tracker.observe({ ...increased }, 'driver-user', true)).toBeNull();
+    expect(tracker.observe({
+      ...increased, priceMinor: 41_000, searchPriceIncreaseMinor: 6_000,
+      updatedAt: '2026-07-30T08:08:00.000Z',
+    }, 'driver-user', true)?.feedback.sound).toBe('order-updated');
   });
 });
 

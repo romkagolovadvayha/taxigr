@@ -8,7 +8,18 @@ import {
   isRuStorePushEnabled,
 } from '@/notifications/rustore-push';
 
-async function configureAndroidChannels(): Promise<void> {
+let channelsConfiguration: Promise<void> | undefined;
+
+function configureAndroidChannels(): Promise<void> {
+  // Token refresh and foreground events can arrive together on first launch.
+  channelsConfiguration ??= createMissingAndroidChannels().catch((error) => {
+    channelsConfiguration = undefined;
+    throw error;
+  });
+  return channelsConfiguration;
+}
+
+async function createMissingAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
   const channels = [
     ['ride-taxi-found-v2', 'Статусы поездки', Notifications.AndroidImportance.HIGH, 'taxi_found.wav'],
@@ -42,12 +53,15 @@ async function configureAndroidChannels(): Promise<void> {
     'ride-admin-cancelled-voice-v1': 'ride-cancelled-v2',
     'ride-search-timeout-voice-v1': 'ride-cancelled-v2',
   };
-  await Promise.all(channels.map(async ([id, name, importance, sound]) => {
+  const existing = new Map(
+    (await Notifications.getNotificationChannelsAsync()).map((channel) => [channel.id, channel]),
+  );
+  // One system read, then only missing channels, without a burst of Binder calls.
+  for (const [id, name, importance, sound] of channels) {
+    if (existing.has(id)) continue;
     const previousId = previousChannels[id];
-    const inherited = previousId && !(await Notifications.getNotificationChannelAsync(id))
-      ? await Notifications.getNotificationChannelAsync(previousId)
-      : null;
-    await Notifications.setNotificationChannelAsync(id, {
+    const inherited = previousId ? existing.get(previousId) : undefined;
+    const created = await Notifications.setNotificationChannelAsync(id, {
       name,
       importance: inherited?.importance ?? importance,
       // Preserve a user's muted channel when moving chat to its own spoken clip.
@@ -56,18 +70,22 @@ async function configureAndroidChannels(): Promise<void> {
       vibrationPattern: inherited?.vibrationPattern ?? [0, 250, 180, 250],
       lightColor: '#F6C945',
     });
-  }));
+    if (created) existing.set(id, created);
+  }
 }
 
 export async function syncPushRegistration(
   sessionToken: string,
   requestPermission = false,
 ): Promise<boolean> {
-  await configureAndroidChannels();
   if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
     throw new Error('Удалённые push недоступны в Expo Go. Установите сборку приложения.');
   }
   const current = await Notifications.getPermissionsAsync();
+  if (current.status !== 'granted' && !requestPermission) return false;
+  // Android needs a channel before the explicit permission prompt. On normal
+  // startup with no permission, do not initialize channels or push services.
+  await configureAndroidChannels();
   const permission = current.status === 'granted'
     ? current
     : requestPermission

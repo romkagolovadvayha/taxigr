@@ -8,6 +8,8 @@ const soundFiles = Object.keys(manifest.clips).map(name => `${name}.wav`);
 
 describe.each(soundFiles)('%s', (filename) => {
   it('is a short, normalized voice notification without clipped boundaries', async () => {
+    // The optional price explanation contains both choices and is longer than a status alert.
+    const isPriceExplanation = filename === 'search_price_increase_offer.wav';
     const wav = await readFile(resolve(process.cwd(), 'assets', 'sounds', filename));
     const sampleRate = wav.readUInt32LE(24);
     const channels = wav.readUInt16LE(22);
@@ -25,10 +27,10 @@ describe.each(soundFiles)('%s', (filename) => {
     expect(channels).toBe(1);
     expect(bitsPerSample).toBe(16);
     expect(sampleCount / sampleRate).toBeGreaterThanOrEqual(0.7);
-    expect(sampleCount / sampleRate).toBeLessThanOrEqual(12);
-    expect(wav.length).toBeLessThan(1_100_000);
+    expect(sampleCount / sampleRate).toBeLessThanOrEqual(isPriceExplanation ? 15 : 12);
+    expect(wav.length).toBeLessThan(isPriceExplanation ? 1_400_000 : 1_100_000);
     const mp3 = await readFile(resolve(process.cwd(), 'assets', 'sounds', filename.replace('.wav', '.mp3')));
-    expect(mp3.length).toBeLessThan(100_000);
+    expect(mp3.length).toBeLessThan(isPriceExplanation ? 125_000 : 100_000);
     expect(mp3.length).toBeLessThan(wav.length / 7);
     expect(wav.readUInt32LE(40)).toBe(wav.length - 44);
     expect(20 * Math.log10(peak)).toBeCloseTo(-3.5, 1);

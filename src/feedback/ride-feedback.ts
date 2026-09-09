@@ -51,7 +51,7 @@ export function feedbackForRideChange(
   if (isNewRide) {
     if (passengerOwnsRide && current.status === 'searching') return spoken('searching');
     if (isDriver && !passengerOwnsRide && current.status === 'searching') {
-      return { kind: 'new-order', haptic: 'warning', sound: 'new-order' };
+      return spoken((current.searchPriceIncreaseMinor ?? 0) > 0 ? 'order-updated' : 'new-order', 'warning');
     }
     if (isDriver && !passengerOwnsRide && current.status === 'accepted') {
       return spoken(current.driverQueuePosition === 2 ? 'order-accepted-queued' : 'order-accepted');

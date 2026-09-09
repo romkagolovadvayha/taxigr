@@ -70,6 +70,7 @@ export function buildNativeMapHtml(
     let coordinateSelectionEnabled = false;
     let selectionCenterKey = '';
     let fittedViewportKey = '';
+    let visualReady = false;
     const palettes=${JSON.stringify({light:lightColors,dark:darkColors})};
     const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const apiReady = async () => {
@@ -80,15 +81,24 @@ export function buildNativeMapHtml(
         theme:'${colorScheme}',
         zoomRange:{min:6,max:${Math.max(17, initialLocation.zoom)}},
         showScaleInCopyrights:true
-      }, [new YMapDefaultSchemeLayer({}),new YMapDefaultFeaturesLayer({})]);
+      }, [new YMapDefaultSchemeLayer({layers:{ground:{id:'taxigr-base-map'}}}),new YMapDefaultFeaturesLayer({})]);
       map.addChild(new YMapListener({
         layer:'any',
         onClick:(_object,event)=>{
           if(coordinateSelectionEnabled) ReactNativeWebView.postMessage(JSON.stringify({type:'coordinate',coordinates:{latitude:event.coordinates[1],longitude:event.coordinates[0]}}));
         },
-        onUpdate:({location})=>document.documentElement.classList.toggle('close-route-zoom',location.zoom>=15.5)
+        onUpdate:({location})=>document.documentElement.classList.toggle('close-route-zoom',location.zoom>=15.5),
+        onStateChanged:(state)=>{
+          const tiles=state.getLayerState('taxigr-base-map','tile');
+          if(!visualReady&&tiles&&tiles.tilesTotal>0&&tiles.tilesReady>=tiles.tilesTotal){
+            visualReady=true;
+            requestAnimationFrame(()=>requestAnimationFrame(()=>{
+              ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
+            }));
+          }
+        }
       }));
-      ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
+      ReactNativeWebView.postMessage(JSON.stringify({type:'initialized'}));
     };
     const marker = (kind,calloutLabel,heading,navigationMode) => {
       const el=document.createElement('div');

@@ -87,7 +87,7 @@ export function driverOrderAvailablePush(
 ): PushMessage {
   return {
     title: priceIncreased ? 'Стоимость заказа повышена' : 'Новый заказ',
-    body: priceIncreased ? 'Откройте приложение, чтобы посмотреть детали' : 'Примите или отклоните заказ в приложении',
+    body: priceIncreased ? 'Пассажир повысил стоимость поездки. Примите или отклоните заказ.' : 'Примите или отклоните заказ в приложении',
     data: { orderId, role: 'driver' },
     sound: priceIncreased ? 'order_updated.wav' : 'new_order.wav',
     channelId: priceIncreased ? 'driver-order-updated-voice-v1' : 'driver-orders-v2',

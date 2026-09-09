@@ -6,6 +6,7 @@ import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
 import { storeNames } from '@/domain/app-updates';
+import { useRideFeedback } from '@/feedback/ride-feedback-provider';
 import { useRide } from '@/state/ride-provider';
 import { useThemeColors } from '@/theme/theme-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
@@ -15,14 +16,15 @@ export function AppUpdatePromptHost() {
   const colors = useThemeColors();
   const pathname = usePathname();
   const { user, sessionReady, vkCommunityPromptUrl } = useSession();
-  const { bootstrapReady, currentRide, driverRide, nextDriverRide, driverOffer, busy } = useRide();
+  const { bootstrapReady, currentRide, driverRide, nextDriverRide, driverOffer, driverRatingRide, busy } = useRide();
   const { available, promptVisible, canPrompt, opening, error, controller } = useAppUpdate();
+  const { announceAppUpdate } = useRideFeedback();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const hasRide = [currentRide, driverRide, nextDriverRide, driverOffer].some(
     (ride) => ride && !['completed', 'cancelled'].includes(ride.status),
   );
   const eligible = foreground && sessionReady && bootstrapReady && !!user?.profileComplete &&
-    !user.blockedAt && !vkCommunityPromptUrl && !hasRide && !busy &&
+    !user.blockedAt && !vkCommunityPromptUrl && !hasRide && !driverRatingRide && !busy &&
     ['/', '/profile', '/driver', '/driver/profile'].includes(pathname);
   const eligibleRef = useRef(eligible);
 
@@ -38,6 +40,19 @@ export function AppUpdatePromptHost() {
     // An incoming order takes priority even if the popup is already on screen.
     if (!eligible && promptVisible) controller.dismissPrompt();
   }, [eligible, canPrompt, available?.id, promptVisible, controller]);
+
+  useEffect(() => {
+    if (!eligible || !promptVisible || !available?.id) return;
+    let stopAnnouncement: (() => void) | undefined;
+    // Defer until the prompt is rendered; Strict Mode cleanup cancels an unstarted announcement.
+    const timer = setTimeout(() => {
+      stopAnnouncement = announceAppUpdate(available.id);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      stopAnnouncement?.();
+    };
+  }, [announceAppUpdate, available?.id, eligible, promptVisible]);
 
   if (!available) return null;
   return (

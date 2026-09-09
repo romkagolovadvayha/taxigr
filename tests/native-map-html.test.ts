@@ -7,6 +7,46 @@ import {
 } from '../src/components/map/native-map-html';
 
 describe('native map route overlays', () => {
+  it('keeps the placeholder until visible map tiles are ready, instead of only the JS API', async () => {
+    const messages: { type: string }[] = [];
+    let onStateChanged!: (state: { getLayerState: (id: string, type: string) => unknown }) => void;
+    const frames: (() => void)[] = [];
+    const script = [...buildNativeMapHtml('test-key')
+      .matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+      .map((match) => match[1]!.trim()).find(Boolean)!;
+    runInNewContext(script, {
+      document: { getElementById: () => ({}), addEventListener() {} },
+      window: { matchMedia: () => ({ matches: true }), addEventListener() {} },
+      requestAnimationFrame: (callback: () => void) => frames.push(callback),
+      ymaps3: {
+        ready: Promise.resolve(), YMap: class { addChild() {} },
+        YMapDefaultSchemeLayer: class {}, YMapDefaultFeaturesLayer: class {},
+        YMapListener: class {
+          constructor(props: { onStateChanged: typeof onStateChanged }) { onStateChanged = props.onStateChanged; }
+        },
+      },
+      ReactNativeWebView: { postMessage: (message: string) => messages.push(JSON.parse(message)) },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(messages).toEqual([{ type: 'initialized' }]);
+    const state = (tilesReady: number, tilesTotal = 4) => ({
+      getLayerState: (id: string, type: string) => {
+        expect([id, type]).toEqual(['taxigr-base-map', 'tile']);
+        return { tilesReady, tilesTotal, tilesLoaded: tilesReady };
+      },
+    });
+    onStateChanged(state(0, 0));
+    onStateChanged(state(2));
+    expect(frames).toHaveLength(0);
+    onStateChanged(state(4));
+    expect(messages).toHaveLength(1);
+    frames.shift()!();
+    frames.shift()!();
+    expect(messages).toEqual([{ type: 'initialized' }, { type: 'ready' }]);
+    onStateChanged(state(4));
+    expect(frames).toHaveLength(0);
+  });
+
   it('opens the selected street at zoom 19 and preserves the camera while choosing a house', async () => {
     const street = { latitude: 56.115589, longitude: 52.125607 };
     const updates: Record<string, unknown>[] = [];

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleNavigation, type NavItem } from '@/components/role-navigation';
+import { DriverRatingPrompt } from '@/components/ratings/driver-rating-prompt';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 import { useThemeColors } from '@/theme/theme-provider';
@@ -25,6 +26,7 @@ export default function DriverLayout() {
       {isDesktop && <RoleNavigation items={items} title="Кабинет водителя" />}
       <View style={{ flex: 1 }}><Slot /></View>
       {!isDesktop && <RoleNavigation items={items} title="Кабинет водителя" />}
+      <DriverRatingPrompt />
     </View>
   );
 }

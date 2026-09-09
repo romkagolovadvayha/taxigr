@@ -16,6 +16,7 @@ type Props = {
   loading?: boolean;
   onSubmit: (score: number) => Promise<void>;
   onContinue: () => void;
+  continueLabel?: string;
 };
 
 export function RideRatingCard({
@@ -27,6 +28,7 @@ export function RideRatingCard({
   loading = false,
   onSubmit,
   onContinue,
+  continueLabel = 'Новая поездка',
 }: Props) {
   const colors = useThemeColors();
   const [score, setScore] = useState(submittedScore ?? 0);
@@ -47,7 +49,7 @@ export function RideRatingCard({
           Спасибо за оценку
         </Text>
         <StarRating value={submittedScore} disabled size={26} />
-        <AppButton onPress={onContinue}>Новая поездка</AppButton>
+        <AppButton onPress={onContinue}>{continueLabel}</AppButton>
       </View>
     );
   }

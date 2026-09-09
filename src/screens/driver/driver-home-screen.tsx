@@ -7,7 +7,6 @@ import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ShiftSummary } from '@/components/driver/shift-summary';
 import { RatingBadge } from '@/components/ratings/rating-badge';
-import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
@@ -76,7 +75,6 @@ function DriverOrderCard({
     releaseDriverRide,
     resetDriverRide: resetRide,
     refresh,
-    rateDriverRide: rateRide,
     busy,
     error,
   } = useRide();
@@ -596,21 +594,7 @@ function DriverOrderCard({
           {error}
         </Text>
       )}
-      {currentRide.status === 'completed' ? (
-        <RideRatingCard
-          participantRole="passenger"
-          participantName={currentRide.passenger?.name ?? 'Пассажир'}
-          participantRating={currentRide.passenger?.rating ?? 5}
-          participantRatingCount={currentRide.passenger?.ratingCount}
-          submittedScore={currentRide.ratings?.byDriver}
-          loading={busy}
-          onSubmit={rateRide}
-          onContinue={() => {
-            resetRide();
-            void refresh();
-          }}
-        />
-      ) : currentRide.status === 'driver_waiting' ? (
+      {currentRide.status === 'driver_waiting' ? (
         <View style={{ gap: spacing.x2 }}>
           <AppButton
             variant={currentRide.waitingStartedAt ? 'danger' : 'secondary'}

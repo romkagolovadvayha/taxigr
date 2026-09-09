@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.taxigrwebviewstartup'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.taxigrwebviewstartup'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // 1.16 makes async startup stable and supports the app's Android 7+ baseline.
+  implementation 'androidx.webkit:webkit:1.16.0'
+}

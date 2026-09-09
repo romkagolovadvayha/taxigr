@@ -18,10 +18,19 @@ if (JSON.stringify(manifest) !== JSON.stringify(recorded)) {
 }
 const sampleRate = 44100;
 const peakTarget = 10 ** (-3.5 / 20);
-const stats = [];
+// Optional clip names regenerate only changed recordings and preserve the other files.
+const selected = process.argv.slice(2);
+for (const name of selected) {
+  if (!(name in manifest.clips)) throw new Error(`Unknown voice clip: ${name}`);
+}
+const stats = selected.length
+  ? JSON.parse(await readFile(resolve(output, 'voice-metadata.json'), 'utf8')).clips
+      .filter(clip => !selected.includes(clip.file.replace(/\.wav$/, '')))
+  : [];
 await mkdir(output, { recursive: true });
 
 for (const [name, text] of Object.entries(manifest.clips)) {
+  if (selected.length && !selected.includes(name)) continue;
   const speech = spawnSync(
     process.env.FFMPEG_PATH || "ffmpeg",
     [
@@ -98,9 +107,15 @@ for (const [name, text] of Object.entries(manifest.clips)) {
 await writeFile(
   resolve(output, "voice-metadata.json"),
   JSON.stringify(
-    { voice: manifest.voice, synthetic: true, clips: stats },
+    {
+      voice: manifest.voice,
+      synthetic: true,
+      clips: Object.keys(manifest.clips).map(name => stats.find(clip => clip.file === `${name}.wav`)),
+    },
     null,
     2,
   ) + "\n",
 );
-console.log(JSON.stringify(stats, null, 2));
+console.log(JSON.stringify(selected.length
+  ? stats.filter(clip => selected.includes(clip.file.replace(/\.wav$/, '')))
+  : stats, null, 2));

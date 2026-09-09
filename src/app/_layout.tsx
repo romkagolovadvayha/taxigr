@@ -27,6 +27,7 @@ if (Platform.OS !== 'web') void SplashScreen.preventAutoHideAsync();
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const colors = useThemeColors();
   useEffect(() => {
+    if (Platform.OS !== 'web') void SplashScreen.hideAsync().catch(() => undefined);
     void reportCriticalClientError(error, {
       source: 'react-error-boundary',
       fatal: true,
@@ -90,8 +91,13 @@ function RootNavigator() {
   };
 
   useEffect(() => {
+    // Render our loading view while restoring the session. Keeping Android's
+    // splash visible until network/storage completes hides the first frame.
+    if (Platform.OS !== 'web') void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     if (!sessionReady || !themeReady || !fontsReady) return;
-    if (Platform.OS !== 'web') void SplashScreen.hideAsync();
     if (typeof document !== 'undefined') {
       document.documentElement.removeAttribute('data-session-booting');
       document.documentElement.removeAttribute('data-theme-booting');

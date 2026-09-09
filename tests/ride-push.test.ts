@@ -94,6 +94,7 @@ describe('ride push copy', () => {
     });
     expect(driverOrderAvailablePush(ride.id, true)).toMatchObject({
       sound: 'order_updated.wav', channelId: 'driver-order-updated-voice-v1',
+      body: 'Пассажир повысил стоимость поездки. Примите или отклоните заказ.',
     });
     // A queued driver has been found, but is not yet driving to this passenger.
     expect(passengerRidePush({ ...ride, driverQueuePosition: 2 })?.sound).toBe('taxi_found_queued.wav');

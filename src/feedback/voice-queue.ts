@@ -47,6 +47,17 @@ export function createVoiceQueue(player: VoicePlayer) {
       if (!current) await start(item);
       else { pending = pending.slice(-11); pending.push(item); }
     },
+    cancel(group: string, source: number) {
+      const matches = (item: Item) => item.group === group && item.source === source;
+      pending = pending.filter(item => !matches(item) && item.expires > Date.now());
+      if (!current || !matches(current)) return;
+      ++generation;
+      clearTimeout(watchdog);
+      current = null;
+      player.stop();
+      const next = pending.shift();
+      if (next) void start(next);
+    },
     stop,
     release() { stop(); released = true; player.release(); },
   };

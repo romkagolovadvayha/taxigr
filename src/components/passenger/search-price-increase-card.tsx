@@ -5,6 +5,7 @@ import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
 import { MoneyValue } from '@/components/ui/money-value';
 import type { RideOrder } from '@/domain/models';
+import { useRideFeedback } from '@/feedback/ride-feedback-provider';
 import {
   searchPriceIncreaseAvailableAt,
   searchPriceIncreaseOfferSlot,
@@ -24,6 +25,7 @@ type Props = {
 
 function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
   const colors = useThemeColors();
+  const { announceSearchPriceIncrease } = useRideFeedback();
   const [now, setNow] = useState(() => Date.now());
   const [dismissedOfferKey, setDismissedOfferKey] = useState<string | null>(null);
   const intervalMinutes = ride.searchPriceIncreaseIntervalMinutes ?? 4;
@@ -64,6 +66,17 @@ function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
   }, [ride.driverId, ride.status]);
 
   const visible = offerKey != null && dismissedOfferKey !== offerKey;
+  useEffect(() => {
+    if (!visible || offerSlot == null) return;
+    let stopAnnouncement: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      stopAnnouncement = announceSearchPriceIncrease(ride.id, offerSlot);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      stopAnnouncement?.();
+    };
+  }, [announceSearchPriceIncrease, now, offerSlot, ride.id, visible]);
   // React Native keeps modal children mounted during fade-out. Preserve the offer that the
   // passenger just confirmed so the next price step cannot flash before the modal disappears.
   const displayedOffer = visible || !closingOffer

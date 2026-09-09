@@ -15,7 +15,11 @@ Instructions:
 
 The code is permanent and reusable; no SMS, external messenger, payment, subscription, or location restriction is required. The account has passenger-only access. Reviewers can select addresses, calculate a fare, and inspect the order confirmation flow. Please do not submit a real ride order.
 
-## Release notes 1.0.11
+## Release notes 1.0.12
+
+- Prepared Android WebView asynchronously before mounting the map, with a local placeholder, loading indicator and retry action.
+- Fixed driver-to-passenger ratings after trip completion, including a queued next ride.
+- Added spoken fare-increase and app-update prompts, and profile avatars in navigation.
 
 - Added one-time update prompts and a persistent update action in passenger and driver profiles.
 - Updates open the store used to install the app; prompts wait until no ride is active.

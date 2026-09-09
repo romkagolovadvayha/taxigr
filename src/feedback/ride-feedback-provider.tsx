@@ -24,6 +24,8 @@ import { useRide } from "@/state/ride-provider";
 type RideFeedbackContextValue = {
   previewFeedback: () => Promise<void>;
   announceMessage: (messageId: string) => void;
+  announceSearchPriceIncrease: (orderId: string, slot: number) => () => void;
+  announceAppUpdate: (releaseId: string) => () => void;
 };
 const RideFeedbackContext = createContext<RideFeedbackContextValue | null>(
   null,
@@ -43,6 +45,8 @@ const soundSources: Record<NonNullable<RideFeedback["sound"]>, number> = {
   "ride-cancelled": require("../../assets/sounds/ride_cancelled.mp3"),
   "chat-message": require("../../assets/sounds/chat_message.mp3"),
   "order-updated": require("../../assets/sounds/order_updated.mp3"),
+  "search-price-increase-offer": require("../../assets/sounds/search_price_increase_offer.mp3"),
+  "app-update-available": require("../../assets/sounds/app_update_available.mp3"),
   "notification": require("../../assets/sounds/notification.mp3"),
   "voice-preview": require("../../assets/sounds/voice_preview.mp3"),
   "searching": require("../../assets/sounds/searching.mp3"),
@@ -188,6 +192,24 @@ export function RideFeedbackProvider({ children }: { children: ReactNode }) {
     },
     [announce],
   );
+  const announceSearchPriceIncrease = useCallback((orderId: string, slot: number) => {
+    announce(`price-offer:${orderId}:${slot}`, {
+      kind: 'search-price-increase-offer',
+      sound: 'search-price-increase-offer',
+      haptic: 'warning',
+    }, orderId);
+    // Closing the offer must not cancel a newer "driver found" announcement.
+    return () => playerRef.current?.cancel(orderId, soundSources['search-price-increase-offer']);
+  }, [announce]);
+  const announceAppUpdate = useCallback((releaseId: string) => {
+    const key = `app-update:${releaseId}`;
+    announce(key, {
+      kind: 'app-update-available',
+      sound: 'app-update-available',
+      haptic: 'success',
+    });
+    return () => playerRef.current?.cancel(key, soundSources['app-update-available']);
+  }, [announce]);
   useEffect(() => {
     const id = latestIncomingChatMessage?.id;
     if (!id || previousMessage.current === id) return;
@@ -208,8 +230,8 @@ export function RideFeedbackProvider({ children }: { children: ReactNode }) {
     [performFeedback],
   );
   const value = useMemo(
-    () => ({ previewFeedback, announceMessage }),
-    [previewFeedback, announceMessage],
+    () => ({ previewFeedback, announceMessage, announceSearchPriceIncrease, announceAppUpdate }),
+    [previewFeedback, announceMessage, announceSearchPriceIncrease, announceAppUpdate],
   );
   return (
     <RideFeedbackContext.Provider value={value}>
