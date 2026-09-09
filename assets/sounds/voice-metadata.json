@@ -1,0 +1,180 @@
+{
+  "voice": "ru-RU-DmitryNeural",
+  "synthetic": true,
+  "clips": [
+    {
+      "file": "taxi_found.wav",
+      "text": "Водитель найден.",
+      "seconds": 1.23,
+      "bytes": 108504
+    },
+    {
+      "file": "driver_arriving.wav",
+      "text": "Водитель едет к вам.",
+      "seconds": 1.54,
+      "bytes": 135436
+    },
+    {
+      "file": "driver_arrived.wav",
+      "text": "Водитель приехал и ожидает вас.",
+      "seconds": 2.27,
+      "bytes": 200464
+    },
+    {
+      "file": "new_order.wav",
+      "text": "Найден новый заказ. Примите или отклоните его.",
+      "seconds": 4.35,
+      "bytes": 383428
+    },
+    {
+      "file": "ride_started.wav",
+      "text": "Поездка началась. Хорошей дороги.",
+      "seconds": 3.36,
+      "bytes": 296614
+    },
+    {
+      "file": "ride_complete.wav",
+      "text": "Поездка завершена. Пожалуйста, оцените поездку.",
+      "seconds": 4.53,
+      "bytes": 399426
+    },
+    {
+      "file": "ride_cancelled.wav",
+      "text": "Заказ отменён.",
+      "seconds": 1.29,
+      "bytes": 114006
+    },
+    {
+      "file": "chat_message.wav",
+      "text": "Новое сообщение.",
+      "seconds": 1.36,
+      "bytes": 120044
+    },
+    {
+      "file": "order_updated.wav",
+      "text": "Стоимость заказа повышена.",
+      "seconds": 1.93,
+      "bytes": 170200
+    },
+    {
+      "file": "notification.wav",
+      "text": "Новое уведомление.",
+      "seconds": 1.55,
+      "bytes": 136710
+    },
+    {
+      "file": "voice_preview.wav",
+      "text": "Водитель приехал и ожидает вас. Хорошей поездки!",
+      "seconds": 4.49,
+      "bytes": 395776
+    },
+    {
+      "file": "searching.wav",
+      "text": "Ищем водителя. Пожалуйста, ожидайте.",
+      "seconds": 3.91,
+      "bytes": 344712
+    },
+    {
+      "file": "driver_released.wav",
+      "text": "Водитель отменил поездку. Ищем для вас другого водителя.",
+      "seconds": 4.81,
+      "bytes": 424456
+    },
+    {
+      "file": "search_timeout.wav",
+      "text": "Пока не удалось найти водителя. Попробуйте заказать поездку ещё раз.",
+      "seconds": 5.25,
+      "bytes": 463356
+    },
+    {
+      "file": "passenger_cancelled.wav",
+      "text": "Пассажир отменил заказ.",
+      "seconds": 1.78,
+      "bytes": 157434
+    },
+    {
+      "file": "admin_cancelled.wav",
+      "text": "Заказ отменён администратором.",
+      "seconds": 2.17,
+      "bytes": 191208
+    },
+    {
+      "file": "taxi_found_queued.wav",
+      "text": "Водитель найден. Он завершает предыдущую поездку и скоро освободится.",
+      "seconds": 5.45,
+      "bytes": 480830
+    },
+    {
+      "file": "order_accepted.wav",
+      "text": "Заказ принят. Пассажир вас ожидает. Вы можете позвонить ему или написать в чат, чтобы уточнить детали.",
+      "seconds": 8.63,
+      "bytes": 760932
+    },
+    {
+      "file": "order_accepted_queued.wav",
+      "text": "Следующий заказ принят. Завершите текущую поездку, затем направляйтесь к пассажиру.",
+      "seconds": 6.38,
+      "bytes": 562348
+    },
+    {
+      "file": "next_order_ready.wav",
+      "text": "Можно ехать на следующий заказ. Пассажир вас ожидает.",
+      "seconds": 4.57,
+      "bytes": 402890
+    },
+    {
+      "file": "driver_ready.wav",
+      "text": "Водитель освободился. Скоро он отправится к вам.",
+      "seconds": 4.39,
+      "bytes": 387276
+    },
+    {
+      "file": "driver_departed.wav",
+      "text": "Вы направляетесь к пассажиру.",
+      "seconds": 1.83,
+      "bytes": 161660
+    },
+    {
+      "file": "driver_waiting.wav",
+      "text": "Вы на месте. Ожидайте пассажира.",
+      "seconds": 3.28,
+      "bytes": 289378
+    },
+    {
+      "file": "order_released.wav",
+      "text": "Вы отказались от заказа.",
+      "seconds": 1.86,
+      "bytes": 163810
+    },
+    {
+      "file": "ride_complete_cash.wav",
+      "text": "Поездка завершена. Оплата наличными. Пожалуйста, оцените поездку.",
+      "seconds": 6.75,
+      "bytes": 595714
+    },
+    {
+      "file": "ride_complete_transfer.wav",
+      "text": "Поездка завершена. Оплата переводом. Пожалуйста, оцените поездку.",
+      "seconds": 6.69,
+      "bytes": 590254
+    },
+    {
+      "file": "driver_complete_cash.wav",
+      "text": "Поездка завершена. Оплата наличными. Пожалуйста, оцените пассажира.",
+      "seconds": 6.83,
+      "bytes": 602642
+    },
+    {
+      "file": "driver_complete_transfer.wav",
+      "text": "Поездка завершена. Оплата переводом. Пожалуйста, оцените пассажира.",
+      "seconds": 6.76,
+      "bytes": 596012
+    },
+    {
+      "file": "driver_complete.wav",
+      "text": "Поездка завершена. Пожалуйста, оцените пассажира.",
+      "seconds": 4.61,
+      "bytes": 406412
+    }
+  ]
+}

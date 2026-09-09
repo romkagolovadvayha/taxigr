@@ -64,6 +64,7 @@ import {
   type AdminTelegramAction,
 } from './admin-telegram';
 import { config } from './config';
+import { matchesMessengerPhone } from './messenger-auth-phone';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db, firstRow, withTransaction } from './db';
 import { searchAddresses } from './geocoding';
@@ -130,7 +131,7 @@ import {
 } from './phone-verification';
 import { isPlayReviewPhone, PLAY_REVIEW_CODE } from './play-review-auth';
 import { notifyDrivers, notifyUsers } from './push';
-import { driverOrderAvailablePush, passengerRidePush } from './ride-push';
+import { driverOrderAvailablePush, passengerRidePush, driverRideCancelledPush, passengerDriverReleasedPush } from './ride-push';
 import {
   findOrCreatePhoneUser,
   findUserWithRoles,
@@ -283,6 +284,7 @@ const verifyPhoneCodeSchema = requestPhoneCodeSchema.extend({
 const phoneAuthStartSchema = requestPhoneCodeSchema.extend({
   legalAcceptance: initialLegalAcceptanceSchema,
 });
+const messengerAuthStartSchema = phoneAuthStartSchema.partial({ phone: true });
 const phoneAuthVerifySchema = verifyPhoneCodeSchema;
 const maxAuthStatusSchema = z.object({
   challengeId: z.string().uuid(),
@@ -1587,15 +1589,15 @@ export async function registerRoutes(
       title: 'Водитель освободился',
       body: 'Предыдущая поездка завершена — водитель может выезжать к вам.',
       data: { orderId: promotion.id },
-      sound: 'taxi_found.wav',
-      channelId: 'ride-taxi-found-v2',
+      sound: 'notification.wav',
+      channelId: 'general-voice-v1',
     }).catch((error) => app.log.warn({ error }, 'promoted order push failed'));
     void notifyDrivers([driverId], {
       title: 'Следующий заказ стал текущим',
       body: 'Откройте заказ и выезжайте к пассажиру.',
       data: { orderId: promotion.id, role: 'driver' },
-      sound: 'new_order.wav',
-      channelId: 'driver-orders-v2',
+      sound: 'notification.wav',
+      channelId: 'general-voice-v1',
     }).catch((error) => app.log.warn({ error }, 'promoted driver push failed'));
     notifyMessengers(
       notifyUsersInMessengers([promotion.passengerId], passengerRideNotification(payload, {
@@ -1646,6 +1648,7 @@ export async function registerRoutes(
       const payload = presentOrder(row);
       publish(`user:${item.passengerId}`, 'order:updated', payload);
       publish('admins', 'order:updated', payload);
+      publish('drivers', 'order:unavailable', { orderId: item.id });
       const push = passengerRidePush(payload);
       if (push) {
         void notifyUsers([item.passengerId], {
@@ -1913,9 +1916,9 @@ export async function registerRoutes(
         finalized = true;
       };
       try {
-        const input = parse(phoneAuthStartSchema, request.body);
-        const phone = normalizeRussianPhone(input.phone);
-        if (!phone) {
+        const input = parse(messengerAuthStartSchema, request.body);
+        const phone = input.phone === undefined ? null : normalizeRussianPhone(input.phone);
+        if (input.phone !== undefined && !phone) {
           await finalize('invalid_phone');
           throw Object.assign(new Error('Укажите российский мобильный номер'), {
             statusCode: 400,
@@ -1971,7 +1974,7 @@ export async function registerRoutes(
       const input = parse(vkCallbackSchema, request.query);
       state = input.state;
       const challenge = await firstRow<
-        RowDataPacket & { id: string; code_verifier: string; expected_phone: string; expires_at: Date | string }
+        RowDataPacket & { id: string; code_verifier: string; expected_phone: string | null; expires_at: Date | string }
       >(
         `SELECT id, code_verifier, expected_phone, expires_at
          FROM vk_auth_challenges WHERE state_token = ? LIMIT 1`,
@@ -1986,7 +1989,7 @@ export async function registerRoutes(
         deviceId: input.device_id,
         state: input.state,
       });
-      const matches = Boolean(vkIdentity.phone && vkIdentity.phone === challenge.expected_phone);
+      const matches = matchesMessengerPhone(vkIdentity.phone, challenge.expected_phone);
       await db.execute(
         `UPDATE vk_auth_challenges
          SET verified_phone = ?, vk_user_id = ?, vk_first_name = ?, vk_last_name = ?,
@@ -2056,7 +2059,7 @@ export async function registerRoutes(
       const [rows] = await connection.query<
         (RowDataPacket & {
           exchange_secret_hash: string;
-          expected_phone: string;
+          expected_phone: string | null;
           verified_phone: string | null;
           failure_code: string | null;
           legal_acceptance: string | object;
@@ -2092,7 +2095,10 @@ export async function registerRoutes(
         return { status: 'pending' as const };
       }
 
-      const userId = await findOrCreatePhoneUser(connection, challenge.expected_phone);
+      if (!matchesMessengerPhone(challenge.verified_phone, challenge.expected_phone)) {
+        return { status: 'failed' as const, errorCode: 'PHONE_MISMATCH' };
+      }
+      const userId = await findOrCreatePhoneUser(connection, challenge.verified_phone);
       await linkMessengerIdentity(connection, userId, {
         provider: 'vk',
         externalUserId: challenge.vk_user_id,
@@ -2310,7 +2316,7 @@ export async function registerRoutes(
         ) {
           const verifiedPhone = extractPhoneFromMaxVcf(contact.payload.vcf_info);
           const challenge = await firstRow<
-            RowDataPacket & { id: string; expected_phone: string }
+            RowDataPacket & { id: string; expected_phone: string | null }
           >(
             `SELECT id, expected_phone FROM max_auth_challenges
              WHERE max_user_id = ? AND expires_at > UTC_TIMESTAMP(3)
@@ -2319,7 +2325,7 @@ export async function registerRoutes(
             [userId],
           );
           if (challenge) {
-            const matches = verifiedPhone === challenge.expected_phone;
+            const matches = matchesMessengerPhone(verifiedPhone, challenge.expected_phone);
             await db.execute(
               `UPDATE max_auth_challenges
                SET verified_phone = ?, failure_code = ?,
@@ -2366,15 +2372,15 @@ export async function registerRoutes(
         finalized = true;
       };
       try {
-        let input: z.infer<typeof phoneAuthStartSchema>;
+        let input: z.infer<typeof messengerAuthStartSchema>;
         try {
-          input = parse(phoneAuthStartSchema, request.body);
+          input = parse(messengerAuthStartSchema, request.body);
         } catch (error) {
           await finalize('invalid_request');
           throw error;
         }
-        const phone = normalizeRussianPhone(input.phone);
-        if (!phone) {
+        const phone = input.phone === undefined ? null : normalizeRussianPhone(input.phone);
+        if (input.phone !== undefined && !phone) {
           await finalize('invalid_phone');
           throw Object.assign(new Error('Укажите российский мобильный номер'), {
             statusCode: 400,
@@ -2427,7 +2433,7 @@ export async function registerRoutes(
       const [rows] = await connection.query<
         (RowDataPacket & {
           exchange_secret_hash: string;
-          expected_phone: string;
+          expected_phone: string | null;
           verified_phone: string | null;
           failure_code: string | null;
           legal_acceptance: string | object;
@@ -2465,7 +2471,10 @@ export async function registerRoutes(
       }
       if (!challenge.verified_phone) return { status: 'pending' as const };
 
-      const userId = await findOrCreatePhoneUser(connection, challenge.expected_phone);
+      if (!matchesMessengerPhone(challenge.verified_phone, challenge.expected_phone)) {
+        return { status: 'failed' as const, errorCode: 'PHONE_MISMATCH' };
+      }
+      const userId = await findOrCreatePhoneUser(connection, challenge.verified_phone);
       if (challenge.max_user_id) {
         await linkMessengerIdentity(connection, userId, {
           provider: 'max',
@@ -2584,15 +2593,15 @@ export async function registerRoutes(
         finalized = true;
       };
       try {
-        let input: z.infer<typeof phoneAuthStartSchema>;
+        let input: z.infer<typeof messengerAuthStartSchema>;
         try {
-          input = parse(phoneAuthStartSchema, request.body);
+          input = parse(messengerAuthStartSchema, request.body);
         } catch (error) {
           await finalize('invalid_request');
           throw error;
         }
-        const phone = normalizeRussianPhone(input.phone);
-        if (!phone) {
+        const phone = input.phone === undefined ? null : normalizeRussianPhone(input.phone);
+        if (input.phone !== undefined && !phone) {
           await finalize('invalid_phone');
           throw Object.assign(new Error('Укажите российский мобильный номер'), {
             statusCode: 400,
@@ -2646,7 +2655,7 @@ export async function registerRoutes(
       const [rows] = await connection.query<
         (RowDataPacket & {
           exchange_secret_hash: string;
-          expected_phone: string;
+          expected_phone: string | null;
           verified_phone: string | null;
           failure_code: string | null;
           legal_acceptance: string | object;
@@ -2685,7 +2694,10 @@ export async function registerRoutes(
       }
       if (!challenge.verified_phone) return { status: 'pending' as const };
 
-      const userId = await findOrCreatePhoneUser(connection, challenge.expected_phone);
+      if (!matchesMessengerPhone(challenge.verified_phone, challenge.expected_phone)) {
+        return { status: 'failed' as const, errorCode: 'PHONE_MISMATCH' };
+      }
+      const userId = await findOrCreatePhoneUser(connection, challenge.verified_phone);
       if (challenge.telegram_user_id) {
         await linkMessengerIdentity(connection, userId, {
           provider: 'telegram',
@@ -3580,15 +3592,9 @@ export async function registerRoutes(
     }
     const orderId = randomUUID();
     const hashedDevice = deviceFingerprint(input.deviceId, config.JWT_SECRET);
+    // Identity rows protect duplicate creation; READ COMMITTED avoids locking
+    // index gaps shared by unrelated passengers during the active-order scan.
     const result = await withTransaction(async (connection) => {
-      const [existingRows] = await connection.query<OrderRow[]>(
-        `${orderSelect} WHERE o.passenger_id = ? AND o.idempotency_key = ?`,
-        [session.id, input.idempotencyKey],
-      );
-      if (existingRows[0]) {
-        return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
-      }
-
       const [userRows] = await connection.query<
         (RowDataPacket & {
           phone: string | null;
@@ -3600,6 +3606,15 @@ export async function registerRoutes(
          FROM users WHERE id = ? LIMIT 1 FOR UPDATE`,
         [session.id],
       );
+      // Recheck after serializing this passenger's requests so concurrent retries
+      // return the committed order instead of failing the active-order guard.
+      const [existingRows] = await connection.query<OrderRow[]>(
+        `${orderSelect} WHERE o.passenger_id = ? AND o.idempotency_key = ?`,
+        [session.id, input.idempotencyKey],
+      );
+      if (existingRows[0]) {
+        return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
+      }
       const passenger = userRows[0];
       if (!passenger?.phone || !passenger.phone_verified_at) {
         throw Object.assign(new Error('Подтвердите номер телефона по SMS перед первым заказом'), {
@@ -3625,10 +3640,13 @@ export async function registerRoutes(
       }
 
       const phoneLockKey = deviceFingerprint(`phone:${passenger.phone}`, config.JWT_SECRET);
+      const identityLockKeys = [phoneLockKey, hashedDevice].sort();
+      // Acquire exclusive locks directly, including existing keys. INSERT IGNORE
+      // would take shared locks that concurrent requests must then upgrade.
       await connection.execute(
-        `INSERT IGNORE INTO order_identity_locks (lock_key)
-         VALUES (?), (?)`,
-        [phoneLockKey, hashedDevice],
+        `INSERT INTO order_identity_locks (lock_key)
+         VALUES (?), (?) ON DUPLICATE KEY UPDATE lock_key = VALUES(lock_key)`,
+        identityLockKeys,
       );
       await connection.query(
         `SELECT lock_key
@@ -3636,7 +3654,7 @@ export async function registerRoutes(
          WHERE lock_key IN (?, ?)
          ORDER BY lock_key
          FOR UPDATE`,
-        [phoneLockKey, hashedDevice],
+        identityLockKeys,
       );
 
       const [activeRows] = await connection.query<
@@ -3750,7 +3768,7 @@ export async function registerRoutes(
       const row = insertedRows[0];
       if (!row) throw new Error('Order insert failed');
       return { order: presentOrder(row), created: true, initialDriverIds };
-    });
+    }, { isolationLevel: 'READ COMMITTED' });
     if (result.created) {
       const eligibleDriverIds = result.initialDriverIds;
       sendOrderToDrivers(result.order, eligibleDriverIds);
@@ -4508,6 +4526,7 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     if (participants.driverId) publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    publish('drivers', 'order:unavailable', { orderId: id });
     if (participants.driverId) {
       await announcePromotedDriverOrder(participants.promotion, participants.driverId);
     }
@@ -4538,13 +4557,8 @@ export async function registerRoutes(
       );
     }
     if (participants.driverId) {
-      void notifyDrivers([participants.driverId], {
-        title: 'Заказ отменён',
-        body: 'Заказ больше не активен',
-        data: { orderId: id, role: 'driver' },
-        sound: 'ride_cancelled.wav',
-        channelId: 'ride-cancelled-v2',
-      }).catch((error) => app.log.warn({ error }, 'push notification failed'));
+      void notifyDrivers([participants.driverId], driverRideCancelledPush(payload))
+        .catch((error) => app.log.warn({ error }, 'push notification failed'));
     }
     notifyMessengers(
       notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
@@ -4976,6 +4990,8 @@ export async function registerRoutes(
   app.post('/v1/driver/orders/:id/accept', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
+    // The driver and order rows serialize assignment. Avoid gap locks on the
+    // empty driver-order index ranges while different drivers accept together.
     const updated = await withTransaction(async (connection) => {
       const driver = await getDriver(session.id, connection, true);
       if (!driver?.vehicle_id) {
@@ -5084,13 +5100,14 @@ export async function registerRoutes(
         [id, session.id],
       );
       return { passengerId: row.passenger_id, driverId: driver.id, queuePosition };
-    });
+    }, { isolationLevel: 'READ COMMITTED' });
     const row = await getOrder(id);
     if (!row) throw new Error('Order disappeared');
     const payload = presentOrder(row);
     publish(`user:${updated.passengerId}`, 'order:updated', payload);
     publish(`driver:${updated.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    publish('drivers', 'order:unavailable', { orderId: id });
     notifyAdmins({
       icon: '✅',
       title: 'Водитель принял заказ',
@@ -5212,6 +5229,8 @@ export async function registerRoutes(
       (driverId) => driverId !== participants.driverId,
     );
     sendOrderToDrivers(payload, eligibleDriverIds);
+    void notifyUsers([participants.passengerId], passengerDriverReleasedPush(payload))
+      .catch((error) => app.log.warn({ error }, 'push notification failed'));
     notifyMessengers(
       notifyUsersInMessengers([participants.passengerId], passengerRideNotification(payload, {
         title: 'Ищем другого водителя',

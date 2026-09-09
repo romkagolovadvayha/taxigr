@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { useSession } from '@/auth/session-provider';
+import { yandexMapNetworkResource, YANDEX_MAP_NETWORK_MESSAGE } from '@/components/map/yandex-map-errors';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { classifyWebErrorEvent } from '@/errors/web-error-classifier';
 
@@ -51,6 +52,17 @@ export function CriticalErrorMonitor() {
         });
       };
       const handleRejection = (event: PromiseRejectionEvent) => {
+        const mapResource = yandexMapNetworkResource(event.reason);
+        if (mapResource) {
+          void reportCriticalClientError(new Error(YANDEX_MAP_NETWORK_MESSAGE), {
+            source: 'resource-error',
+            route: context.current.pathname,
+            token: context.current.token,
+            fatal: false,
+            resource: mapResource,
+          });
+          return;
+        }
         void reportCriticalClientError(event.reason, {
           source: 'unhandled-rejection',
           route: context.current.pathname,

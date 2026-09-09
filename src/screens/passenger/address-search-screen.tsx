@@ -1,9 +1,10 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
+import { resolveStreetCenter } from '@/api/street-center';
 import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
@@ -29,13 +30,14 @@ import {
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
-import { buildStreetSuggestions } from '@/domain/address-suggestions';
+import { buildStreetSuggestions, toStreetSuggestion } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address, Coordinates } from '@/domain/models';
 import { confirmAddressPoint } from '@/domain/route-stops';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
+import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -76,7 +78,8 @@ function collectKnownStreetTokens(addresses: readonly Address[]): Set<string> {
   const result = new Set<string>();
   for (const address of addresses) {
     if (!address.details?.includes('улица') || hasHouseNumber(address)) continue;
-    const streetPart = address.label.split(',').at(-1) ?? address.label;
+    const addressParts = address.label.split(',');
+    const streetPart = addressParts[addressParts.length - 1] ?? address.label;
     for (const token of searchTokens(streetPart)) {
       if (!['ул', 'улица', 'пер', 'переулок'].includes(token)) result.add(token);
     }
@@ -294,6 +297,10 @@ export function AddressSearchScreen() {
   const [pendingAddress, setPendingAddress] = useState<Address | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<Coordinates | null>(null);
   const [pointMapError, setPointMapError] = useState<string | null>(null);
+  const [pointMapCenter, setPointMapCenter] = useState<{
+    address: Address;
+    coordinates: Coordinates;
+  } | null>(null);
   const [remoteResults, setRemoteResults] = useState<Address[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -302,6 +309,7 @@ export function AddressSearchScreen() {
   const searchAbortController = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
   const { token } = useSession();
+  const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     setPickup,
     setDestination,
@@ -376,6 +384,37 @@ export function AddressSearchScreen() {
     [manualAnchorDirectory, query, selectedStreet],
   );
   const manualAddress = hasExactHouseResult ? null : buildManualAddress(query, manualAnchor);
+  const pendingStreet = useMemo(() => {
+    if (!pendingAddress) return null;
+    if (selectedStreet && addressSearchScore(pendingAddress, selectedStreet.label) > 0) {
+      return selectedStreet;
+    }
+    return toStreetSuggestion(pendingAddress);
+  }, [pendingAddress, selectedStreet]);
+  const pendingCenter = pointMapCenter?.address === pendingAddress
+    ? pointMapCenter.coordinates
+    : null;
+
+  useEffect(() => {
+    if (!pendingAddress) return;
+    let active = true;
+    const controller = new AbortController();
+    const anchor = pendingStreet ?? pendingAddress;
+    void (pendingStreet
+      ? resolveStreetCenter(pendingStreet, {
+          apiKey: process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY,
+          signal: controller.signal,
+          referer: Platform.OS === 'web' ? undefined : 'https://taxigr.ru/',
+        })
+      : Promise.resolve(null)
+    ).then((coordinates) => {
+      if (active) setPointMapCenter({ address: pendingAddress, coordinates: coordinates ?? anchor.coordinates });
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [pendingAddress, pendingStreet]);
 
   const runRemoteSearch = useCallback(() => {
     const normalized = query.trim();
@@ -433,6 +472,7 @@ export function AddressSearchScreen() {
       (hasHouseNumber(address) || address.placeId) &&
       !(field === 'destination' && address.kind === 'settlement')) {
       setPendingAddress(address);
+      setPointMapCenter(null);
       setSelectedPoint(null);
       setPointMapError(null);
       return;
@@ -486,12 +526,16 @@ export function AddressSearchScreen() {
           Точное расположение дома пока неизвестно. Нажмите на карте на дом или удобный подъезд к нему.
         </Text>
         <View style={{ height: 360, overflow: 'hidden', borderRadius: radius.lg }}>
-          <TaxiMap
-            selectionCenter={pendingAddress.coordinates}
+          {pendingCenter ? <TaxiMap
+            selectionCenter={pendingCenter}
             pickup={selectedPoint ? { ...pendingAddress, coordinates: selectedPoint } : null}
             onCoordinateSelect={setSelectedPoint}
             onMapError={setPointMapError}
-          />
+            onMapReady={() => setPointMapError(null)}
+          /> : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x3 }}>
+            <ActivityIndicator color={colors.infoText} />
+            <Text style={{ ...typography.body, color: colors.inkSecondary }}>Находим улицу на карте…</Text>
+          </View>}
         </View>
         {pointMapError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pointMapError}</Text>}
         <AppButton disabled={!selectedPoint || Boolean(pointMapError)} onPress={() => {
@@ -586,6 +630,53 @@ export function AddressSearchScreen() {
           </AnimatedPressable>
         )}
       </View>
+      {field === 'pickup' && (
+        <AnimatedPressable
+          feedback="subtle"
+          accessibilityRole="button"
+          accessibilityLabel="Моё местоположение"
+          aria-busy={locationLoading}
+          aria-disabled={locationLoading}
+          disabled={locationLoading}
+          onPress={() => {
+            void selectCurrentLocation().then((address) => {
+              if (address) goBackOrReplace('/');
+            });
+          }}
+          style={({ pressed }) => ({
+            minHeight: 58,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.x3,
+            paddingHorizontal: spacing.x4,
+            backgroundColor: colors.surface,
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            opacity: pressed || locationLoading ? 0.6 : 1,
+          })}
+        >
+          {locationLoading ? (
+            <ActivityIndicator color={colors.infoText} />
+          ) : (
+            <AppIcon name="recenter" color={colors.infoText} />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
+              {locationLoading ? 'Определяем местоположение…' : 'Моё местоположение'}
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+              Определить автоматически
+            </Text>
+          </View>
+          {!locationLoading && <AppIcon name="chevron" color={colors.inkMuted} size={20} />}
+        </AnimatedPressable>
+      )}
+      {!!locationError && field === 'pickup' && (
+        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.warningText }}>
+          {locationError}
+        </Text>
+      )}
       {edited &&
         query.trim().length >= 2 &&
         !queryHasHouseNumber(query) &&

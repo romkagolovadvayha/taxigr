@@ -1,16 +1,16 @@
 import {Easing} from 'remotion';
 
 export const C = {
-  brand: '#FFD600',
-  brandPressed: '#E9C400',
-  ink: '#181818',
-  ink2: '#6F706F',
+  brand: '#F6C945',
+  brandPressed: '#E5B82F',
+  ink: '#25231E',
+  ink2: '#686153',
   muted: '#A8AAA8',
-  canvas: '#F4F4F2',
+  canvas: '#F7F4EB',
   surface: '#FFFFFF',
-  surface2: '#ECEDEB',
+  surface2: '#F1EDDF',
   success: '#18A957',
-  route: '#16B96B',
+  route: '#C49413',
   danger: '#E5484D',
 } as const;
 

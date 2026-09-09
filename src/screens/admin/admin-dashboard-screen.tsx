@@ -49,21 +49,22 @@ export function AdminDashboardScreen() {
   }, [token]);
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: spacing.x6, gap: spacing.x6 }}
+      style={{ flex: 1, backgroundColor: colors.surface }}
+      contentContainerStyle={{ padding: spacing.x6, gap: spacing.x8 }}
     >
       <View>
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Операционная сводка</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Такси Грахово · сегодня</Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x3 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.x5, paddingVertical: spacing.x5,
+        borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
         <KpiCard label="Активные заказы" value={String(metrics.activeOrders)} hint="Сейчас выполняются" icon="orders" />
         <KpiCard label="Водители на линии" value={String(metrics.onlineDrivers)} hint="Готовы принять заказ" icon="car" />
         <KpiCard label="Новые заявки" value={String(metrics.pendingApplications)} hint="Нужна проверка" icon="document" />
         <KpiCard label="Комиссия сегодня" value={formatMoney(metrics.commissionTodayMinor)} hint={`Оборот ${formatMoney(metrics.grossTodayMinor)}`} icon="earnings" />
       </View>
-      <SurfaceCard>
+      <SurfaceCard style={{ borderWidth: 0, padding: 0, borderRadius: 0 }}>
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Последние заказы</Text>
         {recent.map((order, index) => (
           <View

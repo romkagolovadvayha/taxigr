@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import appConfig from '../app.json';
 
 import type { RideOrder } from '../src/domain/models';
-import { driverOrderAvailablePush, passengerRidePush } from '../server/ride-push';
+import { driverOrderAvailablePush, passengerRidePush, driverRideCancelledPush, passengerDriverReleasedPush } from '../server/ride-push';
 
 const ride: RideOrder = {
   id: '123e4567-e89b-12d3-a456-426614174000',
@@ -75,7 +77,7 @@ describe('ride push copy', () => {
   it('keeps driver offer pushes free of route and price details', () => {
     expect(driverOrderAvailablePush(ride.id)).toMatchObject({
       title: 'Новый заказ',
-      body: 'Откройте приложение, чтобы посмотреть детали',
+      body: 'Примите или отклоните заказ в приложении',
     });
   });
 
@@ -84,5 +86,44 @@ describe('ride push copy', () => {
       title: 'Водитель принял заказ заранее',
       body: expect.stringContaining('завершает предыдущую поездку'),
     });
+  });
+
+  it('pairs each spoken status with the corresponding Android channel', () => {
+    expect(passengerRidePush({ ...ride, status: 'driver_arriving' })).toMatchObject({
+      sound: 'driver_arriving.wav', channelId: 'ride-driver-arriving-voice-v1',
+    });
+    expect(driverOrderAvailablePush(ride.id, true)).toMatchObject({
+      sound: 'order_updated.wav', channelId: 'driver-order-updated-voice-v1',
+    });
+    // A queued driver has been found, but is not yet driving to this passenger.
+    expect(passengerRidePush({ ...ride, driverQueuePosition: 2 })?.sound).toBe('taxi_found_queued.wav');
+  });
+
+  it.each(['cash', 'transfer'] as const)('matches completion speech to %s payment', (paymentMethod) => {
+    expect(passengerRidePush({ ...ride, status: 'completed', paymentMethod })).toMatchObject({
+      sound: `ride_complete_${paymentMethod}.wav`, channelId: `ride-complete-${paymentMethod}-voice-v1`,
+    });
+  });
+
+  it('distinguishes passenger cancellation, administrator cancellation and renewed search', () => {
+    expect(driverRideCancelledPush({ ...ride, status: 'cancelled', cancellationCode: 'passenger' }).sound).toBe('passenger_cancelled.wav');
+    expect(driverRideCancelledPush({ ...ride, status: 'cancelled', cancellationCode: 'admin' }).sound).toBe('admin_cancelled.wav');
+    expect(passengerRidePush({ ...ride, status: 'cancelled', cancellationCode: 'search_timeout' })?.sound).toBe('search_timeout.wav');
+    expect(passengerDriverReleasedPush({ ...ride, status: 'searching' }).sound).toBe('driver_released.wav');
+  });
+
+  it('bundles and registers every sound sent by ride notifications', () => {
+    const plugin = appConfig.expo.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-notifications') as unknown as [string, { sounds: string[] }];
+    const registrations = readFileSync('src/notifications/push-registration.native.ts', 'utf8');
+    const messages = [
+      passengerRidePush(ride), passengerRidePush({ ...ride, driverQueuePosition: 2 }),
+      ...(['cash', 'transfer', 'direct'] as const).map(paymentMethod => passengerRidePush({ ...ride, status: 'completed', paymentMethod })),
+      ...(['passenger', 'admin', 'search_timeout'] as const).flatMap(cancellationCode => [passengerRidePush({ ...ride, status: 'cancelled', cancellationCode }), driverRideCancelledPush({ ...ride, status: 'cancelled', cancellationCode })]),
+      passengerDriverReleasedPush(ride), driverOrderAvailablePush(ride.id), driverOrderAvailablePush(ride.id, true),
+    ];
+    for (const message of messages) {
+      expect(plugin[1].sounds).toContain(`./assets/sounds/${message?.sound}`);
+      expect(registrations).toContain(`'${message?.channelId}'`);
+    }
   });
 });

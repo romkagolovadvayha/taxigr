@@ -132,9 +132,10 @@ export function rideChatPush(
       orderId: message.orderId,
       role: recipientRole,
       chat: 'true',
+      messageId: message.id,
     },
-    sound: 'taxi_found.wav',
-    channelId: 'ride-chat-v1',
+    sound: 'chat_message.wav',
+    channelId: 'ride-chat-voice-v1',
   };
 }
 

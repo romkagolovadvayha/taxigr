@@ -26,7 +26,7 @@ export function buildYandexNavigatorRouteUrl(
 ): string {
   const targets = routeTargets(target);
   if (origin) assertRouteCoordinates(origin);
-  const finalTarget = targets.at(-1)!;
+  const finalTarget = targets[targets.length - 1]!;
   const parameters = [
     ...(origin
       ? [`lat_from=${origin.latitude}`, `lon_from=${origin.longitude}`]

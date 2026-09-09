@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
+import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
@@ -34,7 +35,7 @@ export function OrdersScreen() {
   }, [loadPassengerOrders]);
 
   return (
-    <Screen contentStyle={{ maxWidth: 900 }}>
+    <PassengerWorkspace><Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 900 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <View>
@@ -94,12 +95,10 @@ export function OrdersScreen() {
             accessibilityLabel={`Поездка ${formatDateTime(order.createdAt)}: ${formatRouteLabel(order.pickup, order.destination)}`}
             onPress={() => router.push({ pathname: '/orders/[id]', params: { id: order.id } })}
             style={({ pressed }) => ({
-              padding: spacing.x4,
+              paddingVertical: spacing.x4,
               gap: spacing.x3,
-              borderRadius: radius.card,
-              borderCurve: 'continuous',
               backgroundColor: colors.surface,
-              borderWidth: 1,
+              borderBottomWidth: 1,
               borderColor: colors.border,
               opacity: pressed ? 0.72 : 1,
             })}
@@ -119,7 +118,7 @@ export function OrdersScreen() {
                   <AppIcon name={order.tariff === 'child' ? 'child-seat' : 'car'} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+                  <Text selectable style={{ ...typography.bodyStrong, fontSize: 14, color: colors.ink }}>
                     {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {formatDateTime(order.createdAt)}
                   </Text>
                   <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -154,6 +153,6 @@ export function OrdersScreen() {
           </AppButton>
         )}
       </View>
-    </Screen>
+    </Screen></PassengerWorkspace>
   );
 }

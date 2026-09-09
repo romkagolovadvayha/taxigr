@@ -6,8 +6,12 @@ export function ensureForegroundLocationPermission(): Promise<Location.LocationP
   if (permissionRequest) return permissionRequest;
 
   permissionRequest = (async () => {
-    const currentPermission = await Location.getForegroundPermissionsAsync();
-    if (currentPermission.granted) return currentPermission;
+    try {
+      const currentPermission = await Location.getForegroundPermissionsAsync();
+      if (currentPermission.granted) return currentPermission;
+    } catch {
+      // Some web browsers cannot inspect permission state before the user action.
+    }
     return Location.requestForegroundPermissionsAsync();
   })().finally(() => {
     permissionRequest = null;

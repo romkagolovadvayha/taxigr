@@ -12,13 +12,14 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
   const [initialColorScheme] = useState(colorScheme);
+  const [initialSelectionCenter] = useState(props.selectionCenter);
   const webViewRef = useRef<WebView>(null);
   const [canMountWebView, setCanMountWebView] = useState(false);
   const [ready, setReady] = useState(false);
   const apiKey = process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY;
   const html = useMemo(
-    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, initialColorScheme) : ''),
-    [apiKey, canMountWebView, initialColorScheme],
+    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, initialColorScheme, initialSelectionCenter) : ''),
+    [apiKey, canMountWebView, initialColorScheme, initialSelectionCenter],
   );
   const source = useMemo(() => ({ html, baseUrl: 'https://taxigr.ru/' }), [html]);
   const state = useMemo(

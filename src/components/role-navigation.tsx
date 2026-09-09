@@ -1,5 +1,5 @@
 import { Link, usePathname } from 'expo-router';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
@@ -39,12 +39,13 @@ export function RoleNavigation({ items, title }: Props) {
           paddingHorizontal: Math.max(insets.left, insets.right, spacing.x2),
         }}
       >
-        <View
+        <ScrollView
           accessibilityRole="tablist"
-          style={{
-            width: '100%',
-            alignSelf: 'center',
-            flexDirection: 'row',
+          horizontal
+          scrollEnabled={items.length > 5}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            flexGrow: 1,
             justifyContent: 'space-between',
             gap: spacing.x1,
           }}
@@ -52,18 +53,18 @@ export function RoleNavigation({ items, title }: Props) {
           {items.map((item) => {
             const active = isNavItemActive(pathname, item.href);
             return (
-              <Link key={item.href} href={item.href as never} asChild>
+              <Link key={item.href} href={item.href as never} replace asChild>
                 <AnimatedPressable
                   feedback="subtle"
                   accessibilityRole="tab"
                   accessibilityLabel={item.label}
                   aria-selected={active}
                   contentStyle={({ pressed }) => ({
-                    minWidth: 0,
-                    flexBasis: 0,
-                    flexGrow: 1,
+                    minWidth: items.length > 5 ? 76 : 0,
+                    flexBasis: items.length > 5 ? 'auto' : 0,
+                    flexGrow: items.length > 5 ? 0 : 1,
                     flexShrink: 1,
-                    minHeight: 56,
+                    minHeight: 48,
                     borderRadius: radius.md,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -78,14 +79,14 @@ export function RoleNavigation({ items, title }: Props) {
                       borderRadius: radius.pill,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: active ? colors.brandSoft : colors.transparent,
+                      backgroundColor: colors.transparent,
                     }}
                   >
                     <AppIcon
                       name={item.icon}
                       size={20}
                       color={active ? colors.infoText : colors.inkSecondary}
-                      strokeWidth={active ? 2.35 : 2}
+                      strokeWidth={active ? 2 : 1.6}
                     />
                   </View>
                   <Text
@@ -105,7 +106,7 @@ export function RoleNavigation({ items, title }: Props) {
               </Link>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -114,7 +115,7 @@ export function RoleNavigation({ items, title }: Props) {
     <View
       style={{
         width: 248,
-        backgroundColor: colors.surface,
+        backgroundColor: colors.canvas,
         borderRightWidth: 1,
         borderColor: colors.border,
         padding: spacing.x5,
@@ -129,7 +130,7 @@ export function RoleNavigation({ items, title }: Props) {
         {items.map((item) => {
           const active = isNavItemActive(pathname, item.href);
           return (
-            <Link key={item.href} href={item.href as never} asChild>
+            <Link key={item.href} href={item.href as never} replace asChild>
               <AnimatedPressable
                 feedback="subtle"
                 accessibilityRole="link"

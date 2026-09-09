@@ -1,0 +1,1037 @@
+{
+  "measurements": [
+    {
+      "name": "methods-1440x900",
+      "width": 1440,
+      "height": 900,
+      "top": 266.5,
+      "bottom": 651.5,
+      "scrollHeight": 900,
+      "clientHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 900.46875,
+          "y": 381.5,
+          "right": 1280.46875,
+          "bottom": 443.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 900.46875,
+          "y": 453.5,
+          "right": 1280.46875,
+          "bottom": 515.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 900.46875,
+          "y": 525.5,
+          "right": 1280.46875,
+          "bottom": 587.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 900.46875,
+          "y": 607.5,
+          "right": 1280.46875,
+          "bottom": 651.5
+        }
+      ]
+    },
+    {
+      "name": "methods-1024x768",
+      "width": 1024,
+      "height": 768,
+      "top": 199,
+      "bottom": 584,
+      "scrollHeight": 768,
+      "clientHeight": 768,
+      "scrollWidth": 1024,
+      "clientWidth": 1024,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 590.09375,
+          "y": 314,
+          "right": 970.09375,
+          "bottom": 376
+        },
+        {
+          "label": "Войти через VK",
+          "x": 590.09375,
+          "y": 386,
+          "right": 970.09375,
+          "bottom": 448
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 590.09375,
+          "y": 458,
+          "right": 970.09375,
+          "bottom": 520
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 590.09375,
+          "y": 540,
+          "right": 970.09375,
+          "bottom": 584
+        }
+      ]
+    },
+    {
+      "name": "methods-768x1024",
+      "width": 768,
+      "height": 1024,
+      "top": 327,
+      "bottom": 712,
+      "scrollHeight": 1024,
+      "clientHeight": 1024,
+      "scrollWidth": 768,
+      "clientWidth": 768,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 434.09375,
+          "y": 442,
+          "right": 736,
+          "bottom": 504
+        },
+        {
+          "label": "Войти через VK",
+          "x": 434.09375,
+          "y": 514,
+          "right": 736,
+          "bottom": 576
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 434.09375,
+          "y": 586,
+          "right": 736,
+          "bottom": 648
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 434.09375,
+          "y": 668,
+          "right": 736,
+          "bottom": 712
+        }
+      ]
+    },
+    {
+      "name": "methods-390x844",
+      "width": 390,
+      "height": 844,
+      "top": 231.5,
+      "bottom": 616.5,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 24,
+          "y": 346.5,
+          "right": 366,
+          "bottom": 408.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 24,
+          "y": 418.5,
+          "right": 366,
+          "bottom": 480.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 24,
+          "y": 490.5,
+          "right": 366,
+          "bottom": 552.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 24,
+          "y": 572.5,
+          "right": 366,
+          "bottom": 616.5
+        }
+      ]
+    },
+    {
+      "name": "methods-320x568",
+      "width": 320,
+      "height": 568,
+      "top": 129.5,
+      "bottom": 451.5,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 16,
+          "y": 229.5,
+          "right": 304,
+          "bottom": 279.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 16,
+          "y": 287.5,
+          "right": 304,
+          "bottom": 337.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 16,
+          "y": 345.5,
+          "right": 304,
+          "bottom": 395.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 16,
+          "y": 407.5,
+          "right": 304,
+          "bottom": 451.5
+        }
+      ]
+    },
+    {
+      "name": "methods-375x667",
+      "width": 375,
+      "height": 667,
+      "top": 179,
+      "bottom": 501,
+      "scrollHeight": 667,
+      "clientHeight": 667,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 24,
+          "y": 279,
+          "right": 351,
+          "bottom": 329
+        },
+        {
+          "label": "Войти через VK",
+          "x": 24,
+          "y": 337,
+          "right": 351,
+          "bottom": 387
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 24,
+          "y": 395,
+          "right": 351,
+          "bottom": 445
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 24,
+          "y": 457,
+          "right": 351,
+          "bottom": 501
+        }
+      ]
+    },
+    {
+      "name": "methods-844x390",
+      "width": 844,
+      "height": 390,
+      "top": 107.5,
+      "bottom": 282.5,
+      "scrollHeight": 390,
+      "clientHeight": 390,
+      "scrollWidth": 844,
+      "clientWidth": 844,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 466.09375,
+          "y": 144.5,
+          "right": 581.390625,
+          "bottom": 230.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 589.390625,
+          "y": 144.5,
+          "right": 704.703125,
+          "bottom": 230.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 712.703125,
+          "y": 144.5,
+          "right": 828,
+          "bottom": 230.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 466.09375,
+          "y": 238.5,
+          "right": 828,
+          "bottom": 282.5
+        }
+      ]
+    },
+    {
+      "name": "methods-320x430",
+      "width": 320,
+      "height": 430,
+      "top": 127.5,
+      "bottom": 302.5,
+      "scrollHeight": 430,
+      "clientHeight": 430,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 16,
+          "y": 164.5,
+          "right": 106.65625,
+          "bottom": 250.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 114.65625,
+          "y": 164.5,
+          "right": 205.328125,
+          "bottom": 250.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 213.328125,
+          "y": 164.5,
+          "right": 304,
+          "bottom": 250.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 16,
+          "y": 258.5,
+          "right": 304,
+          "bottom": 302.5
+        }
+      ]
+    },
+    {
+      "name": "consent-1440x900",
+      "width": 1440,
+      "height": 900,
+      "top": 256.5,
+      "bottom": 661.5,
+      "scrollHeight": 900,
+      "clientHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 900.46875,
+          "y": 256.5,
+          "right": 1008.875,
+          "bottom": 292.5
+        },
+        {
+          "label": "Открыть документ «Условия»",
+          "x": 900.46875,
+          "y": 497.5,
+          "right": 1086.46875,
+          "bottom": 541.5
+        },
+        {
+          "label": "Открыть документ «Правила»",
+          "x": 1094.46875,
+          "y": 497.5,
+          "right": 1280.46875,
+          "bottom": 541.5
+        },
+        {
+          "label": "Открыть документ «Согласие»",
+          "x": 900.46875,
+          "y": 549.5,
+          "right": 1086.46875,
+          "bottom": 593.5
+        },
+        {
+          "label": "Открыть документ «Политика»",
+          "x": 1094.46875,
+          "y": 549.5,
+          "right": 1280.46875,
+          "bottom": 593.5
+        },
+        {
+          "label": "Принять и продолжить",
+          "x": 900.46875,
+          "y": 613.5,
+          "right": 1280.46875,
+          "bottom": 661.5
+        }
+      ]
+    },
+    {
+      "name": "consent-390x844",
+      "width": 390,
+      "height": 844,
+      "top": 221.5,
+      "bottom": 626.5,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 24,
+          "y": 221.5,
+          "right": 132.40625,
+          "bottom": 257.5
+        },
+        {
+          "label": "Открыть документ «Условия»",
+          "x": 24,
+          "y": 462.5,
+          "right": 191,
+          "bottom": 506.5
+        },
+        {
+          "label": "Открыть документ «Правила»",
+          "x": 199,
+          "y": 462.5,
+          "right": 366,
+          "bottom": 506.5
+        },
+        {
+          "label": "Открыть документ «Согласие»",
+          "x": 24,
+          "y": 514.5,
+          "right": 191,
+          "bottom": 558.5
+        },
+        {
+          "label": "Открыть документ «Политика»",
+          "x": 199,
+          "y": 514.5,
+          "right": 366,
+          "bottom": 558.5
+        },
+        {
+          "label": "Принять и продолжить",
+          "x": 24,
+          "y": 578.5,
+          "right": 366,
+          "bottom": 626.5
+        }
+      ]
+    },
+    {
+      "name": "consent-320x568",
+      "width": 320,
+      "height": 568,
+      "top": 93,
+      "bottom": 488,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 16,
+          "y": 93,
+          "right": 124.40625,
+          "bottom": 129
+        },
+        {
+          "label": "Открыть документ «Условия»",
+          "x": 16,
+          "y": 332,
+          "right": 156,
+          "bottom": 376
+        },
+        {
+          "label": "Открыть документ «Правила»",
+          "x": 164,
+          "y": 332,
+          "right": 304,
+          "bottom": 376
+        },
+        {
+          "label": "Открыть документ «Согласие»",
+          "x": 16,
+          "y": 384,
+          "right": 156,
+          "bottom": 428
+        },
+        {
+          "label": "Открыть документ «Политика»",
+          "x": 164,
+          "y": 384,
+          "right": 304,
+          "bottom": 428
+        },
+        {
+          "label": "Принять и продолжить",
+          "x": 16,
+          "y": 440,
+          "right": 304,
+          "bottom": 488
+        }
+      ]
+    },
+    {
+      "name": "consent-844x390",
+      "width": 844,
+      "height": 390,
+      "top": 52,
+      "bottom": 338,
+      "scrollHeight": 390,
+      "clientHeight": 390,
+      "scrollWidth": 844,
+      "clientWidth": 844,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 466.09375,
+          "y": 52,
+          "right": 574.5,
+          "bottom": 84
+        },
+        {
+          "label": "Открыть документ «Условия»",
+          "x": 466.09375,
+          "y": 206,
+          "right": 643.046875,
+          "bottom": 240
+        },
+        {
+          "label": "Открыть документ «Правила»",
+          "x": 651.046875,
+          "y": 206,
+          "right": 828,
+          "bottom": 240
+        },
+        {
+          "label": "Открыть документ «Согласие»",
+          "x": 466.09375,
+          "y": 248,
+          "right": 643.046875,
+          "bottom": 282
+        },
+        {
+          "label": "Открыть документ «Политика»",
+          "x": 651.046875,
+          "y": 248,
+          "right": 828,
+          "bottom": 282
+        },
+        {
+          "label": "Принять и продолжить",
+          "x": 466.09375,
+          "y": 290,
+          "right": 828,
+          "bottom": 338
+        }
+      ]
+    },
+    {
+      "name": "consent-320x430",
+      "width": 320,
+      "height": 430,
+      "top": 63.5,
+      "bottom": 366.5,
+      "scrollHeight": 430,
+      "clientHeight": 430,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 16,
+          "y": 63.5,
+          "right": 124.40625,
+          "bottom": 95.5
+        },
+        {
+          "label": "Открыть документ «Условия»",
+          "x": 16,
+          "y": 234.5,
+          "right": 156,
+          "bottom": 268.5
+        },
+        {
+          "label": "Открыть документ «Правила»",
+          "x": 164,
+          "y": 234.5,
+          "right": 304,
+          "bottom": 268.5
+        },
+        {
+          "label": "Открыть документ «Согласие»",
+          "x": 16,
+          "y": 276.5,
+          "right": 156,
+          "bottom": 310.5
+        },
+        {
+          "label": "Открыть документ «Политика»",
+          "x": 164,
+          "y": 276.5,
+          "right": 304,
+          "bottom": 310.5
+        },
+        {
+          "label": "Принять и продолжить",
+          "x": 16,
+          "y": 318.5,
+          "right": 304,
+          "bottom": 366.5
+        }
+      ]
+    },
+    {
+      "name": "waiting-MAX",
+      "width": 390,
+      "height": 844,
+      "top": 240.5,
+      "bottom": 607.5,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 24,
+          "y": 240.5,
+          "right": 132.40625,
+          "bottom": 276.5
+        },
+        {
+          "label": "Открыть MAX",
+          "x": 24,
+          "y": 559.5,
+          "right": 366,
+          "bottom": 607.5
+        }
+      ]
+    },
+    {
+      "name": "waiting-VK",
+      "width": 390,
+      "height": 844,
+      "top": 240.5,
+      "bottom": 607.5,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 24,
+          "y": 240.5,
+          "right": 132.40625,
+          "bottom": 276.5
+        },
+        {
+          "label": "Открыть VK",
+          "x": 24,
+          "y": 559.5,
+          "right": 366,
+          "bottom": 607.5
+        }
+      ]
+    },
+    {
+      "name": "methods-with-error",
+      "width": 320,
+      "height": 568,
+      "top": 97.5,
+      "bottom": 483.5,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Войти через MAX",
+          "x": 16,
+          "y": 197.5,
+          "right": 304,
+          "bottom": 247.5
+        },
+        {
+          "label": "Войти через VK",
+          "x": 16,
+          "y": 255.5,
+          "right": 304,
+          "bottom": 305.5
+        },
+        {
+          "label": "Войти через Telegram",
+          "x": 16,
+          "y": 313.5,
+          "right": 304,
+          "bottom": 363.5
+        },
+        {
+          "label": "Войти по SMS",
+          "x": 16,
+          "y": 375.5,
+          "right": 304,
+          "bottom": 419.5
+        }
+      ]
+    },
+    {
+      "name": "waiting-Telegram",
+      "width": 320,
+      "height": 568,
+      "top": 122.5,
+      "bottom": 458.5,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 16,
+          "y": 122.5,
+          "right": 124.40625,
+          "bottom": 158.5
+        },
+        {
+          "label": "Открыть Telegram",
+          "x": 16,
+          "y": 410.5,
+          "right": 304,
+          "bottom": 458.5
+        }
+      ]
+    },
+    {
+      "name": "sms-390x844",
+      "width": 390,
+      "height": 844,
+      "top": 279,
+      "bottom": 569,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 24,
+          "y": 279,
+          "right": 132.40625,
+          "bottom": 315
+        },
+        {
+          "label": "Номер телефона, код страны плюс семь уже указан",
+          "x": 87,
+          "y": 442,
+          "right": 365,
+          "bottom": 500
+        },
+        {
+          "label": "Получить код по SMS",
+          "x": 24,
+          "y": 521,
+          "right": 366,
+          "bottom": 569
+        }
+      ]
+    },
+    {
+      "name": "sms-320x568",
+      "width": 320,
+      "height": 568,
+      "top": 161,
+      "bottom": 420,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 16,
+          "y": 161,
+          "right": 124.40625,
+          "bottom": 197
+        },
+        {
+          "label": "Номер телефона, код страны плюс семь уже указан",
+          "x": 79,
+          "y": 309,
+          "right": 303,
+          "bottom": 359
+        },
+        {
+          "label": "Получить код по SMS",
+          "x": 16,
+          "y": 372,
+          "right": 304,
+          "bottom": 420
+        }
+      ]
+    },
+    {
+      "name": "sms-390x340",
+      "width": 390,
+      "height": 340,
+      "top": 67,
+      "bottom": 273,
+      "scrollHeight": 340,
+      "clientHeight": 340,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 16,
+          "y": 67,
+          "right": 124.40625,
+          "bottom": 99
+        },
+        {
+          "label": "Номер телефона, код страны плюс семь уже указан",
+          "x": 79,
+          "y": 166,
+          "right": 373,
+          "bottom": 216
+        },
+        {
+          "label": "Получить код по SMS",
+          "x": 16,
+          "y": 225,
+          "right": 374,
+          "bottom": 273
+        }
+      ]
+    },
+    {
+      "name": "sms-844x390",
+      "width": 844,
+      "height": 390,
+      "top": 92,
+      "bottom": 298,
+      "scrollHeight": 390,
+      "clientHeight": 390,
+      "scrollWidth": 844,
+      "clientWidth": 844,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 466.09375,
+          "y": 92,
+          "right": 574.5,
+          "bottom": 124
+        },
+        {
+          "label": "Номер телефона, код страны плюс семь уже указан",
+          "x": 529.09375,
+          "y": 191,
+          "right": 827,
+          "bottom": 241
+        },
+        {
+          "label": "Получить код по SMS",
+          "x": 466.09375,
+          "y": 250,
+          "right": 828,
+          "bottom": 298
+        }
+      ]
+    },
+    {
+      "name": "sms-keyboard-visual-viewport",
+      "width": 390,
+      "height": 340,
+      "top": 67,
+      "bottom": 273,
+      "scrollHeight": 340,
+      "clientHeight": 340,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Другой способ входа",
+          "x": 24,
+          "y": 67,
+          "right": 132.40625,
+          "bottom": 99
+        },
+        {
+          "label": "Номер телефона, код страны плюс семь уже указан",
+          "x": 87,
+          "y": 166,
+          "right": 365,
+          "bottom": 216
+        },
+        {
+          "label": "Получить код по SMS",
+          "x": 24,
+          "y": 225,
+          "right": 366,
+          "bottom": 273
+        }
+      ]
+    },
+    {
+      "name": "code-error-390x844",
+      "width": 390,
+      "height": 844,
+      "top": 229.5,
+      "bottom": 618.5,
+      "scrollHeight": 844,
+      "clientHeight": 844,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Изменить номер телефона",
+          "x": 24,
+          "y": 229.5,
+          "right": 125.578125,
+          "bottom": 265.5
+        },
+        {
+          "label": "Код из SMS",
+          "x": 24,
+          "y": 366.5,
+          "right": 366,
+          "bottom": 438.5
+        },
+        {
+          "label": "Подтвердить код",
+          "x": 24,
+          "y": 458.5,
+          "right": 366,
+          "bottom": 506.5
+        },
+        {
+          "label": "Отправить код по SMS снова",
+          "x": 24,
+          "y": 526.5,
+          "right": 366,
+          "bottom": 562.5
+        }
+      ]
+    },
+    {
+      "name": "code-error-320x568",
+      "width": 320,
+      "height": 568,
+      "top": 122.5,
+      "bottom": 458.5,
+      "scrollHeight": 568,
+      "clientHeight": 568,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "controls": [
+        {
+          "label": "Изменить номер телефона",
+          "x": 16,
+          "y": 122.5,
+          "right": 117.578125,
+          "bottom": 158.5
+        },
+        {
+          "label": "Код из SMS",
+          "x": 16,
+          "y": 244.5,
+          "right": 304,
+          "bottom": 302.5
+        },
+        {
+          "label": "Подтвердить код",
+          "x": 16,
+          "y": 314.5,
+          "right": 304,
+          "bottom": 362.5
+        },
+        {
+          "label": "Отправить код по SMS снова",
+          "x": 16,
+          "y": 374.5,
+          "right": 304,
+          "bottom": 410.5
+        }
+      ]
+    },
+    {
+      "name": "code-error-390x340",
+      "width": 390,
+      "height": 340,
+      "top": 21.5,
+      "bottom": 318.5,
+      "scrollHeight": 340,
+      "clientHeight": 340,
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "controls": [
+        {
+          "label": "Изменить номер телефона",
+          "x": 16,
+          "y": 21.5,
+          "right": 117.578125,
+          "bottom": 53.5
+        },
+        {
+          "label": "Код из SMS",
+          "x": 16,
+          "y": 116.5,
+          "right": 374,
+          "bottom": 174.5
+        },
+        {
+          "label": "Подтвердить код",
+          "x": 16,
+          "y": 182.5,
+          "right": 374,
+          "bottom": 230.5
+        },
+        {
+          "label": "Отправить код по SMS снова",
+          "x": 16,
+          "y": 238.5,
+          "right": 374,
+          "bottom": 274.5
+        }
+      ]
+    }
+  ],
+  "runtimeErrors": [],
+  "checks": [
+    "provider-first screen without phone",
+    "three provider payloads omit phone",
+    "no initial checkbox or legal links",
+    "consent button required after choosing each method",
+    "cancel does not grant consent or start auth",
+    "legal documents open separately",
+    "provider failure and back navigation",
+    "separate SMS form",
+    "stable input focus",
+    "wrong SMS code",
+    "SMS success to profile setup",
+    "no scroll or clipped controls"
+  ]
+}

@@ -5,6 +5,7 @@ import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
+import { ShiftSummary } from '@/components/driver/shift-summary';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
@@ -15,9 +16,10 @@ import { AccessibleSwitch } from '@/components/ui/accessible-switch';
 import { AppModal } from '@/components/ui/app-modal';
 import { AppIcon } from '@/components/ui/app-icon';
 import { MoneyValue } from '@/components/ui/money-value';
-import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
+import { IconButton } from '@/components/ui/icon-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
+import { headingBetweenCoordinates } from '@/domain/route-tracking';
 import type { Coordinates } from '@/domain/models';
 import {
   formatRoutePointCount,
@@ -84,7 +86,7 @@ function DriverOrderCard({
         <StatusChip label="Нет активного заказа" />
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Вы на линии</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-          Новый заказ появится здесь со звуковым и вибро-сигналом.
+          Новый заказ появится здесь. Сообщим голосом и вибрацией.
         </Text>
         {!!error && (
           <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
@@ -113,7 +115,11 @@ function DriverOrderCard({
   if (currentRide.status === 'searching') {
     return (
       <View style={{ gap: spacing.x4 }}>
-        <StatusChip label="Новый заказ" tone="warning" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <StatusChip label="Новый заказ" tone="info" />
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.tariff === 'child' ? 'Детский' : 'Эконом'}</Text>
+        </View>
+        <Text style={{ ...typography.pageTitle, color: colors.ink }}>Новая поездка</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {currentRide.passenger?.name ?? 'Пассажир'}
@@ -124,17 +130,17 @@ function DriverOrderCard({
             compact
           />
         </View>
-        <View>
-          <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>ПОДАЧА</Text>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{routeAddresses.pickup}</Text>
+        <View style={{ paddingVertical: spacing.x3, borderTopWidth: 1, borderColor: colors.border, gap: 4 }}>
+          <Text selectable style={{ ...typography.micro, color: colors.inkSecondary }}>○  Подача</Text>
+          <Text selectable style={{ ...typography.body, fontSize: 15, color: colors.ink }}>{routeAddresses.pickup}</Text>
         </View>
         <View style={{ gap: spacing.x2 }}>
           {routeAddresses.destinations.map((label, index) => (
-            <View key={`${label}:${index}`}>
+            <View key={`${label}:${index}`} style={{ paddingBottom: spacing.x3, borderBottomWidth: 1, borderColor: colors.border, gap: 4 }}>
               <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
                 {routeDestinationTitle(index, routeAddresses.destinations.length)}
               </Text>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+              <Text selectable style={{ ...typography.body, fontSize: 15, color: colors.ink }}>
                 {label}
               </Text>
             </View>
@@ -157,25 +163,15 @@ function DriverOrderCard({
             {error}
           </Text>
         )}
-        <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
+        <View style={{ gap: spacing.x1 }}>
           <AppButton
-            variant="secondary"
-            fullWidth={false}
-            disabled={busy}
-            style={{ flex: 1 }}
-            onPress={resetRide}
-          >
-            Пропустить
-          </AppButton>
-          <AppButton
-            fullWidth={false}
             loading={busy}
             disabled={busy}
-            style={{ flex: 2 }}
             onPress={() => void transitionRide('accepted')}
           >
-            Принять
+            Принять заказ
           </AppButton>
+          <AppButton variant="quiet" compact disabled={busy} onPress={resetRide}>Пропустить заказ</AppButton>
         </View>
       </View>
     );
@@ -781,11 +777,11 @@ function DriverOrderCard({
 
 export function DriverHomeScreen() {
   const colors = useThemeColors();
-  const { token } = useSession();
+  const { token, user } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [online, setOnline] = useState<boolean | null>(demo ? true : null);
   const statusRequestRef = useRef(0);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone } = useResponsiveLayout();
   const { driverRide: currentRide, refresh } = useRide();
@@ -809,6 +805,12 @@ export function DriverHomeScreen() {
     origin: driverCoordinates,
     token,
   });
+  const mapDriverCoordinates = demo && navigation.active
+    ? navigation.coordinates[0] ?? null
+    : driverCoordinates;
+  const mapDriverHeading = demo && navigation.coordinates.length >= 2
+    ? headingBetweenCoordinates(navigation.coordinates[0]!, navigation.coordinates[1]!)
+    : location.heading;
 
   const loadStatus = useCallback(async () => {
     const requestId = ++statusRequestRef.current;
@@ -898,23 +900,6 @@ export function DriverHomeScreen() {
   const visibleError = statusError ?? location.error ?? navigation.error;
   const panelContent = (
     <>
-      {!activeTrip && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View>
-            <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Смена</Text>
-            <Text selectable style={{ ...typography.caption, color: online ? colors.success : colors.inkSecondary }}>
-              {online === null ? 'Проверяем статус…' : online ? 'На линии' : 'Не на линии'}
-            </Text>
-          </View>
-          <AccessibleSwitch
-            value={online === true}
-            disabled={online === null}
-            accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'}
-            onValueChange={(next) => void changeOnline(next)}
-            trackColor={{ true: colors.brand }}
-          />
-        </View>
-      )}
       {!!visibleError && (
         <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
           {visibleError}
@@ -936,82 +921,51 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    padding: activeTrip ? spacing.x3 : spacing.x5,
+    padding: spacing.x5,
     gap: activeTrip ? spacing.x3 : spacing.x5,
     flexGrow: 1,
   } as const;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas, flexDirection: isPhone ? 'column' : 'row' }}>
-      <View
-        style={{
-          flex: 1,
-          minHeight: isPhone ? (sheetExpanded ? 64 : activeTrip ? 72 : 260) : undefined,
-          position: 'relative',
-        }}
-      >
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View style={{ paddingHorizontal: spacing.x5, paddingVertical: spacing.x4, backgroundColor: activeTrip ? colors.surface : colors.canvas,
+        flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text accessibilityRole="header" numberOfLines={2} style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink }}>
+            {activeTrip ? 'Текущая поездка' : `Хорошего дня, ${user?.name.split(' ')[0] || 'водитель'}`}
+          </Text>
+          <Text style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
+            {activeTrip ? 'Маршрут и действия по заказу' : online === null ? 'Проверяем статус…' : online ? 'На линии · ждём заказы рядом' : 'Вы не на линии'}
+          </Text>
+        </View>
+        {!activeTrip && <AccessibleSwitch value={online === true} disabled={online === null}
+          accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'} onValueChange={(next) => void changeOnline(next)} trackColor={{ true: colors.brand }} />}
+        {!activeTrip && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
+          label={mapVisible ? 'Скрыть карту заказа' : 'Показать карту заказа'} onPress={() => setMapVisible((value) => !value)} />}
+      </View>
+      <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row' }}>
+      {(activeTrip || mapVisible || !isPhone) && <View style={{ flex: activeTrip || !isPhone ? 1 : undefined, height: !activeTrip && isPhone ? 180 : undefined,
+        minHeight: isPhone ? 120 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
         <TaxiMap
           pickup={mapPickup}
           destinations={currentRide?.destinations?.slice(currentRide.nextDestinationIndex ?? 0)}
           destination={mapDestination}
           routeCoordinates={activeRouteCoordinates}
           routeTarget={navigation.targetKind}
-          driver={driverCoordinates}
-          driverHeading={location.heading}
+          driver={mapDriverCoordinates}
+          driverHeading={mapDriverHeading}
           passenger={currentRide?.passengerCoordinates}
           followDriver={navigation.active || !currentRide}
           navigationMode={navigation.active}
         />
+      </View>}
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        style={{ flexGrow: isPhone && !activeTrip ? 1 : 0, flexShrink: 1, flexBasis: 'auto', width: isPhone ? '100%' : 420,
+          maxHeight: activeTrip && isPhone ? '68%' : undefined, backgroundColor: colors.surface }}>
+        {!activeTrip && <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />}
+        <View style={panelContentStyle}>{panelContent}</View>
+      </ScrollView>
       </View>
-      {isPhone ? (
-        <DraggableSheet
-          enabled
-          expanded={sheetExpanded}
-          onExpand={() => setSheetExpanded(true)}
-          onCollapse={() => setSheetExpanded(false)}
-          hint="Развернуть панель водителя"
-          collapseHint="Свернуть панель водителя"
-          style={{
-            width: '100%',
-            maxHeight: activeTrip
-              ? sheetExpanded
-                ? '92%'
-                : '90%'
-              : sheetExpanded
-                ? '80%'
-                : '62%',
-            flexShrink: 1,
-            overflow: 'hidden',
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: radius.sheet,
-            borderTopRightRadius: radius.sheet,
-            borderCurve: 'continuous',
-          }}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={!activeTrip}
-            showsVerticalScrollIndicator={false}
-            style={{ width: '100%', flexShrink: 1 }}
-            contentContainerStyle={panelContentStyle}
-          >
-            {panelContent}
-          </ScrollView>
-        </DraggableSheet>
-      ) : (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          style={{
-            width: 420,
-            backgroundColor: colors.surface,
-            borderLeftWidth: 1,
-            borderColor: colors.border,
-          }}
-          contentContainerStyle={panelContentStyle}
-        >
-          {panelContent}
-        </ScrollView>
-      )}
     </View>
   );
 }

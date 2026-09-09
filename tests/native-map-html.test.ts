@@ -7,6 +7,52 @@ import {
 } from '../src/components/map/native-map-html';
 
 describe('native map route overlays', () => {
+  it('opens the selected street at zoom 19 and preserves the camera while choosing a house', async () => {
+    const street = { latitude: 56.115589, longitude: 52.125607 };
+    const updates: Record<string, unknown>[] = [];
+    const initial: Record<string, unknown>[] = [];
+    const listeners: Record<string, (event: { data: string }) => void> = {};
+    const element = () => ({
+      style: {}, dataset: {}, clientWidth: 390, clientHeight: 360,
+      appendChild() {}, setAttribute() {}, classList: { toggle() {} },
+    });
+    class MapStub {
+      constructor(_element: unknown, props: Record<string, unknown>) { initial.push(props); }
+      addChild() {}
+      removeChild() {}
+      update(props: Record<string, unknown>) { updates.push(props); }
+    }
+    const script = [...buildNativeMapHtml('test-key', 'light', street)
+      .matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+      .map((match) => match[1]!.trim()).find(Boolean)!;
+    runInNewContext(script, {
+      document: { documentElement: element(), body: element(), getElementById: element, createElement: element, addEventListener() {} },
+      window: { matchMedia: () => ({ matches: true }), addEventListener: (name: string, callback: typeof listeners[string]) => { listeners[name] = callback; } },
+      ymaps3: {
+        ready: Promise.resolve(), YMap: MapStub, YMapDefaultSchemeLayer: class {},
+        YMapDefaultFeaturesLayer: class {}, YMapListener: class {}, YMapMarker: class {}, YMapFeature: class {},
+      },
+      ReactNativeWebView: { postMessage() {} },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(initial[0]).toMatchObject({
+      location: { center: [52.125607, 56.115589], zoom: 19 },
+      zoomRange: { min: 6, max: 19 },
+    });
+    const send = (state: object) => listeners.message!({ data: JSON.stringify(state) });
+    send({ selectionCenter: street, coordinateSelectionEnabled: true });
+    const movements = () => updates.filter((update) => update.location);
+    expect(movements()).toHaveLength(1);
+    // A tap adds a marker, without undoing the passenger's pan/zoom.
+    send({ selectionCenter: { ...street }, coordinateSelectionEnabled: true,
+      pickup: { id: 'house', label: 'Дом', coordinates: { latitude: 56.1158, longitude: 52.1258 } } });
+    expect(movements()).toHaveLength(1);
+    send({ selectionCenter: { latitude: 56.05, longitude: 51.96 }, coordinateSelectionEnabled: true });
+    expect(movements().at(-1)).toMatchObject({ location: { center: [51.96, 56.05], zoom: 19 } });
+    send({});
+    expect(updates).toContainEqual({ zoomRange: { min: 6, max: 17 } });
+  });
+
   it('contains compact zoom-aware points and arrival callouts', () => {
     const html = buildNativeMapHtml('test-key');
 

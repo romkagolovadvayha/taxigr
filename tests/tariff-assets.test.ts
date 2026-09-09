@@ -5,39 +5,32 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 const assets = [
-  { name: 'economy car', file: 'economy-car.png', width: 288, height: 144 },
-  { name: 'child seat', file: 'child-seat.png', width: 160, height: 160 },
+  { name: 'economy car', file: 'economy-car.webp', width: 384, height: 256, maxBytes: 15_000 },
+  { name: 'child seat', file: 'child-seat.webp', width: 384, height: 256, maxBytes: 10_000 },
+  { name: 'inline economy car', file: 'economy-car-compact.webp', width: 192, height: 128, maxBytes: 6_000 },
+  { name: 'inline child seat', file: 'child-seat-compact.webp', width: 192, height: 128, maxBytes: 4_000 },
 ] as const;
 
 describe('tariff illustrations', () => {
   for (const asset of assets) {
-    it(`keeps the ${asset.name} transparent, sharp and lightweight`, async () => {
+    it(`keeps the runtime ${asset.name} sharp, lightweight and on a clean card background`, async () => {
       const path = resolve(process.cwd(), 'assets', 'tariffs', asset.file);
       const file = await stat(path);
       const metadata = await sharp(path).metadata();
-      const trimmed = await sharp(path)
-        .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 8 })
-        .toBuffer({ resolveWithObject: true });
       const { data, info } = await sharp(path)
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      expect(file.size).toBeLessThan(50_000);
-      expect(metadata.format).toBe('png');
-      expect(metadata.hasAlpha).toBe(true);
+      expect(file.size).toBeLessThan(asset.maxBytes);
+      expect(metadata.format).toBe('webp');
       expect(metadata.width).toBe(asset.width);
       expect(metadata.height).toBe(asset.height);
-      expect((trimmed.info.width * trimmed.info.height) / (asset.width * asset.height)).toBeGreaterThan(0.65);
-
-      const alphaAt = (x: number, y: number) =>
-        data[(y * info.width + x) * info.channels + 3];
-      expect([
-        alphaAt(0, 0),
-        alphaAt(info.width - 1, 0),
-        alphaAt(0, info.height - 1),
-        alphaAt(info.width - 1, info.height - 1),
-      ]).toEqual([0, 0, 0, 0]);
+      for (const [x, y] of [[0, 0], [info.width - 1, 0], [0, info.height - 1], [info.width - 1, info.height - 1]]) {
+        const offset = (y! * info.width + x!) * info.channels;
+        expect(Math.min(...data.subarray(offset, offset + 3))).toBeGreaterThan(245);
+        expect(data[offset + 3]).toBe(255);
+      }
     });
   }
 });

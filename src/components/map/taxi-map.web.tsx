@@ -1,7 +1,11 @@
+import { useIsFocused } from 'expo-router';
 import { memo, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { MapViewportInsets, TaxiMapProps } from '@/components/map/types';
+import { POINT_SELECTION_ZOOM, pointSelectionLocation } from '@/components/map/selection-viewport';
+import { AppButton } from '@/components/ui/app-button';
+import { subscribeToYandexMapFailures } from '@/components/map/yandex-map-errors';
 import {
   DRIVER_MARKER_HEIGHT,
   DRIVER_MARKER_WIDTH,
@@ -162,7 +166,7 @@ function markerElement(
   return element;
 }
 
-export const TaxiMap = memo(function TaxiMap({
+const ActiveTaxiMap = memo(function ActiveTaxiMap({
   pickup,
   destinations,
   destination,
@@ -182,12 +186,16 @@ export const TaxiMap = memo(function TaxiMap({
   onMapError,
   selectionCenter,
   onCoordinateSelect,
-}: TaxiMapProps) {
+  onRetry,
+}: TaxiMapProps & { onRetry: () => void }) {
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
   const [initialColorScheme] = useState(colorScheme);
   const onReady = useEffectEvent(() => onMapReady?.());
   const onError = useEffectEvent((message: string) => onMapError?.(message));
+  const initialLocation = useEffectEvent(() => selectionCenter
+    ? pointSelectionLocation(selectionCenter)
+    : { center: [grahovoCenter.longitude, grahovoCenter.latitude], zoom: 14 });
   const fittedViewportRef = useRef('');
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -205,28 +213,53 @@ export const TaxiMap = memo(function TaxiMap({
   const coordinateSelectRef = useRef(onCoordinateSelect);
   useEffect(() => { coordinateSelectRef.current = onCoordinateSelect; }, [onCoordinateSelect]);
 
+  const selectionLatitude = selectionCenter?.latitude;
+  const selectionLongitude = selectionCenter?.longitude;
   useEffect(() => {
-    if (mapReady && selectionCenter) mapRef.current?.update({
-      location: { center: [selectionCenter.longitude, selectionCenter.latitude], zoom: 17 },
+    if (!mapReady) return;
+    const center = selectionLatitude != null && selectionLongitude != null
+      ? { latitude: selectionLatitude, longitude: selectionLongitude }
+      : null;
+    mapRef.current?.update({
+      zoomRange: { min: 6, max: center ? POINT_SELECTION_ZOOM : 17 },
+      ...(center ? { location: pointSelectionLocation(center) } : {}),
     });
-  }, [mapReady, selectionCenter]);
+  }, [mapReady, selectionLatitude, selectionLongitude]);
 
   useEffect(() => {
     let active = true;
+    let failed = false;
+    const clearMap = () => {
+      mapRef.current?.destroy();
+      mapRef.current = null;
+      apiRef.current = null;
+      staticEntitiesRef.current = [];
+      driverMarkerRef.current = null;
+      driverElementRef.current = null;
+      passengerMarkerRef.current = null;
+      routePointElementsRef.current = [];
+    };
+    const fail = (message: string) => {
+      if (!active || failed) return;
+      failed = true;
+      clearMap();
+      setMapReady(false);
+      setError(message);
+      onError(message);
+    };
+    const unsubscribe = subscribeToYandexMapFailures(window, fail);
 
     void loadYandexMap()
       .then((api) => {
-        if (!active || !containerRef.current) return;
+        if (!active || failed || !containerRef.current) return;
         apiRef.current = api;
+        const location = initialLocation();
         mapRef.current = new api.YMap(
           containerRef.current,
           {
-            location: {
-              center: [grahovoCenter.longitude, grahovoCenter.latitude],
-              zoom: 14,
-            },
+            location,
             theme: initialColorScheme,
-            zoomRange: { min: 6, max: 17 },
+            zoomRange: { min: 6, max: Math.max(17, location.zoom) },
             showScaleInCopyrights: true,
           },
           [new api.YMapDefaultSchemeLayer({}), new api.YMapDefaultFeaturesLayer({})],
@@ -250,21 +283,13 @@ export const TaxiMap = memo(function TaxiMap({
       })
       .catch((reason: unknown) => {
         const message = reason instanceof Error ? reason.message : 'Карта недоступна';
-        if (active) setError(message);
-        if (active) onError(message);
+        fail(message);
       });
 
     return () => {
       active = false;
-      mapRef.current?.destroy();
-      mapRef.current = null;
-      apiRef.current = null;
-      staticEntitiesRef.current = [];
-      driverMarkerRef.current = null;
-      driverElementRef.current = null;
-      passengerMarkerRef.current = null;
-      routePointElementsRef.current = [];
-      setMapReady(false);
+      unsubscribe();
+      clearMap();
     };
   }, [initialColorScheme]);
 
@@ -293,10 +318,10 @@ export const TaxiMap = memo(function TaxiMap({
       : routeCoordinates ?? [];
     const pickupMarkerCoordinates =
       (routeTarget === 'pickup'
-        ? renderedRouteCoordinates.at(-1)
+        ? renderedRouteCoordinates[renderedRouteCoordinates.length - 1]
         : renderedRouteCoordinates[0]) ?? pickup?.coordinates;
     const destinationMarkerCoordinates =
-      renderedRouteCoordinates.at(-1) ?? destination?.coordinates;
+      renderedRouteCoordinates[renderedRouteCoordinates.length - 1] ?? destination?.coordinates;
 
     if (pickup && pickupMarkerCoordinates) {
       const pickupElement = routePointElement(
@@ -500,10 +525,11 @@ export const TaxiMap = memo(function TaxiMap({
 
   if (error) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.x6 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.x6, gap: spacing.x4 }}>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
           {error}
         </Text>
+        <AppButton onPress={onRetry} fullWidth={false}>Повторить загрузку карты</AppButton>
       </View>
     );
   }
@@ -511,8 +537,17 @@ export const TaxiMap = memo(function TaxiMap({
   return (
     <View
       ref={containerRef as never}
-      style={{ flex: 1, minHeight: 260, backgroundColor: colors.mapFallback }}
+      style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}
       accessibilityLabel="Карта поездки"
     />
   );
+});
+
+export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
+  const focused = useIsFocused();
+  const [attempt, setAttempt] = useState(0);
+  // Stack screens stay mounted behind /profile and address search. Release their SDK maps.
+  return focused
+    ? <ActiveTaxiMap key={attempt} {...props} onRetry={() => setAttempt((value) => value + 1)} />
+    : null;
 });

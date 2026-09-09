@@ -4,6 +4,7 @@ import { AppState, Platform } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
 import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
+import { getDemoRoadRoute } from '@/api/demo-routing';
 import { useSession } from '@/auth/session-provider';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
 import {
@@ -18,8 +19,6 @@ import { isAssignedDriverOrder } from '@/domain/driver-order-queue';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import {
   buildDemoDriverOffer,
-  buildDemoMultiStopRoute,
-  buildDemoRoute,
   placeDemoDriverNearPickup,
 } from '@/domain/demo-flow';
 import type {
@@ -80,6 +79,8 @@ type RideContextValue = {
   busy: boolean;
   error: string | null;
   chatUnreadCounts: Record<string, number>;
+  latestIncomingChatMessage: RideChatMessage | null;
+  subscribeRideUpdates: (listener: (ride: RideOrder) => void) => () => void;
   setPickup: (address: Address) => void;
   setDestination: (address: Address) => void;
   setDestinationAt: (index: number, address: Address) => void;
@@ -215,7 +216,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.roles.includes('admin') ?? false;
   const [pickup, setPickup] = useState<Address | null>(null);
   const [destinations, setDestinations] = useState<Address[]>([]);
-  const destination = destinations.at(-1) ?? null;
+  const destination = destinations[destinations.length - 1] ?? null;
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
   const [selectedTariff, setSelectedTariff] = useState<TariffCode>('economy');
@@ -241,6 +242,16 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
+  const [latestIncomingChatMessage, setLatestIncomingChatMessage] = useState<RideChatMessage | null>(null);
+  // Preserve every transition even when React batches completion and promotion of the next ride.
+  const rideUpdateListeners = useRef(new Set<(ride: RideOrder) => void>());
+  const subscribeRideUpdates = useCallback((listener: (ride: RideOrder) => void) => {
+    rideUpdateListeners.current.add(listener);
+    return () => { rideUpdateListeners.current.delete(listener); };
+  }, []);
+  const emitRideUpdate = useCallback((ride: RideOrder) => {
+    rideUpdateListeners.current.forEach(listener => listener(ride));
+  }, []);
   const quoteRequestController = useRef<AbortController | null>(null);
   const quoteRequestId = useRef(0);
   const completedHistoryOrderIds = useRef(new Set<string>());
@@ -322,6 +333,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   );
 
   const applyPassengerOrder = useCallback((ride: RideOrder) => {
+    emitRideUpdate(ride);
     const summary = toOrderSummary(ride);
     setOrders((previous) => upsertOrderSummary(previous, summary));
     setAdminOrders((previous) => upsertOrderSummary(previous, summary));
@@ -331,9 +343,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDestinationHistory((history) => addCompletedDestination(history, ride));
     }
     if (ride.routeCoordinates?.length) setRouteCoordinates(ride.routeCoordinates);
-  }, []);
+  }, [emitRideUpdate]);
 
   const applyDriverOrder = useCallback((ride: RideOrder) => {
+    emitRideUpdate(ride);
     if (isAssignedDriverOrder(ride)) {
       if (ride.driverQueuePosition === 2) {
         setNextDriverRide(ride);
@@ -351,7 +364,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverOffer((current) => (current?.id === ride.id ? null : current));
     }
     setAdminOrders((previous) => upsertOrderSummary(previous, toOrderSummary(ride)));
-  }, []);
+  }, [emitRideUpdate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -498,7 +511,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const loadMorePassengerOrders = useCallback(async () => {
     if (!token || demoSession || !passengerOrdersHasMore) return;
-    const cursor = orders.at(-1);
+    const cursor = orders[orders.length - 1];
     if (!cursor) return;
     const next = await apiRequest<RideOrderSummary[]>(
       `/v1/orders?scope=passenger&view=summary&limit=20&before=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
@@ -510,7 +523,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const loadMoreAdminOrders = useCallback(async () => {
     if (!token || demoSession || !isAdmin || !adminOrdersHasMore) return;
-    const cursor = adminOrders.at(-1);
+    const cursor = adminOrders[adminOrders.length - 1];
     if (!cursor) return;
     const next = await apiRequest<RideOrderSummary[]>(
       `/v1/orders?view=summary&limit=20&before=${encodeURIComponent(cursor.createdAt)}&beforeId=${cursor.id}`,
@@ -531,7 +544,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       reconnectionDelayMax: 8_000,
     });
     const handleReconnect = () => void refresh();
-    socket.io.on('reconnect', handleReconnect);
+    // Also close the gap between the initial bootstrap and socket connection.
+    socket.on('connect', handleReconnect);
+    let offerRequestId = 0;
     socket.on('order:updated', (order: RideOrder) => {
       if (isAdmin) {
         setAdminOrders((previous) => upsertOrderSummary(previous, toOrderSummary(order)));
@@ -567,6 +582,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     );
     socket.on('order:available', (order: RideOrder) => {
       if (isDriver) {
+        offerRequestId += 1;
         setDriverOffer(order);
         setDriverRide((current) =>
           !current || !isAssignedDriverOrder(current) || current.id === order.id
@@ -575,8 +591,25 @@ export function RideProvider({ children }: { children: ReactNode }) {
         );
       }
     });
+    socket.on('order:unavailable', ({ orderId }: { orderId: string }) => {
+      if (!isDriver) return;
+      const requestId = ++offerRequestId;
+      setDriverOffer((current) => current?.id === orderId ? null : current);
+      setDriverRide((current) => current?.id === orderId && current.status === 'searching' ? null : current);
+      void apiRequest<RideOrder[]>('/v1/driver/offers', { token }).then((offers) => {
+        if (!socket.connected || requestId !== offerRequestId) return;
+        const offer = offers[0] ?? null;
+        setDriverOffer(offer);
+        setDriverRide((current) => current && isAssignedDriverOrder(current) ? current : offer);
+      }).catch(() => {
+        if (socket.connected && requestId === offerRequestId) {
+          setError('Не удалось обновить доступные заказы. Проверьте соединение.');
+        }
+      });
+    });
     socket.on('ride-chat:message', (message: RideChatMessage) => {
       if (message.sender.id === userId) return;
+      setLatestIncomingChatMessage(message);
       setChatUnreadCounts((current) => ({
         ...current,
         [message.orderId]: (current[message.orderId] ?? 0) + 1,
@@ -603,7 +636,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       });
     });
     return () => {
-      socket.io.off('reconnect', handleReconnect);
+      offerRequestId += 1;
+      socket.off('connect', handleReconnect);
       socket.disconnect();
     };
   }, [
@@ -663,7 +697,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
     try {
       if (demoSession) {
-        const route = buildDemoMultiStopRoute(pickup, destinations);
+        const route = await getDemoRoadRoute(
+          pickup.coordinates,
+          destinations.map((item) => item.coordinates),
+          controller.signal,
+        );
+        if (controller.signal.aborted || quoteRequestId.current !== requestId) return;
         const allPointsInGrahovo = [pickup, ...destinations].every(isGrahovoAddress);
         const segments = destinations.map((item, index) => ({
           distanceMeters: route.segmentDistances[index]!,
@@ -785,7 +824,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      const route = buildDemoRoute(demoAddresses[0]!, demoAddresses[2]!);
+      const route = await getDemoRoadRoute(
+        demoAddresses[0]!.coordinates,
+        [demoAddresses[2]!.coordinates],
+      );
       const ride = buildDemoDriverOffer({
         route,
         pickup: demoAddresses[0]!,
@@ -1215,6 +1257,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       return false;
     }
     if (demoSession) {
+      emitRideUpdate({ ...current, status: 'searching', driverId: undefined, driver: undefined, updatedAt: new Date().toISOString() });
       if (current.id === nextDriverRide?.id) setNextDriverRide(null);
       else if (nextDriverRide) {
         setDriverRide({ ...nextDriverRide, driverQueuePosition: 1 });
@@ -1226,11 +1269,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      await apiRequest(`/v1/driver/orders/${current.id}/release`, {
+      const released = await apiRequest<RideOrder>(`/v1/driver/orders/${current.id}/release`, {
         method: 'POST',
         token,
         body: JSON.stringify({ reason }),
       });
+      emitRideUpdate(released);
       if (current.id === nextDriverRide?.id) setNextDriverRide(null);
       else setDriverRide(null);
       await refresh();
@@ -1241,7 +1285,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [demoSession, driverRide, nextDriverRide, refresh, token]);
+  }, [demoSession, driverRide, nextDriverRide, refresh, token, emitRideUpdate]);
 
   const cancelRide = useCallback(async () => {
     const current = currentRide;
@@ -1250,6 +1294,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       applyPassengerOrder({
         ...current,
         status: 'cancelled',
+        cancellationCode: 'passenger',
         updatedAt: new Date().toISOString(),
       });
       return;
@@ -1370,6 +1415,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       busy,
       error,
       chatUnreadCounts,
+      latestIncomingChatMessage,
+      subscribeRideUpdates,
       setPickup: selectPickup,
       setDestination: selectDestination,
       setDestinationAt,
@@ -1426,6 +1473,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       requestQuote,
       error,
       chatUnreadCounts,
+      latestIncomingChatMessage,
+      subscribeRideUpdates,
       adminOrders,
       passengerOrdersHasMore,
       adminOrdersHasMore,

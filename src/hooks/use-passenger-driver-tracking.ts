@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { getDemoRoadRoute } from '@/api/demo-routing';
 import { getDemoDriverSnapshot, getDemoPassengerProgression } from '@/domain/demo-flow';
 import type { Coordinates, RideOrder } from '@/domain/models';
 import {
@@ -35,6 +36,8 @@ export function usePassengerDriverTracking(
     }
 
     if (demo) {
+      const controller = new AbortController();
+      let approachRoute: Coordinates[] = [];
       const statusDuration = getDemoPassengerProgression(ride.status)?.delay ?? 0;
       const statusStartedAt = Date.parse(ride.updatedAt);
       const update = () => {
@@ -42,16 +45,32 @@ export function usePassengerDriverTracking(
           statusDuration > 0 && Number.isFinite(statusStartedAt)
             ? Math.max(0, Math.min(1, (Date.now() - statusStartedAt) / statusDuration))
             : 1;
-        const next = getDemoDriverSnapshot(ride, progress);
+        const next = getDemoDriverSnapshot(ride, progress, approachRoute);
         currentRef.current = next;
         setRendered({ rideId: ride.id, position: next });
       };
       const startTimer = setTimeout(update, 0);
+      if (['accepted', 'driver_arriving'].includes(ride.status)) {
+        void getDemoRoadRoute(rawCoordinates, [ride.pickup.coordinates], controller.signal)
+          .then((route) => {
+            if (controller.signal.aborted) return;
+            approachRoute = route.coordinates;
+            update();
+          })
+          .catch(() => {
+            // Keep the last position while roads are unavailable; never animate
+            // the car through buildings between the driver and the pickup.
+          });
+      }
       if (!['driver_arriving', 'in_progress'].includes(ride.status)) {
-        return () => clearTimeout(startTimer);
+        return () => {
+          controller.abort();
+          clearTimeout(startTimer);
+        };
       }
       const timer = setInterval(update, FRAME_INTERVAL_MS);
       return () => {
+        controller.abort();
         clearTimeout(startTimer);
         clearInterval(timer);
       };

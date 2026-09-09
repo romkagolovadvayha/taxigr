@@ -12,6 +12,7 @@ type Props = {
   onChange: (nationalDigits: string) => void;
   editable?: boolean;
   onSubmit?: () => void;
+  compact?: boolean;
 };
 
 export function RussianPhoneInput({
@@ -19,6 +20,7 @@ export function RussianPhoneInput({
   onChange,
   editable = true,
   onSubmit,
+  compact = false,
 }: Props) {
   const colors = useThemeColors();
   const digits = russianNationalPhoneDigits(value);
@@ -31,31 +33,33 @@ export function RussianPhoneInput({
       </Text>
       <View
         style={{
-          minHeight: 68,
+          minHeight: compact ? 52 : 60,
           flexDirection: 'row',
           alignItems: 'center',
           borderWidth: 1,
-          borderColor: colors.borderStrong,
+          borderColor: colors.border,
           borderRadius: radius.lg,
           borderCurve: 'continuous',
-          backgroundColor: colors.surface,
+          backgroundColor: colors.surfaceSecondary,
           overflow: 'hidden',
         }}
       >
         <View
           style={{
             alignSelf: 'stretch',
-            minWidth: 72,
+            minWidth: 62,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: colors.surfaceSecondary,
+            borderRightWidth: 1,
+            borderRightColor: colors.border,
           }}
         >
           <Text
             selectable
             accessibilityLabel="Код страны плюс семь"
             style={{
-              fontSize: 24,
+              fontSize: compact ? 20 : 22,
               lineHeight: 30,
               fontWeight: '700',
               color: colors.ink,
@@ -75,6 +79,7 @@ export function RussianPhoneInput({
           textContentType="telephoneNumber"
           autoComplete="tel"
           autoCorrect={false}
+          underlineColorAndroid="transparent"
           returnKeyType="done"
           accessibilityLabel="Номер телефона, код страны плюс семь уже указан"
           accessibilityHint="Введите десять цифр российского мобильного номера"
@@ -84,10 +89,11 @@ export function RussianPhoneInput({
           style={{
             flex: 1,
             minWidth: 0,
-            minHeight: 64,
+            minHeight: compact ? 50 : 58,
             paddingHorizontal: spacing.x4,
             paddingVertical: 0,
-            fontSize: 23,
+            fontFamily: 'Manrope',
+            fontSize: compact ? 19 : 22,
             lineHeight: 30,
             fontWeight: '600',
             letterSpacing: 0.2,

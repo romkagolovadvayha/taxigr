@@ -47,7 +47,7 @@ function localityKey(segment: string): string | null {
   const match = segment.trim().match(LOCALITY_SEGMENT);
   if (!match) return null;
 
-  const rawPrefix = match[1]?.toLocaleLowerCase('ru').replaceAll('.', '') ?? '';
+  const rawPrefix = match[1]?.toLocaleLowerCase('ru').replace(/\./g, '') ?? '';
   const name = match[2]?.trim().toLocaleLowerCase('ru').replace(/\s+/g, ' ');
   if (!name || !/[а-яё]/iu.test(name) || /^\d/u.test(name)) return null;
 

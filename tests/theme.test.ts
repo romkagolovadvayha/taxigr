@@ -19,6 +19,8 @@ describe('application theme contrast', () => {
       for (const background of [colors.canvas, colors.surface, colors.surfaceSecondary]) {
         expect(contrast(colors.ink, background)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(colors.inkSecondary, background)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colors.inkMuted, background)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colors.infoText, background)).toBeGreaterThanOrEqual(4.5);
       }
       for (const [text, background] of [
         [colors.brandInk, colors.brand], [colors.brandInkSecondary, colors.brand],
@@ -26,7 +28,7 @@ describe('application theme contrast', () => {
       ]) expect(contrast(text!, background!)).toBeGreaterThanOrEqual(4.5);
     });
   }
-  it('keeps the original white symbol legible on the cobalt identity', () => {
-    expect(contrast(brandIdentity.white, brandIdentity.blue)).toBeGreaterThanOrEqual(4.5);
+  it('keeps the route symbol legible on the yellow identity', () => {
+    expect(contrast(brandIdentity.ink, brandIdentity.background)).toBeGreaterThanOrEqual(4.5);
   });
 });

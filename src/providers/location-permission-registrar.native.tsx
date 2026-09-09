@@ -1,11 +1,4 @@
-import { useEffect } from 'react';
-
-import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
-
 export function LocationPermissionRegistrar() {
-  useEffect(() => {
-    void ensureForegroundLocationPermission().catch(() => undefined);
-  }, []);
-
+  // Ask only in direct response to a location action selected by the user.
   return null;
 }

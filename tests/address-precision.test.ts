@@ -44,4 +44,19 @@ describe('address precision', () => {
     expect(isPickupAddressComplete(settlement)).toBe(false);
     expect(isDestinationAddressComplete({ label: 'улица Советская', kind: 'street' })).toBe(false);
   });
+
+  it('accepts a precise device location as a pickup point', () => {
+    expect(isPickupAddressComplete({
+      id: 'location:56.0475800,51.9584200',
+      label: 'Моё местоположение',
+      kind: 'place',
+      coordinatePrecision: 'precise',
+    })).toBe(true);
+    expect(isPickupAddressComplete({
+      id: 'location:56.0475800,51.9584200',
+      label: 'Моё местоположение',
+      kind: 'place',
+      coordinatePrecision: 'approximate',
+    })).toBe(false);
+  });
 });

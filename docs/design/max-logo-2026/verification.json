@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "inlineLogo": true,
+      "at": 5344.300000000745
+    },
+    {
+      "inlineLogo": true,
+      "at": 3234.9000000003725
+    }
+  ],
+  "imageRequests": [],
+  "errors": [],
+  "consentOpened": true
+}

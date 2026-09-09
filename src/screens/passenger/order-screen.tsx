@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,34 +16,21 @@ import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
+import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
-import { DraggableSheet } from '@/components/ui/sheet-drag-handle';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-tracking';
 import { useRide } from '@/state/ride-provider';
-import { radius, shadows, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { formatEstimatedArrivalTime } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
 
-function PassengerNav({ vertical = false }: { vertical?: boolean }) {
-  return (
-    <View
-      style={{
-        flexDirection: vertical ? 'column' : 'row',
-        gap: spacing.x2,
-        alignItems: 'center',
-      }}
-    >
-      <IconButton icon="orders" label="Мои заказы" onPress={() => router.push('/orders')} />
-      <IconButton icon="profile" label="Профиль" onPress={() => router.push('/profile')} />
-    </View>
-  );
-}
+const mapInsets = { top: 44, bottom: 60, left: 28, right: 28 };
 
-function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinutes?: number | null; showTitle?: boolean }) {
+function BookingPanel({ pickupEtaMinutes, section = 'content' }: { pickupEtaMinutes?: number | null; section?: 'content' | 'action' }) {
   const colors = useThemeColors();
-  const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
     destinations,
@@ -65,10 +52,25 @@ function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinute
     isPickupAddressComplete(pickup) &&
     destinations.length > 0 &&
     destinations.every(isDestinationAddressComplete);
-  const routeAddressesSelected = !!pickup && !!destination;
   const quotePending =
     routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
   const quoteReady = routeIsPrecise && quoteStatus === 'ready';
+
+  if (section === 'action') {
+    if (currentRide) return null;
+    return <BookingSubmitButton
+      priceMinor={selected.priceMinor}
+      etaMinutes={selected.etaMinutes}
+      disabled={!routeIsPrecise}
+      loading={quotePending}
+      estimateAvailable={quoteReady}
+      canRetry={routeIsPrecise && quoteStatus === 'error'}
+      onPress={() => {
+        if (quoteReady) { router.push('/order-confirmation'); return; }
+        void requestQuote();
+      }}
+    />;
+  }
 
   if (currentRide) {
     return (
@@ -92,17 +94,13 @@ function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinute
 
   return (
     <View style={{ gap: spacing.x3 }}>
-      {showTitle && <Text accessibilityRole="header" style={{ ...typography.sectionTitle, color: colors.ink }}>Куда поедем?</Text>}
       <AddressFields
         pickup={pickup}
         destinations={destinations}
         destination={destination}
-        onUseLocation={() => void selectCurrentLocation()}
-        locationLoading={locationLoading}
         compact
-        reducedActions
+        hideAddDestination
       />
-      {routeAddressesSelected && (
         <TariffSelector
           tariffs={tariffs}
           selected={selectedTariff}
@@ -111,27 +109,11 @@ function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinute
           loading={quotePending}
           estimateAvailable={quoteReady}
         />
-      )}
       {!!error && (
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
           {error}
         </Text>
       )}
-      <BookingSubmitButton
-        priceMinor={selected.priceMinor}
-        etaMinutes={selected.etaMinutes}
-        disabled={!routeIsPrecise}
-        loading={quotePending}
-        estimateAvailable={quoteReady}
-        canRetry={routeIsPrecise && quoteStatus === 'error'}
-        onPress={() => {
-          if (quoteReady) {
-            router.push('/order-confirmation');
-            return;
-          }
-          void requestQuote();
-        }}
-      />
     </View>
   );
 }
@@ -140,7 +122,7 @@ export function OrderScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { isPhone, isDesktop } = useResponsiveLayout();
-  const [bookingPanelHeight, setBookingPanelHeight] = useState(0);
+  const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const [arrivalClock, setArrivalClock] = useState(() => new Date());
   const {
     pickup,
@@ -154,7 +136,7 @@ export function OrderScreen() {
     currentRide,
     transitionRide,
   } = useRide();
-  const { token } = useSession();
+  const { token, user } = useSession();
   const demoSession = token?.startsWith('demo:') ?? false;
   const trackedDriver = usePassengerDriverTracking(currentRide, demoSession);
   const driverIsFinishingPreviousRide = currentRide?.driverQueuePosition === 2;
@@ -169,23 +151,6 @@ export function OrderScreen() {
     !driverIsFinishingPreviousRide &&
     (currentRide?.status === 'driver_arriving' || rideInProgress);
   const selectedPreviewTariff = tariffs.find((tariff) => tariff.code === selectedTariff);
-  const mapViewportInsets = useMemo(
-    () =>
-      isPhone
-        ? {
-            top: insets.top + 64,
-            bottom: bookingPanelHeight,
-          }
-        : undefined,
-    [bookingPanelHeight, insets.top, isPhone],
-  );
-  const expandSheet = useCallback(() => {
-    if (currentRide) {
-      router.push({ pathname: '/orders/[id]', params: { id: currentRide.id } });
-      return;
-    }
-    router.push('/order-confirmation');
-  }, [currentRide]);
 
   useEffect(() => {
     if (currentRide || !pickup || !destination || !routeSummary) return;
@@ -239,122 +204,59 @@ export function OrderScreen() {
       followDriver={followDriver}
       followZoom={rideInProgress ? 17 : 16}
       trimCompletedRoute={rideInProgress || routeCompleted}
-      viewportInsets={mapViewportInsets}
+      viewportInsets={mapInsets}
     />
   );
 
-  if (!isPhone) {
-    return (
-      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.canvas }}>
-        {isDesktop && (
-          <View
-            style={{
-              width: 88,
-              paddingTop: Math.max(insets.top, spacing.x4),
-              paddingBottom: Math.max(insets.bottom, spacing.x4),
-              alignItems: 'center',
-              gap: spacing.x8,
-              borderRightWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-            }}
-          >
-            <BrandMark compact size={48} />
-            <PassengerNav vertical />
-          </View>
-        )}
-        <View
-          style={{
-            width: isDesktop ? 420 : 390,
-            paddingTop: Math.max(insets.top, spacing.x6),
-            paddingBottom: Math.max(insets.bottom, spacing.x6),
-            paddingHorizontal: spacing.x5,
-            gap: spacing.x6,
-            backgroundColor: colors.surface,
-            borderRightWidth: 1,
-            borderColor: colors.border,
-            zIndex: 2,
-          }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <BrandMark size={44} />
-            {!isDesktop && <PassengerNav />}
-          </View>
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
-            Куда поедем?
-          </Text>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.x4 }} keyboardShouldPersistTaps="handled">
-            <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
-          </ScrollView>
-        </View>
-        <View style={{ flex: 1 }}>{map}</View>
-      </View>
-    );
-  }
-
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <View style={{ flex: 1 }}>{map}</View>
+    <PassengerWorkspace>
       <View
+        testID="passenger-header"
         style={{
-          position: 'absolute',
-          top: insets.top + spacing.x3,
-          left: spacing.x4,
-          right: spacing.x4,
-          pointerEvents: 'box-none',
+          backgroundColor: colors.surface,
+          paddingTop: insets.top + spacing.x3,
+          paddingBottom: spacing.x3,
+          paddingLeft: Math.max(insets.left, spacing.x5),
+          paddingRight: Math.max(insets.right, spacing.x5),
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: spacing.x3,
         }}
       >
-        <View
-          style={{
-            backgroundColor: colors.surfaceRaised,
-            padding: spacing.x2,
-            paddingRight: spacing.x3,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            ...shadows.subtle,
-          }}
-        >
-          <BrandMark size={34} />
+        <View style={{ flex: 1, gap: 3 }}>
+          {currentRide ? <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Ваша поездка</Text> : <BrandMark size={32} />}
+          <Text numberOfLines={1} style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
+            {currentRide ? currentRide.destination.label : 'Такси рядом · Грахово'}
+          </Text>
         </View>
-        <PassengerNav />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+          {!isDesktop && <IconButton icon="orders" size={44} label="Мои поездки" onPress={() => router.push('/orders')} />}
+          <AnimatedPressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={() => router.push('/profile')}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ ...typography.caption, color: colors.infoText }}>{user?.name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('') || 'Я'}</Text>
+          </AnimatedPressable>
+        </View>
       </View>
-      <DraggableSheet
-        onLayout={(event) => {
-          const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-          setBookingPanelHeight((currentHeight) =>
-            Math.abs(currentHeight - nextHeight) >= 1 ? nextHeight : currentHeight,
-          );
-        }}
-        enabled
-        onExpand={expandSheet}
-        hint={
-          currentRide
-            ? 'Развернуть детали активной поездки'
-            : 'Развернуть подтверждение заказа'
-        }
-        style={{
-          position: 'absolute',
-          maxHeight: '82%',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.surface,
-          borderTopLeftRadius: radius.sheet,
-          borderTopRightRadius: radius.sheet,
-          borderCurve: 'continuous',
-          paddingHorizontal: spacing.x4,
-          paddingBottom: Math.max(insets.bottom, spacing.x4),
-          ...shadows.floating,
-        }}
-      >
-        <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} showTitle />
+      <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row-reverse' }}>
+        <View testID="passenger-map-region" style={{ flex: 1, minHeight: isPhone ? 120 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
+          {map}
+          {!currentRide && <View style={{ position: 'absolute', bottom: 24, right: 16 }}>
+            <IconButton icon="recenter" label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
+              disabled={locationLoading} size={44} onPress={() => void selectCurrentLocation()} />
+          </View>}
+        </View>
+        <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1, flexBasis: isPhone ? 'auto' : 0,
+          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, maxHeight: isPhone ? '72%' : undefined, backgroundColor: colors.surface }}
+        >
+        <ScrollView style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
+          contentContainerStyle={{ padding: spacing.x4, paddingTop: spacing.x5, paddingBottom: currentRide ? spacing.x4 : spacing.x2 }}
+          keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
         </ScrollView>
-      </DraggableSheet>
-    </View>
+        {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" /></View>}
+        </View>
+      </View>
+    </PassengerWorkspace>
   );
 }

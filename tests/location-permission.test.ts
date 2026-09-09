@@ -49,4 +49,15 @@ describe('ensureForegroundLocationPermission', () => {
     expect(Location.getForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(Location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
   });
+
+  it('requests access when the browser cannot inspect permission state first', async () => {
+    vi.mocked(Location.getForegroundPermissionsAsync).mockRejectedValue(
+      new Error('Permissions API is unavailable'),
+    );
+    vi.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValue(grantedPermission);
+
+    await expect(ensureForegroundLocationPermission()).resolves.toBe(grantedPermission);
+
+    expect(Location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,16 +1,18 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { resolveApiUrl } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
+import { AppModal } from '@/components/ui/app-modal';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
+import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { goBackOrReplace } from '@/navigation/back';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { formatRussianPhone } from '@/utils/phone';
@@ -36,7 +38,7 @@ function MenuRow({
       accessibilityLabel={subtitle ? `${label}. ${subtitle}` : label}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 68,
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.x4,
@@ -45,18 +47,18 @@ function MenuRow({
     >
       <View
         style={{
-          width: 44,
-          height: 44,
+          width: 36,
+          height: 36,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: radius.md,
-          backgroundColor: colors.canvas,
+          backgroundColor: colors.transparent,
         }}
       >
-        <AppIcon name={icon} />
+        <AppIcon name={icon} size={21} color={colors.inkSecondary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{label}</Text>
+        <Text selectable style={{ ...typography.bodyStrong, fontSize: 15, color: colors.ink }}>{label}</Text>
         {!!subtitle && <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{subtitle}</Text>}
       </View>
       <AppIcon name="chevron" color={colors.inkMuted} size={20} />
@@ -77,31 +79,35 @@ export function ProfileScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [photoVisible, setPhotoVisible] = useState(false);
+  const photoButtonRef = useRef<View>(null);
+  const { width, height } = useWindowDimensions();
+  const previewSize = Math.max(120, Math.min(280, width - 80, height - 360));
 
   const pickAvatar = async () => {
     if (busy) return;
     setError(null);
     setMessage(null);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.65,
-      base64: true,
-    });
-    if (result.canceled) return;
-    const base64 = result.assets[0]?.base64;
-    if (!base64) {
-      setError('Не удалось прочитать выбранное изображение');
-      return;
-    }
-    const mimeType = detectAvatarMimeType(base64);
-    if (!mimeType) {
-      setError('Поддерживаются изображения JPG, PNG и WebP');
-      return;
-    }
-    setBusy(true);
     try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.65,
+        base64: true,
+      });
+      if (result.canceled) return;
+      const base64 = result.assets[0]?.base64;
+      if (!base64) {
+        setError('Не удалось прочитать выбранное изображение');
+        return;
+      }
+      const mimeType = detectAvatarMimeType(base64);
+      if (!mimeType) {
+        setError('Поддерживаются изображения JPG, PNG и WebP');
+        return;
+      }
+      setBusy(true);
       await uploadAvatar(base64, mimeType);
       setMessage('Аватар обновлён');
     } catch (reason) {
@@ -127,20 +133,30 @@ export function ProfileScreen() {
   };
 
   return (
-    <Screen contentStyle={{ maxWidth: 760 }}>
+    <PassengerWorkspace><Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 760 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Профиль</Text>
       </View>
 
-      <View style={{ alignItems: 'center', gap: spacing.x3, paddingVertical: spacing.x3 }}>
-        <View
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x4, paddingVertical: spacing.x3 }}>
+        <AnimatedPressable
+          ref={photoButtonRef}
+          accessibilityRole="button"
+          accessibilityLabel="Открыть фото профиля"
+          accessibilityHint="Посмотреть увеличенное фото или загрузить новое"
+          feedback="subtle"
+          onPress={() => {
+            setMessage(null);
+            setError(null);
+            setPhotoVisible(true);
+          }}
           style={{
-            width: 112,
-            height: 112,
-            borderRadius: 56,
+            width: 64,
+            height: 64,
+            borderRadius: 22,
             overflow: 'hidden',
-            backgroundColor: colors.brand,
+            backgroundColor: colors.brandSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -150,39 +166,21 @@ export function ProfileScreen() {
               source={resolveApiUrl(user.avatarUrl)}
               contentFit="cover"
               transition={motion.duration.standard}
-              style={{ width: 112, height: 112 }}
-              accessibilityLabel="Аватар пользователя"
+              style={{ width: 64, height: 64 }}
+              accessible={false}
+              alt=""
+              loading="eager"
             />
           ) : (
-            <AppIcon name="profile" size={48} color={colors.brandInk} />
+            <AppIcon name="profile" size={28} color={colors.infoText} />
           )}
+        </AnimatedPressable>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={{ ...typography.sectionTitle, color: colors.ink }}>{user?.name}</Text>
+          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{formatRussianPhone(user?.phone ?? '')}</Text>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2, justifyContent: 'center' }}>
-          <AppButton
-            fullWidth={false}
-            variant="secondary"
-            loading={busy}
-            onPress={() => void pickAvatar()}
-          >
-            {user?.avatarUrl ? 'Сменить фото' : 'Загрузить фото'}
-          </AppButton>
-          {!!user?.avatarUrl && (
-            <AppButton
-              fullWidth={false}
-              variant="quiet"
-              disabled={busy}
-              onPress={() => void clearAvatar()}
-            >
-              Удалить фото
-            </AppButton>
-          )}
-        </View>
-        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          {formatRussianPhone(user?.phone ?? '')}
-        </Text>
       </View>
-
-      {!!message && (
+      {!!message && !photoVisible && (
         <Text
           accessibilityRole="alert"
           selectable
@@ -191,7 +189,7 @@ export function ProfileScreen() {
           {message}
         </Text>
       )}
-      {!!error && (
+      {!!error && !photoVisible && (
         <Text
           accessibilityRole="alert"
           selectable
@@ -204,9 +202,9 @@ export function ProfileScreen() {
       <View
         style={{
           backgroundColor: colors.surface,
-          borderRadius: radius.card,
-          paddingHorizontal: spacing.x4,
-          borderWidth: 1,
+          paddingHorizontal: 0,
+          borderTopWidth: 1,
+          borderBottomWidth: 1,
           borderColor: colors.border,
         }}
       >
@@ -236,6 +234,45 @@ export function ProfileScreen() {
       </View>
 
       <AppButton variant="secondary" onPress={() => void signOut()}>Выйти</AppButton>
-    </Screen>
+      <AppModal
+        visible={photoVisible}
+        title="Фото профиля"
+        onClose={() => setPhotoVisible(false)}
+        returnFocusRef={photoButtonRef}
+      >
+        <ScrollView
+          style={{ flexShrink: 1 }}
+          contentContainerStyle={{ alignItems: 'center', gap: spacing.x4 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ width: previewSize, height: previewSize, borderRadius: radius.card,
+            overflow: 'hidden', backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center', gap: spacing.x3 }}>
+            {user?.avatarUrl ? (
+              <Image
+                source={resolveApiUrl(user.avatarUrl)}
+                contentFit="contain"
+                loading="eager"
+                transition={motion.duration.standard}
+                accessibilityLabel="Фото профиля в увеличенном виде"
+                style={{ width: previewSize, height: previewSize }}
+              />
+            ) : (
+              <>
+                <AppIcon name="profile" size={72} color={colors.infoText} />
+                <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Фото ещё не добавлено</Text>
+              </>
+            )}
+          </View>
+          <View style={{ width: '100%', gap: spacing.x2 }}>
+            <AppButton loading={busy} onPress={() => void pickAvatar()}>Загрузить новое фото</AppButton>
+            {!!user?.avatarUrl && (
+              <AppButton compact variant="quiet" disabled={busy} onPress={() => void clearAvatar()}>Удалить фото</AppButton>
+            )}
+          </View>
+          {!!message && <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.successText, textAlign: 'center' }}>{message}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.dangerText, textAlign: 'center' }}>{error}</Text>}
+        </ScrollView>
+      </AppModal>
+    </Screen></PassengerWorkspace>
   );
 }

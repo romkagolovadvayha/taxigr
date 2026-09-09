@@ -1,0 +1,68 @@
+[
+  {
+    "role": "passenger",
+    "theme": "light",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": true,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  },
+  {
+    "role": "driver",
+    "theme": "light",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": true,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  },
+  {
+    "role": "admin",
+    "theme": "light",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": false,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  },
+  {
+    "role": "passenger",
+    "theme": "dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": true,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  },
+  {
+    "role": "driver",
+    "theme": "dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": true,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  },
+  {
+    "role": "admin",
+    "theme": "dark",
+    "width": 390,
+    "scrollWidth": 390,
+    "oldAccent": false,
+    "yellow": false,
+    "themedText": true,
+    "errors": [],
+    "cancelledMapRequests": []
+  }
+]

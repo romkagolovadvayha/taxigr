@@ -32,8 +32,12 @@ export function hasHouseNumber(address: AddressLike | null | undefined): boolean
 }
 
 export function isPickupAddressComplete(address: AddressLike | null | undefined): boolean {
-  return !!address && !hasApproximateCoordinates(address) &&
-    (hasHouseNumber(address) || Boolean(address.placeId));
+  return !!address && !hasApproximateCoordinates(address) && (
+    hasHouseNumber(address) ||
+    Boolean(address.placeId) ||
+    (address.kind === 'place' && address.coordinatePrecision === 'precise' &&
+      address.id?.startsWith('location:') === true)
+  );
 }
 
 export function hasApproximateCoordinates(address: AddressLike): boolean {

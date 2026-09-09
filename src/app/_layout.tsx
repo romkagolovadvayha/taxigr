@@ -119,17 +119,17 @@ function RootNavigator() {
           minHeight: '100%',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: brandIdentity.blue,
+          backgroundColor: brandIdentity.background,
           gap: spacing.x4,
           padding: spacing.x6,
         }}
       >
         <BrandGlyph size={76} />
-        <Text selectable style={{ ...typography.pageTitle, color: brandIdentity.white, textAlign: 'center' }}>
+        <Text selectable style={{ ...typography.pageTitle, color: brandIdentity.ink, textAlign: 'center' }}>
           Такси Грахово
         </Text>
-        <ActivityIndicator color={brandIdentity.white} size="small" />
-        <Text selectable style={{ ...typography.caption, color: '#DBE5FF', textAlign: 'center' }}>
+        <ActivityIndicator color={brandIdentity.ink} size="small" />
+        <Text selectable style={{ ...typography.caption, color: '#53451E', textAlign: 'center' }}>
           Загружаем приложение…
         </Text>
       </View>

@@ -1,0 +1,123 @@
+{
+  "remoteApplied": false,
+  "files": [
+    {
+      "file": "cover-desktop.jpg",
+      "width": 1920,
+      "height": 768,
+      "aiGenerated": true,
+      "bytes": 557924
+    },
+    {
+      "file": "cover-mobile.jpg",
+      "width": 1080,
+      "height": 1920,
+      "aiGenerated": true,
+      "bytes": 732531
+    },
+    {
+      "file": "post-welcome.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true,
+      "bytes": 593195
+    },
+    {
+      "file": "post-how.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true,
+      "bytes": 535802
+    },
+    {
+      "file": "post-tariffs.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true,
+      "bytes": 577747
+    },
+    {
+      "file": "post-safety.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true,
+      "bytes": 665199
+    },
+    {
+      "file": "post-drivers.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true,
+      "bytes": 672195
+    },
+    {
+      "file": "article-first-order.jpg",
+      "width": 1920,
+      "height": 1080,
+      "aiGenerated": true,
+      "bytes": 755210
+    },
+    {
+      "file": "menu-order.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 153866
+    },
+    {
+      "file": "menu-how.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 129686
+    },
+    {
+      "file": "menu-tariffs.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 144552
+    },
+    {
+      "file": "menu-support.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 119898
+    },
+    {
+      "file": "menu-safety.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 118498
+    },
+    {
+      "file": "menu-drivers.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true,
+      "bytes": 144792
+    },
+    {
+      "file": "avatar.png",
+      "width": 1024,
+      "height": 1024,
+      "aiGenerated": false,
+      "source": "Original blue brand icon, unchanged geometry",
+      "bytes": 42443
+    }
+  ],
+  "video": {
+    "file": "cover-mobile.mp4",
+    "width": 1080,
+    "height": 1920,
+    "durationSeconds": 20,
+    "frames": 480,
+    "fps": 24,
+    "codec": "H.264",
+    "audio": false,
+    "bytes": 5731671,
+    "motion": "Seamless 2.4% breathing zoom, derived from AI-generated cover"
+  }
+}

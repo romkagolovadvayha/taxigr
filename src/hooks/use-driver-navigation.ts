@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 
 import { apiRequest } from '@/api/client';
+import { getDemoRoadRoute } from '@/api/demo-routing';
 import {
   drawableNavigationRoute,
   navigationPositionBucket,
@@ -110,20 +111,11 @@ export function useDriverNavigation({
     };
     setLoading(true);
     const request = demo
-      ? apiRequest<{ route: RouteSummary } | RouteSummary>('/v1/routes/preview', {
-          method: 'POST',
-          signal: controller.signal,
-          body: JSON.stringify({
-            pickup: {
-              id: 'driver-position',
-              label: 'Текущее положение, 1',
-              houseNumber: '1',
-              coordinates: requestOrigin,
-            },
-            destination: targetKind === 'pickup' ? target : remainingDestinations.at(-1),
-            destinations: targetKind === 'pickup' ? [target] : remainingDestinations,
-          }),
-        }).then((response) => ('coordinates' in response ? response : response.route))
+      ? getDemoRoadRoute(
+          requestOrigin,
+          (targetKind === 'pickup' ? [target] : remainingDestinations).map((item) => item.coordinates),
+          controller.signal,
+        )
       : apiRequest<NavigationRouteResponse>(`/v1/driver/orders/${rideId}/route`, {
           method: 'POST',
           token,

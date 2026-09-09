@@ -24,6 +24,10 @@ const environment = {
     process.env.YANDEX_MAPS_API_KEY ||
     production.YANDEX_MAPS_API_KEY ||
     '',
+  EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY:
+    process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY ||
+    production.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY ||
+    '',
   EXPO_PUBLIC_DEMO_MODE: 'false',
   EXPO_PUBLIC_VK_COMMUNITY_ID:
     process.env.EXPO_PUBLIC_VK_COMMUNITY_ID ||

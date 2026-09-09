@@ -1,10 +1,10 @@
-import { Image } from 'expo-image';
-import { View } from 'react-native';
+import { Image } from "expo-image";
+import { View } from "react-native";
 
-import { radius } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/theme-provider';
+import { radius } from "@/theme/tokens";
+import { useAppTheme } from "@/theme/theme-provider";
 
-const vehiclePhoto = require('../../../assets/tariffs/economy-car.webp');
+const vehiclePhoto = require("../../../assets/tariffs/economy-car.webp");
 
 type Props = {
   colorHex?: string | null;
@@ -18,15 +18,29 @@ export function VehicleIllustration({
   height = 48,
   framed = false,
 }: Props) {
-  const colors = useThemeColors();
+  const { colors, dark } = useAppTheme();
   const illustration = (
-    <Image
-      source={vehiclePhoto}
-      style={{ width, height }}
-      contentFit="contain"
-      alt=""
-      accessible={false}
-    />
+    <View
+      style={{
+        width,
+        height,
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#FFFFFF",
+        mixBlendMode: dark ? "normal" : "multiply",
+      }}
+    >
+      <Image
+        source={vehiclePhoto}
+        style={{ width, height }}
+        contentFit="contain"
+        loading="eager"
+        cachePolicy="memory-disk"
+        transition={0}
+        alt=""
+        accessible={false}
+      />
+    </View>
   );
 
   if (!framed) return illustration;
@@ -37,8 +51,8 @@ export function VehicleIllustration({
         minHeight: height + 16,
         borderRadius: radius.lg,
         backgroundColor: colors.surfaceSecondary,
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {illustration}

@@ -47,7 +47,7 @@ export function StarRating({ value, onChange, disabled = false, size = 31 }: Pro
             <AppIcon
               name="star"
               size={size}
-              color={selected ? colors.brandPressed : colors.inkMuted}
+              color={selected ? colors.info : colors.inkMuted}
               strokeWidth={selected ? 1.6 : 1.8}
               filled={selected}
             />

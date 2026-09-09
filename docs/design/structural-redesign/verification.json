@@ -1,0 +1,109 @@
+{
+  "checks": [
+    "Live map and both tariff illustrations load",
+    "Five viewport sizes: header, map, booking separation; CTA always visible",
+    "Bottom navigation preserves addresses and tariff",
+    "Theme and reduced motion retain a working selector",
+    "Add and remove intermediate destination",
+    "Demo booking, payment choice, comment, assigned driver, plate and detail route",
+    "Driver earnings, map toggle, demo offer, acceptance",
+    "Driver departure, arrival, waiting, trip completion and payment confirmation in demo",
+    "All seven admin destinations remain accessible",
+    "No uncaught JavaScript errors",
+    "No React style warnings"
+  ],
+  "views": [
+    {
+      "name": "booking-light-390",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "booking-light-360",
+      "width": 360,
+      "height": 640
+    },
+    {
+      "name": "booking-light-320",
+      "width": 320,
+      "height": 568
+    },
+    {
+      "name": "booking-light-768",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "booking-light-1440",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "history",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "profile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "booking-dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "stops",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "confirmation",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "active-ride",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "ride-details",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "driver-shift",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "driver-offer",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "driver-accepted",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "driver-completed",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "admin",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "admin-mobile",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "errors": [],
+  "styleWarnings": []
+}

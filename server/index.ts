@@ -111,6 +111,7 @@ io.use(async (socket, next) => {
     await socket.join(`user:${session.id}`);
     if (session.roles.includes('driver') && socket.data.driverId) {
       await socket.join(`driver:${String(socket.data.driverId)}`);
+      await socket.join('drivers');
     }
     if (session.roles.includes('admin')) await socket.join('admins');
     next();

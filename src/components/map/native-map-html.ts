@@ -4,6 +4,7 @@ import type { MapViewportInsets } from '@/components/map/types';
 import { darkColors, lightColors, motion, type AppColorScheme } from '../../theme/tokens';
 
 import { driverMarkerPngMarkup } from './driver-marker';
+import { POINT_SELECTION_ZOOM, pointSelectionLocation } from './selection-viewport';
 
 type State = {
   pickup?: Address | null;
@@ -25,7 +26,14 @@ type State = {
   coordinateSelectionEnabled?: boolean;
 };
 
-export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme = 'light'): string {
+export function buildNativeMapHtml(
+  apiKey: string,
+  colorScheme: AppColorScheme = 'light',
+  selectionCenter?: Coordinates,
+): string {
+  const initialLocation = selectionCenter
+    ? pointSelectionLocation(selectionCenter)
+    : { center: [51.95842, 56.04758], zoom: 14 };
   return `<!doctype html>
 <html lang="ru" data-theme="${colorScheme}">
 <head>
@@ -68,9 +76,9 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
       await ymaps3.ready;
       const {YMap,YMapDefaultSchemeLayer,YMapDefaultFeaturesLayer,YMapListener} = ymaps3;
       map = new YMap(document.getElementById('map'), {
-        location:{center:[51.95842,56.04758],zoom:14},
+        location:${JSON.stringify(initialLocation)},
         theme:'${colorScheme}',
-        zoomRange:{min:6,max:17},
+        zoomRange:{min:6,max:${Math.max(17, initialLocation.zoom)}},
         showScaleInCopyrights:true
       }, [new YMapDefaultSchemeLayer({}),new YMapDefaultFeaturesLayer({})]);
       map.addChild(new YMapListener({
@@ -156,9 +164,10 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
       entities=[];
       const add=(entity)=>{map.addChild(entity);entities.push(entity)};
       coordinateSelectionEnabled=Boolean(state.coordinateSelectionEnabled);
+      map.update({zoomRange:{min:6,max:state.selectionCenter?${POINT_SELECTION_ZOOM}:17}});
       const nextCenterKey=JSON.stringify(state.selectionCenter||null);
       if(state.selectionCenter&&nextCenterKey!==selectionCenterKey){
-        map.update({location:{center:[state.selectionCenter.longitude,state.selectionCenter.latitude],zoom:17}});
+        map.update({location:{center:[state.selectionCenter.longitude,state.selectionCenter.latitude],zoom:${POINT_SELECTION_ZOOM}}});
       }
       selectionCenterKey=nextCenterKey;
       const {YMapMarker,YMapFeature}=ymaps3;

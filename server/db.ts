@@ -23,11 +23,18 @@ function isRetryableTransactionError(error: unknown): boolean {
   );
 }
 
-export async function withTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  work: (connection: PoolConnection) => Promise<T>,
+  options: { isolationLevel?: 'READ COMMITTED' } = {},
+): Promise<T> {
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const connection = await db.getConnection();
     try {
+      if (options.isolationLevel === 'READ COMMITTED') {
+        // Applies only to the next transaction, never to other pooled requests.
+        await connection.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      }
       await connection.beginTransaction();
       const result = await work(connection);
       await connection.commit();

@@ -14,7 +14,7 @@ const socialLogo = await sharp(logo).resize(320, 320).png().toBuffer();
 const createOpaqueWebIcon = (size) =>
   sharp(logo)
     .resize(size, size)
-    .flatten({ background: '#315DD5' });
+    .flatten({ background: '#F6C945' });
 
 const maskableInset = 51;
 const maskableLogo = await sharp(logo)
@@ -29,7 +29,7 @@ await Promise.all([
   sharp(logo).resize(432, 432, { fit: 'contain' }).png().toFile(resolve(brandDir, 'android-foreground.png')),
   sharp(monochrome).resize(432, 432, { fit: 'contain' }).png().toFile(resolve(brandDir, 'android-monochrome.png')),
   sharp({
-    create: { width: 1200, height: 630, channels: 4, background: '#315DD5' },
+    create: { width: 1200, height: 630, channels: 4, background: '#F6C945' },
   })
     .composite([{ input: socialLogo, gravity: 'centre' }])
     .png()
@@ -37,7 +37,7 @@ await Promise.all([
   createOpaqueWebIcon(192).png().toFile(resolve(publicDir, 'pwa-192.png')),
   createOpaqueWebIcon(512).png().toFile(resolve(publicDir, 'pwa-512.png')),
   sharp({
-    create: { width: 512, height: 512, channels: 4, background: '#315DD5' },
+    create: { width: 512, height: 512, channels: 4, background: '#F6C945' },
   })
     .composite([{ input: maskableLogo, gravity: 'centre' }])
     .png()

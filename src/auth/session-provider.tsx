@@ -76,17 +76,17 @@ type SessionContextValue = {
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<PhoneAuthStartResult>;
   startMaxPhoneAuth: (
-    phone: string,
+    phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<MaxAuthChallenge>;
   checkMaxPhoneAuth: (challenge: MaxAuthChallenge) => Promise<MaxAuthStatus['status']>;
   startTelegramPhoneAuth: (
-    phone: string,
+    phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<TelegramAuthChallenge>;
   checkTelegramPhoneAuth: (challenge: TelegramAuthChallenge) => Promise<MaxAuthStatus['status']>;
   startVkPhoneAuth: (
-    phone: string,
+    phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<VkAuthChallenge>;
   checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<VkAuthStatus['status']>;
@@ -220,7 +220,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const startMaxPhoneAuth = useCallback(
-    async (phone: string, legalAcceptance: InitialLegalAcceptance) => {
+    async (phone: string | undefined, legalAcceptance: InitialLegalAcceptance) => {
       setAuthenticating(true);
       setAuthError(null);
       try {
@@ -260,7 +260,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } else if (result.status === 'failed') {
           setAuthError(
             result.errorCode === 'PHONE_MISMATCH'
-              ? 'Номер в MAX не совпадает с указанным номером.'
+              ? 'Не удалось подтвердить номер в MAX. Попробуйте ещё раз или войдите по SMS.'
               : 'Не удалось подтвердить номер через MAX.',
           );
         } else if (result.status === 'verified') {
@@ -281,7 +281,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const startTelegramPhoneAuth = useCallback(
-    async (phone: string, legalAcceptance: InitialLegalAcceptance) => {
+    async (phone: string | undefined, legalAcceptance: InitialLegalAcceptance) => {
       setAuthenticating(true);
       setAuthError(null);
       try {
@@ -321,7 +321,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } else if (result.status === 'failed') {
           setAuthError(
             result.errorCode === 'PHONE_MISMATCH'
-              ? 'Номер в Telegram не совпадает с указанным номером.'
+              ? 'Не удалось подтвердить номер в Telegram. Попробуйте ещё раз или войдите по SMS.'
               : 'Не удалось подтвердить номер через Telegram.',
           );
         } else if (result.status === 'verified') {
@@ -342,7 +342,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const startVkPhoneAuth = useCallback(
-    async (phone: string, legalAcceptance: InitialLegalAcceptance) => {
+    async (phone: string | undefined, legalAcceptance: InitialLegalAcceptance) => {
       setAuthenticating(true);
       setAuthError(null);
       try {
@@ -381,7 +381,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } else if (result.status === 'failed') {
           setAuthError(
             result.errorCode === 'PHONE_MISMATCH'
-              ? 'Номер в VK не совпадает с указанным номером.'
+              ? 'Не удалось подтвердить номер в VK. Попробуйте ещё раз или войдите по SMS.'
               : result.errorCode === 'PHONE_NOT_SHARED'
                 ? 'Разрешите VK передать номер телефона для безопасного входа.'
                 : 'Не удалось подтвердить вход через VK.',

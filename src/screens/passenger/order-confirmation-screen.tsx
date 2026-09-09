@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
 
 import { AddressFields } from '@/components/passenger/address-fields';
+import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { AppButton } from '@/components/ui/app-button';
@@ -40,7 +41,7 @@ export function OrderConfirmationScreen() {
     busy,
     error,
   } = useRide();
-  const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
+  const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const { initialLegalConsentRequired } = useSession();
   const [comment, setComment] = useState('');
   const [consentVisible, setConsentVisible] = useState(false);
@@ -96,9 +97,9 @@ export function OrderConfirmationScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Screen contentStyle={{ maxWidth: 560, alignSelf: 'center' }}>
+      <Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, alignSelf: 'center', paddingHorizontal: spacing.x4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-          <IconButton icon="back" label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
+          <IconButton icon="back" size={44} label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
           <View style={{ flex: 1 }}>
             <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
               Подтверждение
@@ -109,23 +110,38 @@ export function OrderConfirmationScreen() {
           </View>
         </View>
 
-        <View
-          style={{
-            paddingHorizontal: spacing.x4,
-            borderRadius: radius.card,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
+        <View style={{ gap: spacing.x2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+            <Text style={{ ...typography.bodyStrong, color: colors.ink, flex: 1 }}>Маршрут</Text>
+            <IconButton
+              icon="recenter"
+              size={44}
+              label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
+              disabled={locationLoading}
+              onPress={() => void selectCurrentLocation()}
+            />
+            {destinations.length < 5 && (
+              <IconButton
+                icon="plus"
+                size={44}
+                label="Добавить ещё одну точку назначения"
+                onPress={() => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })}
+              />
+            )}
+          </View>
           <AddressFields
             pickup={pickup}
             destinations={destinations}
             destination={destination}
             compact
-            onUseLocation={() => void selectCurrentLocation()}
+            hideAddDestination
             locationLoading={locationLoading}
           />
+          {!!locationError && (
+            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.warningText }}>
+              {locationError}
+            </Text>
+          )}
         </View>
 
         <View style={{ gap: spacing.x2 }} accessibilityRole="radiogroup">
@@ -159,12 +175,6 @@ export function OrderConfirmationScreen() {
                 </AnimatedPressable>
               );
             })}
-          </View>
-          <View style={{ flexDirection: 'row', gap: spacing.x2, alignItems: 'center' }}>
-            <AppIcon name="wallet" size={18} />
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, flex: 1 }}>
-              Оплата производится напрямую водителю после поездки.
-            </Text>
           </View>
         </View>
 
@@ -251,9 +261,15 @@ export function OrderConfirmationScreen() {
               </Text>
             )}
 
-            <AppButton
+            <BookingSubmitButton
+              priceMinor={selected.priceMinor}
+              etaMinutes={selected.etaMinutes}
+              label="Подтвердить"
+              loadingLabel={busy ? 'Создаём заказ…' : 'Рассчитываем…'}
               disabled={!addressesArePrecise || quotePending || busy}
               loading={busy || quotePending}
+              estimateAvailable={routeReady}
+              canRetry={addressesArePrecise && quoteStatus === 'error'}
               onPress={() => {
                 if (routeReady) {
                   void confirm();
@@ -262,19 +278,17 @@ export function OrderConfirmationScreen() {
                 void requestQuote();
               }}
               accessibilityLabel={
-                routeReady
-                  ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
-                  : addressesArePrecise
-                    ? 'Повторить расчёт стоимости поездки'
-                    : 'Подтвердить заказ, сначала укажите маршрут'
+                busy
+                  ? 'Создаём заказ'
+                  : quotePending
+                    ? 'Рассчитываем стоимость и время подачи'
+                    : routeReady
+                      ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
+                      : addressesArePrecise
+                        ? 'Повторить расчёт стоимости поездки'
+                        : 'Подтвердить заказ, сначала укажите маршрут'
               }
-            >
-              {routeReady
-                ? `Подтвердить · ${selected.priceMinor / 100} ₽`
-                : addressesArePrecise
-                  ? 'Повторить расчёт'
-                  : 'Укажите маршрут'}
-            </AppButton>
+            />
           </>
         )}
       </Screen>

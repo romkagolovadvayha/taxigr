@@ -18,8 +18,8 @@ type BrandGlyphProps = {
 
 export function BrandGlyph({
   size,
-  color = brandIdentity.white,
-  pinColor = brandIdentity.blue,
+  color = brandIdentity.ink,
+  pinColor = brandIdentity.background,
 }: BrandGlyphProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 32 32">
@@ -29,6 +29,7 @@ export function BrandGlyph({
         strokeWidth="0.8"
         strokeLinecap="round"
         strokeDasharray="1.8 1.5"
+        fill="none"
       />
       <Path
         d="M9.5 3.8a5.3 5.3 0 00-5.3 5.3c0 4 5.3 8.2 5.3 8.2s5.3-4.2 5.3-8.2a5.3 5.3 0 00-5.3-5.3z"
@@ -53,13 +54,13 @@ export function BrandMark({ compact = false, label = 'Такси Грахово'
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.26),
-          backgroundColor: brandIdentity.blue,
+          backgroundColor: brandIdentity.background,
           alignItems: 'center',
           justifyContent: 'center',
           borderCurve: 'continuous',
         }}
       >
-        <BrandGlyph size={size * 0.74} color={brandIdentity.white} />
+        <BrandGlyph size={size * 0.74} color={brandIdentity.ink} />
       </View>
       {!compact && (
         <Text

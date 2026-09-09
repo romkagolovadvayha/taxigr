@@ -1,0 +1,207 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "role": "passenger",
+      "scenarios": [
+        "full-trip",
+        "transfer-payment",
+        "rating-prompt"
+      ],
+      "events": [
+        {
+          "type": "start",
+          "clip": "searching",
+          "at": 11447.199999999255,
+          "duration": 3.9077916666666668
+        },
+        {
+          "type": "ended",
+          "clip": "searching",
+          "at": 11698.39999999851
+        },
+        {
+          "type": "start",
+          "clip": "taxi_found",
+          "at": 11757.099999999627,
+          "duration": 1.2297083333333334
+        },
+        {
+          "type": "ended",
+          "clip": "taxi_found",
+          "at": 12981.099999999627
+        },
+        {
+          "type": "start",
+          "clip": "driver_arriving",
+          "at": 14579.699999999255,
+          "duration": 1.5350833333333334
+        },
+        {
+          "type": "ended",
+          "clip": "driver_arriving",
+          "at": 16111.5
+        },
+        {
+          "type": "start",
+          "clip": "driver_arrived",
+          "at": 17810.299999998882,
+          "duration": 2.2723333333333335
+        },
+        {
+          "type": "ended",
+          "clip": "driver_arrived",
+          "at": 20091.5
+        },
+        {
+          "type": "start",
+          "clip": "ride_started",
+          "at": 21348.5,
+          "duration": 3.3624583333333335
+        },
+        {
+          "type": "ended",
+          "clip": "ride_started",
+          "at": 24712.699999999255
+        },
+        {
+          "type": "start",
+          "clip": "ride_complete_transfer",
+          "at": 25423.299999998882,
+          "duration": 6.69175
+        },
+        {
+          "type": "ended",
+          "clip": "ride_complete_transfer",
+          "at": 32122
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "driver",
+      "scenarios": [
+        "accept",
+        "depart",
+        "arrive",
+        "start",
+        "accept-next",
+        "complete-and-promote",
+        "release"
+      ],
+      "events": [
+        {
+          "type": "start",
+          "clip": "new_order",
+          "at": 11417.5,
+          "duration": 4.34675
+        },
+        {
+          "type": "ended",
+          "clip": "new_order",
+          "at": 15762
+        },
+        {
+          "type": "start",
+          "clip": "order_accepted",
+          "at": 15972.60000000149,
+          "duration": 8.626875
+        },
+        {
+          "type": "ended",
+          "clip": "order_accepted",
+          "at": 24601.60000000149
+        },
+        {
+          "type": "start",
+          "clip": "driver_departed",
+          "at": 24667.300000000745,
+          "duration": 1.832375
+        },
+        {
+          "type": "ended",
+          "clip": "driver_departed",
+          "at": 26501.700000001118
+        },
+        {
+          "type": "start",
+          "clip": "driver_waiting",
+          "at": 26647.60000000149,
+          "duration": 3.2804583333333333
+        },
+        {
+          "type": "ended",
+          "clip": "driver_waiting",
+          "at": 29931.800000000745
+        },
+        {
+          "type": "start",
+          "clip": "ride_started",
+          "at": 30011.900000000373,
+          "duration": 3.3624583333333335
+        },
+        {
+          "type": "ended",
+          "clip": "ride_started",
+          "at": 33382.10000000149
+        },
+        {
+          "type": "start",
+          "clip": "new_order",
+          "at": 33460.300000000745,
+          "duration": 4.34675
+        },
+        {
+          "type": "ended",
+          "clip": "new_order",
+          "at": 37802.20000000112
+        },
+        {
+          "type": "start",
+          "clip": "order_accepted_queued",
+          "at": 37900.90000000037,
+          "duration": 6.375333333333334
+        },
+        {
+          "type": "ended",
+          "clip": "order_accepted_queued",
+          "at": 44272.10000000149
+        },
+        {
+          "type": "start",
+          "clip": "driver_complete_cash",
+          "at": 44529.70000000112,
+          "duration": 6.832166666666667
+        },
+        {
+          "type": "ended",
+          "clip": "driver_complete_cash",
+          "at": 51362.40000000037
+        },
+        {
+          "type": "start",
+          "clip": "next_order_ready",
+          "at": 51382.5,
+          "duration": 4.5674166666666665
+        },
+        {
+          "type": "ended",
+          "clip": "next_order_ready",
+          "at": 55952.5
+        },
+        {
+          "type": "start",
+          "clip": "order_released",
+          "at": 56172.800000000745,
+          "duration": 1.85675
+        },
+        {
+          "type": "ended",
+          "clip": "order_released",
+          "at": 58032.800000000745
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

@@ -31,8 +31,8 @@ function SessionScopedRideProviders({ children }: { children: ReactNode }) {
 
   return (
     <RideProvider key={sessionOwner}>
-      <PostBootstrapServices />
       <RideFeedbackProvider>
+        <PostBootstrapServices />
         <PassengerLocationPublisher />
         <SearchPriceIncreaseModalHost />
         {children}

@@ -1,0 +1,13 @@
+{
+  "menuAtlas": "b99cc76c-2ff8-4ad7-9306-ec33ffc50b70",
+  "images": [
+    { "file": "cover-desktop.jpg", "id": "4de825d7-1892-4430-a17b-0c488e59085f", "width": 1920, "height": 768 },
+    { "file": "cover-mobile.jpg", "id": "efd974ee-7b9b-4ec3-97da-563356b74acc", "width": 1080, "height": 1920 },
+    { "file": "post-welcome.jpg", "id": "8b248de9-7991-4607-8930-ca1a29cad922", "width": 1200, "height": 1200 },
+    { "file": "post-how.jpg", "id": "9217bf55-8c13-41d7-9058-a11a0f014936", "width": 1200, "height": 1200 },
+    { "file": "post-tariffs.jpg", "id": "51566a85-1c29-407e-aadb-b92ecb7bcfb2", "width": 1200, "height": 1200 },
+    { "file": "post-safety.jpg", "id": "2ad3211d-5457-4144-a40b-290f0a45d495", "width": 1200, "height": 1200 },
+    { "file": "post-drivers.jpg", "id": "64f18326-d90b-4734-8b95-80d78e9f3073", "width": 1200, "height": 1200 },
+    { "file": "article-first-order.jpg", "id": "8c21543e-ea7c-4a5b-9edd-9e74e754387c", "width": 1920, "height": 1080 }
+  ]
+}

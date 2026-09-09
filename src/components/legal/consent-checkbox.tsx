@@ -19,9 +19,10 @@ type Props = {
   label: string;
   links: ConsentLink[];
   compactLinks?: boolean;
+  dense?: boolean;
 };
 
-export function ConsentCheckbox({ checked, onChange, label, links, compactLinks = false }: Props) {
+export function ConsentCheckbox({ checked, onChange, label, links, compactLinks = false, dense = false }: Props) {
   const colors = useThemeColors();
   const handleChange = () => {
     if (process.env.EXPO_OS === 'ios') {
@@ -47,7 +48,7 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
           hitSlop={4}
           onPress={handleChange}
           style={({ pressed }) => ({
-            width: 44,
+            width: dense ? 32 : 44,
             minHeight: 44,
             alignItems: 'center',
             justifyContent: 'flex-start',
@@ -57,8 +58,8 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
         >
           <View
             style={{
-              width: 28,
-              height: 28,
+              width: dense ? 22 : 28,
+              height: dense ? 22 : 28,
               borderRadius: 8,
               borderCurve: 'continuous',
               borderWidth: checked ? 0 : 1.5,
@@ -86,6 +87,7 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
           selectable
           style={{
             ...typography.caption,
+            ...(dense ? { fontSize: 11, lineHeight: 16 } : {}),
             color: colors.ink,
             flex: 1,
             paddingTop: spacing.x2,
@@ -101,6 +103,7 @@ export function ConsentCheckbox({ checked, onChange, label, links, compactLinks 
                 accessibilityLabel={`Открыть документ «${link.label}»`}
                 style={{
                   ...typography.caption,
+                  ...(dense ? { fontSize: 11, lineHeight: 16 } : {}),
                   color: colors.ink,
                   fontWeight: '700',
                   textDecorationLine: 'underline',

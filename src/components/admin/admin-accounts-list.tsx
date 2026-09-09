@@ -62,7 +62,7 @@ export function AdminAccountsList({ kind, title, subtitle, items, loading, error
       key === 'Home'
         ? order[0]
         : key === 'End'
-          ? order.at(-1)
+          ? order[order.length - 1]
           : key === 'ArrowRight' || key === 'ArrowDown'
             ? order[(index + 1) % order.length]
             : key === 'ArrowLeft' || key === 'ArrowUp'

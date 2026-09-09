@@ -1,5 +1,6 @@
 import { Slot } from 'expo-router';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RoleNavigation, type NavItem } from '@/components/role-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -19,8 +20,10 @@ const items: NavItem[] = [
 export default function AdminLayout() {
   const colors = useThemeColors();
   const { isDesktop } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column', backgroundColor: colors.canvas }}>
+    <View style={{ flex: 1, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right,
+      flexDirection: isDesktop ? 'row' : 'column', backgroundColor: colors.canvas }}>
       {isDesktop && <RoleNavigation items={items} title="Суперадмин" />}
       <View style={{ flex: 1 }}><Slot /></View>
       {!isDesktop && <RoleNavigation items={items} title="Суперадмин" />}

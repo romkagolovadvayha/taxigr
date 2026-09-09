@@ -1,3 +1,5 @@
+import { installYandexMapCancellationHandler } from './yandex-map-errors';
+
 declare global {
   interface Window {
     ymaps3?: {
@@ -28,34 +30,63 @@ export type YandexMap = {
 };
 
 let loader: Promise<NonNullable<Window['ymaps3']>> | null = null;
+const LOAD_TIMEOUT_MS = 15_000;
 
 export async function loadYandexMap(): Promise<NonNullable<Window['ymaps3']>> {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     throw new Error('Карта доступна только в браузере');
   }
-  if (window.ymaps3) {
-    await window.ymaps3.ready;
-    return window.ymaps3;
-  }
+  // Keep the narrow cancellation filter after maps unmount, when SDK aborts arrive.
+  installYandexMapCancellationHandler(window);
   if (loader) return loader;
 
   const apiKey = process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY;
-  if (!apiKey) throw new Error('Не настроен ключ Яндекс Карт');
+  if (!window.ymaps3 && !apiKey) throw new Error('Не настроен ключ Яндекс Карт');
 
-  loader = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://api-maps.yandex.ru/v3/?apikey=${encodeURIComponent(apiKey)}&lang=ru_RU`;
-    script.async = true;
-    script.onload = async () => {
-      if (!window.ymaps3) {
-        reject(new Error('Яндекс Карты не загрузились'));
+  loader = new Promise<NonNullable<Window['ymaps3']>>((resolve, reject) => {
+    let script: HTMLScriptElement | undefined;
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      if (script) {
+        script.onload = null;
+        script.onerror = null;
+      }
+    };
+    const fail = (reason: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      script?.remove();
+      reject(reason);
+    };
+    const timeout = setTimeout(() => fail(new Error('Загрузка Яндекс Карт заняла слишком много времени')), LOAD_TIMEOUT_MS);
+    const waitForApi = () => {
+      const api = window.ymaps3;
+      if (!api) {
+        fail(new Error('Яндекс Карты не загрузились'));
         return;
       }
-      await window.ymaps3.ready;
-      resolve(window.ymaps3);
+      // Do not use an async onload: a rejected ready promise must settle our loader.
+      void Promise.resolve(api.ready).then(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(api);
+      }, fail);
     };
-    script.onerror = () => reject(new Error('Не удалось загрузить Яндекс Карты'));
-    document.head.appendChild(script);
+    if (window.ymaps3) waitForApi();
+    else {
+      script = document.createElement('script');
+      script.src = `https://api-maps.yandex.ru/v3/?apikey=${encodeURIComponent(apiKey!)}&lang=ru_RU`;
+      script.async = true;
+      script.onload = waitForApi;
+      script.onerror = () => fail(new Error('Не удалось загрузить Яндекс Карты'));
+      document.head.appendChild(script);
+    }
+  }).catch((reason: unknown) => {
+    loader = null;
+    throw reason;
   });
 
   return loader;

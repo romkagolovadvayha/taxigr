@@ -26,7 +26,7 @@ function confirmBackgroundLocationDisclosure(): Promise<boolean> {
 TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data) return;
   const locations = (data as { locations?: Location.LocationObject[] }).locations;
-  const latest = locations?.at(-1);
+  const latest = locations?.[locations.length - 1];
   if (!latest) return;
   const token = await readSessionToken();
   if (!token || token.startsWith('demo:')) return;
@@ -91,7 +91,7 @@ export async function syncDriverBackgroundLocation(
     foregroundService: {
       notificationTitle: 'Такси Грахово — водитель на линии',
       notificationBody: 'Геопозиция передаётся только пока вы принимаете заказы',
-      notificationColor: '#315DD5',
+      notificationColor: '#F6C945',
       killServiceOnDestroy: false,
     },
   });

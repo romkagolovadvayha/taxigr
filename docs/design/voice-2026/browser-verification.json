@@ -1,0 +1,139 @@
+{
+  "passed": true,
+  "clips": [
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/voice_preview.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/searching.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/taxi_found.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/driver_arriving.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/driver_arrived.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/ride_started.mp3",
+      "status": 200
+    },
+    {
+      "url": "/assets/?unstable_path=.%2Fassets%2Fsounds/ride_complete_cash.mp3",
+      "status": 200
+    }
+  ],
+  "previewEvents": [
+    {
+      "type": "start",
+      "duration": 4.48675,
+      "at": 6345.5
+    },
+    {
+      "type": "ended",
+      "at": 10831.799999998882
+    },
+    {
+      "type": "start",
+      "duration": 4.48675,
+      "at": 10860.199999999255
+    },
+    {
+      "type": "stop",
+      "at": 10912.400000000373
+    },
+    {
+      "type": "ended",
+      "at": 10921.699999999255
+    },
+    {
+      "type": "start",
+      "duration": 4.48675,
+      "at": 10988.5
+    },
+    {
+      "type": "ended",
+      "at": 15471.799999998882
+    }
+  ],
+  "tripEvents": [
+    {
+      "type": "start",
+      "duration": 3.9077916666666668,
+      "at": 5979.9000000003725
+    },
+    {
+      "type": "stop",
+      "at": 8283.400000000373
+    },
+    {
+      "type": "ended",
+      "at": 8338.599999999627
+    },
+    {
+      "type": "start",
+      "duration": 1.2297083333333334,
+      "at": 8406
+    },
+    {
+      "type": "ended",
+      "at": 9637.800000000745
+    },
+    {
+      "type": "start",
+      "duration": 1.5350833333333334,
+      "at": 11215.700000001118
+    },
+    {
+      "type": "ended",
+      "at": 12749.300000000745
+    },
+    {
+      "type": "start",
+      "duration": 2.2723333333333335,
+      "at": 14433
+    },
+    {
+      "type": "ended",
+      "at": 16718.099999999627
+    },
+    {
+      "type": "start",
+      "duration": 3.3624583333333335,
+      "at": 17988.599999999627
+    },
+    {
+      "type": "ended",
+      "at": 21358.099999999627
+    },
+    {
+      "type": "start",
+      "duration": 6.753625,
+      "at": 22051.300000000745
+    },
+    {
+      "type": "ended",
+      "at": 28808.599999999627
+    }
+  ],
+  "driverEvents": [
+    {
+      "type": "start",
+      "duration": 4.34675,
+      "at": 6091.60000000149
+    },
+    {
+      "type": "ended",
+      "at": 10433.300000000745
+    }
+  ],
+  "errors": [],
+  "cancelledMapRequests": []
+}

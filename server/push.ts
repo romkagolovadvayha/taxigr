@@ -17,7 +17,18 @@ export type PushMessage = {
     | 'ride-started-v2'
     | 'driver-orders-v2'
     | 'ride-chat-v1'
+    | 'ride-chat-voice-v1'
+    | 'ride-driver-arriving-voice-v1'
+    | 'driver-order-updated-voice-v1'
+    | 'general-voice-v1'
     | 'ride-complete-v2'
+    | 'ride-taxi-found-queued-voice-v1'
+    | 'ride-complete-cash-voice-v1'
+    | 'ride-complete-transfer-voice-v1'
+    | 'ride-driver-released-voice-v1'
+    | 'ride-passenger-cancelled-voice-v1'
+    | 'ride-admin-cancelled-voice-v1'
+    | 'ride-search-timeout-voice-v1'
     | 'ride-cancelled-v2';
 };
 
@@ -77,8 +88,8 @@ async function sendRuStorePush(token: string, message: PushMessage): Promise<'se
               title: message.title,
               body: message.body,
               icon: 'notification_icon',
-              color: '#FFD600',
-              channel_id: message.channelId ?? 'ride-taxi-found-v2',
+              color: '#F6C945',
+              channel_id: message.channelId ?? 'general-voice-v1',
               click_action: pushDeepLink(message.data),
               click_action_type: 1,
             },
@@ -130,9 +141,9 @@ export async function notifyUsers(
       },
       body: JSON.stringify(batch.map(({ token }) => ({
         to: token,
-        sound: message.sound ?? 'taxi_found.wav',
+        sound: message.sound ?? 'notification.wav',
         priority: 'high',
-        channelId: message.channelId ?? 'ride-taxi-found-v2',
+        channelId: message.channelId ?? 'general-voice-v1',
         title: message.title,
         body: message.body,
         data: message.data,

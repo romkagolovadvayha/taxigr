@@ -130,7 +130,7 @@ export function RideChatScreen() {
     };
   }, [id, markRideChatRead]));
 
-  const latestMessage = messages.at(-1);
+  const latestMessage = messages[messages.length - 1];
   useEffect(() => {
     if (
       !chatFocused.current ||

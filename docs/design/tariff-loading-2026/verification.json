@@ -1,0 +1,147 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "run": "sign-in",
+      "simulatedImageLatencyMs": 700,
+      "first": {
+        "at": 2473.4000000003725,
+        "images": [
+          {
+            "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+            "complete": false
+          },
+          {
+            "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+            "complete": false
+          }
+        ]
+      },
+      "frames": [
+        {
+          "at": 2547.5,
+          "complete": true,
+          "count": 2
+        }
+      ],
+      "preloads": [
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp"
+      ],
+      "images": [
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "width": 192,
+          "loading": "eager",
+          "priority": "high"
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "width": 192,
+          "loading": "eager",
+          "priority": "high"
+        }
+      ],
+      "resources": [
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "initiator": "link",
+          "start": 911.7000000011176,
+          "end": 1627.300000000745,
+          "size": 5112
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "initiator": "link",
+          "start": 911.9000000003725,
+          "end": 1627.800000000745,
+          "size": 3414
+        }
+      ],
+      "requests": [
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp"
+      ],
+      "errors": []
+    },
+    {
+      "run": "cold-passenger",
+      "simulatedImageLatencyMs": 700,
+      "first": {
+        "at": 2369.2000000011176,
+        "images": []
+      },
+      "frames": [
+        {
+          "at": 2369.4000000003725,
+          "complete": false,
+          "count": 0
+        },
+        {
+          "at": 2411.2000000011176,
+          "complete": true,
+          "count": 2
+        }
+      ],
+      "preloads": [
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp"
+      ],
+      "images": [
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "width": 192,
+          "loading": "eager",
+          "priority": "high"
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "width": 192,
+          "loading": "eager",
+          "priority": "high"
+        }
+      ],
+      "resources": [
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "initiator": "link",
+          "start": 1249.0999999996275,
+          "end": 1968.5,
+          "size": 5112
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "initiator": "link",
+          "start": 1249.4000000003725,
+          "end": 1967.7000000011176,
+          "size": 3414
+        }
+      ],
+      "transfersAfterConfirmation": [
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "transferred": 5412
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "transferred": 3714
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+          "transferred": 5412
+        },
+        {
+          "url": "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+          "transferred": 3714
+        }
+      ],
+      "requests": [
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/economy-car-compact.webp",
+        "http://localhost:8082/assets/?unstable_path=.%2Fassets%2Ftariffs/child-seat-compact.webp"
+      ],
+      "errors": []
+    }
+  ]
+}

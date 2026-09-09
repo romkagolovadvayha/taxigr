@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import type { AppIconName } from '@/components/ui/app-icon';
 import { AppIcon } from '@/components/ui/app-icon';
-import { radius, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
@@ -18,33 +18,27 @@ export function KpiCard({ label, value, hint, icon }: Props) {
     <View
       style={{
         flexGrow: 1,
-        flexBasis: 220,
-        minHeight: 150,
-        padding: spacing.x5,
-        gap: spacing.x3,
-        borderRadius: radius.card,
-        borderCurve: 'continuous',
+        flexBasis: 190,
+        minHeight: 136,
+        padding: spacing.x4,
+        gap: spacing.x2,
         backgroundColor: colors.surface,
-        borderWidth: 1,
+        borderLeftWidth: 1,
         borderColor: colors.border,
       }}
     >
       <View
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: radius.md,
-          backgroundColor: colors.canvas,
+          flexDirection: 'row',
+          gap: spacing.x2,
           alignItems: 'center',
-          justifyContent: 'center',
         }}
       >
-        <AppIcon name={icon} />
+        <AppIcon name={icon} size={17} color={colors.inkSecondary} />
+        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
       </View>
-      <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
-      <Text selectable style={{ ...typography.pageTitle, color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text selectable style={{ ...typography.display, fontSize: 32, color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
       <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>{hint}</Text>
     </View>
   );
 }
-

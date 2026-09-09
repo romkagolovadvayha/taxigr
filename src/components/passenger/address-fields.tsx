@@ -24,6 +24,7 @@ type Props = {
   locationLoading?: boolean;
   compact?: boolean;
   reducedActions?: boolean;
+  hideAddDestination?: boolean;
 };
 
 const addressActionSizing = componentSizing.addressFieldAction;
@@ -108,7 +109,7 @@ function AddressRow({
             ? `Маршрут: ${routeDestinations
                 .map((item, index) => `${routeDestinationTitle(index, routeDestinations.length)}: ${item.label}`)
                 .join('; ')}`
-            : `${label}: ${address?.label ?? 'не указано'}`
+            : `${label}: ${address?.label ?? (kind === 'pickup' ? 'Где вы?' : 'не указано')}`
         }${needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
         onPress={() => {
           if (kind === 'destination' && address) {
@@ -121,10 +122,10 @@ function AddressRow({
           });
         }}
         style={({ pressed }) => ({
-          minHeight: compact ? 48 : 58,
+          minHeight: compact ? 56 : 64,
           flexDirection: 'row',
           alignItems: multipleDestinations ? 'flex-start' : 'center',
-          gap: spacing.x4,
+          gap: spacing.x3,
           paddingVertical: multipleDestinations ? spacing.x3 : 0,
           paddingRight: compactLocationAction || addDestinationAction ? 56 : 0,
           opacity: pressed ? 0.68 : 1,
@@ -135,13 +136,16 @@ function AddressRow({
             style={{
               width: 10,
               height: 10,
-              borderRadius: kind === 'pickup' ? 999 : 2,
-              backgroundColor: kind === 'pickup' ? colors.ink : colors.brand,
+              marginHorizontal: 4,
+              borderRadius: kind === 'pickup' ? 999 : 3,
+              borderWidth: kind === 'pickup' ? 2 : 0,
+              borderColor: colors.brand,
+              backgroundColor: kind === 'pickup' ? colors.transparent : colors.brand,
             }}
           />
         )}
         <View style={{ flex: 1 }}>
-          <Text selectable style={{ ...typography.micro, color: colors.inkMuted, textTransform: 'uppercase' }}>
+          <Text selectable style={{ ...typography.micro, fontSize: 10, color: colors.inkSecondary }}>
             {multipleDestinations
               ? `Маршрут · ${formatRoutePointCount(routeDestinations.length)}`
               : label}
@@ -200,13 +204,13 @@ function AddressRow({
             <Text
               selectable
               numberOfLines={1}
-              style={{ ...typography.body, color: address ? colors.ink : colors.inkSecondary }}
+              style={{ ...typography.body, fontSize: compact ? 14 : 16, fontWeight: '500', color: address ? colors.ink : colors.inkSecondary }}
             >
               {address?.label ??
                 (kind === 'pickup'
                   ? locationLoading
                     ? 'Определяем местоположение…'
-                    : 'Моё местоположение'
+                    : 'Где вы?'
                   : 'Куда поедем?')}
             </Text>
           )}
@@ -290,6 +294,7 @@ export function AddressFields({
   locationLoading,
   compact = false,
   reducedActions = false,
+  hideAddDestination = false,
 }: Props) {
   const colors = useThemeColors();
   useEffect(() => {
@@ -330,12 +335,12 @@ export function AddressFields({
             opacity: pressed || locationLoading ? 0.55 : 1,
           })}
         >
-          <Text style={{ ...typography.caption, color: colors.info }}>
+          <Text style={{ ...typography.caption, color: colors.infoText }}>
             {locationLoading ? 'Определяем геопозицию…' : 'Использовать моё местоположение'}
           </Text>
         </AnimatedPressable>
       )}
-      <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 26 }} />
+      <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 30 }} />
       <AddressRow
         kind="destination"
         label="Куда"
@@ -343,7 +348,7 @@ export function AddressFields({
         destinations={destinations}
         compact={compact}
         onAddDestination={
-          (destinations?.length ?? 0) < 5
+          !hideAddDestination && (destinations?.length ?? 0) < 5
             ? () => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })
             : undefined
         }

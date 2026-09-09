@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "upload": true,
+  "removal": true,
+  "keyboard": true,
+  "checks": [
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "imageSize": {
+        "width": 280,
+        "height": 280
+      }
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "imageSize": {
+        "width": 208,
+        "height": 208
+      }
+    },
+    {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "imageSize": {
+        "width": 120,
+        "height": 120
+      }
+    }
+  ],
+  "errors": []
+}

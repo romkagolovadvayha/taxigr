@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import { useSession } from '@/auth/session-provider';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
+import { useRideFeedback } from '@/feedback/ride-feedback-provider';
 import { syncPushRegistration } from '@/notifications/push-registration';
 import {
   addRuStorePushTokenListener,
@@ -12,20 +13,30 @@ import {
 } from '@/notifications/rustore-push';
 
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => ({
+  handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
-    // Ride status sounds are handled by RideFeedbackProvider. Chat has no separate
-    // in-app sound, so let its foreground push use the configured channel sound.
-    shouldPlaySound: notification.request.content.data?.chat === 'true',
+    // One in-app narrator handles both socket and foreground push events.
+    shouldPlaySound: false,
     shouldSetBadge: false,
   }),
 });
 
 export function NotificationRegistrar() {
   const { token } = useSession();
+  const { announceMessage } = useRideFeedback();
   const router = useRouter();
   const initialResponseHandled = useRef(false);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (AppState.currentState === 'active' && data?.chat === 'true' && typeof data.messageId === 'string') {
+        announceMessage(data.messageId);
+      }
+    });
+    return () => subscription.remove();
+  }, [announceMessage]);
 
   useEffect(() => {
     if (!token || token.startsWith('demo:')) return;

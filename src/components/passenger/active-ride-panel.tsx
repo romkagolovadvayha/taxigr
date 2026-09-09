@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
@@ -10,14 +11,11 @@ import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
-import { MoneyValue } from '@/components/ui/money-value';
-import { StatusChip } from '@/components/ui/status-chip';
-import { VehicleIllustration } from '@/components/vehicle/vehicle-illustration';
 import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
-import { formatMultiStopRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
-import { radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
+import { formatMoney } from '@/utils/format';
 import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -99,10 +97,9 @@ export function ActiveRidePanel({
   const terminal = ride.status === 'completed' || ride.status === 'cancelled';
   const cancellable = !terminal && ride.status !== 'in_progress';
   const driver = ride.driver;
-  const showProminentHeadline =
-    ride.status === 'accepted' ||
-    ride.status === 'driver_arriving' ||
-    ride.status === 'driver_waiting';
+  const showEta = pickupEtaMinutes != null && ride.driverQueuePosition !== 2 &&
+    (ride.status === 'accepted' || ride.status === 'driver_arriving');
+  const stage = ride.status === 'searching' ? 1 : ride.status === 'accepted' || ride.status === 'driver_arriving' ? 2 : ride.status === 'driver_waiting' ? 3 : 4;
 
   const openDetails = () => {
     router.push({ pathname: '/orders/[id]', params: { id: ride.id } });
@@ -110,53 +107,28 @@ export function ActiveRidePanel({
 
   return (
     <View style={{ gap: spacing.x4 }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: spacing.x3,
-        }}
-      >
-        <View style={{ flex: 1, minWidth: 0, gap: spacing.x2 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: spacing.x2,
-            }}
-          >
-            <StatusChip
-              label={ride.driverQueuePosition === 2 ? 'Ваш заказ следующий' : rideStatusLabel[ride.status]}
-              tone={
-                ride.status === 'completed'
-                  ? 'success'
-                  : ride.status === 'cancelled'
-                    ? 'danger'
-                    : ride.status === 'searching'
-                      ? 'success'
-                      : 'info'
-              }
-            />
-            {ride.status === 'searching' && <SearchElapsedBadge startedAt={ride.createdAt} />}
-          </View>
-          <Text
-            accessibilityRole="header"
-            selectable
-            style={{
-              ...(showProminentHeadline ? typography.pageTitle : typography.sectionTitle),
-              color: colors.ink,
-            }}
-          >
-            {rideHeadline(ride, pickupEtaMinutes)}
+      <Animated.View key={ride.status} entering={FadeIn.duration(motion.duration.standard).reduceMotion(ReduceMotion.System)}
+        accessibilityLiveRegion="polite" style={{ gap: spacing.x2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
+          <Text style={{ ...typography.caption, color: colors.inkSecondary, flex: 1 }}>
+            {ride.driverQueuePosition === 2 ? 'Ваш заказ следующий' : rideStatusLabel[ride.status]}
           </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])}
-          </Text>
+          {ride.status === 'searching' && <SearchElapsedBadge startedAt={ride.createdAt} />}
         </View>
-        <MoneyValue valueMinor={ride.priceMinor} compact />
-      </View>
+        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, fontSize: showEta ? 42 : 28, lineHeight: showEta ? 52 : 36, color: colors.ink }}>
+          {showEta ? `~ ${Math.max(1, pickupEtaMinutes)} ` : rideHeadline(ride, pickupEtaMinutes)}
+          {showEta && <Text style={{ fontSize: 20, fontWeight: '400', color: colors.inkSecondary }}>мин</Text>}
+        </Text>
+        {!terminal && <>
+          <View accessible accessibilityLabel={`Этап поездки ${stage} из 4`} style={{ flexDirection: 'row', gap: 5, marginTop: 4 }}>
+            {[1, 2, 3, 4].map((step) => <View key={step} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: step <= stage ? colors.brand : colors.surfaceSecondary }} />)}
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ ...typography.micro, fontWeight: '400', color: colors.inkSecondary }}>{driver ? 'Машина найдена' : 'Подбираем машину'}</Text>
+            <Text style={{ ...typography.micro, fontWeight: '400', color: colors.inkSecondary }}>{ride.status === 'in_progress' ? 'В пути' : 'Встречаемся'}</Text>
+          </View>
+        </>}
+      </Animated.View>
 
       {ride.status === 'cancelled' && !!ride.cancellationReason && (
         <Text
@@ -180,12 +152,16 @@ export function ActiveRidePanel({
             flexDirection: 'row',
             alignItems: 'center',
             gap: spacing.x3,
-            padding: spacing.x3,
-            borderRadius: radius.lg,
-            backgroundColor: colors.canvas,
+            paddingVertical: spacing.x3,
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
           }}
         >
-          <View style={{ flex: 1, minWidth: 0, gap: spacing.x2 }}>
+          <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft }}>
+            <Text style={{ ...typography.caption, color: colors.infoText }}>{driver.name.split(' ').slice(0, 2).map((part) => part[0]).join('')}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
             <View
               style={{
                 flexDirection: 'row',
@@ -197,7 +173,6 @@ export function ActiveRidePanel({
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                 {driver.name}
               </Text>
-              <RatingBadge rating={driver.rating} count={driver.ratingCount} compact />
             </View>
             <Text
               selectable
@@ -206,18 +181,24 @@ export function ActiveRidePanel({
             >
               {driver.vehicle.color} {driver.vehicle.make} {driver.vehicle.model}
             </Text>
-            <VehiclePlate plate={driver.vehicle.plate} />
           </View>
-          <VehicleIllustration colorHex={driver.vehicle.colorHex} width={116} height={64} />
+          <RatingBadge rating={driver.rating} count={driver.ratingCount} compact />
         </View>
       )}
+
+      {driver && !terminal && <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x3 }}>
+        <VehiclePlate plate={driver.vehicle.plate} />
+        <Text style={{ ...typography.micro, color: colors.inkSecondary }}>Ваш автомобиль</Text>
+      </View>}
 
       {driver && !terminal && (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.x2 }}>
           {!!driver.phone && (
             <PhoneCallButton
               phone={driver.phone}
-              label="Звонок"
+              label="Позвонить"
+              variant="secondary"
+              buttonStyle={{ backgroundColor: colors.brandSoft }}
               accessibilityLabel="Позвонить водителю"
               compact
               containerStyle={{ flex: 1 }}
@@ -225,23 +206,18 @@ export function ActiveRidePanel({
           )}
           <RideChatButton
             orderId={ride.id}
-            label="Чат"
+            label="Написать"
             accessibilityLabel="Написать водителю"
             compact
             style={{ flex: 1 }}
           />
-          <AppButton
-            variant="secondary"
-            compact
-            accessibilityLabel="Открыть детали поездки"
-            icon={<AppIcon name="orders" size={20} color={colors.ink} />}
-            onPress={openDetails}
-            style={{ flex: 1 }}
-          >
-            Детали
-          </AppButton>
         </View>
       )}
+
+      {driver && !terminal && <AppButton variant="quiet" compact onPress={openDetails}
+        accessibilityLabel="Открыть детали поездки" icon={<AppIcon name="orders" size={16} color={colors.inkSecondary} />}>
+        {`Детали поездки · ${formatMoney(ride.priceMinor)}`}
+      </AppButton>}
 
       <WaitingBreakdown ride={ride} compact />
 

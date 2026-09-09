@@ -80,10 +80,19 @@ describe('demo passenger journey', () => {
       },
     };
 
-    const arriving = getDemoDriverSnapshot(baseRide, 0.5);
-    expect(arriving.coordinates.latitude).toBeCloseTo(56.005, 6);
-    expect(arriving.coordinates.longitude).toBeCloseTo(52.005, 6);
+    const approachRoute = [
+      { latitude: 56.01, longitude: 52.01 },
+      { latitude: 56, longitude: 52.01 },
+      { latitude: 56, longitude: 52 },
+    ];
+    const arriving = getDemoDriverSnapshot(baseRide, 0.5, approachRoute);
+    expect(arriving.coordinates.latitude).toBeGreaterThan(56);
+    expect(arriving.coordinates.longitude).toBe(52.01);
     expect(arriving.heading).not.toBeNull();
+
+    expect(getDemoDriverSnapshot(baseRide, 0.5).coordinates).toEqual(baseRide.driver.coordinates);
+    expect(getDemoDriverSnapshot({ ...baseRide, status: 'in_progress', routeCoordinates: [] }, 0.5).coordinates)
+      .toEqual(baseRide.pickup.coordinates);
 
     const inProgress = getDemoDriverSnapshot(
       { ...baseRide, status: 'in_progress' },

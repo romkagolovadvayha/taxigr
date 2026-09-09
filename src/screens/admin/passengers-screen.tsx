@@ -19,7 +19,7 @@ const demoPassengers: AdminAccountSummary[] = [
     grossMinor: demoOrders
       .filter((order) => order.status === 'completed')
       .reduce((sum, order) => sum + order.priceMinor, 0),
-    createdAt: demoOrders.at(-1)?.createdAt ?? new Date().toISOString(),
+    createdAt: demoOrders[demoOrders.length - 1]?.createdAt ?? new Date().toISOString(),
     lastOrderAt: demoOrders[0]?.createdAt,
   },
 ];

@@ -81,7 +81,8 @@ describe('ride chat', () => {
     expect(rideChatPush(presented, 'passenger')).toMatchObject({
       title: 'Сообщение от Иван',
       body: 'Я уже подъехал',
-      channelId: 'ride-chat-v1',
+      channelId: 'ride-chat-voice-v1',
+      sound: 'chat_message.wav',
       data: {
         orderId: presented.orderId,
         role: 'passenger',

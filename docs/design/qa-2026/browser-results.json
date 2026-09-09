@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "checks": [
+    "Three passengers create separate orders concurrently through the UI and real API",
+    "Two drivers accept three distinct orders; one receives a current and a next ride",
+    "Concurrent chats reach only the assigned driver in separate live browser sessions",
+    "Reload restores both drivers, all passenger rides and the queued order",
+    "Passenger cancellation promotes the queued ride live and leaves the second driver unchanged",
+    "Promoted ride completes through driver UI with passenger updates and payment confirmation"
+  ],
+  "errors": [],
+  "serverErrors": [],
+  "cancelledMapRequests": []
+}

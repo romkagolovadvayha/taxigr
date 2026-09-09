@@ -55,7 +55,7 @@ export function DriverTripsScreen() {
 
   const loadMore = useCallback(async () => {
     if (!token || token.startsWith('demo:') || !hasMore) return;
-    const cursor = orders.at(-1);
+    const cursor = orders[orders.length - 1];
     if (!cursor) return;
     setLoadingMore(true);
     try {

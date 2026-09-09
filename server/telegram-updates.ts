@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
 
 import { db, firstRow } from './db';
+import { matchesMessengerPhone } from './messenger-auth-phone';
 import {
   answerTelegramCallback,
   extractOwnTelegramPhone,
@@ -125,7 +126,7 @@ export async function processTelegramUpdate(
   if (!verifiedPhone) return;
 
   const challenge = await firstRow<
-    RowDataPacket & { id: string; expected_phone: string }
+    RowDataPacket & { id: string; expected_phone: string | null }
   >(
     `SELECT id, expected_phone FROM telegram_auth_challenges
      WHERE telegram_user_id = ? AND expires_at > UTC_TIMESTAMP(3)
@@ -135,7 +136,7 @@ export async function processTelegramUpdate(
   );
   if (!challenge) return;
 
-  const matches = verifiedPhone === challenge.expected_phone;
+  const matches = matchesMessengerPhone(verifiedPhone, challenge.expected_phone);
   await db.execute(
     `UPDATE telegram_auth_challenges
      SET verified_phone = ?, failure_code = ?,

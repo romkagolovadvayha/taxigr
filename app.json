@@ -23,7 +23,7 @@
       "versionCode": 23,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#315DD5",
+        "backgroundColor": "#F6C945",
         "foregroundImage": "./assets/brand/android-foreground.png",
         "monochromeImage": "./assets/brand/android-monochrome.png"
       },
@@ -46,8 +46,8 @@
       "name": "Такси Грахово",
       "shortName": "Такси Грахово",
       "display": "standalone",
-      "themeColor": "#315DD5",
-      "backgroundColor": "#F3F5FA",
+      "themeColor": "#F6C945",
+      "backgroundColor": "#F7F4EB",
       "startUrl": "/",
       "scope": "/"
     },
@@ -84,7 +84,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#315DD5",
+          "backgroundColor": "#F6C945",
           "image": "./assets/brand/splash-icon.png",
           "imageWidth": 112
         }
@@ -110,15 +110,36 @@
         "expo-notifications",
         {
           "icon": "./assets/brand/android-monochrome.png",
-          "color": "#315DD5",
+          "color": "#F6C945",
           "defaultChannel": "ride-taxi-found-v2",
           "sounds": [
             "./assets/sounds/taxi_found.wav",
+            "./assets/sounds/driver_arriving.wav",
             "./assets/sounds/driver_arrived.wav",
             "./assets/sounds/new_order.wav",
             "./assets/sounds/ride_started.wav",
             "./assets/sounds/ride_complete.wav",
-            "./assets/sounds/ride_cancelled.wav"
+            "./assets/sounds/ride_cancelled.wav",
+            "./assets/sounds/chat_message.wav",
+            "./assets/sounds/order_updated.wav",
+            "./assets/sounds/notification.wav",
+            "./assets/sounds/searching.wav",
+            "./assets/sounds/driver_released.wav",
+            "./assets/sounds/search_timeout.wav",
+            "./assets/sounds/passenger_cancelled.wav",
+            "./assets/sounds/admin_cancelled.wav",
+            "./assets/sounds/taxi_found_queued.wav",
+            "./assets/sounds/order_accepted.wav",
+            "./assets/sounds/order_accepted_queued.wav",
+            "./assets/sounds/next_order_ready.wav",
+            "./assets/sounds/driver_departed.wav",
+            "./assets/sounds/driver_waiting.wav",
+            "./assets/sounds/order_released.wav",
+            "./assets/sounds/ride_complete_cash.wav",
+            "./assets/sounds/ride_complete_transfer.wav",
+            "./assets/sounds/driver_complete_cash.wav",
+            "./assets/sounds/driver_complete_transfer.wav",
+            "./assets/sounds/driver_complete.wav"
           ]
         }
       ]

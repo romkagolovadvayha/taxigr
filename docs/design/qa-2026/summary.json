@@ -1,0 +1,12 @@
+{
+  "unit": 424,
+  "api": 33,
+  "concurrency": 13,
+  "total": 470,
+  "failed": 0,
+  "browserPassed": true,
+  "browserChecks": 6,
+  "build": true,
+  "typecheck": true,
+  "lint": true
+}

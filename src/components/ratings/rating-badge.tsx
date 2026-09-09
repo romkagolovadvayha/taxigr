@@ -31,7 +31,7 @@ export function RatingBadge({ rating, count, compact = false }: Props) {
         backgroundColor: colors.surfaceSecondary,
       }}
     >
-      <AppIcon name="star" size={compact ? 12 : 14} color={colors.brandPressed} filled />
+      <AppIcon name="star" size={compact ? 12 : 14} color={colors.info} filled />
       <Text
         style={{
           ...typography.micro,

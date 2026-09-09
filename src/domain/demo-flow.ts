@@ -35,51 +35,6 @@ const passengerProgression: Partial<Record<RideStatus, DemoProgression>> = {
 const DEMO_DRIVER_LATITUDE_OFFSET = 0.0032;
 const DEMO_DRIVER_LONGITUDE_OFFSET = 0.0048;
 
-function directDistanceMeters(origin: Coordinates, destination: Coordinates): number {
-  const latitudeDelta = (destination.latitude - origin.latitude) * Math.PI / 180;
-  const longitudeDelta = (destination.longitude - origin.longitude) * Math.PI / 180;
-  const latitude1 = origin.latitude * Math.PI / 180;
-  const latitude2 = destination.latitude * Math.PI / 180;
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
-  return 2 * 6_371_000 * Math.asin(Math.sqrt(haversine));
-}
-
-export function buildDemoRoute(pickup: Address, destination: Address): RouteSummary {
-  const distanceMeters = Math.max(
-    800,
-    Math.round(directDistanceMeters(pickup.coordinates, destination.coordinates) * 1.25),
-  );
-  return {
-    distanceMeters,
-    durationSeconds: Math.max(300, Math.round(distanceMeters / 8.3)),
-    source: 'estimate',
-    coordinates: [pickup.coordinates, destination.coordinates],
-  };
-}
-
-export function buildDemoMultiStopRoute(
-  pickup: Address,
-  destinations: readonly Address[],
-): RouteSummary & { segmentDistances: number[] } {
-  const routes: RouteSummary[] = [];
-  let origin = pickup;
-  for (const destination of destinations) {
-    routes.push(buildDemoRoute(origin, destination));
-    origin = destination;
-  }
-  return {
-    distanceMeters: routes.reduce((total, route) => total + route.distanceMeters, 0),
-    durationSeconds: routes.reduce((total, route) => total + route.durationSeconds, 0),
-    source: 'estimate',
-    coordinates: routes.flatMap((route, index) =>
-      index === 0 ? route.coordinates : route.coordinates.slice(1),
-    ),
-    segmentDistances: routes.map((route) => route.distanceMeters),
-  };
-}
-
 function offsetInsideRange(value: number, offset: number, limit: number): number {
   return value + offset <= limit ? value + offset : value - offset;
 }
@@ -114,29 +69,27 @@ function fixedDriverPosition(
 export function getDemoDriverSnapshot(
   ride: RideOrder,
   progress: number,
+  approachRoute: Coordinates[] = [],
 ): RoutePosition {
-  const initial = ride.driver?.coordinates ?? ride.pickup.coordinates;
+  const initial = approachRoute[0] ?? ride.driver?.coordinates ?? ride.pickup.coordinates;
+  const pickup = ride.routeCoordinates?.[0] ?? ride.pickup.coordinates;
   if (ride.status === 'driver_arriving') {
     return routePositionAtProgress(
-      [initial, ride.pickup.coordinates],
+      approachRoute,
       progress,
     ) ?? fixedDriverPosition(initial);
   }
   if (ride.status === 'driver_waiting') {
-    return fixedDriverPosition(ride.pickup.coordinates, initial);
+    return fixedDriverPosition(pickup, initial);
   }
   if (ride.status === 'in_progress') {
-    const route =
-      ride.routeCoordinates?.length && ride.routeCoordinates.length >= 2
-        ? ride.routeCoordinates
-        : [ride.pickup.coordinates, ride.destination.coordinates];
-    return routePositionAtProgress(route, progress) ??
-      fixedDriverPosition(ride.pickup.coordinates);
+    return routePositionAtProgress(ride.routeCoordinates ?? [], progress) ??
+      fixedDriverPosition(pickup);
   }
   if (ride.status === 'completed') {
     return fixedDriverPosition(
-      ride.destination.coordinates,
-      ride.routeCoordinates?.at(-2) ?? ride.pickup.coordinates,
+      ride.routeCoordinates?.[ride.routeCoordinates.length - 1] ?? ride.destination.coordinates,
+      ride.routeCoordinates?.[ride.routeCoordinates.length - 2] ?? ride.pickup.coordinates,
     );
   }
   return fixedDriverPosition(initial);

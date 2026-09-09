@@ -12,7 +12,7 @@ export function sameRouteStop(left: Address, right: Address): boolean {
 export function normalizeRouteStops(pickup: Address | null, destinations: readonly Address[]): Address[] {
   const result: Address[] = [];
   for (const destination of destinations) {
-    const previous = result.at(-1) ?? pickup;
+    const previous = result[result.length - 1] ?? pickup;
     if (!previous || !sameRouteStop(previous, destination)) result.push(destination);
   }
   return result;

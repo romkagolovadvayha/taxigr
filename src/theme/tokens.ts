@@ -2,8 +2,8 @@ import type { TextStyle, ViewStyle } from 'react-native';
 
 export type AppColorScheme = 'light' | 'dark';
 
-// The identity stays cobalt in both themes; controls use the adaptive palette.
-export const brandIdentity = { blue: '#315DD5', white: '#FFFFFF' } as const;
+// The route symbol stays graphite on warm taxi yellow in both themes.
+export const brandIdentity = { background: '#F6C945', ink: '#25231E' } as const;
 
 export type ColorPalette = {
   brand: string;
@@ -53,20 +53,20 @@ export type ColorPalette = {
 };
 
 export const lightColors: ColorPalette = {
-  brand: '#315DD5',
-  brandSoft: '#E4EBFC',
-  brandPressed: '#254AB5',
-  brandInk: '#FFFFFF',
-  brandInkSecondary: '#DBE5FF',
-  ink: '#172642',
-  inkSecondary: '#5F6C83',
-  inkMuted: '#748198',
-  canvas: '#F3F5FA',
+  brand: '#F6C945',
+  brandSoft: '#FFF3CB',
+  brandPressed: '#E5B82F',
+  brandInk: '#25231E',
+  brandInkSecondary: '#53451E',
+  ink: '#25231E',
+  inkSecondary: '#686153',
+  inkMuted: '#716958',
+  canvas: '#F7F4EB',
   surface: '#FFFFFF',
-  surfaceSecondary: '#EDF1F8',
+  surfaceSecondary: '#F1EDDF',
   surfaceRaised: 'rgba(255,255,255,0.94)',
-  border: '#DCE3F0',
-  borderStrong: '#B9C6DE',
+  border: '#E6DFCA',
+  borderStrong: '#B9AE91',
   success: '#18A957',
   successSoft: '#E7F7EE',
   successText: '#107C41',
@@ -83,11 +83,11 @@ export const lightColors: ColorPalette = {
   dangerText: '#B3262B',
   dangerInk: '#FFFFFF',
   dangerPanelInk: '#F7F7F5',
-  info: '#315DD5',
-  infoSoft: '#E4EBFC',
-  infoText: '#304B87',
-  route: '#476DCF',
-  mapFallback: '#E7ECF3',
+  info: '#9B750A',
+  infoSoft: '#FFF3CB',
+  infoText: '#725714',
+  route: '#C49413',
+  mapFallback: '#ECE7D9',
   vehicleGlass: '#AFC7D8',
   vehicleGlassHighlight: '#EAF6FC',
   vehicleOutline: '#24272B',
@@ -95,25 +95,25 @@ export const lightColors: ColorPalette = {
   vehicleWheel: '#AEB4BC',
   vehiclePlateSurface: '#FFFFFF',
   vehiclePlateInk: '#111111',
-  overlay: 'rgba(16,23,37,0.40)',
+  overlay: 'rgba(37,35,30,0.40)',
   transparent: 'transparent',
 };
 
 export const darkColors: ColorPalette = {
-  brand: '#A6BDFF',
-  brandSoft: '#263959',
-  brandPressed: '#8EABF5',
-  brandInk: '#152750',
-  brandInkSecondary: '#304B87',
-  ink: '#F0F4FC',
-  inkSecondary: '#B2BDD1',
-  inkMuted: '#95A4BE',
-  canvas: '#101725',
-  surface: '#192336',
-  surfaceSecondary: '#232E44',
-  surfaceRaised: 'rgba(25,35,54,0.96)',
-  border: '#354259',
-  borderStrong: '#566684',
+  brand: '#F7D46A',
+  brandSoft: '#40351C',
+  brandPressed: '#EAC453',
+  brandInk: '#242119',
+  brandInkSecondary: '#53461E',
+  ink: '#F7F3E8',
+  inkSecondary: '#C2BAA9',
+  inkMuted: '#AAA08D',
+  canvas: '#181714',
+  surface: '#22211D',
+  surfaceSecondary: '#2E2C25',
+  surfaceRaised: 'rgba(34,33,29,0.96)',
+  border: '#454136',
+  borderStrong: '#706850',
   success: '#35C878',
   successSoft: '#173B29',
   successText: '#7CE5AA',
@@ -130,11 +130,11 @@ export const darkColors: ColorPalette = {
   dangerText: '#FF9EA2',
   dangerInk: '#33131D',
   dangerPanelInk: '#F7F7F5',
-  info: '#A6BDFF',
-  infoSoft: '#263959',
-  infoText: '#CDDAFA',
-  route: '#AFC7FF',
-  mapFallback: '#253244',
+  info: '#F7D46A',
+  infoSoft: '#40351C',
+  infoText: '#FFE7A0',
+  route: '#F7D46A',
+  mapFallback: '#302D24',
   vehicleGlass: '#7895A8',
   vehicleGlassHighlight: '#C6D9E4',
   vehicleOutline: '#17191B',
@@ -251,10 +251,10 @@ export const typography = {
 
 export const shadows = {
   floating: {
-    boxShadow: '0 8px 28px rgba(24,42,80,0.09)',
+    boxShadow: '0 8px 28px rgba(54,44,20,0.09)',
   },
   subtle: {
-    boxShadow: '0 2px 12px rgba(24,42,80,0.05)',
+    boxShadow: '0 2px 12px rgba(54,44,20,0.05)',
   },
 } satisfies Record<string, ViewStyle>;
 

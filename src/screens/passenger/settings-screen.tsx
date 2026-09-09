@@ -76,7 +76,7 @@ function SettingToggle({
         accessibilityLabel={title}
         onValueChange={onValueChange}
         trackColor={{ false: colors.surfaceSecondary, true: colors.brand }}
-        thumbColor="#FFFFFF"
+        thumbColor={value ? colors.brandInk : colors.surface}
       />
     </View>
   );
@@ -371,8 +371,8 @@ export function SettingsScreen() {
         </AppButton>
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <SettingToggle
-          title="Звуки событий"
-          subtitle="Машина найдена, водитель приехал, новый заказ"
+          title="Голосовые уведомления"
+          subtitle="Короткие сообщения о водителе, поездке и новых заказах"
           value={soundEnabled}
           onValueChange={setSoundEnabled}
         />
@@ -386,7 +386,7 @@ export function SettingsScreen() {
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <AnimatedPressable feedback="subtle"
           accessibilityRole="button"
-          accessibilityLabel="Проверить звук и вибрацию"
+          accessibilityLabel="Послушать голос и проверить вибрацию"
           aria-disabled={!soundEnabled && !vibrationEnabled}
           disabled={!soundEnabled && !vibrationEnabled}
           onPress={() => void previewFeedback()}
@@ -400,7 +400,7 @@ export function SettingsScreen() {
         >
           <AppIcon name="volume" size={22} />
           <Text selectable style={{ ...typography.body, color: colors.ink, flex: 1 }}>
-            Проверить оповещение
+            Послушать голос
           </Text>
           <AppIcon name="chevron" size={20} color={colors.inkMuted} />
         </AnimatedPressable>

@@ -73,7 +73,7 @@ export function smoothRouteCoordinates(
   if (coordinates.length < 3) return [...coordinates];
 
   const first = coordinates[0]!;
-  const last = coordinates.at(-1)!;
+  const last = coordinates[coordinates.length - 1]!;
   const result: Coordinates[] = [first];
 
   for (let index = 1; index < coordinates.length - 1; index += 1) {

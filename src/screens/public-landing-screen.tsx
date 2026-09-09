@@ -229,7 +229,7 @@ export function PublicLandingScreen() {
             <BrandGlyph
               size={isPhone ? 200 : 560}
               color={colors.brandInk}
-              pinColor={colors.brandInk}
+              pinColor={colors.brand}
             />
           </View>
         )}
@@ -349,7 +349,7 @@ export function PublicLandingScreen() {
                   opacity: pressed ? 0.68 : 1,
                 })}
               >
-                <Text style={{ ...typography.caption, color: colors.info }}>
+                <Text style={{ ...typography.caption, color: colors.infoText }}>
                   {item.label}
                 </Text>
               </AnimatedPressable>

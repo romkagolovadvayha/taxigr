@@ -97,7 +97,7 @@ function statsFromOrders(orders: RideOrder[], rating: number, ratingCount: numbe
     rating,
     ratingCount,
     fiveStarRatings: ratingCount,
-    firstOrderAt: orders.at(-1)?.createdAt,
+    firstOrderAt: orders[orders.length - 1]?.createdAt,
     lastOrderAt: orders[0]?.createdAt,
   };
 }
@@ -111,7 +111,7 @@ function demoProfile(kind: Props['kind']): AdminAccountProfile {
     phone: isDriver ? demoDriver.phone : demoPassenger.phone,
     profileComplete: true,
     roles: isDriver ? ['passenger', 'driver'] : ['passenger'],
-    createdAt: demoOrders.at(-1)?.createdAt ?? new Date().toISOString(),
+    createdAt: demoOrders[demoOrders.length - 1]?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -271,7 +271,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
       key === 'Home'
         ? order[0]
         : key === 'End'
-          ? order.at(-1)
+          ? order[order.length - 1]
           : key === 'ArrowRight'
             ? order[(index + 1) % order.length]
             : key === 'ArrowLeft'

@@ -2,18 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import manifest from '../assets/sounds/voice-manifest.json';
 
-const soundFiles = [
-  'taxi_found.wav',
-  'driver_arrived.wav',
-  'new_order.wav',
-  'ride_started.wav',
-  'ride_complete.wav',
-  'ride_cancelled.wav',
-];
+const soundFiles = Object.keys(manifest.clips).map(name => `${name}.wav`);
 
 describe.each(soundFiles)('%s', (filename) => {
-  it('is a compact, normalized notification WAV', async () => {
+  it('is a short, normalized voice notification without clipped boundaries', async () => {
     const wav = await readFile(resolve(process.cwd(), 'assets', 'sounds', filename));
     const sampleRate = wav.readUInt32LE(24);
     const channels = wav.readUInt16LE(22);
@@ -31,9 +25,16 @@ describe.each(soundFiles)('%s', (filename) => {
     expect(channels).toBe(1);
     expect(bitsPerSample).toBe(16);
     expect(sampleCount / sampleRate).toBeGreaterThanOrEqual(0.7);
-    expect(sampleCount / sampleRate).toBeLessThanOrEqual(1.25);
+    expect(sampleCount / sampleRate).toBeLessThanOrEqual(12);
+    expect(wav.length).toBeLessThan(1_100_000);
+    const mp3 = await readFile(resolve(process.cwd(), 'assets', 'sounds', filename.replace('.wav', '.mp3')));
+    expect(mp3.length).toBeLessThan(100_000);
+    expect(mp3.length).toBeLessThan(wav.length / 7);
+    expect(wav.readUInt32LE(40)).toBe(wav.length - 44);
     expect(20 * Math.log10(peak)).toBeCloseTo(-3.5, 1);
     expect(wav.readInt16LE(44)).toBe(0);
     expect(wav.readInt16LE(wav.length - 2)).toBe(0);
+    // Quiet padding leaves consonants intact and avoids clicks on playback.
+    expect(wav.subarray(44, 44 + 2 * Math.round(sampleRate * 0.08)).every((byte) => byte === 0)).toBe(true);
   });
 });

@@ -1,11 +1,8 @@
-import { Image } from 'expo-image';
-import { Paperclip, Send } from 'lucide-react-native';
+import { CarFront, Paperclip, Send, Settings } from 'lucide-react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 
 import { useThemeColors } from '@/theme/theme-provider';
-
-const carPng = require('../../../assets/vehicles/driver-map-car.png');
 
 export type AppIconName =
   | 'back'
@@ -58,15 +55,14 @@ export function AppIcon({
 }: Props) {
   const colors = useThemeColors();
   const color = customColor ?? colors.ink;
-  if (name === 'car') {
+  if (name === 'car' || name === 'settings') {
+    const LibraryIcon = name === 'car' ? CarFront : Settings;
     return (
-      <Image
-        source={carPng}
-        style={{ width: size, height: size }}
-        contentFit="contain"
-        tintColor={color}
-        alt=""
-        accessible={false}
+      <LibraryIcon
+        size={size}
+        color={color}
+        strokeWidth={strokeWidth}
+        aria-hidden
       />
     );
   }
@@ -193,12 +189,6 @@ export function AppIcon({
         <>
           <Circle cx="10.5" cy="10.5" r="6.5" {...common} />
           <Path d="M15.5 15.5L21 21" {...common} />
-        </>
-      )}
-      {name === 'settings' && (
-        <>
-          <Circle cx="12" cy="12" r="3" {...common} />
-          <Path d="M19 13.5l1.2 1.8-2.1 2.1-1.8-1.2-2.3 1v2.1h-4v-2.1l-2.3-1-1.8 1.2-2.1-2.1L5 13.5l-1-2.3H2V8.3h2l1-2.3-1.2-1.8 2.1-2.1L7.7 3.3l2.3-1V.2h4v2.1l2.3 1 1.8-1.2 2.1 2.1L19 6l1 2.3h2v2.9h-2z" {...common} />
         </>
       )}
       {name === 'shield' && <Path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z" {...common} />}

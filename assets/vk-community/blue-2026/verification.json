@@ -1,0 +1,28 @@
+[
+  {
+    "width": 1440,
+    "horizontalOverflow": false,
+    "menuItems": 6,
+    "postDialogs": 6,
+    "motionStartsOnRequest": true,
+    "video": {
+      "duration": 20,
+      "width": 1080,
+      "height": 1920
+    },
+    "errors": []
+  },
+  {
+    "width": 390,
+    "horizontalOverflow": false,
+    "menuItems": 6,
+    "postDialogs": 6,
+    "motionStartsOnRequest": true,
+    "video": {
+      "duration": 20,
+      "width": 1080,
+      "height": 1920
+    },
+    "errors": []
+  }
+]

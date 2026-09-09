@@ -1,0 +1,60 @@
+{
+  "passed": true,
+  "metrics": [
+    {
+      "step": "continue",
+      "width": 320,
+      "text": "Продолжить · 150 ₽",
+      "centerOffset": 0,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    },
+    {
+      "step": "continue",
+      "width": 390,
+      "text": "Продолжить · 150 ₽",
+      "centerOffset": 0,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    },
+    {
+      "step": "continue",
+      "width": 768,
+      "text": "Продолжить · 150 ₽",
+      "centerOffset": 0,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    },
+    {
+      "step": "confirm",
+      "width": 320,
+      "text": "Подтвердить · 150 ₽",
+      "centerOffset": 0.0078125,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    },
+    {
+      "step": "confirm",
+      "width": 390,
+      "text": "Подтвердить · 150 ₽",
+      "centerOffset": 0.0078125,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    },
+    {
+      "step": "confirm",
+      "width": 768,
+      "text": "Подтвердить · 150 ₽",
+      "centerOffset": 0.0078125,
+      "textHeight": 22,
+      "buttonHeight": 56,
+      "fits": true
+    }
+  ],
+  "errors": []
+}

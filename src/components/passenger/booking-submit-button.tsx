@@ -1,8 +1,7 @@
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { MoneyValue } from '@/components/ui/money-value';
-import { SkeletonBlock } from '@/components/ui/skeleton-block';
+import { formatMoney } from '@/utils/format';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -13,6 +12,9 @@ type Props = {
   loading?: boolean;
   estimateAvailable: boolean;
   canRetry?: boolean;
+  label?: string;
+  loadingLabel?: string;
+  accessibilityLabel?: string;
   onPress: () => void;
 };
 
@@ -23,6 +25,9 @@ export function BookingSubmitButton({
   loading = false,
   estimateAvailable,
   canRetry = false,
+  label = 'Продолжить',
+  loadingLabel = 'Рассчитываем…',
+  accessibilityLabel,
   onPress,
 }: Props) {
   const colors = useThemeColors();
@@ -32,23 +37,24 @@ export function BookingSubmitButton({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={
-        loading
+        accessibilityLabel ?? (loading
           ? 'Рассчитываем стоимость и время подачи'
           : estimateAvailable
-            ? `Перейти к подтверждению заказа за ${priceMinor / 100} рублей`
+            ? `Перейти к подтверждению заказа за ${priceMinor / 100} рублей, подача около ${etaMinutes} минут`
             : canRetry
               ? 'Повторить расчёт стоимости поездки'
-              : 'Укажите маршрут, чтобы рассчитать стоимость поездки'
+              : 'Укажите маршрут, чтобы рассчитать стоимость поездки')
       }
       aria-disabled={unavailable}
       aria-busy={loading}
       disabled={unavailable}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 60,
-        flexDirection: 'row',
+        minHeight: 56,
         alignItems: 'center',
-        paddingHorizontal: spacing.x5,
+        justifyContent: 'center',
+        paddingHorizontal: spacing.x4,
+        paddingVertical: spacing.x3,
         borderRadius: radius.md,
         borderCurve: 'continuous',
         backgroundColor: colors.brand,
@@ -57,34 +63,30 @@ export function BookingSubmitButton({
     >
       <View
         style={{
-          flex: 1,
           flexDirection: 'row',
-          alignItems: 'baseline',
-          justifyContent: estimateAvailable || loading ? 'flex-start' : 'center',
+          alignItems: 'center',
+          justifyContent: 'center',
           gap: spacing.x2,
+          maxWidth: '100%',
         }}
       >
-        {loading ? (
-          <>
-            <SkeletonBlock width={80} height={24} color={colors.brandInk} opacity={0.16} />
-            <SkeletonBlock width={42} height={14} color={colors.brandInk} opacity={0.16} />
-          </>
-        ) : estimateAvailable ? (
-          <>
-            <MoneyValue valueMinor={priceMinor} color={colors.brandInk} />
-            <Text selectable style={{ ...typography.caption, color: colors.brandInkSecondary }}>
-              ~{etaMinutes} мин
-            </Text>
-          </>
-        ) : (
-          <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>
-            {canRetry ? 'Повторить расчёт' : 'Укажите маршрут'}
-          </Text>
-        )}
+        {loading && <ActivityIndicator size="small" color={colors.brandInk} />}
+        <Text style={{
+          ...typography.bodyStrong,
+          fontSize: 16,
+          lineHeight: 22,
+          textAlign: 'center',
+          flexShrink: 1,
+          color: colors.brandInk,
+          fontVariant: ['tabular-nums'],
+        }}>
+          {loading
+            ? loadingLabel
+            : estimateAvailable
+              ? `${label} · ${formatMoney(priceMinor)}`
+              : canRetry ? 'Повторить расчёт' : 'Укажите маршрут'}
+        </Text>
       </View>
-      {(estimateAvailable || loading) && (
-        <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Заказать</Text>
-      )}
     </AnimatedPressable>
   );
 }
