@@ -10,6 +10,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { AppUpdateCard } from '@/components/updates/app-update-card';
 import { VehicleColorPicker } from '@/components/vehicle/vehicle-color-picker';
 import { VehicleIllustration } from '@/components/vehicle/vehicle-illustration';
 import { demoDriver } from '@/data/demo';
@@ -446,6 +447,7 @@ export function DriverProfileScreen() {
         </SurfaceCard>
       )}
 
+      <AppUpdateCard />
       <AppButton variant="secondary" onPress={() => router.push('/settings')}>
         Настройки уведомлений
       </AppButton>

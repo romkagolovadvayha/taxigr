@@ -64,6 +64,7 @@ import {
   type AdminTelegramAction,
 } from './admin-telegram';
 import { config } from './config';
+import { registerAppReleaseRoutes } from './app-releases';
 import { matchesMessengerPhone } from './messenger-auth-phone';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db, firstRow, withTransaction } from './db';
@@ -1528,6 +1529,7 @@ export async function registerRoutes(
   publish: EventPublisher,
   realtime: RealtimeControls,
 ): Promise<RegisteredRouteHandlers> {
+  registerAppReleaseRoutes(app);
   const lastDriverLocationAcceptedAt = new Map<string, number>();
   const lastPassengerLocationAcceptedAt = new Map<string, number>();
   const notifyAdmins = (action: AdminTelegramAction): void => {

@@ -1,0 +1,61 @@
+{
+  "version": "1.0.10",
+  "files": [
+    {
+      "file": "01-booking.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 490375,
+      "sha256": "fa94cc9720d62e646d71833f3657f4c7f156c7266db729102d839832634ecfdc"
+    },
+    {
+      "file": "02-tariffs.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 553010,
+      "sha256": "698d81207dc74d16a5ac66c283a3e8ee74a1262a3b9ce3739ad683a3d228e091"
+    },
+    {
+      "file": "03-signin.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 405240,
+      "sha256": "9c3df93e0fda6b8b4a8c6d7e38883e8a65bd1cabf12043411af537a861e53b0d"
+    },
+    {
+      "file": "04-driver.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 482773,
+      "sha256": "08fbf27ff75b4996914b7e5798e0dd7fc4ae635c5fc40e406d09124085c40baf"
+    },
+    {
+      "file": "05-voice.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 482799,
+      "sha256": "cdcd8386f4bdd8bcb6d6c21cd28d5b975847493ce45c511c375e1964cb97d94b"
+    },
+    {
+      "file": "06-dark.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 510440,
+      "sha256": "2cf59241c1ffb7778a4d78a947c3ff1ec1877e4ced9c56bd25a081d1331881bf"
+    },
+    {
+      "file": "feature-graphic.png",
+      "width": 1024,
+      "height": 500,
+      "bytes": 662357,
+      "sha256": "f7425f193d9236c1eb708c03adb32c862b0864cdd1440623d4fdeeee163121e1"
+    },
+    {
+      "file": "icon.png",
+      "width": 512,
+      "height": 512,
+      "bytes": 16707,
+      "sha256": "e7d38557bdf3cdd11f494257a03910932b547f21a99bd97cc42979a0beaefeeb"
+    }
+  ]
+}

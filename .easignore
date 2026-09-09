@@ -1,8 +1,10 @@
 .git
 .github
 .expo
-android
-ios
+/android
+/ios
+/modules/*/android/build
+/modules/*/android/.gradle
 node_modules
 server/node_modules
 dist
@@ -32,6 +34,8 @@ server
 tests
 store-listing
 assets/store
+assets/vk-community
+docs
 
 # Previously generated store artifacts
 *.apk

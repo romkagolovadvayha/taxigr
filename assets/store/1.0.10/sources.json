@@ -1,0 +1,9 @@
+{
+  "01-booking": "sources/01-booking.png",
+  "02-tariffs": "sources/02-tariffs.png",
+  "03-signin": "sources/03-signin.png",
+  "04-driver": "sources/04-driver.png",
+  "05-voice": "sources/05-voice.png",
+  "06-dark": "sources/06-dark.png",
+  "feature-graphic": "sources/feature-graphic.png"
+}

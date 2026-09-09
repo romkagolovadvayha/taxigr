@@ -1,0 +1,62 @@
+{
+  "version": "1.0.10",
+  "versionCode": 29,
+  "packageName": "ru.grahovo.taxi",
+  "updatedAt": "2026-09-09T15:59:56.582Z",
+  "googlePlay": {
+    "status": "IN_REVIEW",
+    "phase": "AUTOMATIC_PRE_REVIEW_CHECKS",
+    "track": "alpha",
+    "releaseId": 20,
+    "consoleUrl": "https://play.google.com/console/u/0/developers/9149396433864811864/app/4975290218741681000/publishing",
+    "productionAccess": "12 testers participating for 11 of 14 required days; production access not yet available",
+    "persistedListingAndBundleVerified": true,
+    "screenshots": 6,
+    "imagesInCorrectOrder": true,
+    "uiStatus": "Изменения на проверке",
+    "aiDisclosure": {
+      "assetCount": 7,
+      "verifiedInSavedConsole": true
+    }
+  },
+  "rustore": {
+    "status": "MODERATION",
+    "versionId": 2064812788,
+    "submittedAt": "2026-09-09T15:36:57.092",
+    "publishType": "INSTANTLY",
+    "consoleUrl": "https://console.rustore.ru/apps/2063749723/versions",
+    "screenshots": 6,
+    "uiStatus": "Ожидает модерацию",
+    "verifiedInConsole": true
+  },
+  "verification": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "unitTests": 475,
+    "regularSuiteIntegrationTestsSkipped": 46,
+    "storeReviewerLogin": "passed",
+    "nativeApkAndAab": "passed",
+    "notificationWavCount": 27,
+    "runtimeMp3Count": 29,
+    "originalSigningKeyVerified": true,
+    "android16KBAlignmentVerified": true
+  },
+  "nativeFix": "Retain notification WAV resources during R8 optimization via plugins/with-android-app-optimization.js",
+  "artifacts": [
+    {
+      "file": "taxi-grahovo-1.0.10-29-rustore.apk",
+      "bytes": 113529516,
+      "sha256": "f60c25a2ab170837c275e9f809e6b9d7965817f2cc27cdc80934879d852850f6"
+    },
+    {
+      "file": "taxi-grahovo-1.0.10-29-google-play.aab",
+      "bytes": 82304031,
+      "sha256": "53fd693dd741e220f290c64b32ce17d34c50bc9f7b5f2c548ca3d2330af3d13a"
+    }
+  ],
+  "developmentServer": {
+    "url": "http://localhost:8082",
+    "demoMode": true,
+    "restored": true
+  }
+}

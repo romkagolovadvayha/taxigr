@@ -14,6 +14,7 @@ import '@/location/driver-background-location';
 import { useSession } from '@/auth/session-provider';
 import { BrandGlyph } from '@/components/brand-mark';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { AppUpdatePromptHost } from '@/components/updates/app-update-prompt';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { AppProviders } from '@/providers/app-providers';
 import { AppHead } from '@/seo/app-head';
@@ -219,6 +220,7 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Screen name="+not-found" />
       </Stack>
+      <AppUpdatePromptHost />
     </ThemeProvider>
   );
 }

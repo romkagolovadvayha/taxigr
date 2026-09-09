@@ -16,6 +16,7 @@ export type AppIconName =
   | 'clock'
   | 'close'
   | 'document'
+  | 'download'
   | 'drag'
   | 'earnings'
   | 'flag'
@@ -128,6 +129,11 @@ export function AppIcon({
         <>
           <Path d="M6 3h8l4 4v14H6z" {...common} />
           <Path d="M14 3v5h4M9 13h6M9 17h6" {...common} />
+        </>
+      )}
+      {name === 'download' && (
+        <>
+          <Path d="M12 3v12m-4-4l4 4 4-4M4 16v5h16v-5" {...common} />
         </>
       )}
       {name === 'drag' && (

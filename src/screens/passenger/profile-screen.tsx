@@ -9,6 +9,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { resolveApiUrl } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
+import { AppUpdateCard } from '@/components/updates/app-update-card';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
@@ -233,6 +234,7 @@ export function ProfileScreen() {
         )}
       </View>
 
+      <AppUpdateCard />
       <AppButton variant="secondary" onPress={() => void signOut()}>Выйти</AppButton>
       <AppModal
         visible={photoVisible}

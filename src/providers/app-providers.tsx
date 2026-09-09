@@ -14,6 +14,7 @@ import { NotificationRegistrar } from '@/providers/notification-registrar';
 import { PassengerLocationPublisher } from '@/providers/passenger-location-publisher';
 import { PassengerPreferencesProvider } from '@/preferences/passenger-preferences-provider';
 import { RideProvider, useRide } from '@/state/ride-provider';
+import { AppUpdateProvider } from '@/updates/app-update-provider';
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
@@ -57,16 +58,18 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider>
-        <CriticalErrorMonitor />
-        <LocationPermissionRegistrar />
-        <VkCommunityPromptHost />
-        <PassengerPreferencesProvider>
-          <FeedbackPreferencesProvider>
-            <SessionScopedRideProviders>{children}</SessionScopedRideProviders>
-          </FeedbackPreferencesProvider>
-        </PassengerPreferencesProvider>
-      </SessionProvider>
+      <AppUpdateProvider>
+        <SessionProvider>
+          <CriticalErrorMonitor />
+          <LocationPermissionRegistrar />
+          <VkCommunityPromptHost />
+          <PassengerPreferencesProvider>
+            <FeedbackPreferencesProvider>
+              <SessionScopedRideProviders>{children}</SessionScopedRideProviders>
+            </FeedbackPreferencesProvider>
+          </PassengerPreferencesProvider>
+        </SessionProvider>
+      </AppUpdateProvider>
     </QueryClientProvider>
   );
 }

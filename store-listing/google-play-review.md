@@ -7,18 +7,23 @@ Credential name: **Passenger review account**
 
 Instructions:
 
-1. Accept the legal terms checkbox.
-2. Enter the phone number above.
-3. Tap **«У меня нет VK, MAX, Telegram»** below the messenger buttons.
-4. Enter `4455` and tap **«Подтвердить код»**.
+1. Tap **«Войти по SMS»** (Sign in by SMS).
+2. Tap **«Принять и продолжить»** (Accept and continue).
+3. Enter `9998887766`; the country code `+7` is already displayed.
+4. Tap **«Получить код по SMS»** (Get code).
+5. Enter `4455` and tap **«Подтвердить код»** (Confirm code).
 
 The code is permanent and reusable; no SMS, external messenger, payment, subscription, or location restriction is required. The account has passenger-only access. Reviewers can select addresses, calculate a fare, and inspect the order confirmation flow. Please do not submit a real ride order.
 
-## Release notes 1.0.9 (27)
+## Release notes 1.0.11
 
-- Introduced the blue Quiet Motion design, light and dark themes, and smooth transitions.
-- Added illustrated fare cards and clearer vehicle registration plates.
-- Preserved multi-stop routes, ride chat with photos, payments, ride history, and driver features.
+- Added one-time update prompts and a persistent update action in passenger and driver profiles.
+- Updates open the store used to install the app; prompts wait until no ride is active.
+
+- Updated the yellow identity, compact illustrated fares, and light/dark themes.
+- Introduced provider-first sign-in and a separate SMS flow.
+- Added natural Russian voice notifications for ride states.
+- Improved road routes, address resolution, concurrent orders, and driver queues.
 - Refreshed the store icon, feature graphic, and six promotional screenshot cards.
 
 Production reviewer sign-in and session refresh were verified on 9 September 2026.

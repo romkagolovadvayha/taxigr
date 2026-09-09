@@ -1,7 +1,7 @@
 {
   "name": "taxi-grahovo",
   "main": "expo-router/entry",
-  "version": "1.0.9",
+  "version": "1.0.11",
   "dependencies": {
     "@expo/ui": "~57.0.14",
     "@fastify/cors": "^11.3.0",
@@ -13,6 +13,7 @@
     "@vkontakte/vk-bridge": "^3.0.2",
     "dotenv": "^17.4.2",
     "expo": "~57.0.18",
+    "expo-application": "~57.0.2",
     "expo-asset": "~57.0.8",
     "expo-audio": "~57.0.4",
     "expo-build-properties": "~57.0.17",
@@ -81,6 +82,7 @@
     "typecheck": "tsc --noEmit",
     "check:store-review": "tsx server/scripts/check-store-review-auth.ts",
     "test": "vitest run",
+    "release:available": "tsx server/scripts/publish-app-release.ts",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:watch": "vitest",
     "build:web": "node scripts/build-web-production.mjs",
