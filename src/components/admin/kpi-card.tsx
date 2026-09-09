@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 
 import type { AppIconName } from '@/components/ui/app-icon';
 import { AppIcon } from '@/components/ui/app-icon';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   label: string;
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function KpiCard({ label, value, hint, icon }: Props) {
+  const colors = useThemeColors();
   return (
     <View
       style={{

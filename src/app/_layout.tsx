@@ -3,6 +3,8 @@ import { router, usePathname, type ErrorBoundaryProps, type Href } from 'expo-ro
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,12 +18,13 @@ import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { AppProviders } from '@/providers/app-providers';
 import { AppHead } from '@/seo/app-head';
 import { BlockedAccountScreen } from '@/screens/blocked-account-screen';
-import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { useThemeColors, AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
+import { brandIdentity, radius, spacing, typography } from '@/theme/tokens';
 
 if (Platform.OS !== 'web') void SplashScreen.preventAutoHideAsync();
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const colors = useThemeColors();
   useEffect(() => {
     void reportCriticalClientError(error, {
       source: 'react-error-boundary',
@@ -64,9 +67,13 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 function RootNavigator() {
+  const colors = useThemeColors();
   const { user, loading, sessionReady } = useSession();
   const pathname = usePathname();
-  const { colorScheme, dark, ready: themeReady } = useAppTheme();
+  const { dark, ready: themeReady } = useAppTheme();
+  const [fontsLoaded, fontError] = useFonts({ Manrope: require('../../assets/fonts/Manrope.ttf') });
+  const fontsReady = fontsLoaded || !!fontError;
+  const reducedMotion = useReducedMotion();
   const navigationTheme = {
     ...DefaultTheme,
     dark,
@@ -82,14 +89,14 @@ function RootNavigator() {
   };
 
   useEffect(() => {
-    if (!sessionReady || !themeReady) return;
+    if (!sessionReady || !themeReady || !fontsReady) return;
     if (Platform.OS !== 'web') void SplashScreen.hideAsync();
     if (typeof document !== 'undefined') {
       document.documentElement.removeAttribute('data-session-booting');
       document.documentElement.removeAttribute('data-theme-booting');
       document.getElementById('session-boot')?.remove();
     }
-  }, [sessionReady, themeReady]);
+  }, [sessionReady, themeReady, fontsReady]);
 
   useEffect(() => {
     if (
@@ -102,7 +109,7 @@ function RootNavigator() {
     router.replace('/profile-setup' as Href);
   }, [pathname, sessionReady, user]);
 
-  if (loading || !themeReady) {
+  if (loading || !themeReady || !fontsReady) {
     return (
       <View
         accessibilityLabel="Загрузка приложения"
@@ -112,17 +119,17 @@ function RootNavigator() {
           minHeight: '100%',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.brand,
+          backgroundColor: brandIdentity.blue,
           gap: spacing.x4,
           padding: spacing.x6,
         }}
       >
-        <BrandGlyph size={76} color={colors.brandInk} pinColor={colors.brand} />
-        <Text selectable style={{ ...typography.pageTitle, color: colors.brandInk, textAlign: 'center' }}>
+        <BrandGlyph size={76} />
+        <Text selectable style={{ ...typography.pageTitle, color: brandIdentity.white, textAlign: 'center' }}>
           Такси Грахово
         </Text>
-        <ActivityIndicator color={colors.brandInk} size="small" />
-        <Text selectable style={{ ...typography.caption, color: colors.brandInkSecondary, textAlign: 'center' }}>
+        <ActivityIndicator color={brandIdentity.white} size="small" />
+        <Text selectable style={{ ...typography.caption, color: '#DBE5FF', textAlign: 'center' }}>
           Загружаем приложение…
         </Text>
       </View>
@@ -131,8 +138,8 @@ function RootNavigator() {
 
   if (user?.blockedAt && pathname !== '/vk') {
     return (
-      <ThemeProvider key={colorScheme} value={navigationTheme}>
-        <StatusBar style="dark" />
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style={dark ? 'light' : 'dark'} />
         <BlockedAccountScreen />
       </ThemeProvider>
     );
@@ -142,11 +149,11 @@ function RootNavigator() {
   const isAdmin = user?.roles.includes('admin') ?? false;
 
   return (
-    <ThemeProvider key={colorScheme} value={navigationTheme}>
+    <ThemeProvider value={navigationTheme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
-        key={`${colorScheme}:${user?.id ?? 'signed-out'}`}
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
+        key={user?.id ?? 'signed-out'}
+        screenOptions={{ headerShown: false, animation: reducedMotion ? 'none' : 'slide_from_right', contentStyle: { backgroundColor: colors.canvas } }}
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="privacy" />
@@ -173,7 +180,7 @@ function RootNavigator() {
               sheetAllowedDetents: [0.78, 1],
               sheetInitialDetentIndex: 'last',
               sheetGrabberVisible: true,
-              sheetCornerRadius: 30,
+              sheetCornerRadius: radius.sheet,
             }}
           />
           <Stack.Screen
@@ -183,7 +190,7 @@ function RootNavigator() {
               sheetAllowedDetents: [0.58, 1],
               sheetInitialDetentIndex: 0,
               sheetGrabberVisible: true,
-              sheetCornerRadius: 30,
+              sheetCornerRadius: radius.sheet,
             }}
           />
           <Stack.Screen
@@ -193,7 +200,7 @@ function RootNavigator() {
               sheetAllowedDetents: [0.72, 1],
               sheetInitialDetentIndex: 'last',
               sheetGrabberVisible: true,
-              sheetCornerRadius: 30,
+              sheetCornerRadius: radius.sheet,
             }}
           />
           <Stack.Screen name="orders" />

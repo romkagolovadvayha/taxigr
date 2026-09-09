@@ -9,8 +9,9 @@ import {
   rideWaitingPriceMinor,
   rideWaitingSeconds,
 } from '@/domain/waiting';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function WaitingBreakdown({
   ride,
@@ -19,6 +20,7 @@ export function WaitingBreakdown({
   ride: RideOrder;
   compact?: boolean;
 }) {
+  const colors = useThemeColors();
   const [now, setNow] = useState(0);
   const active = Boolean(ride.waitingStartedAt);
 

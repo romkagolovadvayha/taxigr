@@ -13,7 +13,8 @@ import {
   formatRoutePointCount,
   routeDestinationTitle,
 } from '@/domain/route-label';
-import { colors, componentSizing, layout, radius, spacing, typography } from '@/theme/tokens';
+import { componentSizing, layout, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   pickup: Address | null;
@@ -38,6 +39,7 @@ function AddressActionVisual({
   color: string;
   reduced: boolean;
 }) {
+  const colors = useThemeColors();
   const scale = reduced ? addressActionSizing.visualScale : 1;
   const visualSize = addressActionSizing.touchTarget * scale;
 
@@ -83,6 +85,7 @@ function AddressRow({
   onAddDestination?: () => void;
   reducedActions: boolean;
 }) {
+  const colors = useThemeColors();
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
   const addDestinationAction = kind === 'destination' && !!address && !!onAddDestination;
   const routeDestinations = destinations ?? [];
@@ -288,6 +291,7 @@ export function AddressFields({
   compact = false,
   reducedActions = false,
 }: Props) {
+  const colors = useThemeColors();
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       router.prefetch('/address-search');

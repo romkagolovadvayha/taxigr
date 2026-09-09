@@ -1,6 +1,7 @@
 import { View, type DimensionValue } from 'react-native';
 
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   width: DimensionValue;
@@ -12,9 +13,10 @@ type Props = {
 export function SkeletonBlock({
   width,
   height,
-  color = colors.surfaceSecondary,
+  color: customColor,
   opacity = 1,
 }: Props) {
+  const colors = useThemeColors();
   return (
     <View
       accessible={false}
@@ -24,7 +26,7 @@ export function SkeletonBlock({
         width,
         height,
         borderRadius: Math.min(radius.sm, height / 2),
-        backgroundColor: color,
+        backgroundColor: customColor ?? colors.surfaceSecondary,
         opacity,
       }}
     />

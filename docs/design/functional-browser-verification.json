@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-09T03:28:30.014Z",
+  "mode": "Real HTTP API + MySQL + sockets; isolated synthetic users; browser API transport redirected to port 4112; no mocked API responses",
+  "checks": [
+    "Chat: passenger sends message through actual API; driver receives via socket",
+    "Chat: driver reply arrives without refreshing passenger screen",
+    "Chat: attachment picker opens and returns focus",
+    "Plate fits viewport 320",
+    "Plate fits viewport 360",
+    "Plate fits viewport 390",
+    "Active ride: readable real plate and contact actions at 320, 360, 390 px",
+    "Admin places: create and persist through API",
+    "Admin places: filtering"
+  ],
+  "runtimeErrors": [
+    {
+      "role": "passenger",
+      "error": "Failed to parse coverage response https://api-maps.yandex.ru/services/coverage/v2?l=map&ll=51.95842%2C56.04757999999336&z=14&lang=ru_RU: The user aborted a request."
+    }
+  ],
+  "externalMapAborts": [
+    {
+      "role": "passenger",
+      "error": "Failed to parse coverage response https://api-maps.yandex.ru/services/coverage/v2?l=map&ll=51.95842%2C56.04757999999336&z=14&lang=ru_RU: The user aborted a request."
+    }
+  ]
+}

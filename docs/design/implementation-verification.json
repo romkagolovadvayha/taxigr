@@ -1,0 +1,1907 @@
+{
+  "checks": [
+    "driver: accept, arrive, wait, start and finish demo ride",
+    "driver: submit rating",
+    "driver: profile vehicle form",
+    "admin: tariff and priority settings save in demo",
+    "admin: application moderation in demo",
+    "admin: place editor opens, edits and closes"
+  ],
+  "runtimeErrors": [],
+  "networkFailures": [
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "yastatic.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "yastatic.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "yastatic.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "log.api-maps.yandex.ru",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "yastatic.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "yastatic.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "core-renderer-tiles.maps.yandex.net",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "host": "localhost",
+      "error": "net::ERR_ABORTED"
+    }
+  ],
+  "views": [
+    {
+      "role": "passenger",
+      "path": "/",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders/ride-history-1",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/profile",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/personal-data",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/settings",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/driver-application",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/stops",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/order-confirmation",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/address-search?field=pickup",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/profile",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips/ride-history-1",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/earnings",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/support",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders/ride-history-1",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers/demo-driver",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers/demo-passenger",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/applications",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/places",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "width": 360,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders/ride-history-1",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/profile",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/personal-data",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/settings",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/driver-application",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/stops",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/order-confirmation",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/address-search?field=pickup",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/profile",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips/ride-history-1",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/earnings",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/support",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders/ride-history-1",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers/demo-driver",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers/demo-passenger",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/applications",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/places",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "role": "passenger",
+      "path": "/",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders/ride-history-1",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/profile",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/personal-data",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/settings",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/driver-application",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/stops",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/order-confirmation",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/address-search?field=pickup",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/profile",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips/ride-history-1",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/earnings",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/support",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders/ride-history-1",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers/demo-driver",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers/demo-passenger",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/applications",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/places",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "width": 360,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/orders/ride-history-1",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/profile",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/personal-data",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/settings",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/driver-application",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/stops",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/order-confirmation",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "passenger",
+      "path": "/address-search?field=pickup",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/profile",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/trips/ride-history-1",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/earnings",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "driver",
+      "path": "/driver/support",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/orders/ride-history-1",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/drivers/demo-driver",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/passengers/demo-passenger",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/applications",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/places",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "role": "admin",
+      "path": "/admin/settings",
+      "width": 1440,
+      "theme": "dark"
+    }
+  ]
+}

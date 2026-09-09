@@ -2,7 +2,8 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { SurfaceCard } from '@/components/ui/surface-card';
 import type { AdminActivityPoint } from '@/domain/models';
-import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
+import { layout, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   points: AdminActivityPoint[];
@@ -11,6 +12,7 @@ type Props = {
 const shortDate = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' });
 
 export function AdminActivityChart({ points }: Props) {
+  const colors = useThemeColors();
   const visiblePoints = points.slice(-14);
   const maximum = Math.max(
     1,

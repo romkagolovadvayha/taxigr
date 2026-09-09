@@ -5,14 +5,16 @@ import { useSession } from '@/auth/session-provider';
 import { VkLogo } from '@/components/auth/vk-logo';
 import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import {
   closePreparedExternalAuthWindow,
   openExternalAuthUrl,
   prepareExternalAuthWindow,
 } from '@/utils/open-external-auth';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function VkCommunityPromptHost() {
+  const colors = useThemeColors();
   const { user, vkCommunityPromptUrl, dismissVkCommunityPrompt } = useSession();
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);

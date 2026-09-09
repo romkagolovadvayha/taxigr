@@ -11,9 +11,10 @@ import {
   searchPriceIncreaseSlotAt,
   SEARCH_PRICE_INCREASE_MINOR,
 } from '@/domain/search-price-increase';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { useRide } from '@/state/ride-provider';
 import { formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   ride: RideOrder;
@@ -22,6 +23,7 @@ type Props = {
 };
 
 function SearchPriceIncreasePrompt({ ride, onConfirm, busy }: Required<Props>) {
+  const colors = useThemeColors();
   const [now, setNow] = useState(() => Date.now());
   const [dismissedOfferKey, setDismissedOfferKey] = useState<string | null>(null);
   const intervalMinutes = ride.searchPriceIncreaseIntervalMinutes ?? 4;

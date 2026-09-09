@@ -12,9 +12,11 @@ import type { RideOrderSummary } from '@/domain/models';
 import { formatRouteAddresses } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function AdminOrdersScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const {
     adminOrders: orders,

@@ -10,9 +10,11 @@ import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function PersonalDataScreen() {
+  const colors = useThemeColors();
   const { user, updateProfile } = useSession();
   const [name, setName] = useState(user?.name ?? '');
   const [gender, setGender] = useState<ProfileGender | null>(user?.gender ?? null);

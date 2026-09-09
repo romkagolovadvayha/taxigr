@@ -7,11 +7,13 @@ import { SurfaceCard } from '@/components/ui/surface-card';
 import {
   defaultGatewaySettings, type GatewaySettingsView, type TelegramWebhookStatus,
 } from '@/domain/gateway';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 const endpoint = '/v1/admin/gateway-settings';
 
 export function GatewaySettingsCard({ token, demo }: { token: string | null; demo: boolean }) {
+  const colors = useThemeColors();
   const [settings, setSettings] = useState<GatewaySettingsView>(defaultGatewaySettings);
   const [proxyPassword, setProxyPassword] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');

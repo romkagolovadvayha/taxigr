@@ -15,7 +15,8 @@ import { useSession } from '@/auth/session-provider';
 import { IconButton } from '@/components/ui/icon-button';
 import type { RideChatMessage, RideChatParticipant } from '@/domain/models';
 import { formatRideChatTime } from '@/domain/ride-chat';
-import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type RideChatImageSource = {
   uri: string;
@@ -38,6 +39,7 @@ export function RideChatAvatar({
   participant: RideChatParticipant;
   size?: number;
 }) {
+  const colors = useThemeColors();
   const fallback = (
     <View
       accessible
@@ -98,6 +100,7 @@ function RideChatImagePreview({
   senderName: string;
   onClose: () => void;
 }) {
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 4 / 3;
@@ -196,6 +199,7 @@ export function RideChatMessageRow({
   own?: boolean;
   adminView?: boolean;
 }) {
+  const colors = useThemeColors();
   const { token } = useSession();
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const emphasized = adminView ? message.sender.role === 'driver' : own;

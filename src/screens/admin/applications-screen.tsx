@@ -13,8 +13,9 @@ import type {
   DriverApplicationStatus,
   VehicleChangeRequest,
 } from '@/domain/models';
-import { breakpoints, colors, radius, spacing, typography } from '@/theme/tokens';
+import { breakpoints, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 const statusLabels: Record<DriverApplicationStatus, string> = {
   draft: 'Черновик',
@@ -57,6 +58,7 @@ type ModerationAction = {
 } | null;
 
 export function ApplicationsScreen() {
+  const colors = useThemeColors();
   const { width } = useWindowDimensions();
   const { token } = useSession();
   const demo = token?.startsWith('demo:') ?? false;

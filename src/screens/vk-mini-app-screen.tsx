@@ -10,7 +10,7 @@ import { AppModal } from '@/components/ui/app-modal';
 import { Screen } from '@/components/ui/screen';
 import { BlockedAccountScreen } from '@/screens/blocked-account-screen';
 import { OrderScreen } from '@/screens/passenger/order-screen';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import {
   allowVkCommunityMessages,
   getVkMiniAppLaunchParams,
@@ -19,8 +19,10 @@ import {
   requestVkMiniAppProfile,
   type VkMiniAppProfileIdentity,
 } from '@/vk-mini-app/bridge';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function VkMiniAppScreen() {
+  const colors = useThemeColors();
   const {
     user,
     token,

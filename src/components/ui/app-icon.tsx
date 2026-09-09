@@ -2,7 +2,8 @@ import { Image } from 'expo-image';
 import { Paperclip, Send } from 'lucide-react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-import { colors } from '@/theme/tokens';
+
+import { useThemeColors } from '@/theme/theme-provider';
 
 const carPng = require('../../../assets/vehicles/driver-map-car.png');
 
@@ -51,10 +52,12 @@ type Props = {
 export function AppIcon({
   name,
   size = 24,
-  color = colors.ink,
+  color: customColor,
   strokeWidth = 2,
   filled = false,
 }: Props) {
+  const colors = useThemeColors();
+  const color = customColor ?? colors.ink;
   if (name === 'car') {
     return (
       <Image
@@ -76,7 +79,6 @@ export function AppIcon({
         color={color}
         strokeWidth={2}
         absoluteStrokeWidth
-        accessible={false}
         aria-hidden
       />
     );

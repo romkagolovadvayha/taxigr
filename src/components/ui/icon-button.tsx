@@ -3,7 +3,8 @@ import type { View } from 'react-native';
 
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { colors, radius, shadows } from '@/theme/tokens';
+import { radius, shadows } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   icon: AppIconName;
@@ -18,6 +19,7 @@ export const IconButton = forwardRef<View, Props>(function IconButton(
   { icon, label, onPress, selected, disabled = false, size = 48 },
   ref,
 ) {
+  const colors = useThemeColors();
   return (
     <AnimatedPressable
       ref={ref}
@@ -40,7 +42,7 @@ export const IconButton = forwardRef<View, Props>(function IconButton(
         ...shadows.subtle,
       })}
     >
-      <AppIcon name={icon} color={colors.ink} size={22} />
+      <AppIcon name={icon} color={selected ? colors.brandInk : colors.ink} size={22} />
     </AnimatedPressable>
   );
 });

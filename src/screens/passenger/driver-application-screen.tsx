@@ -14,7 +14,8 @@ import { VehicleColorPicker } from '@/components/vehicle/vehicle-color-picker';
 import type { DriverApplication } from '@/domain/models';
 import { currentDriverLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Form = {
   applicantName: string;
@@ -39,6 +40,7 @@ const fields: { key: keyof Form; label: string; keyboard?: 'default' | 'phone-pa
 ];
 
 export function DriverApplicationScreen() {
+  const colors = useThemeColors();
   const { token, user, refreshSession } = useSession();
   const [values, setValues] = useState<Form>({
     applicantName: user?.name ?? '',

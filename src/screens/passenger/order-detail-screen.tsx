@@ -21,10 +21,12 @@ import { formatMultiStopRouteAddresses } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { formatWaitingDuration } from '@/domain/waiting';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrderDetailScreen() {
+  const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token } = useSession();
   const { currentRide } = useRide();

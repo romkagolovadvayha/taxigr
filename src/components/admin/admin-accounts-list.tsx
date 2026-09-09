@@ -9,8 +9,9 @@ import { StatusChip } from '@/components/ui/status-chip';
 import { driverPriorityScopeLabels, driverPriorityScopes } from '@/domain/driver-priority';
 import type { AdminAccountSummary } from '@/domain/models';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors, opacity, radius, spacing, typography } from '@/theme/tokens';
+import { opacity, radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Filter = 'all' | 'available' | 'blocked';
 
@@ -31,6 +32,7 @@ const driverStatusLabels: Record<NonNullable<AdminAccountSummary['driverStatus']
 };
 
 export function AdminAccountsList({ kind, title, subtitle, items, loading, error }: Props) {
+  const colors = useThemeColors();
   const { isDesktop } = useResponsiveLayout();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');

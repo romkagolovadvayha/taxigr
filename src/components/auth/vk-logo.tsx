@@ -6,8 +6,7 @@ export function VkLogo({ size = 26, color = '#FFFFFF' }: { size?: number; color?
       width={size}
       height={size}
       viewBox="8 8 33 33"
-      accessibilityLabel="VK"
-      accessibilityElementsHidden
+      aria-hidden
     >
       <Path
         fill={color}

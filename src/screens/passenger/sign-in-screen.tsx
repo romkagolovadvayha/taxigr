@@ -19,7 +19,7 @@ import { Screen } from '@/components/ui/screen';
 import type { DemoPersona } from '@/domain/models';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatRetryAfter } from '@/utils/format';
 import {
   closePreparedExternalAuthWindow,
@@ -32,6 +32,7 @@ import {
   isCompleteRussianMobilePhone,
   russianPhoneE164,
 } from '@/utils/phone';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type AuthAction = 'max' | 'telegram' | 'vk' | 'sms' | 'code' | null;
 
@@ -40,6 +41,7 @@ const TELEGRAM_BRAND_COLOR = '#229ED9';
 const VK_BRAND_COLOR = '#0077FF';
 
 export function SignInScreen() {
+  const colors = useThemeColors();
   const { isPhone } = useResponsiveLayout();
   const {
     demoMode,

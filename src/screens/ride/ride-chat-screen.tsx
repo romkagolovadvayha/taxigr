@@ -30,8 +30,9 @@ import type { RideChatMessage } from '@/domain/models';
 import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
 import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
 import { useRide } from '@/state/ride-provider';
-import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { base64ByteLength, imageResizeToFit } from '@/utils/image-data';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type SelectedChatImage = RideChatImageUpload & {
   uri: string;
@@ -93,6 +94,7 @@ async function optimizePickedImage(
 }
 
 export function RideChatScreen() {
+  const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useSession();
   const insets = useSafeAreaInsets();

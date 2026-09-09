@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
@@ -22,8 +22,9 @@ import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-locatio
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-tracking';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { radius, shadows, spacing, typography } from '@/theme/tokens';
 import { formatEstimatedArrivalTime } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 function PassengerNav({ vertical = false }: { vertical?: boolean }) {
   return (
@@ -40,7 +41,8 @@ function PassengerNav({ vertical = false }: { vertical?: boolean }) {
   );
 }
 
-function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }) {
+function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinutes?: number | null; showTitle?: boolean }) {
+  const colors = useThemeColors();
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
@@ -89,7 +91,8 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
   }
 
   return (
-    <View style={{ gap: spacing.x2 }}>
+    <View style={{ gap: spacing.x3 }}>
+      {showTitle && <Text accessibilityRole="header" style={{ ...typography.sectionTitle, color: colors.ink }}>Куда поедем?</Text>}
       <AddressFields
         pickup={pickup}
         destinations={destinations}
@@ -134,6 +137,7 @@ function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null }
 }
 
 export function OrderScreen() {
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { isPhone, isDesktop } = useResponsiveLayout();
   const [bookingPanelHeight, setBookingPanelHeight] = useState(0);
@@ -279,9 +283,9 @@ export function OrderScreen() {
           <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Куда поедем?
           </Text>
-          <View style={{ flex: 1 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.x4 }} keyboardShouldPersistTaps="handled">
             <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
-          </View>
+          </ScrollView>
         </View>
         <View style={{ flex: 1 }}>{map}</View>
       </View>
@@ -334,6 +338,7 @@ export function OrderScreen() {
         }
         style={{
           position: 'absolute',
+          maxHeight: '82%',
           left: 0,
           right: 0,
           bottom: 0,
@@ -346,7 +351,9 @@ export function OrderScreen() {
           ...shadows.floating,
         }}
       >
-        <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
+        <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} showTitle />
+        </ScrollView>
       </DraggableSheet>
     </View>
   );

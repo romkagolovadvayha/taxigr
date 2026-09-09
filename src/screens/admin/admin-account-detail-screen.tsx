@@ -33,8 +33,9 @@ import type {
 } from '@/domain/models';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors, opacity, radius, spacing, typography } from '@/theme/tokens';
+import { opacity, radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Detail = AdminPassengerDetail | AdminDriverDetail;
 type Section = 'overview' | 'orders' | 'ratings' | 'data';
@@ -165,6 +166,7 @@ function demoDetail(kind: Props['kind']): Detail {
 }
 
 function DetailRows({ rows }: { rows: [string, string | undefined][] }) {
+  const colors = useThemeColors();
   return (
     <View style={{ gap: spacing.x3 }}>
       {rows.map(([label, value]) => (
@@ -178,6 +180,7 @@ function DetailRows({ rows }: { rows: [string, string | undefined][] }) {
 }
 
 function RatingStars({ score }: { score: number }) {
+  const colors = useThemeColors();
   return (
     <View
       accessible
@@ -198,6 +201,7 @@ function RatingStars({ score }: { score: number }) {
 }
 
 export function AdminAccountDetailScreen({ id, kind }: Props) {
+  const colors = useThemeColors();
   const { token } = useSession();
   const { isDesktop } = useResponsiveLayout();
   const demo = token?.startsWith('demo:') ?? false;

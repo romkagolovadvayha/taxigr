@@ -4,7 +4,8 @@ import { Text, View } from 'react-native';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { StarRating } from '@/components/ratings/star-rating';
 import { AppButton } from '@/components/ui/app-button';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   participantRole: 'driver' | 'passenger';
@@ -27,6 +28,7 @@ export function RideRatingCard({
   onSubmit,
   onContinue,
 }: Props) {
+  const colors = useThemeColors();
   const [score, setScore] = useState(submittedScore ?? 0);
 
   if (submittedScore) {

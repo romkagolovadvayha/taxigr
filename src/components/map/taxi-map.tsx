@@ -5,19 +5,22 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { buildNativeMapHtml, serializeNativeMapState } from '@/components/map/native-map-html';
 import type { TaxiMapProps } from '@/components/map/types';
 import { remainingRouteCoordinates } from '@/domain/route-tracking';
-import { useAppTheme } from '@/theme/theme-provider';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
+import { spacing, typography } from '@/theme/tokens';
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
+  const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
+  const [initialColorScheme] = useState(colorScheme);
   const webViewRef = useRef<WebView>(null);
   const [canMountWebView, setCanMountWebView] = useState(false);
   const [ready, setReady] = useState(false);
   const apiKey = process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY;
   const html = useMemo(
-    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, colorScheme) : ''),
-    [apiKey, canMountWebView, colorScheme],
+    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, initialColorScheme) : ''),
+    [apiKey, canMountWebView, initialColorScheme],
   );
+  const source = useMemo(() => ({ html, baseUrl: 'https://taxigr.ru/' }), [html]);
   const state = useMemo(
     () =>
       canMountWebView
@@ -115,7 +118,7 @@ export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   return (
     <WebView
       ref={webViewRef}
-      source={{ html, baseUrl: 'https://taxigr.ru/' }}
+      source={source}
       style={{ flex: 1, backgroundColor: colors.mapFallback }}
       onMessage={onMessage}
       onLoadEnd={pushState}

@@ -1,7 +1,8 @@
 import { Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { colors, spacing, typography } from '@/theme/tokens';
+import { brandIdentity, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   compact?: boolean;
@@ -17,8 +18,8 @@ type BrandGlyphProps = {
 
 export function BrandGlyph({
   size,
-  color = colors.brandInk,
-  pinColor = colors.brand,
+  color = brandIdentity.white,
+  pinColor = brandIdentity.blue,
 }: BrandGlyphProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 32 32">
@@ -44,6 +45,7 @@ export function BrandGlyph({
 }
 
 export function BrandMark({ compact = false, label = 'Такси Грахово', size = 40 }: Props) {
+  const colors = useThemeColors();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
       <View
@@ -51,13 +53,13 @@ export function BrandMark({ compact = false, label = 'Такси Грахово'
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.26),
-          backgroundColor: colors.brand,
+          backgroundColor: brandIdentity.blue,
           alignItems: 'center',
           justifyContent: 'center',
           borderCurve: 'continuous',
         }}
       >
-        <BrandGlyph size={size * 0.74} color={colors.brandInk} />
+        <BrandGlyph size={size * 0.74} color={brandIdentity.white} />
       </View>
       {!compact && (
         <Text

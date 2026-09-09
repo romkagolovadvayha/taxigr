@@ -3,8 +3,9 @@ import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { openPhoneCall } from '@/utils/open-phone-call';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   phone: string;
@@ -27,6 +28,7 @@ export function PhoneCallButton({
   containerStyle,
   buttonStyle,
 }: Props) {
+  const colors = useThemeColors();
   const [calling, setCalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

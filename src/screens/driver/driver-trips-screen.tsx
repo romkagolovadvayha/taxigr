@@ -14,8 +14,9 @@ import { demoDriver, demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
 import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 function statusTone(status: RideOrder['status']): 'success' | 'danger' | 'info' {
   if (status === 'completed') return 'success';
@@ -24,6 +25,7 @@ function statusTone(status: RideOrder['status']): 'success' | 'danger' | 'info' 
 }
 
 export function DriverTripsScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const [orders, setOrders] = useState<RideOrder[]>([]);
   const [loading, setLoading] = useState(true);

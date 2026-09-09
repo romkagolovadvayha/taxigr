@@ -11,7 +11,8 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 const features = [
   {
@@ -39,6 +40,7 @@ const footerLinks = [
 ] as const;
 
 function CommissionVerification({ compact }: { compact: boolean }) {
+  const colors = useThemeColors();
   const sealSize = compact ? 84 : 116;
 
   return (
@@ -187,6 +189,7 @@ function CommissionVerification({ compact }: { compact: boolean }) {
 }
 
 export function PublicLandingScreen() {
+  const colors = useThemeColors();
   const { isPhone, isDesktop } = useResponsiveLayout();
   return (
     <Screen contentStyle={{ maxWidth: 1180, gap: spacing.x10 }}>

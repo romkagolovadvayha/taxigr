@@ -1,7 +1,7 @@
 import type { Address, Coordinates } from '@/domain/models';
 import type { DriverRouteTarget } from '@/domain/ride-state';
 import type { MapViewportInsets } from '@/components/map/types';
-import { motion, type AppColorScheme } from '../../theme/tokens';
+import { darkColors, lightColors, motion, type AppColorScheme } from '../../theme/tokens';
 
 import { driverMarkerPngMarkup } from './driver-marker';
 
@@ -26,28 +26,29 @@ type State = {
 };
 
 export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme = 'light'): string {
-  const initialMapBackground = colorScheme === 'dark' ? '#202522' : '#E9EFE7';
   return `<!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="${colorScheme}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <style>
-    html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:${initialMapBackground}}
-    .marker{width:18px;height:18px;border-radius:999px;border:4px solid white;box-shadow:0 3px 12px rgba(0,0,0,.25);transform:translate(-50%,-50%);background:#181818}
+    html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:var(--map-background)}
+    :root{--ink:${lightColors.ink};--brand:${lightColors.brand};--on-brand:${lightColors.brandInk};--surface:${lightColors.surface};--map-background:${lightColors.mapFallback}}
+    :root[data-theme="dark"]{--ink:${darkColors.ink};--brand:${darkColors.brand};--on-brand:${darkColors.brandInk};--surface:${darkColors.surface};--map-background:${darkColors.mapFallback}}
+    .marker{width:18px;height:18px;border-radius:999px;border:4px solid white;box-shadow:0 3px 12px rgba(0,0,0,.25);transform:translate(-50%,-50%);background:var(--ink)}
     .marker.route-point{position:relative;width:1px;height:1px;border:0;box-shadow:none;transform:none;background:transparent;pointer-events:none}
-    .route-dot{position:absolute;left:0;top:0;width:18px;height:18px;box-sizing:border-box;border:2px solid white;border-radius:999px;background:#181818;box-shadow:0 1px 5px rgba(0,0,0,.24);transform:translate(-50%,-50%) scale(.7778);transition:transform ${motion.duration.quick}ms cubic-bezier(${motion.easing.out.join(',')})}
-    .marker.pickup .route-dot{background:#FFD600}
-    .marker.stop .route-dot{background:white;border-color:#181818}
-    .route-callout{position:absolute;left:0;bottom:15px;transform:translateX(-50%);white-space:nowrap;padding:5px 11px;border-radius:12px;background:white;color:#181818;box-shadow:0 2px 10px rgba(0,0,0,.16);font:650 15px/20px system-ui,-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-.15px}
-    .route-callout.pickup{background:#FFD600}
-    .route-callout.destination{background:#181818;color:white}
-    .route-callout-pointer{position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid white}
-    .route-callout.pickup .route-callout-pointer{border-top-color:#FFD600}
-    .route-callout.destination .route-callout-pointer{border-top-color:#181818}
+    .route-dot{position:absolute;left:0;top:0;width:18px;height:18px;box-sizing:border-box;border:2px solid white;border-radius:999px;background:var(--ink);box-shadow:0 1px 5px rgba(0,0,0,.24);transform:translate(-50%,-50%) scale(.7778);transition:transform ${motion.duration.quick}ms cubic-bezier(${motion.easing.out.join(',')})}
+    .marker.pickup .route-dot{background:var(--brand)}
+    .marker.stop .route-dot{background:var(--surface);border-color:var(--ink)}
+    .route-callout{position:absolute;left:0;bottom:15px;transform:translateX(-50%);white-space:nowrap;padding:5px 11px;border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.16);font:650 15px/20px system-ui,-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-.15px}
+    .route-callout.pickup{background:var(--brand);color:var(--on-brand)}
+    .route-callout.destination{background:var(--ink);color:var(--surface)}
+    .route-callout-pointer{position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--surface)}
+    .route-callout.pickup .route-callout-pointer{border-top-color:var(--brand)}
+    .route-callout.destination .route-callout-pointer{border-top-color:var(--ink)}
     html.close-route-zoom .route-dot{transform:translate(-50%,-50%) scale(1)}
     html.close-route-zoom .route-callout{bottom:17px}
-    .marker.passenger{background:#2684FF}
+    .marker.passenger{background:var(--brand)}
     .marker.driver{width:28px;height:40px;border:0;border-radius:0;box-shadow:none;background:transparent}
     @media (prefers-reduced-motion:reduce){.route-dot,.marker.driver{transition:none!important}}
   </style>
@@ -60,6 +61,8 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
     let entities = [];
     let coordinateSelectionEnabled = false;
     let selectionCenterKey = '';
+    let fittedViewportKey = '';
+    const palettes=${JSON.stringify({light:lightColors,dark:darkColors})};
     const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const apiReady = async () => {
       await ymaps3.ready;
@@ -146,7 +149,8 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
       if(!map) return;
       const colorScheme=state.colorScheme==='dark'?'dark':'light';
       document.documentElement.style.colorScheme=colorScheme;
-      document.body.style.background=colorScheme==='dark'?'#202522':'#E9EFE7';
+      document.documentElement.dataset.theme=colorScheme;
+      document.body.style.background=palettes[colorScheme].mapFallback;
       map.update({theme:colorScheme});
       entities.forEach((entity)=>map.removeChild(entity));
       entities=[];
@@ -211,11 +215,17 @@ export function buildNativeMapHtml(apiKey: string, colorScheme: AppColorScheme =
           geometry:{type:'LineString',coordinates:routeCoordinates.map(
             (point)=>[point.longitude,point.latitude]
           )},
-          style:{simplificationRate:0,zIndex:1000,stroke:[{width:7,color:colorScheme==='dark'?'#31D17E':'#16B96B'}]}
+          style:{simplificationRate:0,zIndex:1000,stroke:[{width:7,color:palettes[colorScheme].route}]}
         }));
+        const viewportKey=JSON.stringify([visibleCoordinates,margin,Boolean(state.followDriver)]);
         if(!state.followDriver){
-          const location=fitRouteLocation(visibleCoordinates,margin);
-          if(location) map.update({margin,location:{...location,duration:reduceMotion?0:${motion.duration.tracking}}});
+          if(viewportKey!==fittedViewportKey){
+            const location=fitRouteLocation(visibleCoordinates,margin);
+            if(location){
+              fittedViewportKey=viewportKey;
+              map.update({margin,location:{...location,duration:reduceMotion?0:${motion.duration.tracking}}});
+            }
+          }
         }
       }
       if(state.driver){

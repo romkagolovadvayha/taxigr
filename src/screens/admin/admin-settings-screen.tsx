@@ -12,7 +12,8 @@ import {
   type DriverDispatchSettings,
 } from '@/domain/driver-priority';
 import { defaultPricingRules, type PricingRules } from '@/domain/pricing';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type EditableKey =
   | 'serviceCommissionBps'
@@ -34,6 +35,7 @@ type EditableKey =
   | 'passengerCancellationBlockHours';
 
 export function AdminSettingsScreen() {
+  const colors = useThemeColors();
   const { token, signOut } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [rules, setRules] = useState<PricingRules>(defaultPricingRules);

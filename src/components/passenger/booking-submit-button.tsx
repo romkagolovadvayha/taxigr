@@ -3,7 +3,8 @@ import { Text, View } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { MoneyValue } from '@/components/ui/money-value';
 import { SkeletonBlock } from '@/components/ui/skeleton-block';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   priceMinor: number;
@@ -24,6 +25,7 @@ export function BookingSubmitButton({
   canRetry = false,
   onPress,
 }: Props) {
+  const colors = useThemeColors();
   const unavailable = disabled || loading;
 
   return (
@@ -47,7 +49,7 @@ export function BookingSubmitButton({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.x5,
-        borderRadius: radius.card,
+        borderRadius: radius.md,
         borderCurve: 'continuous',
         backgroundColor: colors.brand,
         opacity: loading ? 0.78 : disabled ? 0.42 : pressed ? 0.88 : 1,

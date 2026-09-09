@@ -22,8 +22,10 @@ import { formatWaitingDuration } from '@/domain/waiting';
 import { useRideChat } from '@/hooks/use-ride-chat';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
+import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = { id: string };
 
@@ -39,6 +41,7 @@ const paymentLabels: Record<RideOrder['paymentMethod'], string> = {
 };
 
 function DetailRows({ rows }: { rows: [string, string][] }) {
+  const colors = useThemeColors();
   return (
     <View>
       {rows.map(([label, value], index) => (
@@ -77,6 +80,7 @@ function DetailRows({ rows }: { rows: [string, string][] }) {
 }
 
 export function AdminOrderDetailScreen({ id }: Props) {
+  const colors = useThemeColors();
   const { token } = useSession();
   const { isDesktop } = useResponsiveLayout();
   const [loadedOrder, setLoadedOrder] = useState<RideOrder>();
@@ -285,9 +289,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
                   <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                     {order.driver.vehicle.color} {order.driver.vehicle.make} {order.driver.vehicle.model}
                   </Text>
-                  <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-                    Госномер {order.driver.vehicle.plate}
-                  </Text>
+                  <VehiclePlate plate={order.driver.vehicle.plate} />
                 </>
               )}
             </SurfaceCard>

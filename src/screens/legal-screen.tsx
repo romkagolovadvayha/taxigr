@@ -9,7 +9,8 @@ import { Screen } from '@/components/ui/screen';
 import type { LegalSection } from '@/legal/content';
 import { goBackOrReplace } from '@/navigation/back';
 import { operatorDetailsReady } from '@/legal/operator';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   title: string;
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export function LegalScreen({ title, updated, lead, sections, showOperatorWarning = true }: Props) {
+  const colors = useThemeColors();
   return (
     <Screen contentStyle={{ maxWidth: 860 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>

@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "Both tariffs retain visible ETA and selectable centered text",
+    "Stops: keyboard reorder and remove preserve route editing",
+    "Confirmation: transfer payment and 500-character comment",
+    "Settings: theme, sound, vibration persist after reload"
+  ],
+  "errors": [],
+  "Тёмная тема": "true",
+  "Звуки событий": "false",
+  "Вибрация": "false"
+}

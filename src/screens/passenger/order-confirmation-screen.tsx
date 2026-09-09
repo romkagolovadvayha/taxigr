@@ -20,9 +20,11 @@ import {
 import { useSession } from '@/auth/session-provider';
 import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrderConfirmationScreen() {
+  const colors = useThemeColors();
   const {
     pickup,
     destinations,
@@ -141,6 +143,7 @@ export function OrderConfirmationScreen() {
                   key={method}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selectedMethod }}
+                  aria-checked={selectedMethod}
                   onPress={() => setSelectedPaymentMethod(method)}
                   style={{
                     minHeight: 44,

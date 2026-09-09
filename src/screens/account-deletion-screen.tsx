@@ -8,7 +8,8 @@ import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { operatorDetails } from '@/legal/operator';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 const requestSteps = [
   {
@@ -43,6 +44,7 @@ const retainedData = [
 ] as const;
 
 function BulletList({ items }: { items: readonly string[] }) {
+  const colors = useThemeColors();
   return (
     <View style={{ gap: spacing.x2 }}>
       {items.map((item) => (
@@ -60,6 +62,7 @@ function BulletList({ items }: { items: readonly string[] }) {
 }
 
 export function AccountDeletionScreen() {
+  const colors = useThemeColors();
   const subject = 'Удаление аккаунта — Такси Грахово';
   const body = [
     'Здравствуйте!',
@@ -95,7 +98,7 @@ export function AccountDeletionScreen() {
           backgroundColor: colors.brandSoft,
         }}
       >
-        <Text selectable style={{ ...typography.caption, color: colors.brandInkSecondary }}>
+        <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
           ТАКСИ ГРАХОВО · УПРАВЛЕНИЕ ДАННЫМИ
         </Text>
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>

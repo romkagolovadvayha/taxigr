@@ -27,7 +27,8 @@ import {
   type PlaceSocialLink,
   type Weekday,
 } from '@/domain/models';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type PlaceDraft = {
   name: string;
@@ -183,6 +184,7 @@ function Field({
   multiline?: boolean;
   keyboardType?: 'default' | 'decimal-pad' | 'url' | 'phone-pad';
 }) {
+  const colors = useThemeColors();
   return (
     <View style={{ gap: spacing.x2, flex: 1, minWidth: 220 }}>
       <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
@@ -220,6 +222,7 @@ function CategoryButton({
   selected: boolean;
   onPress: () => void;
 }) {
+  const colors = useThemeColors();
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -242,6 +245,7 @@ function CategoryButton({
 }
 
 export function PlacesScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const [places, setPlaces] = useState<PlaceDirectoryEntry[]>([]);
   const [query, setQuery] = useState('');

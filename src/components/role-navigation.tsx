@@ -7,7 +7,8 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { isNavItemActive } from '@/domain/role-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export type NavItem = {
   href: string;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function RoleNavigation({ items, title }: Props) {
+  const colors = useThemeColors();
   const pathname = usePathname();
   const { isDesktop } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
@@ -82,7 +84,7 @@ export function RoleNavigation({ items, title }: Props) {
                     <AppIcon
                       name={item.icon}
                       size={20}
-                      color={active ? colors.ink : colors.inkSecondary}
+                      color={active ? colors.infoText : colors.inkSecondary}
                       strokeWidth={active ? 2.35 : 2}
                     />
                   </View>
@@ -91,7 +93,7 @@ export function RoleNavigation({ items, title }: Props) {
                     maxFontSizeMultiplier={1.15}
                     style={{
                       ...typography.micro,
-                      color: active ? colors.ink : colors.inkSecondary,
+                      color: active ? colors.infoText : colors.inkSecondary,
                       fontSize: 10,
                       lineHeight: 12,
                       textAlign: 'center',
@@ -139,12 +141,12 @@ export function RoleNavigation({ items, title }: Props) {
                   gap: spacing.x3,
                   paddingHorizontal: spacing.x3,
                   borderRadius: radius.md,
-                  backgroundColor: active ? colors.canvas : colors.transparent,
+                  backgroundColor: active ? colors.brandSoft : colors.transparent,
                   opacity: pressed ? 0.65 : 1,
                 })}
               >
-                <AppIcon name={item.icon} color={active ? colors.ink : colors.inkSecondary} />
-                <Text style={{ ...typography.bodyStrong, color: active ? colors.ink : colors.inkSecondary }}>{item.label}</Text>
+                <AppIcon name={item.icon} color={active ? colors.infoText : colors.inkSecondary} />
+                <Text style={{ ...typography.bodyStrong, color: active ? colors.infoText : colors.inkSecondary }}>{item.label}</Text>
               </AnimatedPressable>
             </Link>
           );

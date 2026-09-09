@@ -4,7 +4,8 @@ import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { useRide } from '@/state/ride-provider';
-import { colors } from '@/theme/tokens';
+
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   orderId: string;
@@ -23,6 +24,7 @@ export function RideChatButton({
   fullWidth = true,
   style,
 }: Props) {
+  const colors = useThemeColors();
   const { chatUnreadCounts } = useRide();
   const unreadCount = chatUnreadCounts[orderId] ?? 0;
   const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount);

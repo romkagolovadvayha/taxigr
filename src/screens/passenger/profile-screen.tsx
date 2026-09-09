@@ -12,9 +12,10 @@ import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { formatRussianPhone } from '@/utils/phone';
 import { detectAvatarMimeType } from '@/utils/avatar';
+import { useThemeColors } from '@/theme/theme-provider';
 
 function MenuRow({
   icon,
@@ -27,6 +28,7 @@ function MenuRow({
   subtitle?: string;
   onPress: () => void;
 }) {
+  const colors = useThemeColors();
   return (
     <AnimatedPressable
       feedback="subtle"
@@ -63,6 +65,7 @@ function MenuRow({
 }
 
 export function ProfileScreen() {
+  const colors = useThemeColors();
   const {
     user,
     signOut,

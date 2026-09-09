@@ -9,10 +9,12 @@ import { demoAdminMetrics } from '@/data/demo';
 import type { AdminMetrics } from '@/domain/models';
 import { formatRouteLabel } from '@/domain/route-label';
 import { useRide } from '@/state/ride-provider';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function AdminDashboardScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const { adminOrders: orders, loadAdminOrders } = useRide();
   const [metrics, setMetrics] = useState<AdminMetrics>({

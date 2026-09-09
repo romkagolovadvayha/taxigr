@@ -8,9 +8,11 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import { operatorDetails } from '@/legal/operator';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function DriverSupportScreen() {
+  const colors = useThemeColors();
   const [message, setMessage] = useState<string | null>(null);
   const supportPhoneAvailable = operatorDetails.phone !== 'не указан';
 

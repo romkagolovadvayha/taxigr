@@ -1,7 +1,8 @@
 import { Text, View } from 'react-native';
 
 import { AppIcon } from '@/components/ui/app-icon';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   rating: number;
@@ -14,6 +15,7 @@ function formatRating(value: number): string {
 }
 
 export function RatingBadge({ rating, count, compact = false }: Props) {
+  const colors = useThemeColors();
   const countLabel = count != null && count > 0 ? `, ${count} оценок` : '';
   return (
     <View

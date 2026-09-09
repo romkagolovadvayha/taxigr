@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors, spacing } from '@/theme/tokens';
+import { spacing } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   children: ReactNode;
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function Screen({ children, scroll = true, style, contentStyle }: Props) {
+  const colors = useThemeColors();
   const { contentInset } = useResponsiveLayout();
   const baseContent: ViewStyle = {
     width: '100%',

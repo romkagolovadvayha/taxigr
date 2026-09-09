@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { View, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing } from '@/theme/tokens';
+import { radius, spacing } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   children: ReactNode;
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function SurfaceCard({ children, style, muted = false }: Props) {
+  const colors = useThemeColors();
   return (
     <View
       style={[

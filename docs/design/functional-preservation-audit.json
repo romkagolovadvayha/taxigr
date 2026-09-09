@@ -1,0 +1,80 @@
+{
+  "date": "2026-09-09T03:26:38.470Z",
+  "baseline": "eaeb0ac40b990f8571d9a9c869cccf06741bc313",
+  "method": "TypeScript AST: callback, navigation, form/state, visibility and selectable attributes; all existing src and server files compared to HEAD. Cosmetic props excluded. Reports syntactic changes for manual review; not a runtime proof.",
+  "counts": {
+    "routeFiles": 44,
+    "screenModules": 34,
+    "sourceFiles": 222,
+    "existingBindings": 967,
+    "unchangedBindings": 964
+  },
+  "missingFiles": [],
+  "backendChanges": [],
+  "changes": [
+    {
+      "file": "src/components/passenger/active-ride-panel.tsx",
+      "removed": [
+        "selectable:true"
+      ],
+      "added": [],
+      "routeDelta": {
+        "removed": [],
+        "added": []
+      }
+    },
+    {
+      "file": "src/components/passenger/tariff-selector.tsx",
+      "removed": [
+        "selectable:true"
+      ],
+      "added": [
+        "onLayout:{(event) => setWidth(event.nativeEvent.layout.width)}",
+        "onSelect:{onSelect}"
+      ],
+      "routeDelta": {
+        "removed": [],
+        "added": []
+      }
+    },
+    {
+      "file": "src/screens/admin/admin-order-detail-screen.tsx",
+      "removed": [
+        "selectable:true"
+      ],
+      "added": [],
+      "routeDelta": {
+        "removed": [],
+        "added": []
+      }
+    }
+  ],
+  "screenLogic": {
+    "method": "Named screen functions compared after replacing JSX with a placeholder and removing only useThemeColors variable declarations. Handler JSX expressions separately compared in binding audit.",
+    "functions": 73,
+    "unchanged": 72,
+    "changed": [
+      {
+        "file": "src/screens/passenger/order-screen.tsx",
+        "name": "BookingPanel",
+        "before": "function BookingPanel({ pickupEtaMinutes }: { pickupEtaMinutes?: number | null; }) { const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation(); const { pickup, destinations, destination, tariffs, selectedTariff, currentRide, setSelectedTariff, cancelRide, rateRide, resetRide, quoteStatus, requestQuote, busy, error, } = useRide(); const selected = tariffs.find((item) => item.code === selectedTariff)!; const routeIsPrecise = isPickupAddressComplete(pickup) && destinations.length > 0 && destinations.every(isDestinationAddressComplete); const routeAddressesSelected = !!pickup && !!destination; const quotePending = routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading'); const quoteReady = routeIsPrecise && quoteStatus === 'ready'; if (currentRide) { return (__PRESENTATION__); } return (__PRESENTATION__); }",
+        "after": "function BookingPanel({ pickupEtaMinutes, showTitle = false }: { pickupEtaMinutes?: number | null; showTitle?: boolean; }) { const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation(); const { pickup, destinations, destination, tariffs, selectedTariff, currentRide, setSelectedTariff, cancelRide, rateRide, resetRide, quoteStatus, requestQuote, busy, error, } = useRide(); const selected = tariffs.find((item) => item.code === selectedTariff)!; const routeIsPrecise = isPickupAddressComplete(pickup) && destinations.length > 0 && destinations.every(isDestinationAddressComplete); const routeAddressesSelected = !!pickup && !!destination; const quotePending = routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading'); const quoteReady = routeIsPrecise && quoteStatus === 'ready'; if (currentRide) { return (__PRESENTATION__); } return (__PRESENTATION__); }"
+      }
+    ]
+  },
+  "manualReview": [
+    {
+      "files": [
+        "src/components/passenger/active-ride-panel.tsx",
+        "src/screens/admin/admin-order-detail-screen.tsx"
+      ],
+      "result": "Plate Text moved to shared VehiclePlate; selectable restored on main plate and region."
+    },
+    {
+      "files": [
+        "src/components/passenger/tariff-selector.tsx"
+      ],
+      "result": "Two title branches compact/full consolidated into one; title/subtitle selectable, ETA visible for both tariffs; onSelect forwarded to new TariffOption and selection handler unchanged."
+    }
+  ]
+}

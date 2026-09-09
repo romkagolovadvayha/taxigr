@@ -10,7 +10,8 @@ import { Screen } from '@/components/ui/screen';
 import { legalDocuments } from '@/legal/documents';
 import { operatorDetails, operatorDetailsReady } from '@/legal/operator';
 import { goBackOrReplace } from '@/navigation/back';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 const groups = [
   {
@@ -30,6 +31,7 @@ const groups = [
 ];
 
 export function LegalHubScreen() {
+  const colors = useThemeColors();
   return (
     <Screen contentStyle={{ maxWidth: 920 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>

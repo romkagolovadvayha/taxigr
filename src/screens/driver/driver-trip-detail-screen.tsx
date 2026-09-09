@@ -16,10 +16,12 @@ import type { RideOrder } from '@/domain/models';
 import { formatMultiStopRouteAddresses } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { rideStatusLabel } from '@/domain/ride-state';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function DriverTripDetailScreen() {
+  const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token } = useSession();
   const [order, setOrder] = useState<RideOrder | null>(

@@ -3,9 +3,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/ui/app-icon';
 import { useSession } from '@/auth/session-provider';
-import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
+import { layout, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function BlockedAccountScreen() {
+  const colors = useThemeColors();
   const { user } = useSession();
   const insets = useSafeAreaInsets();
 

@@ -3,7 +3,8 @@ import { View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
-import { colors, spacing } from '@/theme/tokens';
+import { spacing } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   value: number;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function StarRating({ value, onChange, disabled = false, size = 31 }: Props) {
+  const colors = useThemeColors();
   return (
     <View
       accessibilityRole="radiogroup"

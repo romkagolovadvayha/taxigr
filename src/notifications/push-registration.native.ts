@@ -25,7 +25,7 @@ async function configureAndroidChannels(): Promise<void> {
       importance,
       sound,
       vibrationPattern: [0, 250, 180, 250],
-      lightColor: '#FFD600',
+      lightColor: '#315DD5',
     })));
 }
 

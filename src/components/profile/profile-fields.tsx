@@ -1,7 +1,8 @@
 import { Text, TextInput, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export type ProfileGender = 'male' | 'female';
 
@@ -18,6 +19,7 @@ export function ProfileFields({
   onGenderChange: (value: ProfileGender) => void;
   editable?: boolean;
 }) {
+  const colors = useThemeColors();
   return (
     <View style={{ gap: spacing.x4 }}>
       <View style={{ gap: spacing.x2 }}>

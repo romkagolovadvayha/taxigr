@@ -3,7 +3,8 @@ import { View } from 'react-native';
 
 import { RoleNavigation, type NavItem } from '@/components/role-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { colors } from '@/theme/tokens';
+
+import { useThemeColors } from '@/theme/theme-provider';
 
 const items: NavItem[] = [
   { href: '/admin', label: 'Сводка', icon: 'earnings' },
@@ -16,6 +17,7 @@ const items: NavItem[] = [
 ];
 
 export default function AdminLayout() {
+  const colors = useThemeColors();
   const { isDesktop } = useResponsiveLayout();
   return (
     <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column', backgroundColor: colors.canvas }}>

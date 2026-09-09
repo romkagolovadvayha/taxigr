@@ -20,8 +20,8 @@ import { syncPushRegistration } from '@/notifications/push-registration';
 import { goBackOrReplace } from '@/navigation/back';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
-import { useAppTheme } from '@/theme/theme-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
+import { radius, spacing, typography } from '@/theme/tokens';
 
 type MessengerProvider = 'vk' | 'max' | 'telegram';
 
@@ -63,6 +63,7 @@ function SettingToggle({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const colors = useThemeColors();
   return (
     <View style={{ minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.x4 }}>
       <View style={{ flex: 1 }}>
@@ -82,6 +83,7 @@ function SettingToggle({
 }
 
 export function SettingsScreen() {
+  const colors = useThemeColors();
   const [push, setPush] = useState(false);
   const [pushChanging, setPushChanging] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);

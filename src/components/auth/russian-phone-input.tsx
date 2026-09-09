@@ -4,7 +4,8 @@ import {
   formatRussianNationalPhone,
   russianNationalPhoneDigits,
 } from '@/utils/phone';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   value: string;
@@ -19,6 +20,7 @@ export function RussianPhoneInput({
   editable = true,
   onSubmit,
 }: Props) {
+  const colors = useThemeColors();
   const digits = russianNationalPhoneDigits(value);
   const hasInvalidMobilePrefix = digits.length > 0 && !digits.startsWith('9');
 

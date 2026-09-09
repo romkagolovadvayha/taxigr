@@ -1,0 +1,64 @@
+{
+  "date": "2026-09-09",
+  "checks": [
+    "Original plate value and accessible name preserved",
+    "Separate region, RUS and flag rendered",
+    "White physical plate in dark theme",
+    "Ride, profile, application and admin cards use the same component",
+    "Two- and three-digit regions supported",
+    "Live input preview and safe unformatted fallback"
+  ],
+  "layouts": [
+    {
+      "width": 360,
+      "overflow": false,
+      "phones": [
+        true,
+        true,
+        true
+      ],
+      "plateWidth": 156.984375
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "phones": [
+        true,
+        true,
+        true
+      ],
+      "plateWidth": 156.984375
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "phones": [
+        true,
+        true,
+        true
+      ],
+      "plateWidth": 156.984375
+    },
+    {
+      "width": 1100,
+      "overflow": false,
+      "phones": [
+        true,
+        true,
+        true
+      ],
+      "plateWidth": 156.984375
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "phones": [
+        true,
+        true,
+        true
+      ],
+      "plateWidth": 156.984375
+    }
+  ],
+  "errors": []
+}

@@ -14,7 +14,9 @@ import { VehicleColorPicker } from '@/components/vehicle/vehicle-color-picker';
 import { VehicleIllustration } from '@/components/vehicle/vehicle-illustration';
 import { demoDriver } from '@/data/demo';
 import type { VehicleChangeRequest } from '@/domain/models';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type DriverProfile = {
   id: string;
@@ -71,6 +73,7 @@ function formFromProfile(profile: DriverProfile): VehicleForm {
 }
 
 export function DriverProfileScreen() {
+  const colors = useThemeColors();
   const { token, user, signOut } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [profile, setProfile] = useState<DriverProfile | null>(demo ? demoProfile : null);
@@ -319,8 +322,9 @@ export function DriverProfileScreen() {
               {[activeProfile.color, activeProfile.make, activeProfile.model].filter(Boolean).join(' ')}
             </Text>
             <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-              {[activeProfile.year, activeProfile.plate].filter(Boolean).join(' · ')}
+              {activeProfile.year}
             </Text>
+            {!!activeProfile.plate && <VehiclePlate plate={activeProfile.plate} />}
           </View>
         </View>
         <StatusChip

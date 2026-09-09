@@ -20,7 +20,8 @@ import type { Address } from '@/domain/models';
 import { routeDestinationTitle } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
-import { colors, layout, opacity, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { layout, opacity, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type StopRowProps = {
   address: Address;
@@ -39,6 +40,7 @@ function StopRow({
   onRemove,
   onReorder,
 }: StopRowProps) {
+  const colors = useThemeColors();
   const translationY = useSharedValue(0);
   const active = useSharedValue(false);
   const final = index === count - 1;
@@ -207,6 +209,7 @@ function StopRow({
 }
 
 export function StopsScreen() {
+  const colors = useThemeColors();
   const { destinations, removeDestination, reorderDestinations } = useRide();
   const canAdd = destinations.length < 5;
 

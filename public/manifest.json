@@ -9,8 +9,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#FFD600",
-  "background_color": "#F4F4F2",
+  "theme_color": "#315DD5",
+  "background_color": "#F3F5FA",
   "categories": ["travel", "transportation"],
   "icons": [
     {

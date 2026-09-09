@@ -36,9 +36,10 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 import { openYandexNavigatorRoute } from '@/utils/open-yandex-navigator';
+import { useThemeColors } from '@/theme/theme-provider';
 
 function DriverOrderCard({
   demo,
@@ -53,6 +54,7 @@ function DriverOrderCard({
   navigationLoading: boolean;
   navigationOrigin?: Coordinates | null;
 }) {
+  const colors = useThemeColors();
   const [navigatorBusy, setNavigatorBusy] = useState(false);
   const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
@@ -778,6 +780,7 @@ function DriverOrderCard({
 }
 
 export function DriverHomeScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [online, setOnline] = useState<boolean | null>(demo ? true : null);

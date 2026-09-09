@@ -36,7 +36,8 @@ import { confirmAddressPoint } from '@/domain/route-stops';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
-import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 function addressKey(address: Address): string {
   return `${address.placeId ?? address.label.toLocaleLowerCase('ru')}:${address.houseNumber?.toLocaleLowerCase('ru') ?? 'place'}:${address.coordinates.latitude.toFixed(5)}:${address.coordinates.longitude.toFixed(5)}`;
@@ -110,6 +111,7 @@ function historyMeta(item: DestinationHistoryItem): string {
 }
 
 function SectionTitle({ children }: { children: string }) {
+  const colors = useThemeColors();
   return (
     <Text
       selectable
@@ -141,6 +143,7 @@ function AddressResult({
   now: Date;
   onPress: () => void;
 }) {
+  const colors = useThemeColors();
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
   const displayLines = formatAddressSuggestionLines(address);
@@ -277,6 +280,7 @@ function AddressResult({
 }
 
 export function AddressSearchScreen() {
+  const colors = useThemeColors();
   const { field, initialQuery, destinationIndex, append } = useLocalSearchParams<{
     field?: 'pickup' | 'destination';
     initialQuery?: string | string[];
@@ -578,7 +582,7 @@ export function AddressSearchScreen() {
               opacity: pressed ? 0.72 : 1,
             })}
           >
-            <AppIcon name="search" color={canSearchRemote ? colors.ink : colors.inkMuted} />
+            <AppIcon name="search" color={canSearchRemote ? colors.brandInk : colors.inkMuted} />
           </AnimatedPressable>
         )}
       </View>

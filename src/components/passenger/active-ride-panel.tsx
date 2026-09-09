@@ -17,7 +17,9 @@ import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
 import { formatMultiStopRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   ride: RideOrder;
@@ -29,6 +31,7 @@ type Props = {
 };
 
 function SearchElapsedBadge({ startedAt }: { startedAt: string }) {
+  const colors = useThemeColors();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -83,39 +86,6 @@ function rideHeadline(ride: RideOrder, pickupEtaMinutes?: number | null): string
   return 'Поездка отменена';
 }
 
-function VehiclePlate({ plate }: { plate: string }) {
-  return (
-    <View
-      accessible
-      accessibilityLabel={`Государственный номер ${plate}`}
-      style={{
-        alignSelf: 'flex-start',
-        minHeight: 34,
-        justifyContent: 'center',
-        paddingHorizontal: spacing.x2,
-        borderWidth: 1.5,
-        borderColor: colors.vehiclePlateInk,
-        borderRadius: radius.sm,
-        backgroundColor: colors.vehiclePlateSurface,
-      }}
-    >
-      <Text
-        selectable
-        style={{
-          fontSize: 18,
-          lineHeight: 22,
-          fontWeight: '600',
-          letterSpacing: 1.1,
-          color: colors.vehiclePlateInk,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {plate.toLocaleUpperCase('ru-RU')}
-      </Text>
-    </View>
-  );
-}
-
 export function ActiveRidePanel({
   ride,
   pickupEtaMinutes,
@@ -124,6 +94,7 @@ export function ActiveRidePanel({
   onRate,
   busy = false,
 }: Props) {
+  const colors = useThemeColors();
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
   const terminal = ride.status === 'completed' || ride.status === 'cancelled';
   const cancellable = !terminal && ride.status !== 'in_progress';

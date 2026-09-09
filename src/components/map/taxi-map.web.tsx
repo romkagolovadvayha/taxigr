@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { MapViewportInsets, TaxiMapProps } from '@/components/map/types';
@@ -19,8 +19,8 @@ import {
   type YandexMapEntity,
 } from '@/components/map/yandex-map-loader';
 import { grahovoCenter } from '@/data/demo';
-import { useAppTheme } from '@/theme/theme-provider';
-import { colors, motion, spacing, typography } from '@/theme/tokens';
+import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
+import { motion, spacing, typography, type ColorPalette } from '@/theme/tokens';
 
 type MapMargin = [number, number, number, number];
 
@@ -51,6 +51,7 @@ function setRoutePointZoom(element: HTMLDivElement, zoom: number): void {
 }
 
 function routePointElement(
+  colors: ColorPalette,
   kind: 'pickup' | 'stop' | 'destination',
   calloutLabel: string | undefined,
   zoom: number,
@@ -79,8 +80,8 @@ function routePointElement(
   dot.style.height = `${ROUTE_POINT_BASE_SIZE}px`;
   dot.style.borderRadius = '999px';
   dot.style.background =
-    kind === 'pickup' ? colors.brand : kind === 'stop' ? colors.surface : colors.brandInk;
-  dot.style.border = kind === 'stop' ? `2px solid ${colors.brandInk}` : '2px solid white';
+    kind === 'pickup' ? colors.brand : kind === 'stop' ? colors.surface : colors.ink;
+  dot.style.border = kind === 'stop' ? `2px solid ${colors.ink}` : '2px solid white';
   dot.style.boxSizing = 'border-box';
   dot.style.boxShadow = '0 1px 5px rgba(0,0,0,.24)';
   dot.style.transform = 'translate(-50%, -50%)';
@@ -91,7 +92,7 @@ function routePointElement(
 
   if (calloutLabel) {
     const background =
-      kind === 'pickup' ? colors.brand : kind === 'destination' ? colors.brandInk : colors.surface;
+      kind === 'pickup' ? colors.brand : kind === 'destination' ? colors.ink : colors.surface;
     const callout = document.createElement('div');
     callout.dataset.routeCallout = 'true';
     callout.textContent = calloutLabel;
@@ -102,9 +103,9 @@ function routePointElement(
     callout.style.padding = '5px 11px';
     callout.style.borderRadius = '12px';
     callout.style.background = background;
-    callout.style.color = kind === 'destination' ? '#FFFFFF' : colors.ink;
+    callout.style.color = kind === 'destination' ? colors.surface : kind === 'pickup' ? colors.brandInk : colors.ink;
     callout.style.boxShadow = '0 2px 10px rgba(0,0,0,.16)';
-    callout.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+    callout.style.fontFamily = 'Manrope, system-ui, sans-serif';
     callout.style.fontSize = '15px';
     callout.style.fontWeight = '650';
     callout.style.lineHeight = '20px';
@@ -130,6 +131,7 @@ function routePointElement(
 }
 
 function markerElement(
+  colors: ColorPalette,
   kind: 'driver' | 'passenger',
   heading?: number | null,
   navigationMode = false,
@@ -181,7 +183,13 @@ export const TaxiMap = memo(function TaxiMap({
   selectionCenter,
   onCoordinateSelect,
 }: TaxiMapProps) {
+  const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
+  const [initialColorScheme] = useState(colorScheme);
+  const onReady = useEffectEvent(() => onMapReady?.());
+  const onError = useEffectEvent((message: string) => onMapError?.(message));
+  const fittedViewportRef = useRef('');
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YandexMap | null>(null);
   const staticEntitiesRef = useRef<YandexMapEntity[]>([]);
@@ -217,7 +225,7 @@ export const TaxiMap = memo(function TaxiMap({
               center: [grahovoCenter.longitude, grahovoCenter.latitude],
               zoom: 14,
             },
-            theme: colorScheme,
+            theme: initialColorScheme,
             zoomRange: { min: 6, max: 17 },
             showScaleInCopyrights: true,
           },
@@ -238,12 +246,12 @@ export const TaxiMap = memo(function TaxiMap({
           }),
         );
         setMapReady(true);
-        onMapReady?.();
+        onReady();
       })
       .catch((reason: unknown) => {
         const message = reason instanceof Error ? reason.message : 'Карта недоступна';
-        setError(message);
-        onMapError?.(message);
+        if (active) setError(message);
+        if (active) onError(message);
       });
 
     return () => {
@@ -258,7 +266,9 @@ export const TaxiMap = memo(function TaxiMap({
       routePointElementsRef.current = [];
       setMapReady(false);
     };
-  }, [colorScheme, onMapError, onMapReady]);
+  }, [initialColorScheme]);
+
+  useEffect(() => { mapRef.current?.update({ theme: colorScheme }); }, [colorScheme, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -290,6 +300,7 @@ export const TaxiMap = memo(function TaxiMap({
 
     if (pickup && pickupMarkerCoordinates) {
       const pickupElement = routePointElement(
+        colors,
         'pickup',
         pickupEtaMinutes ? `Старт · ${pickupEtaMinutes} мин` : 'Старт',
         zoomRef.current,
@@ -319,6 +330,7 @@ export const TaxiMap = memo(function TaxiMap({
         ? destinationMarkerCoordinates
         : item.coordinates;
       const destinationElement = routePointElement(
+        colors,
         final ? 'destination' : 'stop',
         routeDestinationMapLabel(
           index,
@@ -363,7 +375,8 @@ export const TaxiMap = memo(function TaxiMap({
           }),
         );
       }
-      if (!followDriver) {
+      const viewportKey = JSON.stringify([visibleCoordinates, margin, followDriver]);
+      if (!followDriver && fittedViewportRef.current !== viewportKey) {
         const container = containerRef.current;
         const location = container
           ? fitRouteLocation(
@@ -374,6 +387,7 @@ export const TaxiMap = memo(function TaxiMap({
             )
           : null;
         if (location) {
+          fittedViewportRef.current = viewportKey;
           map.update({
             margin,
             location: { ...location, duration: reduceMotion ? 0 : motion.duration.tracking },
@@ -382,7 +396,7 @@ export const TaxiMap = memo(function TaxiMap({
       }
     }
   }, [
-    colorScheme,
+    colors,
     destination,
     destinationArrivalLabel,
     destinations,
@@ -407,7 +421,7 @@ export const TaxiMap = memo(function TaxiMap({
       if (driverMarkerRef.current) {
         driverMarkerRef.current.update({ coordinates });
       } else {
-        const element = markerElement('driver', driverHeading, navigationMode);
+        const element = markerElement(colors, 'driver', driverHeading, navigationMode);
         const marker = new api.YMapMarker({ coordinates, zIndex: 1200 }, element);
         map.addChild(marker);
         driverMarkerRef.current = marker;
@@ -458,7 +472,7 @@ export const TaxiMap = memo(function TaxiMap({
       } else {
         const marker = new api.YMapMarker(
           { coordinates, zIndex: 32 },
-          markerElement('passenger'),
+          markerElement(colors, 'passenger'),
         );
         map.addChild(marker);
         passengerMarkerRef.current = marker;
@@ -468,6 +482,7 @@ export const TaxiMap = memo(function TaxiMap({
       passengerMarkerRef.current = null;
     }
   }, [
+    colors,
     destinationArrivalLabel,
     driver,
     driverHeading,

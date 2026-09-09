@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-09",
+  "checks": [
+    "Stop add/remove/reorder, maximum five, recalculated fare",
+    "Manual address, house number and point confirmation",
+    "Payment, comment, required first consent, search and price increase",
+    "Driver arrival, trip, paid waiting, all stops, payment, rating and next-order promotion",
+    "Chat escaping and admin read-only transcript",
+    "Profile persistence, settings, theme and reduced motion",
+    "Driver application, required consents, rejection reason, resubmission and approval",
+    "Vehicle change remains pending until moderation",
+    "Account blocking, passenger screen, unblock, order restriction, rating deletion and driver priorities",
+    "Place creation and visibility linked to passenger search",
+    "Pricing and gateway settings remain local",
+    "Admin order cancellation requires a reason",
+    "SMS demo validation and first-profile screen"
+  ],
+  "errors": [],
+  "externalRequests": [],
+  "scope": "Local interactive prototype; no API, native or integration parity claimed",
+  "screenCount": 52,
+  "sourceModuleCount": 34,
+  "missingModules": [],
+  "layouts": [
+    {
+      "theme": "light",
+      "width": 360,
+      "screens": 52,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "screens": 52,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "screens": 52,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "screens": 52,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "screens": 52,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "screens": 52,
+      "noOverflow": true
+    }
+  ],
+  "actionCoverage": {
+    "renderedActions": 67,
+    "unhandledActions": []
+  },
+  "additionalChecks": [
+    "Deep links open the requested screen",
+    "One additional Grahovo stop changes fare from 150 to 240 RUB",
+    "Screenshots captured after transitions settled"
+  ]
+}

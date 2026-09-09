@@ -11,12 +11,14 @@ import {
 
 import { readStoredColorScheme, writeStoredColorScheme } from '@/theme/theme-storage';
 import {
-  applyColorScheme,
-  colors,
+  darkColors,
+  lightColors,
   type AppColorScheme,
+  type ColorPalette,
 } from '@/theme/tokens';
 
 type AppThemeContextValue = {
+  colors: ColorPalette;
   colorScheme: AppColorScheme;
   dark: boolean;
   ready: boolean;
@@ -26,7 +28,7 @@ type AppThemeContextValue = {
 const AppThemeContext = createContext<AppThemeContextValue | null>(null);
 
 function applyPlatformTheme(colorScheme: AppColorScheme): void {
-  applyColorScheme(colorScheme);
+  const colors = colorScheme === 'dark' ? darkColors : lightColors;
 
   if (process.env.EXPO_OS === 'web' && typeof document !== 'undefined') {
     document.documentElement.dataset.appTheme = colorScheme;
@@ -42,8 +44,6 @@ function applyPlatformTheme(colorScheme: AppColorScheme): void {
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [colorScheme, setColorScheme] = useState<AppColorScheme>('light');
   const [ready, setReady] = useState(false);
-
-  applyColorScheme(colorScheme);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +72,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppThemeContextValue>(
     () => ({
+      colors: colorScheme === 'dark' ? darkColors : lightColors,
       colorScheme,
       dark: colorScheme === 'dark',
       ready,
@@ -87,4 +88,9 @@ export function useAppTheme(): AppThemeContextValue {
   const value = useContext(AppThemeContext);
   if (!value) throw new Error('useAppTheme must be used inside AppThemeProvider');
   return value;
+}
+
+// The root error boundary can render before the provider is available.
+export function useThemeColors(): ColorPalette {
+  return useContext(AppThemeContext)?.colors ?? lightColors;
 }

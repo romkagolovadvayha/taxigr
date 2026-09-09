@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from 'react-native-reanimated';
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -11,7 +12,8 @@ import {
 } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
-import { colors, layout, radius, spacing, typography } from '@/theme/tokens';
+import { layout, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   visible: boolean;
@@ -34,6 +36,8 @@ export function AppModal({
   returnFocusRef,
   initialFocusRef,
 }: Props) {
+  const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const dialogRef = useRef<View>(null);
   const wasVisible = useRef(false);
   const previousWebFocus = useRef<FocusableWebNode | null>(null);
@@ -107,7 +111,7 @@ export function AppModal({
 
   return (
     <Modal
-      animationType="fade"
+      animationType={reducedMotion ? 'none' : 'fade'}
       accessibilityLabel={Platform.OS === 'web' ? title : undefined}
       transparent
       visible={visible}

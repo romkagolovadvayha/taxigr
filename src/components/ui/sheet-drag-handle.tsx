@@ -21,7 +21,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { colors, motion, radius, spacing, typography } from '@/theme/tokens';
+import { motion, radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   children: ReactNode;
@@ -50,6 +51,7 @@ export function DraggableSheet({
   onLayout,
   style,
 }: Props) {
+  const colors = useThemeColors();
   const translationY = useSharedValue(0);
   const canToggle = enabled && (!expanded || Boolean(onCollapse));
   const toggle = useCallback(() => {

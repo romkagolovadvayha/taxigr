@@ -23,7 +23,7 @@
       "versionCode": 23,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#FFD600",
+        "backgroundColor": "#315DD5",
         "foregroundImage": "./assets/brand/android-foreground.png",
         "monochromeImage": "./assets/brand/android-monochrome.png"
       },
@@ -46,8 +46,8 @@
       "name": "Такси Грахово",
       "shortName": "Такси Грахово",
       "display": "standalone",
-      "themeColor": "#FFD600",
-      "backgroundColor": "#F4F4F2",
+      "themeColor": "#315DD5",
+      "backgroundColor": "#F3F5FA",
       "startUrl": "/",
       "scope": "/"
     },
@@ -84,7 +84,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFD600",
+          "backgroundColor": "#315DD5",
           "image": "./assets/brand/splash-icon.png",
           "imageWidth": 112
         }
@@ -110,7 +110,7 @@
         "expo-notifications",
         {
           "icon": "./assets/brand/android-monochrome.png",
-          "color": "#FFD600",
+          "color": "#315DD5",
           "defaultChannel": "ride-taxi-found-v2",
           "sounds": [
             "./assets/sounds/taxi_found.wav",

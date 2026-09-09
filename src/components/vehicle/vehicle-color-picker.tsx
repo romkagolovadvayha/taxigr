@@ -8,7 +8,8 @@ import {
   normalizeVehicleColorHex,
   vehicleColorOptions,
 } from '@/domain/vehicle-colors';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   name: string;
@@ -23,6 +24,7 @@ export function VehicleColorPicker({
   onChange,
   label = 'Цвет автомобиля',
 }: Props) {
+  const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const selectedPopular = useMemo(
     () =>

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Variant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'call';
 
@@ -48,6 +49,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
   },
   ref,
 ) {
+  const colors = useThemeColors();
   const backgrounds: Record<Variant, string> = {
     primary: colors.brand,
     secondary: colors.surfaceSecondary,
@@ -86,7 +88,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
           minHeight: compact ? 48 : 56,
           width: fullWidth ? '100%' : undefined,
           paddingHorizontal: compact ? spacing.x3 : spacing.x6,
-          borderRadius: radius.lg,
+          borderRadius: radius.md,
           borderCurve: 'continuous',
           backgroundColor:
             variant === 'call'
@@ -116,7 +118,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
             style={{
               ...(compact ? typography.caption : typography.bodyStrong),
               color: resolvedForeground,
-              fontWeight: '700',
+              fontWeight: '600',
             }}
           >
             {children}
@@ -128,7 +130,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
           style={{
             ...(compact ? typography.caption : typography.bodyStrong),
             color: resolvedForeground,
-            fontWeight: '700',
+            fontWeight: '600',
           }}
         >
           {children}

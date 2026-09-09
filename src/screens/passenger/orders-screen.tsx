@@ -13,10 +13,12 @@ import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrdersScreen() {
+  const colors = useThemeColors();
   const {
     orders,
     passengerOrdersHasMore,

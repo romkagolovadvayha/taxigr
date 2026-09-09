@@ -1,0 +1,268 @@
+{
+  "date": "2026-09-09",
+  "browser": "Headless Chrome",
+  "checks": [
+    "Local Manrope loaded",
+    "Tariff selection and keyboard navigation update price",
+    "Address filtering, empty state and selection",
+    "Confirmation, searching, assigned and reset states",
+    "All four ride stages",
+    "Driver acceptance, reset, online/offline",
+    "Demo chat text is safe; Escape dismisses modal",
+    "Admin order filters",
+    "System reduced motion removes transitions",
+    "Both themes",
+    "No page overflow at 360,390,768,1100,1440"
+  ],
+  "errors": [],
+  "externalNetworkRequests": [],
+  "layouts": [
+    {
+      "width": 360,
+      "overflow": false,
+      "phones": [
+        {
+          "height": 782,
+          "scroll": 782
+        },
+        {
+          "height": 782,
+          "scroll": 782
+        },
+        {
+          "height": 782,
+          "scroll": 782
+        }
+      ],
+      "driverOffer": {
+        "height": 395,
+        "scroll": 395
+      }
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "phones": [
+        {
+          "height": 782,
+          "scroll": 782
+        },
+        {
+          "height": 782,
+          "scroll": 782
+        },
+        {
+          "height": 782,
+          "scroll": 782
+        }
+      ],
+      "driverOffer": {
+        "height": 395,
+        "scroll": 395
+      }
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "phones": [
+        {
+          "height": 760,
+          "scroll": 760
+        },
+        {
+          "height": 760,
+          "scroll": 760
+        },
+        {
+          "height": 760,
+          "scroll": 760
+        }
+      ],
+      "driverOffer": {
+        "height": 375,
+        "scroll": 382
+      }
+    },
+    {
+      "width": 1100,
+      "overflow": false,
+      "phones": [
+        {
+          "height": 756,
+          "scroll": 756
+        },
+        {
+          "height": 756,
+          "scroll": 756
+        },
+        {
+          "height": 756,
+          "scroll": 756
+        }
+      ],
+      "driverOffer": {
+        "height": 371,
+        "scroll": 380
+      }
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "phones": [
+        {
+          "height": 756,
+          "scroll": 756
+        },
+        {
+          "height": 756,
+          "scroll": 756
+        },
+        {
+          "height": 756,
+          "scroll": 756
+        }
+      ],
+      "driverOffer": {
+        "height": 371,
+        "scroll": 380
+      }
+    }
+  ],
+  "applicationBaseline": {
+    "typecheck": "passed",
+    "testsPassed": 326,
+    "testsSkipped": 33,
+    "testFilesPassed": 79,
+    "testFilesSkipped": 1,
+    "nativePerformance": "not measured",
+    "apiIntegration": "not run"
+  },
+  "designRevision": {
+    "name": "Quiet Motion — blue",
+    "brandLight": "#315DD5",
+    "brandDark": "#A6BDFF",
+    "originalLogoGeometryPreserved": true,
+    "logoColors": [
+      "#315DD5",
+      "#FFFFFF"
+    ],
+    "wordmarks": "Такси Грахово",
+    "previewsCapturedAfterThemeTransitions": true
+  },
+  "tariffIllustrations": {
+    "date": "2026-09-09",
+    "images": [
+      {
+        "src": "assets/tariff-economy.webp",
+        "loaded": true,
+        "decorative": true,
+        "width": 96,
+        "height": 64
+      },
+      {
+        "src": "assets/tariff-child.webp",
+        "loaded": true,
+        "decorative": true,
+        "width": 84,
+        "height": 56
+      }
+    ],
+    "payloadBytes": 35130,
+    "checks": [
+      "Both illustration assets decoded",
+      "Accessible radio names preserved",
+      "Pointer and keyboard selection update the price",
+      "Both themes fit five viewport widths",
+      "Reduced Motion removes image and checkmark transitions"
+    ],
+    "layouts": [
+      {
+        "theme": "light",
+        "width": 360,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "light",
+        "width": 390,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "light",
+        "width": 768,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "light",
+        "width": 1100,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "light",
+        "width": 1440,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "dark",
+        "width": 360,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "dark",
+        "width": 390,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "dark",
+        "width": 768,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "dark",
+        "width": 1100,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      },
+      {
+        "theme": "dark",
+        "width": 1440,
+        "overflow": false,
+        "phoneFits": true,
+        "tariffFits": true,
+        "ctaVisible": true
+      }
+    ],
+    "errors": [],
+    "externalNetworkRequests": []
+  },
+  "extendedPrototype": {
+    "verification": "full-flow-verification.json",
+    "coverage": "functional-coverage.md",
+    "note": "Prior checks above describe the earlier overview prototype. Current expanded flows are checked in the linked report."
+  }
+}

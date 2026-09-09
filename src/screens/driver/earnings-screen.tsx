@@ -11,8 +11,9 @@ import { Screen } from '@/components/ui/screen';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import { demoEarnings } from '@/data/demo';
 import type { EarningsSummary } from '@/domain/models';
-import { colors, spacing, typography } from '@/theme/tokens';
+import { spacing, typography } from '@/theme/tokens';
 import { formatDuration } from '@/utils/format';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type EarningsPeriod = EarningsSummary['period'];
 
@@ -36,6 +37,7 @@ function demoEarningsForPeriod(period: EarningsPeriod): EarningsSummary {
 }
 
 export function EarningsScreen() {
+  const colors = useThemeColors();
   const { token } = useSession();
   const [period, setPeriod] = useState<EarningsPeriod>('today');
   const [earnings, setEarnings] = useState<EarningsSummary>({

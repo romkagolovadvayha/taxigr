@@ -91,7 +91,7 @@ export async function syncDriverBackgroundLocation(
     foregroundService: {
       notificationTitle: 'Такси Грахово — водитель на линии',
       notificationBody: 'Геопозиция передаётся только пока вы принимаете заказы',
-      notificationColor: '#FFD600',
+      notificationColor: '#315DD5',
       killServiceOnDestroy: false,
     },
   });

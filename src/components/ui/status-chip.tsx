@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
 
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function StatusChip({ label, tone = 'neutral' }: Props) {
+  const colors = useThemeColors();
   const toneColors: Record<Tone, { bg: string; fg: string }> = {
     neutral: { bg: colors.surfaceSecondary, fg: colors.inkSecondary },
     success: { bg: colors.successSoft, fg: colors.successText },

@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 
-import { colors, radius } from '@/theme/tokens';
+import { radius } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
-const vehiclePhoto = require('../../../assets/tariffs/economy-car.png');
+const vehiclePhoto = require('../../../assets/tariffs/economy-car.webp');
 
 type Props = {
   colorHex?: string | null;
@@ -17,6 +18,7 @@ export function VehicleIllustration({
   height = 48,
   framed = false,
 }: Props) {
+  const colors = useThemeColors();
   const illustration = (
     <Image
       source={vehiclePhoto}

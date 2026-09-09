@@ -5,7 +5,8 @@ import Svg, { Path } from 'react-native-svg';
 
 import { AppIcon } from '@/components/ui/app-icon';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { colors, radius, spacing, typography } from '@/theme/tokens';
+import { radius, spacing, typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/theme-provider';
 
 type ConsentLink = {
   label: string;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function ConsentCheckbox({ checked, onChange, label, links, compactLinks = false }: Props) {
+  const colors = useThemeColors();
   const handleChange = () => {
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.selectionAsync();
