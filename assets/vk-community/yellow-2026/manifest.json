@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2026-09-09T14:07:49.342Z",
+  "files": [
+    {
+      "file": "cover-desktop.jpg",
+      "width": 1920,
+      "height": 768,
+      "aiGenerated": true
+    },
+    {
+      "file": "cover-mobile.jpg",
+      "width": 1080,
+      "height": 1920,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-welcome.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-how.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-tariffs.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-support.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-drivers.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "post-safety.jpg",
+      "width": 1200,
+      "height": 1200,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-order.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-how.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-tariffs.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-support.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-safety.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "menu-drivers.jpg",
+      "width": 752,
+      "height": 512,
+      "aiGenerated": true
+    },
+    {
+      "file": "avatar.png",
+      "width": 512,
+      "height": 512,
+      "source": "Existing approved TaxiGR brand mark"
+    },
+    {
+      "file": "cover-desktop-safe.jpg",
+      "width": 1920,
+      "height": 768,
+      "aiGenerated": true
+    }
+  ]
+}

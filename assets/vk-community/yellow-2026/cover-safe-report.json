@@ -1,0 +1,20 @@
+{
+  "preparedAt": "2026-09-09T16:07:47.241Z",
+  "community": "https://vk.ru/taxigr",
+  "file": "cover-desktop-safe.jpg",
+  "width": 1920,
+  "height": 768,
+  "bytes": 504015,
+  "sha256": "e725f8f780d95f635e53882fc0a659878947006bb57dfaaff5c342f18c9a37a0",
+  "liveUpdate": "NOT_APPLIED",
+  "reason": "Browser site-safety policy blocks access to vk.ru/taxigr. No permission prompt or Auto-review was attempted. No API workaround was used.",
+  "desktopPreview": {
+    "top": 129,
+    "left": 0,
+    "width": 1920,
+    "height": 639
+  },
+  "layoutReference": "https://ohvat.top/vk-cover-size",
+  "evidence": "Published cover layout reference, consistent with the crop boundary in the user-provided VK editor screenshot. Local crop preview only; live VK display not verified.",
+  "originalLiveArtworkPreserved": "cover-desktop.jpg"
+}

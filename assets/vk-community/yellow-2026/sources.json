@@ -1,0 +1,78 @@
+{
+  "images": [
+    {
+      "key": "cover-desktop",
+      "source": "sources/cover-desktop.png",
+      "file": "cover-desktop.jpg",
+      "width": 1920,
+      "height": 768,
+      "generationId": "exec-e972367c-f47b-4e3d-8028-616dc30e71e3"
+    },
+    {
+      "key": "cover-mobile",
+      "source": "sources/cover-mobile.png",
+      "file": "cover-mobile.jpg",
+      "width": 1080,
+      "height": 1920,
+      "generationId": "exec-8e3b7a77-8306-404c-bf70-f62faa2b1fbf"
+    },
+    {
+      "key": "post-welcome",
+      "source": "sources/post-welcome.png",
+      "file": "post-welcome.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-ce296725-4b8e-4a9e-8234-2944e00dd9f9"
+    },
+    {
+      "key": "post-how",
+      "source": "sources/post-how.png",
+      "file": "post-how.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-01198267-46cc-425b-aee9-cf064ee645e7"
+    },
+    {
+      "key": "post-tariffs",
+      "source": "sources/post-tariffs.png",
+      "file": "post-tariffs.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-be89fd71-a9b9-44f3-8dbb-d02b3bf79863"
+    },
+    {
+      "key": "post-support",
+      "source": "sources/post-support.png",
+      "file": "post-support.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-7479c372-413b-4edc-9a0a-9abfc3c0124b"
+    },
+    {
+      "key": "post-drivers",
+      "source": "sources/post-drivers.png",
+      "file": "post-drivers.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-f5825662-2a25-4b15-a869-d6efe5b7228d"
+    },
+    {
+      "key": "post-safety",
+      "source": "sources/post-safety.png",
+      "file": "post-safety.jpg",
+      "width": 1200,
+      "height": 1200,
+      "generationId": "exec-29674dce-423a-433b-9d8d-5a6215c49274"
+    },
+    {
+      "key": "cover-desktop-safe",
+      "source": "sources/cover-desktop-safe.png",
+      "file": "cover-desktop-safe.jpg",
+      "width": 1920,
+      "height": 768,
+      "generationId": "exec-1486b9a3-b323-455d-960f-85e4ab0d825f"
+    }
+  ],
+  "menuAtlas": "sources/menu-atlas.png",
+  "menuAtlasGenerationId": "exec-929632d8-625b-4a8d-b684-4a74313ca9fd"
+}

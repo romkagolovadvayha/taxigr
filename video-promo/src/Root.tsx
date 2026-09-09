@@ -7,8 +7,10 @@ import {TripScene} from './scenes/TripScene';
 import {LocationPermissionDemo} from './LocationPermissionDemo';
 import {TaxiGrahovoPromoPortrait} from './PortraitPromo';
 import {TaxiGrahovoFastPortrait} from './FastPortraitPromo';
+import {TaxiGrahovoSignature} from './SignaturePromo';
 
 export const Root: React.FC = () => <>
+  <Composition id="TaxiGrahovoSignature" component={TaxiGrahovoSignature} durationInFrames={1920} fps={60} width={1080} height={1920} defaultProps={{voiceover:true}}/>
   <Folder name="Taxi-Grahovo-Scenes">
     <Composition id="PromoIntro" component={IntroScene} durationInFrames={120} fps={30} width={1920} height={1080}/>
     <Composition id="PromoTrip" component={TripScene} durationInFrames={210} fps={30} width={1920} height={1080}/>

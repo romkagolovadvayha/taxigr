@@ -1,0 +1,64 @@
+{
+  "checkedAt": "2026-09-09T16:35:21.989Z",
+  "file": "taxigr-signature-1080x1920-60fps.mp4",
+  "sha256": "76bab900f4428b9d0ceee29ae85ad29fe23b0c9ac6672765174aa0ddb8a4e113",
+  "format": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "index": 0,
+        "codec_name": "h264",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "r_frame_rate": "60/1",
+        "duration": "32.000000",
+        "nb_frames": "1920"
+      },
+      {
+        "index": 1,
+        "codec_name": "aac",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0",
+        "duration": "32.000000",
+        "nb_frames": "1501"
+      }
+    ],
+    "format": {
+      "duration": "32.000000",
+      "size": "6154567"
+    }
+  },
+  "loudness": {
+    "integratedLUFS": -16.06,
+    "truePeakDBTP": -3.19,
+    "rangeLU": 5.1
+  },
+  "checks": {
+    "decodedEntireVideo": true,
+    "unintendedBlackSections": 0,
+    "decodedFrames": 1920,
+    "longestIdenticalRunFrames": 7,
+    "lowMotionDetectorNotes": [
+      "frame=  446 fps=0.0 q=-0.0 size=N/A time=00:00:07.43 bitrate=N/A speed=14.1x    \rframe=  896 fps=872 q=-0.0 size=N/A time=00:00:14.93 bitrate=N/A speed=14.5x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 18.6",
+      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 19.4",
+      "frame= 1375 fps=889 q=-0.0 size=N/A time=00:00:22.91 bitrate=N/A speed=14.8x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 25.233333",
+      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 26.066667",
+      "frame= 1825 fps=882 q=-0.0 size=N/A time=00:00:30.41 bitrate=N/A speed=14.7x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 29.633333",
+      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 30.6"
+    ],
+    "sourceAudio": "Existing user-supplied audio, words and speed unchanged",
+    "visualReview": "Eight scene frames, transition frame, full preview playback, and full final-master playback in the in-app browser.",
+    "browserPlayback": {
+      "duration": 32,
+      "currentTime": 32,
+      "ended": true,
+      "width": 1080,
+      "height": 1920,
+      "readyState": 4,
+      "mediaError": null
+    }
+  }
+}

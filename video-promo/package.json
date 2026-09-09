@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "render:signature": "node scripts/build-signature.mjs",
+    "preview:signature": "node scripts/render-signature.mjs preview",
     "studio": "remotion studio src/index.ts --no-open",
     "still": "remotion still src/index.ts TaxiGrahovoPromo",
-    "render": "remotion render src/index.ts TaxiGrahovoPromo out/taxi-grahovo-promo.mp4",
+    "render": "npm run render:signature",
+    "render:legacy": "remotion render src/index.ts TaxiGrahovoPromo out/taxi-grahovo-promo.mp4",
     "render:location-demo": "remotion render src/index.ts LocationPermissionDemo out/location-permission-demo.mp4",
     "render:no-bgm": "remotion render src/index.ts TaxiGrahovoPromo out/taxi-grahovo-promo-no-bgm.mp4 --props=props-nobgm.json",
     "render:fast-portrait": "remotion render src/index.ts TaxiGrahovoFastPortrait out/taxi-grahovo-fast-portrait.mp4",

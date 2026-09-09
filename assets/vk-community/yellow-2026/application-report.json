@@ -1,0 +1,74 @@
+{
+  "checkedAt": "2026-09-09T14:02:47.520Z",
+  "community": "https://vk.ru/taxigr",
+  "verification": "VK API responses; browser verification blocked by site-safety policy",
+  "applied": {
+    "avatar": true,
+    "cover": true,
+    "description": true,
+    "website": "https://taxigr.ru/",
+    "posts": [
+      {
+        "id": 989,
+        "url": "https://vk.ru/wall-193790756_989",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": true
+      },
+      {
+        "id": 988,
+        "url": "https://vk.ru/wall-193790756_988",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": false
+      },
+      {
+        "id": 987,
+        "url": "https://vk.ru/wall-193790756_987",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": false
+      },
+      {
+        "id": 986,
+        "url": "https://vk.ru/wall-193790756_986",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": false
+      },
+      {
+        "id": 985,
+        "url": "https://vk.ru/wall-193790756_985",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": false
+      },
+      {
+        "id": 984,
+        "url": "https://vk.ru/wall-193790756_984",
+        "fromCommunity": true,
+        "textMatches": true,
+        "hasImage": true,
+        "pinned": false
+      }
+    ]
+  },
+  "pending": {
+    "menu": "Prepared 6 tile images and new post links; not applied",
+    "mobileCover": {
+      "prepared": true,
+      "liveEnabled": false
+    },
+    "status": "Not applied: status.set returned API error 3",
+    "greeting": "Prepared, not applied",
+    "links": "Prepared, not applied: groups.addLink returned API error 3",
+    "actionButton": "Prepared target URL; current UI state unverified"
+  },
+  "legacyPosts": "Preserved: VK editing window expired",
+  "security": "Browser site-safety policy blocked opening vk.ru/taxigr; no permission prompt or Auto-review was attempted. No alternative browser or indirect execution used after the rejection."
+}
