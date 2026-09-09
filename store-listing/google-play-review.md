@@ -14,10 +14,12 @@ Instructions:
 
 The code is permanent and reusable; no SMS, external messenger, payment, subscription, or location restriction is required. The account has passenger-only access. Reviewers can select addresses, calculate a fare, and inspect the order confirmation flow. Please do not submit a real ride order.
 
-## Release notes 1.0.6 (21)
+## Release notes 1.0.9 (27)
 
-- Added multi-stop routes.
-- Added passenger-driver ride chat with photo attachments.
-- Added queued next rides for drivers.
-- Improved routing, notifications, and car display on the map.
-- Fixed chat image upload and full-screen preview issues.
+- Introduced the blue Quiet Motion design, light and dark themes, and smooth transitions.
+- Added illustrated fare cards and clearer vehicle registration plates.
+- Preserved multi-stop routes, ride chat with photos, payments, ride history, and driver features.
+- Refreshed the store icon, feature graphic, and six promotional screenshot cards.
+
+Production reviewer sign-in and session refresh were verified on 9 September 2026.
+This release targets the existing closed Alpha test; production access still requires completion of Google's testing requirements.

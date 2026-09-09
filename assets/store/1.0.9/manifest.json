@@ -1,0 +1,65 @@
+{
+  "version": "1.0.9",
+  "screenshots": [
+    {
+      "file": "01-booking.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 583960,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    },
+    {
+      "file": "02-tariffs.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 624249,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    },
+    {
+      "file": "03-stops.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 490255,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    },
+    {
+      "file": "04-driver.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 616614,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    },
+    {
+      "file": "05-chat.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 536232,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    },
+    {
+      "file": "06-dark.jpg",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 590866,
+      "aiGenerated": true,
+      "source": "imagegen with real app screen reference"
+    }
+  ],
+  "featureGraphic": {
+    "file": "feature-graphic.png",
+    "width": 1024,
+    "height": 500,
+    "aiGenerated": true
+  },
+  "icon": {
+    "file": "icon.png",
+    "width": 512,
+    "height": 512,
+    "source": "existing blue brand icon"
+  }
+}
