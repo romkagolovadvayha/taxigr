@@ -4,7 +4,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "types": [
-      "node"
+      "node",
+      "expo/types"
     ],
     "paths": {
       "@/*": [
