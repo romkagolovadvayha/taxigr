@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveApiUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { IconButton } from '@/components/ui/icon-button';
+import { UserAvatar } from '@/components/user-avatar';
 import type { RideChatMessage, RideChatParticipant } from '@/domain/models';
 import { formatRideChatTime } from '@/domain/ride-chat';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
@@ -23,15 +24,6 @@ type RideChatImageSource = {
   headers?: { Authorization: string };
 };
 
-function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/u)
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase('ru-RU') ?? '')
-    .join('') || '—';
-}
-
 export function RideChatAvatar({
   participant,
   size = spacing.x10,
@@ -39,50 +31,12 @@ export function RideChatAvatar({
   participant: RideChatParticipant;
   size?: number;
 }) {
-  const colors = useThemeColors();
-  const fallback = (
-    <View
-      accessible
-      accessibilityLabel={`Аватар: ${participant.name}`}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius.pill,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: participant.role === 'driver' ? colors.brand : colors.infoSoft,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      <Text
-        style={{
-          ...typography.caption,
-          color: participant.role === 'driver' ? colors.brandInk : colors.infoText,
-          fontWeight: '700',
-        }}
-      >
-        {initials(participant.name)}
-      </Text>
-    </View>
-  );
-
-  if (!participant.avatarUrl) return fallback;
-
   return (
-    <Image
-      source={resolveApiUrl(participant.avatarUrl)}
-      accessibilityLabel={`Аватар: ${participant.name}`}
-      contentFit="cover"
-      transition={motion.duration.quick}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surfaceSecondary,
-      }}
+    <UserAvatar
+      name={participant.name}
+      avatarUrl={participant.avatarUrl}
+      size={size}
+      tone={participant.role === 'driver' ? 'brand' : 'info'}
     />
   );
 }

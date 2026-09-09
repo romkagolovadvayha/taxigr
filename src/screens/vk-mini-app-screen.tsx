@@ -31,6 +31,7 @@ export function VkMiniAppScreen() {
     authError,
     clearAuthError,
     signInWithVkMiniApp,
+    consumeVkMiniAppSessionHandoff,
     verifyVkMiniAppSession,
     resetSessionForEmbeddedAuth,
   } = useSession();
@@ -55,6 +56,10 @@ export function VkMiniAppScreen() {
       if (!launchParams) throw new Error('Параметры запуска VK отсутствуют.');
 
       if (user && token) {
+        if (consumeVkMiniAppSessionHandoff(launchParams)) {
+          setSessionVerified(true);
+          return;
+        }
         const verified = await verifyVkMiniAppSession(launchParams);
         if (verified) {
           setSessionVerified(true);
@@ -84,6 +89,7 @@ export function VkMiniAppScreen() {
     }
   }, [
     clearAuthError,
+    consumeVkMiniAppSessionHandoff,
     resetSessionForEmbeddedAuth,
     signInWithVkMiniApp,
     token,

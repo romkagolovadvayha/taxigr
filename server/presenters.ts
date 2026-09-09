@@ -56,11 +56,18 @@ export type OrderRow = RowDataPacket & {
   created_at: Date | string;
   updated_at: Date | string;
   driver_name?: string | null;
+  driver_user_id?: string | null;
   driver_phone?: string | null;
+  driver_avatar_url?: string | null;
+  driver_avatar_mime?: string | null;
+  driver_updated_at?: Date | string | null;
   driver_rating_count?: number | null;
   rating?: number | null;
   passenger_name?: string | null;
   passenger_phone?: string | null;
+  passenger_avatar_url?: string | null;
+  passenger_avatar_mime?: string | null;
+  passenger_updated_at?: Date | string | null;
   passenger_rating?: number | null;
   passenger_rating_count?: number | null;
   passenger_score?: number | null;
@@ -240,6 +247,12 @@ export function presentOrder(row: OrderRow): RideOrder {
         ? {
             id: row.driver_id,
             name: row.driver_name,
+            avatarUrl: presentUserAvatarUrl(
+              row.driver_user_id,
+              row.driver_avatar_url,
+              row.driver_avatar_mime,
+              row.driver_updated_at,
+            ),
             phone: row.driver_phone ?? '',
             rating: row.rating ?? 5,
             ratingCount: row.driver_rating_count ?? 0,
@@ -260,6 +273,12 @@ export function presentOrder(row: OrderRow): RideOrder {
       ? {
           id: row.passenger_id,
           name: row.passenger_name,
+          avatarUrl: presentUserAvatarUrl(
+            row.passenger_id,
+            row.passenger_avatar_url,
+            row.passenger_avatar_mime,
+            row.passenger_updated_at,
+          ),
           phone:
             row.driver_id && row.passenger_phone
               ? row.passenger_phone
@@ -283,6 +302,18 @@ export function presentOrder(row: OrderRow): RideOrder {
           }
         : undefined,
   };
+}
+
+function presentUserAvatarUrl(
+  userId?: string | null,
+  remoteUrl?: string | null,
+  storedMime?: string | null,
+  updatedAt?: Date | string | null,
+): string | undefined {
+  if (userId && storedMime && updatedAt) {
+    return `/v1/users/${userId}/avatar?v=${new Date(updatedAt).getTime()}`;
+  }
+  return remoteUrl ?? undefined;
 }
 
 export function presentOrderSummary(row: OrderSummaryRow): RideOrderSummary {
@@ -344,9 +375,13 @@ export function limitOrderRatings(
 
 export const orderSelect = `
   SELECT o.*,
-    u.name AS driver_name, u.phone AS driver_phone, d.rating,
+    u.id AS driver_user_id, u.name AS driver_name, u.phone AS driver_phone, d.rating,
+    u.avatar_url AS driver_avatar_url, u.avatar_mime AS driver_avatar_mime,
+    u.updated_at AS driver_updated_at,
     d.rating_count AS driver_rating_count,
     pu.name AS passenger_name, pu.phone AS passenger_phone,
+    pu.avatar_url AS passenger_avatar_url, pu.avatar_mime AS passenger_avatar_mime,
+    pu.updated_at AS passenger_updated_at,
     pu.rating AS passenger_rating,
     pu.rating_count AS passenger_rating_count,
     rr_passenger.score AS passenger_score, rr_driver.score AS driver_score,

@@ -6,6 +6,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { UserAvatar } from '@/components/user-avatar';
 import { driverPriorityScopeLabels, driverPriorityScopes } from '@/domain/driver-priority';
 import type { AdminAccountSummary } from '@/domain/models';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -226,21 +227,12 @@ export function AdminAccountsList({ kind, title, subtitle, items, loading, error
                   opacity: pressed ? opacity.pressed : opacity.visible,
                 })}
               >
-                <View
-                  style={{
-                    width: spacing.x12,
-                    height: spacing.x12,
-                    borderRadius: radius.pill,
-                    backgroundColor: item.blockedAt ? colors.dangerSoft : colors.brandSoft,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <AppIcon
-                    name={kind === 'drivers' ? 'car' : 'profile'}
-                    color={item.blockedAt ? colors.dangerText : colors.ink}
-                  />
-                </View>
+                <UserAvatar
+                  name={item.name}
+                  avatarUrl={item.avatarUrl}
+                  size={spacing.x12}
+                  tone={item.blockedAt ? 'danger' : 'brand'}
+                />
                 <View style={{ flex: 1, minWidth: spacing.x12 * 4, gap: spacing.x1 }}>
                   <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{item.name}</Text>
                   <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>

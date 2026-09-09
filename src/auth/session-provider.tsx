@@ -9,6 +9,7 @@ import type { InitialLegalAcceptance } from '@/legal/documents';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { clearSessionToken, readSessionToken, writeSessionToken } from '@/storage/auth-storage';
 import { getInstallationId } from '@/storage/device-id';
+import { createVkMiniAppSessionHandoff } from '@/vk-mini-app/session-handoff';
 
 type PhoneAuthStartResult = {
   phone: string;
@@ -91,6 +92,7 @@ type SessionContextValue = {
   ) => Promise<VkAuthChallenge>;
   checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<VkAuthStatus['status']>;
   signInWithVkMiniApp: (input: VkMiniAppAuthInput) => Promise<void>;
+  consumeVkMiniAppSessionHandoff: (launchParams: string) => boolean;
   verifyVkMiniAppSession: (launchParams: string) => Promise<boolean>;
   resetSessionForEmbeddedAuth: () => Promise<void>;
   markInitialLegalConsentAccepted: () => void;
@@ -146,6 +148,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [vkCommunityPromptUrl, setVkCommunityPromptUrl] = useState<string | null>(null);
   const [initialLegalConsentRequired, setInitialLegalConsentRequired] = useState(false);
+  const [vkMiniAppSessionHandoff] = useState(createVkMiniAppSessionHandoff);
 
   const applySession = useCallback(async (result: {
     token: string;
@@ -406,6 +409,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signInWithVkMiniApp = useCallback(async (input: VkMiniAppAuthInput) => {
     setAuthenticating(true);
     setAuthError(null);
+    vkMiniAppSessionHandoff.clear();
     try {
       const installationId = await getInstallationId();
       const result = await apiRequest<{
@@ -418,8 +422,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         body: JSON.stringify({ ...input, installationId }),
       });
+      vkMiniAppSessionHandoff.remember(input.launchParams);
       await applySession(result);
     } catch (error) {
+      vkMiniAppSessionHandoff.clear();
       const message = error instanceof ApiError
         ? error.code === 'VK_MINI_APP_UNAUTHORIZED'
           ? 'Сессия VK недействительна. Закройте и заново откройте мини-приложение.'
@@ -432,9 +438,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setAuthenticating(false);
     }
-  }, [applySession]);
+  }, [applySession, vkMiniAppSessionHandoff]);
+
+  const consumeVkMiniAppSessionHandoff = useCallback(
+    (launchParams: string) => vkMiniAppSessionHandoff.consume(launchParams),
+    [vkMiniAppSessionHandoff],
+  );
 
   const resetSessionForEmbeddedAuth = useCallback(async () => {
+    vkMiniAppSessionHandoff.clear();
     await syncDriverBackgroundLocation(false).catch(() => undefined);
     await clearSessionToken();
     setToken(null);
@@ -442,7 +454,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
     setVkCommunityPromptUrl(null);
     setInitialLegalConsentRequired(false);
-  }, []);
+  }, [vkMiniAppSessionHandoff]);
 
   const markInitialLegalConsentAccepted = useCallback(() => {
     setInitialLegalConsentRequired(false);
@@ -556,6 +568,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const signOut = useCallback(async () => {
+    vkMiniAppSessionHandoff.clear();
     await syncDriverBackgroundLocation(false).catch(() => undefined);
     await clearSessionToken();
     setToken(null);
@@ -564,7 +577,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setVkCommunityPromptUrl(null);
     setInitialLegalConsentRequired(false);
     router.replace('/sign-in');
-  }, []);
+  }, [vkMiniAppSessionHandoff]);
 
   const refreshSession = useCallback(async () => {
     if (!token || token.startsWith('demo:')) return;
@@ -609,6 +622,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       startVkPhoneAuth,
       checkVkPhoneAuth,
       signInWithVkMiniApp,
+      consumeVkMiniAppSessionHandoff,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,
       markInitialLegalConsentAccepted,
@@ -629,6 +643,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkTelegramPhoneAuth,
       checkVkPhoneAuth,
       signInWithVkMiniApp,
+      consumeVkMiniAppSessionHandoff,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,
       markInitialLegalConsentAccepted,

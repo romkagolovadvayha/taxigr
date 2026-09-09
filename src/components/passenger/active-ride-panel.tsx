@@ -11,6 +11,7 @@ import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
+import { UserAvatar } from '@/components/user-avatar';
 import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
 import { rideStatusLabel } from '@/domain/ride-state';
@@ -158,9 +159,7 @@ export function ActiveRidePanel({
             borderColor: colors.border,
           }}
         >
-          <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft }}>
-            <Text style={{ ...typography.caption, color: colors.infoText }}>{driver.name.split(' ').slice(0, 2).map((part) => part[0]).join('')}</Text>
-          </View>
+          <UserAvatar name={driver.name} avatarUrl={driver.avatarUrl} size={42} tone="brand" />
           <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
             <View
               style={{

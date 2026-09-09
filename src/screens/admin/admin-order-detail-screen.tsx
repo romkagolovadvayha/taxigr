@@ -14,6 +14,7 @@ import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { UserAvatar } from '@/components/user-avatar';
 import { demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
 import { pricingScopeLabel } from '@/domain/pricing';
@@ -253,7 +254,11 @@ export function AdminOrderDetailScreen({ id }: Props) {
           <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: spacing.x4 }}>
             <SurfaceCard style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-                <AppIcon name="profile" color={colors.infoText} />
+                <UserAvatar
+                  name={order.passenger?.name ?? 'Пассажир'}
+                  avatarUrl={order.passenger?.avatarUrl}
+                  size={spacing.x8}
+                />
                 <Text accessibilityRole="header" style={{ ...typography.bodyStrong, color: colors.ink }}>
                   Пассажир
                 </Text>
@@ -270,7 +275,12 @@ export function AdminOrderDetailScreen({ id }: Props) {
             </SurfaceCard>
             <SurfaceCard style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-                <AppIcon name="car" color={colors.infoText} />
+                <UserAvatar
+                  name={order.driver?.name ?? 'Водитель'}
+                  avatarUrl={order.driver?.avatarUrl}
+                  size={spacing.x8}
+                  tone="brand"
+                />
                 <Text accessibilityRole="header" style={{ ...typography.bodyStrong, color: colors.ink }}>
                   Водитель
                 </Text>

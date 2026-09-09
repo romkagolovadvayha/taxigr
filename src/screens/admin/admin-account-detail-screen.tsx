@@ -15,6 +15,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { UserAvatar } from '@/components/user-avatar';
 import { demoDriver, demoOrders, demoPassenger } from '@/data/demo';
 import {
   defaultDriverPriorities,
@@ -485,6 +486,12 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
       <Screen contentStyle={{ gap: spacing.x6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <IconButton icon="back" label="Назад к списку" onPress={() => router.back()} />
+          <UserAvatar
+            name={detail.user.name}
+            avatarUrl={detail.user.avatarUrl}
+            size={spacing.x12}
+            tone={blocked ? 'danger' : 'brand'}
+          />
           <View style={{ flex: 1 }}>
             <Text accessibilityRole="header" style={{ ...typography.pageTitle, color: colors.ink }}>
               {detail.user.name}

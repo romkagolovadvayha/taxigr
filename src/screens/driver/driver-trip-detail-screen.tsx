@@ -11,6 +11,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { UserAvatar } from '@/components/user-avatar';
 import { demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
 import { formatMultiStopRouteAddresses } from '@/domain/route-label';
@@ -117,7 +118,11 @@ export function DriverTripDetailScreen() {
           )}
         </View>
         <View style={{ flexDirection: 'row', gap: spacing.x3 }}>
-          <AppIcon name="profile" />
+          <UserAvatar
+            name={order.passenger?.name ?? 'Пассажир'}
+            avatarUrl={order.passenger?.avatarUrl}
+            size={40}
+          />
           <View style={{ flex: 1 }}>
             <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
               {order.passenger?.name ?? 'Пассажир'}

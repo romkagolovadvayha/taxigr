@@ -10,6 +10,7 @@ import { AppButton } from '@/components/ui/app-button';
 import { MoneyValue } from '@/components/ui/money-value';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
+import { UserAvatar } from '@/components/user-avatar';
 import { demoDriver, demoOrders } from '@/data/demo';
 import type { RideOrder } from '@/domain/models';
 import { formatRouteLabel } from '@/domain/route-label';
@@ -208,18 +209,11 @@ export function DriverTripsScreen() {
               })}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-                <View
-                  style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: colors.canvas,
-                  }}
-                >
-                  <AppIcon name={order.tariff === 'child' ? 'child-seat' : 'car'} />
-                </View>
+                <UserAvatar
+                  name={order.passenger?.name ?? 'Пассажир'}
+                  avatarUrl={order.passenger?.avatarUrl}
+                  size={46}
+                />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                     {order.passenger?.name ?? 'Пассажир'} · {formatDateTime(order.createdAt)}

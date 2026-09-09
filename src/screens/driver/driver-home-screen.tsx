@@ -42,6 +42,7 @@ import { radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 import { openYandexNavigatorRoute } from '@/utils/open-yandex-navigator';
 import { useThemeColors } from '@/theme/theme-provider';
+import { UserAvatar } from '@/components/user-avatar';
 
 function DriverOrderCard({
   demo,
@@ -121,6 +122,11 @@ function DriverOrderCard({
         </View>
         <Text style={{ ...typography.pageTitle, color: colors.ink }}>Новая поездка</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+          <UserAvatar
+            name={currentRide.passenger?.name ?? 'Пассажир'}
+            avatarUrl={currentRide.passenger?.avatarUrl}
+            size={40}
+          />
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {currentRide.passenger?.name ?? 'Пассажир'}
           </Text>
@@ -376,18 +382,11 @@ function DriverOrderCard({
         </View>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: radius.md,
-              backgroundColor: colors.canvas,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <AppIcon name="profile" />
-          </View>
+          <UserAvatar
+            name={currentRide.passenger?.name ?? 'Пассажир'}
+            avatarUrl={currentRide.passenger?.avatarUrl}
+            size={40}
+          />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>

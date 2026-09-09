@@ -57,6 +57,27 @@ function orderRow(): OrderRow {
 }
 
 describe('order summary payload', () => {
+  it('includes stored and remote participant avatars in detailed orders', () => {
+    const row = orderRow();
+    Object.assign(row, {
+      driver_id: '00000000-0000-4000-8000-000000000003',
+      driver_user_id: '00000000-0000-4000-8000-000000000004',
+      driver_name: 'Иван Водитель',
+      driver_avatar_mime: 'image/jpeg',
+      driver_updated_at: new Date('2026-09-09T12:00:00.000Z'),
+      passenger_name: 'Анна Пассажир',
+      passenger_avatar_url: 'https://images.example.test/passenger.jpg',
+      passenger_avatar_mime: null,
+    });
+
+    const detail = presentOrder(row);
+
+    expect(detail.driver?.avatarUrl).toBe(
+      '/v1/users/00000000-0000-4000-8000-000000000004/avatar?v=1788955200000',
+    );
+    expect(detail.passenger?.avatarUrl).toBe('https://images.example.test/passenger.jpg');
+  });
+
   it('keeps list fields and excludes route geometry and joined profiles', () => {
     const row = orderRow();
     const summary = presentOrderSummary(row);

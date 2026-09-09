@@ -10,6 +10,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { UserAvatar } from '@/components/user-avatar';
 import { AppUpdateCard } from '@/components/updates/app-update-card';
 import { VehicleColorPicker } from '@/components/vehicle/vehicle-color-picker';
 import { VehicleIllustration } from '@/components/vehicle/vehicle-illustration';
@@ -285,18 +286,12 @@ export function DriverProfileScreen() {
       )}
       <SurfaceCard>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x4 }}>
-          <View
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: radius.lg,
-              backgroundColor: colors.brand,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <AppIcon name="profile" size={32} color={colors.brandInk} />
-          </View>
+          <UserAvatar
+            name={activeProfile.name}
+            avatarUrl={user?.avatarUrl}
+            size={64}
+            tone="brand"
+          />
           <View style={{ flex: 1 }}>
             <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
               {activeProfile.name}

@@ -160,6 +160,7 @@ export type RideOrderSummary = Pick<
 export type DriverSummary = {
   id: string;
   name: string;
+  avatarUrl?: string;
   phone: string;
   rating: number;
   ratingCount?: number;
@@ -176,6 +177,7 @@ export type DriverSummary = {
 export type PassengerSummary = {
   id: string;
   name: string;
+  avatarUrl?: string;
   phone?: string;
   rating: number;
   ratingCount: number;
