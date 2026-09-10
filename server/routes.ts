@@ -3057,7 +3057,7 @@ export async function registerRoutes(
         if (isPlayReviewPhone(phone)) {
           await connection.execute(
             `UPDATE users
-             SET name = 'Тестовый пассажир Google Play',
+             SET name = CASE WHEN TRIM(name) = '' THEN 'Тестовый пассажир Google Play' ELSE name END,
                  gender = 'male',
                  profile_completed_at = COALESCE(profile_completed_at, UTC_TIMESTAMP(3)),
                  phone_verified_at = UTC_TIMESTAMP(3)
