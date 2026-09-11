@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import type { Address } from '../src/domain/models';
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
 import { isDestinationAddressComplete, isPickupAddressComplete } from '../src/domain/address-precision';
-import { confirmAddressPoint, normalizeRouteStops, sameRouteStop } from '../src/domain/route-stops';
+import { confirmAddressPoint, normalizeRouteStops, replaceRouteStop, sameRouteStop } from '../src/domain/route-stops';
 
 const a: Address = { id: 'a', label: 'с. Грахово, ул. Ачинцева, 5', coordinates: { latitude: 56.0477, longitude: 51.9586 } };
 const b: Address = { id: 'b', label: 'с. Грахово, ул. Колпакова, 1Б', coordinates: { latitude: 56.04576, longitude: 51.96165 } };
 const c: Address = { id: 'c', label: 'д. Благодатное, ул. Благодатновская, 53А', coordinates: { latitude: 55.9995786, longitude: 51.8684492 } };
 describe('route stop identity and coordinate precision', () => {
+  it('keeps the chosen destination when an editor opens before the destination list exists', () => {
+    expect(replaceRouteStop([], 0, b)).toEqual([b]);
+    expect(replaceRouteStop([b], 0, c)).toEqual([c]);
+    expect(replaceRouteStop([b], 2, c)).toEqual([b, c]);
+  });
   it('removes consecutive duplicate stops without deleting a return to the pickup', () => {
     expect(normalizeRouteStops(a!, [a!, b!, b!, c!, a!])).toEqual([b, c, a]);
   });

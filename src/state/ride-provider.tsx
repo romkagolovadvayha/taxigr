@@ -3,7 +3,7 @@ import React, { createContext, useCallback, useEffect, useMemo, useReducer, useR
 import { AppState, Platform } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 
-import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
+import { ApiError, apiRequest, getSocketUrl, invalidateApiCache } from '@/api/client';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import { useSession } from '@/auth/session-provider';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
@@ -45,7 +45,7 @@ import {
   isGrahovoAddress,
 } from '@/domain/pricing';
 import { canTransitionRide } from '@/domain/ride-state';
-import { normalizeRouteStops } from '@/domain/route-stops';
+import { normalizeRouteStops, replaceRouteStop } from '@/domain/route-stops';
 import {
   searchPriceIncreaseOfferSlot,
   SEARCH_PRICE_INCREASE_MINOR,
@@ -132,6 +132,9 @@ type RideBootstrap = {
 };
 
 const RideContext = createContext<RideContextValue | null>(null);
+type RideAddressValue = Pick<RideContextValue, 'setPickup' | 'setDestination' | 'setDestinationAt' | 'addDestination' | 'destinationHistory'>;
+const RideAddressContext = createContext<RideAddressValue | null>(null);
+const RideBootstrapContext = createContext(false);
 
 function isActive(order: RideOrder): boolean {
   return !['completed', 'cancelled'].includes(order.status);
@@ -206,6 +209,8 @@ function addCompletedDestination(
 
 function updateDriverCoordinates(order: RideOrder, coordinates: Coordinates): RideOrder {
   if (!order.driver) return order;
+  if (order.driver.coordinates?.latitude === coordinates.latitude &&
+    order.driver.coordinates?.longitude === coordinates.longitude) return order;
   return { ...order, driver: { ...order.driver, coordinates } };
 }
 
@@ -306,9 +311,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const setDestinationAt = useCallback(
     (index: number, address: Address) => {
-      updateDestinations((current) =>
-        current.map((item, itemIndex) => itemIndex === index ? address : item),
-      );
+      updateDestinations((current) => replaceRouteStop(current, index, address));
     },
     [updateDestinations],
   );
@@ -404,16 +407,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setOrders((items) => items.filter((item) => item.passengerId !== 'demo-passenger'));
-      setAdminOrders((items) => items.filter((item) => item.passengerId !== 'demo-passenger'));
-      setCurrentRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
-      setDriverRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
-      setNextDriverRide((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
-      setDriverOffer((ride) => (ride?.passengerId === 'demo-passenger' ? null : ride));
-      setPickup((address) => (address && demoAddresses.some((item) => item.id === address.id) ? null : address));
-      setDestinations((items) =>
-        items.filter((address) => !demoAddresses.some((item) => item.id === address.id)),
-      );
+      // SessionScopedRideProviders remounts us when the account changes.
+      // A token refresh must preserve the draft, including local directory places
+      // that are also offered to demo passengers.
 
       if (!token) {
         setPickup(null);
@@ -554,11 +550,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
       transports: ['websocket', 'polling'],
       reconnectionDelayMax: 8_000,
     });
-    const handleReconnect = () => void refresh();
+    const handleReconnect = () => {
+      invalidateApiCache(['orders', 'stats', 'admin', 'profile']);
+      void refresh();
+    };
     // Also close the gap between the initial bootstrap and socket connection.
     socket.on('connect', handleReconnect);
     let offerRequestId = 0;
     socket.on('order:updated', (order: RideOrder) => {
+      invalidateApiCache(['orders', 'stats', 'admin', 'profile']);
       if (isAdmin) {
         setAdminOrders((previous) => upsertOrderSummary(previous, toOrderSummary(order)));
       }
@@ -584,6 +584,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       (payload: { orderId: string; coordinates: Coordinates | null }) => {
         setDriverRide((current) => {
           if (!current || current.id !== payload.orderId) return current;
+          if (current.passengerCoordinates?.latitude === payload.coordinates?.latitude &&
+            current.passengerCoordinates?.longitude === payload.coordinates?.longitude) return current;
           return {
             ...current,
             passengerCoordinates: payload.coordinates ?? undefined,
@@ -592,6 +594,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       },
     );
     socket.on('order:available', (order: RideOrder) => {
+      invalidateApiCache(['orders', 'admin', 'profile']);
       if (isDriver) {
         offerRequestId += 1;
         setDriverOffer(order);
@@ -603,6 +606,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
     });
     socket.on('order:unavailable', ({ orderId }: { orderId: string }) => {
+      invalidateApiCache(['orders', 'admin', 'profile']);
       if (!isDriver) return;
       const requestId = ++offerRequestId;
       setDriverOffer((current) => current?.id === orderId ? null : current);
@@ -630,18 +634,20 @@ export function RideProvider({ children }: { children: ReactNode }) {
       'ride-chat:read',
       (payload: { orderId: string; userId: string; unreadCount: number }) => {
         if (payload.userId !== userId) return;
-        setChatUnreadCounts((current) => ({
+        setChatUnreadCounts((current) => current[payload.orderId] === payload.unreadCount ? current : ({
           ...current,
           [payload.orderId]: payload.unreadCount,
         }));
       },
     );
     socket.on('application:updated', () => {
+      invalidateApiCache(['profile', 'admin']);
       void refreshSession().catch(() => {
         setError('Статус заявки обновлён. Перезапустите приложение, чтобы обновить доступ.');
       });
     });
     socket.on('account:access-changed', () => {
+      invalidateApiCache(['profile', 'admin']);
       void refreshSession().catch(() => {
         setError('Доступ изменён. Перезапустите приложение, чтобы обновить статус.');
       });
@@ -1540,8 +1546,26 @@ export function RideProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <RideContext.Provider value={value}>{children}</RideContext.Provider>;
+  const addressValue = useMemo(() => ({
+    setPickup: selectPickup, setDestination: selectDestination, setDestinationAt, addDestination, destinationHistory,
+  }), [selectPickup, selectDestination, setDestinationAt, addDestination, destinationHistory]);
+
+  return <RideContext.Provider value={value}>
+    <RideAddressContext.Provider value={addressValue}>
+      <RideBootstrapContext.Provider value={bootstrapReady}>{children}</RideBootstrapContext.Provider>
+    </RideAddressContext.Provider>
+  </RideContext.Provider>;
 }
+
+// Address entry and startup services do not subscribe to GPS, chat or driver
+// queue updates. Their context values remain stable when those fields change.
+export function useRideAddresses(): RideAddressValue {
+  const value = React.use(RideAddressContext);
+  if (!value) throw new Error('useRideAddresses must be used inside RideProvider');
+  return value;
+}
+
+export function useRideBootstrapReady(): boolean { return React.use(RideBootstrapContext); }
 
 export function useRide(): RideContextValue {
   const value = React.use(RideContext);

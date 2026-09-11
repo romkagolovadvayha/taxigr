@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
@@ -19,6 +19,7 @@ import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
 import { useThemeColors } from '@/theme/theme-provider';
+import { useScreenClock } from '@/hooks/use-screen-clock';
 
 type Props = {
   ride: RideOrder;
@@ -31,12 +32,7 @@ type Props = {
 
 function SearchElapsedBadge({ startedAt }: { startedAt: string }) {
   const colors = useThemeColors();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(interval);
-  }, [startedAt]);
+  const now = useScreenClock(1_000);
 
   const elapsed = formatElapsedClock(startedAt, now);
 

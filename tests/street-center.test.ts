@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveStreetCenter } from '../src/api/street-center';
+import { clearApiCache } from '../src/api/client';
 import type { Address } from '../src/domain/models';
 
 const street: Address = { id: 'gar:kokshan-novaya', label: 'д. Кокшан, ул. Новая', kind: 'street',
@@ -9,7 +10,10 @@ const result: Address = { id: 'osm-street', label: 'Новая улица', deta
 function mockResponse(data: unknown = [result]) {
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) }); vi.stubGlobal('fetch', fetch); return fetch;
 }
-beforeEach(() => vi.stubGlobal('window', { location: { hostname: 'localhost' } }));
+beforeEach(async () => {
+  await clearApiCache();
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+});
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('street center for map point selection', () => {

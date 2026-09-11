@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 
 import { apiRequest } from '@/api/client';
@@ -6,6 +6,7 @@ import { getDemoRoadRoute } from '@/api/demo-routing';
 import {
   drawableNavigationRoute,
   navigationPositionBucket,
+  navigationTargetsKey,
 } from '@/domain/navigation';
 import type {
   Address,
@@ -49,12 +50,6 @@ export function useDriverNavigation({
   const rideStatus = ride?.status ?? null;
   const targetKind = rideStatus ? driverRouteTarget(rideStatus) : null;
   const nextDestinationIndex = ride?.nextDestinationIndex ?? 0;
-  const destinations = ride?.destinations;
-  const destination = ride?.destination;
-  const remainingDestinations = useMemo(
-    () => (destinations ?? (destination ? [destination] : [])).slice(nextDestinationIndex),
-    [destinations, destination, nextDestinationIndex],
-  );
   const targetSource =
     ride && targetKind
       ? targetKind === 'pickup'
@@ -62,7 +57,11 @@ export function useDriverNavigation({
         : ride.destinations?.[nextDestinationIndex] ?? ride.destination
       : null;
   const target = targetSource;
-  const positionBucket = origin ? navigationPositionBucket(origin) : null;
+  // Order/status refreshes replace address objects even when the road targets
+  // have not changed. Rebuild only for changed coordinates/order of stops.
+  const targetsKey = target ? navigationTargetsKey(targetKind === 'pickup'
+    ? [target] : (ride?.destinations ?? (ride?.destination ? [ride.destination] : [])).slice(nextDestinationIndex)) : null;
+  const positionBucket = rideId && targetKind && origin ? navigationPositionBucket(origin) : null;
   const originRef = useRef(origin);
   useEffect(() => {
     originRef.current = origin;
@@ -72,22 +71,22 @@ export function useDriverNavigation({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const routeKey = rideId && targetKind ? `${rideId}:${targetKind}:${nextDestinationIndex}` : null;
+  const routeKey = rideId && targetKind && targetsKey ? `${rideId}:${targetKind}:${nextDestinationIndex}:${targetsKey}` : null;
   const routeKeyRef = useRef(routeKey);
 
-  useEffect(
-    () => onlineManager.subscribe((online) => {
+  useEffect(() => {
+    if (!routeKey) return;
+    return onlineManager.subscribe((online) => {
       if (online) setRetryKey((value) => value + 1);
-    }),
-    [],
-  );
+    });
+  }, [routeKey]);
 
   useEffect(() => {
     const requestOrigin = originRef.current;
-    if (!rideId || !requestOrigin || !target || !targetKind || !positionBucket || !token) {
+    if (!rideId || !requestOrigin || !targetsKey || !targetKind || !positionBucket || !token) {
       const timer = setTimeout(() => {
         setSummary(null);
-        setCoordinates([]);
+        setCoordinates(current => current.length ? [] : current);
         setLoading(false);
         setError(null);
       }, 0);
@@ -113,7 +112,7 @@ export function useDriverNavigation({
     const request = demo
       ? getDemoRoadRoute(
           requestOrigin,
-          (targetKind === 'pickup' ? [target] : remainingDestinations).map((item) => item.coordinates),
+          (JSON.parse(targetsKey) as [number, number][]).map(([latitude, longitude]) => ({ latitude, longitude })),
           controller.signal,
         )
       : apiRequest<NavigationRouteResponse>(`/v1/driver/orders/${rideId}/route`, {
@@ -152,7 +151,7 @@ export function useDriverNavigation({
       if (resetTimer) clearTimeout(resetTimer);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [demo, positionBucket, remainingDestinations, retryKey, rideId, routeKey, target, targetKind, token]);
+  }, [demo, positionBucket, retryKey, rideId, routeKey, targetsKey, targetKind, token]);
 
   return {
     active: Boolean(rideId && origin && targetKind),

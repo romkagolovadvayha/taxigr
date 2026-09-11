@@ -1,6 +1,10 @@
-import type { Coordinates } from '@/domain/models';
+import type { Address, Coordinates } from '@/domain/models';
 
 const EARTH_RADIUS_METERS = 6_371_000;
+
+export function navigationTargetsKey(targets: readonly Address[]): string {
+  return JSON.stringify(targets.map(({ coordinates }) => [coordinates.latitude, coordinates.longitude]));
+}
 
 export function distanceBetweenCoordinates(
   from: Coordinates,

@@ -35,7 +35,7 @@ const INFRASTRUCTURE_TOKENS = new Set([
 
 function tokens(value: string): string[] {
   return value
-    .toLocaleLowerCase('ru')
+    .toLowerCase()
     .replace(/ё/g, 'е')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
@@ -88,7 +88,7 @@ export function addressSearchScore(address: SearchableAddress, query: string): n
 export function uniqueAddressesByLabel<T extends SearchableAddress>(addresses: readonly T[]): T[] {
   const seen = new Set<string>();
   return addresses.filter((address) => {
-    const label = address.label.toLocaleLowerCase('ru');
+    const label = address.label.toLowerCase();
     if (seen.has(label)) return false;
     seen.add(label);
     return true;

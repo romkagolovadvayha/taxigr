@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -297,15 +296,6 @@ export function AddressFields({
   hideAddDestination = false,
 }: Props) {
   const colors = useThemeColors();
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      router.prefetch('/address-search');
-      router.prefetch('/stops' as never);
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
   return (
     <View>
       <AddressRow

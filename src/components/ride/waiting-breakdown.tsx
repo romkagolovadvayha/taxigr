@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { MoneyValue } from '@/components/ui/money-value';
@@ -12,6 +11,7 @@ import {
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
+import { useScreenClock } from '@/hooks/use-screen-clock';
 
 export function WaitingBreakdown({
   ride,
@@ -21,18 +21,8 @@ export function WaitingBreakdown({
   compact?: boolean;
 }) {
   const colors = useThemeColors();
-  const [now, setNow] = useState(0);
   const active = Boolean(ride.waitingStartedAt);
-
-  useEffect(() => {
-    if (!active) return;
-    const initial = setTimeout(() => setNow(Date.now()), 0);
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(timer);
-    };
-  }, [active, ride.waitingStartedAt]);
+  const now = useScreenClock(1_000, active);
 
   const seconds = rideWaitingSeconds(ride, now);
   const priceMinor = rideWaitingPriceMinor(ride, now);

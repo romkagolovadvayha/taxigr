@@ -114,19 +114,25 @@ export function useDriverLocation({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       };
-      setState((current) => ({
-        coordinates,
-        heading:
-          position.coords.heading != null && position.coords.heading >= 0
-            ? position.coords.heading
-            : current.heading,
-        speedMetersPerSecond:
-          position.coords.speed != null && position.coords.speed >= 0
-            ? position.coords.speed
-            : current.speedMetersPerSecond,
-        accuracyMeters: position.coords.accuracy,
-        error: backgroundWarning,
-      }));
+      setState((current) => {
+        const next = {
+          coordinates,
+          heading:
+            position.coords.heading != null && position.coords.heading >= 0
+              ? position.coords.heading
+              : current.heading,
+          speedMetersPerSecond:
+            position.coords.speed != null && position.coords.speed >= 0
+              ? position.coords.speed
+              : current.speedMetersPerSecond,
+          accuracyMeters: position.coords.accuracy,
+          error: backgroundWarning,
+        };
+        if (current.coordinates?.latitude === coordinates.latitude && current.coordinates?.longitude === coordinates.longitude &&
+          current.heading === next.heading && current.speedMetersPerSecond === next.speedMetersPerSecond &&
+          current.accuracyMeters === next.accuracyMeters && current.error === next.error) return current;
+        return next;
+      });
       const lastPublished = lastPublishedRef.current;
       if (
         lastPublished?.token === token &&
@@ -165,6 +171,7 @@ export function useDriverLocation({
 
     void (async () => {
       const permission = await ensureForegroundLocationPermission();
+      if (cancelled) return;
       if (!permission.granted) {
         setState((current) => ({
           ...current,
@@ -174,6 +181,7 @@ export function useDriverLocation({
       }
 
       const backgroundEnabled = await syncDriverBackgroundLocation(true, false);
+      if (cancelled) return;
       if (!backgroundEnabled) {
         backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы заказы и маршрут работали при свёрнутом приложении';
         setState((current) => ({
@@ -186,6 +194,7 @@ export function useDriverLocation({
         maxAge: 120_000,
         requiredAccuracy: 200,
       });
+      if (cancelled) return;
       if (lastKnown) applyPosition(lastKnown);
 
       subscription = await Location.watchPositionAsync(
@@ -211,6 +220,8 @@ export function useDriverLocation({
           setState((current) => ({ ...current, error: message }));
         },
       );
+      // Permission/GPS setup can finish after the screen has been left.
+      if (cancelled) subscription.remove();
     })().catch((reason: unknown) => {
       if (cancelled) return;
       setState((current) => ({

@@ -5,12 +5,21 @@ import {
   drawableNavigationRoute,
   formatNavigationDistance,
   navigationPositionBucket,
+  navigationTargetsKey,
 } from '../src/domain/navigation';
 
 const origin = { latitude: 56.04758, longitude: 51.95842 };
 const target = { latitude: 56.055332, longitude: 51.960263 };
 
 describe('driver navigation helpers', () => {
+  it('ignores refreshed address objects but invalidates changed coordinates and stop order', () => {
+    const first = { id: 'a', label: 'A', coordinates: origin };
+    const second = { id: 'b', label: 'B', coordinates: target };
+    const key = navigationTargetsKey([first, second]);
+    expect(navigationTargetsKey([{ ...first, label: 'Обновлённое описание', coordinates: { ...origin } }, { ...second }])).toBe(key);
+    expect(navigationTargetsKey([second, first])).not.toBe(key);
+    expect(navigationTargetsKey([{ ...first, coordinates: { ...origin, latitude: origin.latitude + 0.001 } }, second])).not.toBe(key);
+  });
   it('measures movement and groups nearby GPS updates for route rebuilding', () => {
     expect(distanceBetweenCoordinates(origin, target)).toBeGreaterThan(800);
     expect(navigationPositionBucket(origin)).toBe('56.048:51.958');

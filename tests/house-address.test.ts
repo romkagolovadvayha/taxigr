@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveHouseAddress } from '../src/api/house-address';
+import { clearApiCache } from '../src/api/client';
 import type { Address } from '../src/domain/models';
 
 const address: Address = { id: 'gar:example', label: 'д. Благодатное, ул. Благодатновская, 1', houseNumber: '1',
@@ -10,7 +11,10 @@ const result: Address = { id: 'osm-test', label: 'Благодатновская
 function mockResponse(data: Address[]) {
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) }); vi.stubGlobal('fetch', fetch); return fetch;
 }
-beforeEach(() => vi.stubGlobal('window', { location: { hostname: 'localhost' } }));
+beforeEach(async () => {
+  await clearApiCache();
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe('selected house resolution', () => {

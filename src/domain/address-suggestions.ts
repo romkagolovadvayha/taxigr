@@ -7,7 +7,7 @@ function escapeRegExp(value: string): string {
 
 function suggestionId(label: string): string {
   return `street:${label
-    .toLocaleLowerCase('ru')
+    .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-|-$/g, '')}`;
 }
@@ -36,7 +36,7 @@ export function buildStreetSuggestions(addresses: Address[]): Address[] {
   return addresses.flatMap((address) => {
     const suggestion = toStreetSuggestion(address);
     if (!suggestion) return [];
-    const key = suggestion.label.toLocaleLowerCase('ru');
+    const key = suggestion.label.toLowerCase();
     if (seen.has(key)) return [];
     seen.add(key);
     return [suggestion];

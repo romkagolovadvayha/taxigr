@@ -81,4 +81,25 @@ describe('API client request bodies', () => {
       message: 'Размер загружаемого файла слишком большой',
     });
   });
+
+  it('reuses a profile across token rotation and clears it after mutation, account change and logout', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockImplementation(async () => ({
+      ok: true, json: async () => ({ data: { revision: fetchMock.mock.calls.length } }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest, setApiCacheSession, clearApiCache } = await import('../src/api/client');
+    setApiCacheSession('alice-one', 'alice');
+    const first = await apiRequest('/v1/driver/profile', { token: 'alice-one' });
+    setApiCacheSession('alice-two', 'alice');
+    expect(await apiRequest('/v1/driver/profile', { token: 'alice-two' })).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await apiRequest('/v1/driver/status', { token: 'alice-two', method: 'POST' });
+    expect(await apiRequest('/v1/driver/profile', { token: 'alice-two' })).toEqual({ revision: 3 });
+    setApiCacheSession('bob-token', 'bob');
+    expect(await apiRequest('/v1/driver/profile', { token: 'bob-token' })).toEqual({ revision: 4 });
+    await clearApiCache();
+    setApiCacheSession('bob-token', 'bob');
+    expect(await apiRequest('/v1/driver/profile', { token: 'bob-token' })).toEqual({ revision: 5 });
+  });
 });

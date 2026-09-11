@@ -286,7 +286,7 @@ const directory: DirectoryNode[] = [
 ];
 
 function slug(value: string): string {
-  return value.toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
 }
 
 function nodeDetails(level: 6 | 7 | 8): string {
@@ -298,8 +298,9 @@ function nodeDetails(level: 6 | 7 | 8): string {
 export const grahovoDirectoryAddresses: Address[] = directory.flatMap(
   ([label, level, latitude, longitude, encodedHouses]) => {
     const coordinates = { latitude, longitude };
+    const parentId = 'gar:' + slug(label);
     const parent: Address = {
-      id: 'gar:' + slug(label),
+      id: parentId,
       label,
       details: nodeDetails(level),
       kind: level === 6 ? 'settlement' : level === 8 ? 'street' : undefined,
@@ -324,7 +325,7 @@ export const grahovoDirectoryAddresses: Address[] = directory.flatMap(
         const displayedHouse =
           numberCounts.get(houseNumber) === 1 ? houseNumber : `${objectType} ${houseNumber}`;
         return {
-          id: 'gar:' + slug(label) + ':' + slug(encodedHouse),
+          id: parentId + ':' + slug(encodedHouse),
           label: `${label}, ${displayedHouse}`,
           houseNumber,
           kind: 'house',

@@ -3,6 +3,7 @@ import { version } from 'maplibre-gl/package.json';
 type MapApi = typeof import('maplibre-gl');
 declare global { interface Window { __taxiMapLibre?: MapApi } }
 let pending: Promise<MapApi> | undefined;
+let failedAttempts = 0;
 
 export function loadMapLibre(): Promise<MapApi> {
   if (pending) return pending;
@@ -22,7 +23,10 @@ export function loadMapLibre(): Promise<MapApi> {
   const apiReady = new Promise<MapApi>((resolve, reject) => {
     if (window.__taxiMapLibre) { resolve(window.__taxiMapLibre); return; }
     const script = document.createElement('script');
-    script.type = 'module'; script.src = `${base}/entry.mjs?attempt=${Date.now()}`;
+    // The package version already invalidates the HTTP cache after an upgrade.
+    // Only a failed module load needs a fresh URL within this document.
+    script.type = 'module';
+    script.src = `${base}/entry.mjs${failedAttempts ? `?attempt=${failedAttempts}` : ''}`;
     const fail = () => { clearTimeout(timer); script.remove(); reject(new Error('Не удалось загрузить MapLibre')); };
     const timer = setTimeout(fail, 20_000);
     script.onerror = fail;
@@ -33,6 +37,6 @@ export function loadMapLibre(): Promise<MapApi> {
     document.head.appendChild(script);
   });
   pending = Promise.all([cssReady, apiReady]).then(([, api]) => api)
-    .catch((error: unknown) => { pending = undefined; throw error; });
+    .catch((error: unknown) => { failedAttempts += 1; pending = undefined; throw error; });
   return pending;
 }

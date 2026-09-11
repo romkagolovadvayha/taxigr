@@ -53,6 +53,7 @@ type CacheEntry = {
 };
 
 const routeCache = new Map<string, CacheEntry>();
+const pendingRoutes = new Map<string, Promise<RouteMetrics>>();
 let routerUnavailableUntil = 0;
 const OSRM_REQUEST_ATTEMPTS = 2;
 const OSRM_RETRY_DELAY_MS = 200;
@@ -207,20 +208,27 @@ export async function getRouteMetrics(origin: Point, destination: Point): Promis
   const cached = routeCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
+  const pending = pendingRoutes.get(key);
+  if (pending) return pending;
+
   if (!config.ROUTER_BASE_URL || routerUnavailableUntil > Date.now()) {
     return cached?.value ?? estimateRoute(origin, destination);
   }
 
-  try {
-    const route = await requestOsrm(origin, destination);
-    routerUnavailableUntil = 0;
-    return remember(key, route);
-  } catch (reason) {
-    if (reason instanceof OsrmTransportError && reason.retryable) {
-      routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
+  const request = (async () => {
+    try {
+      const route = await requestOsrm(origin, destination);
+      routerUnavailableUntil = 0;
+      return remember(key, route);
+    } catch (reason) {
+      if (reason instanceof OsrmTransportError && reason.retryable) {
+        routerUnavailableUntil = Date.now() + config.ROUTER_CIRCUIT_BREAKER_SECONDS * 1_000;
+      }
+      return cached?.value ?? estimateRoute(origin, destination);
     }
-    return cached?.value ?? estimateRoute(origin, destination);
-  }
+  })().finally(() => pendingRoutes.delete(key));
+  pendingRoutes.set(key, request);
+  return request;
 }
 
 export async function getMultiStopRouteMetrics(

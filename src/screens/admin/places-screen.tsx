@@ -4,6 +4,7 @@ import { Linking, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
+import { useScreenClock } from '@/hooks/use-screen-clock';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
@@ -256,7 +257,8 @@ export function PlacesScreen() {
   const [editing, setEditing] = useState<PlaceDirectoryEntry | null | 'new'>(null);
   const [draft, setDraft] = useState<PlaceDraft>(blankDraft);
   const [deleting, setDeleting] = useState<PlaceDirectoryEntry | null>(null);
-  const [now, setNow] = useState(() => new Date());
+  const clock = useScreenClock(30_000, places.length > 0 && editing === null);
+  const now = useMemo(() => new Date(clock), [clock]);
 
   useEffect(() => {
     if (!token) return;
@@ -276,10 +278,6 @@ export function PlacesScreen() {
       });
     return () => controller.abort();
   }, [token]);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   const filtered = useMemo(
     () =>

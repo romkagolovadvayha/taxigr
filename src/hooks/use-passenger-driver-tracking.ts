@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import { getDemoDriverSnapshot, getDemoPassengerProgression } from '@/domain/demo-flow';
 import type { Coordinates, RideOrder } from '@/domain/models';
+import { useForegroundScreen } from './use-foreground-screen';
 import {
   headingBetweenCoordinates,
   routePositionAtProgress,
@@ -23,19 +24,39 @@ export function usePassengerDriverTracking(
   demo: boolean,
 ): { coordinates: Coordinates | null; heading: number | null } {
   const rawCoordinates = ride?.driver?.coordinates ?? null;
+  const latitude = rawCoordinates?.latitude;
+  const longitude = rawCoordinates?.longitude;
+  const rideId = ride?.id;
+  const demoRide = demo ? ride : null;
+  const active = useForegroundScreen();
   const currentRef = useRef<RoutePosition | null>(null);
+  const trackedRideId = useRef(rideId);
   const [rendered, setRendered] = useState<{
     rideId: string;
     position: RoutePosition;
   } | null>(null);
 
   useEffect(() => {
-    if (!ride?.driver || !rawCoordinates) {
+    if (!active) return;
+    if (trackedRideId.current !== rideId) {
+      trackedRideId.current = rideId;
+      currentRef.current = null;
+    }
+    if (!rideId || latitude == null || longitude == null) {
       currentRef.current = null;
       return;
     }
+    const rawCoordinates = { latitude, longitude };
+    const commit = (position: RoutePosition) => {
+      currentRef.current = position;
+      setRendered(current => current?.rideId === rideId &&
+        current.position.coordinates.latitude === position.coordinates.latitude &&
+        current.position.coordinates.longitude === position.coordinates.longitude &&
+        current.position.heading === position.heading ? current : { rideId, position });
+    };
 
-    if (demo) {
+    if (demoRide) {
+      const ride = demoRide;
       const controller = new AbortController();
       let approachRoute: Coordinates[] = [];
       const statusDuration = getDemoPassengerProgression(ride.status)?.delay ?? 0;
@@ -46,8 +67,7 @@ export function usePassengerDriverTracking(
             ? Math.max(0, Math.min(1, (Date.now() - statusStartedAt) / statusDuration))
             : 1;
         const next = getDemoDriverSnapshot(ride, progress, approachRoute);
-        currentRef.current = next;
-        setRendered({ rideId: ride.id, position: next });
+        commit(next);
       };
       const startTimer = setTimeout(update, 0);
       if (['accepted', 'driver_arriving'].includes(ride.status)) {
@@ -87,7 +107,7 @@ export function usePassengerDriverTracking(
       };
       currentRef.current = position;
       const timer = setTimeout(() => {
-        setRendered({ rideId: ride.id, position });
+        commit(position);
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -103,8 +123,7 @@ export function usePassengerDriverTracking(
       const next =
         routePositionAtProgress([origin, rawCoordinates], progress) ?? emptyPosition;
       const rendered = { coordinates: next.coordinates, heading };
-      currentRef.current = rendered;
-      setRendered({ rideId: ride.id, position: rendered });
+      commit(rendered);
     };
     const startTimer = setTimeout(update, 0);
     if (
@@ -117,15 +136,14 @@ export function usePassengerDriverTracking(
     const stopTimer = setTimeout(() => {
       clearInterval(timer);
       const rendered = { coordinates: rawCoordinates, heading };
-      currentRef.current = rendered;
-      setRendered({ rideId: ride.id, position: rendered });
+      commit(rendered);
     }, LIVE_ANIMATION_MS + FRAME_INTERVAL_MS);
     return () => {
       clearTimeout(startTimer);
       clearInterval(timer);
       clearTimeout(stopTimer);
     };
-  }, [demo, rawCoordinates, ride]);
+  }, [active, demoRide, latitude, longitude, rideId]);
 
   return {
     coordinates:

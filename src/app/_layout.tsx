@@ -3,7 +3,7 @@ import { router, usePathname, type ErrorBoundaryProps, type Href } from 'expo-ro
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useFonts } from 'expo-font';
+import { FontDisplay, useFonts } from 'expo-font';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
@@ -73,8 +73,12 @@ function RootNavigator() {
   const { user, loading, sessionReady } = useSession();
   const pathname = usePathname();
   const { dark, ready: themeReady } = useAppTheme();
-  const [fontsLoaded, fontError] = useFonts({ Manrope: require('../../assets/fonts/Manrope.ttf') });
-  const fontsReady = fontsLoaded || !!fontError;
+  const [fontsLoaded, fontError] = useFonts({
+    Manrope: { uri: require('../../assets/fonts/Manrope.ttf'), display: FontDisplay.SWAP },
+  });
+  // Native builds embed this font. A web font request must not hold the app
+  // behind the splash on a cold or slow connection; text uses a fallback.
+  const fontsReady = Platform.OS === 'web' || fontsLoaded || !!fontError;
   const reducedMotion = useReducedMotion();
   const navigationTheme = {
     ...DefaultTheme,

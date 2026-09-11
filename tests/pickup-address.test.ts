@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pickupAddressAtCoordinates, resolvePickupAddress } from '../src/api/pickup-address';
+import { clearApiCache } from '../src/api/client';
 import { isPickupAddressComplete } from '../src/domain/address-precision';
 
 const coordinates = { latitude: 56.0477, longitude: 51.9586 };
@@ -9,7 +10,10 @@ const mockResponse = (data: unknown = [result]) => {
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) });
   vi.stubGlobal('fetch', fetch); return fetch;
 };
-beforeEach(() => vi.stubGlobal('window', { location: { hostname: 'localhost' } }));
+beforeEach(async () => {
+  await clearApiCache();
+  vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+});
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('pickup address without a map-provider key', () => {

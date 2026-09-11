@@ -1,5 +1,4 @@
 import { Camera, GeoJSONSource, Images, Layer, Map as MapLibreMap, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
-import { useIsFocused } from 'expo-router';
 import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -8,6 +7,7 @@ import { grahovoCenter } from '@/data/demo';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { MapLoadingOverlay } from './map-loading-overlay';
+import { configureNativeMapCache } from './map-cache.native';
 import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate } from './map-scene';
 import { taxiMapStyle } from './map-style';
 import type { TaxiMapProps } from './types';
@@ -29,6 +29,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const [following, setFollowing] = useState(true);
   const readyRef = useRef(false);
   const fitted = useRef('');
+  const fittedCoordinates = useRef<ReturnType<typeof useMapScene>['fitCoordinates'] | null>(null);
+  const followTarget = useRef('');
   const scene = useMapScene(props);
   const style = useMemo(() => JSON.stringify(taxiMapStyle(colors, colorScheme)), [colors, colorScheme]);
   // Adding the first selection pin must not change padding and reset a panned camera.
@@ -44,6 +46,12 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   }));
 
   useEffect(() => {
+    // Configure asynchronously once per process; never clear or await the tile
+    // cache before showing a map, including after signing out or switching roles.
+    void configureNativeMapCache();
+  }, []);
+
+  useEffect(() => {
     if (ready) return;
     const slowTimer = setTimeout(() => setSlow(true), 8_000);
     const timeout = setTimeout(() => {
@@ -53,11 +61,12 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     return () => { clearTimeout(slowTimer); clearTimeout(timeout); };
   }, [ready]);
 
-  useEffect(() => { setFollowing(true); }, [props.followDriver, props.followRequestId]);
+  useEffect(() => { followTarget.current = ''; setFollowing(true); }, [props.followDriver, props.followRequestId]);
 
   const selectionLatitude = props.selectionCenter?.latitude, selectionLongitude = props.selectionCenter?.longitude;
   useEffect(() => {
     if (!initialized || selectionLatitude == null || selectionLongitude == null) return;
+    followTarget.current = '';
     const point = { latitude: selectionLatitude, longitude: selectionLongitude };
     if (validMapCoordinate(point)) camera.current?.jumpTo({ center: lngLat(point), zoom: MAP_SELECTION_ZOOM, pitch: 0, bearing: 0, padding });
   }, [initialized, selectionLatitude, selectionLongitude, padding]);
@@ -65,6 +74,10 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   useEffect(() => {
     if (!initialized || !size.width || !size.height || props.selectionCenter) return;
     if (props.followDriver && following && validMapCoordinate(props.driver)) {
+      const target = JSON.stringify([props.driver.latitude, props.driver.longitude, props.navigationMode ? mapBearing(props.driverHeading) : 0,
+        props.followZoom, props.navigationMode, padding, props.followRequestId]);
+      if (followTarget.current === target) return;
+      followTarget.current = target;
       camera.current?.easeTo({ center: lngLat(props.driver),
         zoom: props.followZoom ?? (props.navigationMode ? 16.5 : 15),
         pitch: props.navigationMode ? 40 : 25,
@@ -74,11 +87,12 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       return;
     }
     if (props.followDriver) return;
-    const key = JSON.stringify([scene.fitCoordinates, size, padding, props.followRequestId]);
-    if (key === fitted.current) return;
+    const key = JSON.stringify([size, padding, props.followRequestId]);
+    if (key === fitted.current && fittedCoordinates.current === scene.fitCoordinates) return;
     const location = taxiMapFit(scene.fitCoordinates, size.width, size.height, padding);
     if (location) {
       fitted.current = key;
+      fittedCoordinates.current = scene.fitCoordinates;
       camera.current?.easeTo({ ...location, padding, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : motion.duration.tracking });
     }
   }, [initialized, size, props.selectionCenter, props.followDriver, props.followRequestId, props.driver, props.driverHeading,
@@ -104,7 +118,9 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         readyRef.current = true; setReady(true); onReady();
       }}
       onDidFailLoadingMap={() => { const message = 'Не удалось загрузить карту. Проверьте соединение и повторите.'; setError(message); onError(message); }}
-      onRegionWillChange={event => { if (event.nativeEvent.userInteraction) setFollowing(false); }}
+      onRegionWillChange={event => {
+        if (event.nativeEvent.userInteraction) { setFollowing(false); props.onSelectionInteraction?.(); }
+      }}
       onPress={event => {
         const [longitude, latitude] = event.nativeEvent.lngLat;
         if (validMapCoordinate({ latitude, longitude })) props.onCoordinateSelect?.({ latitude, longitude });
@@ -136,12 +152,11 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         </View>
       </Marker>)}
     </MapLibreMap>
-    {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} onRetry={props.retry} insets={props.viewportInsets} />}
+    {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} mapVisible={initialized} onRetry={props.retry} insets={props.viewportInsets} />}
   </View>;
 });
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
-  const focused = useIsFocused();
   const [attempt, setAttempt] = useState(0);
-  return focused ? <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} /> : null;
+  return <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} />;
 });

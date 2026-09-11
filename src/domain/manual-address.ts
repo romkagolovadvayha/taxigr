@@ -19,7 +19,7 @@ const IGNORED_TOKENS = new Set([
 
 function tokens(value: string): string[] {
   return value
-    .toLocaleLowerCase('ru')
+    .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
     .split(' ')

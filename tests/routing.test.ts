@@ -19,6 +19,24 @@ afterEach(() => {
 });
 
 describe('open routing fallback', () => {
+  it('shares concurrent geometry requests and reuses the completed route', async () => {
+    const origin = { latitude: 56.04213, longitude: 51.95213 };
+    const destination = { latitude: 56.05234, longitude: 51.97234 };
+    let complete!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { complete = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const first = getRouteMetrics(origin, destination);
+    const second = getRouteMetrics(origin, destination);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    complete(new Response(JSON.stringify({ code: 'Ok', routes: [{ distance: 2_000, duration: 250,
+      geometry: { type: 'LineString', coordinates: [[origin.longitude, origin.latitude], [destination.longitude, destination.latitude]] },
+    }] })));
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toBe(b);
+    expect(a.source).toBe('osrm');
+    expect(await getRouteMetrics(origin, destination)).toBe(a);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it('accepts a real zero-length OSRM leg', () => {
     expect(parseOsrmRoute({ code: 'Ok', routes: [{ distance: 0, duration: 0,
       geometry: { type: 'LineString', coordinates: [[51.95, 56.04], [51.95, 56.04]] },

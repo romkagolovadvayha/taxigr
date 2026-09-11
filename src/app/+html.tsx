@@ -6,6 +6,7 @@ import type { PropsWithChildren } from 'react';
 import { Asset } from 'expo-asset';
 
 import { inlineTariffImageSources } from '@/components/passenger/tariff-image-sources';
+import { MAP_GLYPHS_URL, MAP_TILES_URL } from '@/components/map/map-style';
 
 export default function RootHtml({ children }: PropsWithChildren) {
   const { htmlAttributes, bodyAttributes, headNodes, bodyNodes } = useServerDocumentContext();
@@ -15,6 +16,9 @@ export default function RootHtml({ children }: PropsWithChildren) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+        {[...new Set([MAP_TILES_URL, MAP_GLYPHS_URL].flatMap(value => {
+          try { return [new URL(value).origin]; } catch { return []; }
+        }))].map(origin => <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />)}
         {Object.entries(inlineTariffImageSources).map(([code, source]) => (
           <link
             key={code}

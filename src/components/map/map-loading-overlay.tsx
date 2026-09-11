@@ -6,13 +6,35 @@ import { typography } from '@/theme/tokens';
 import type { MapViewportInsets } from './types';
 import { MapPlaceholder } from './map-placeholder';
 
-export function MapLoadingOverlay({ error, slow, onRetry, insets }: {
+export function MapLoadingOverlay({ error, slow, mapVisible = false, onRetry, insets }: {
   error: string | null;
   slow: boolean;
+  mapVisible?: boolean;
   onRetry: () => void;
   insets?: MapViewportInsets;
 }) {
   const colors = useThemeColors();
+  // Once the style exists, let the real map render progressively. Waiting for
+  // every tile/font behind an opaque placeholder makes a usable map look frozen.
+  if (mapVisible) return (
+    <View pointerEvents="box-none" style={{ position: 'absolute', top: (insets?.top ?? 0) + 12,
+      left: (insets?.left ?? 0) + 12, right: (insets?.right ?? 0) + 12, alignItems: 'center' }}>
+      <View accessibilityRole={error ? 'alert' : 'progressbar'} accessibilityLiveRegion="polite"
+        accessibilityLabel={error ?? 'Загружаем карту'}
+        style={{ maxWidth: 320, padding: 12, borderRadius: 16, gap: 8, backgroundColor: colors.surface }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {!error && <ActivityIndicator size="small" color={colors.ink} />}
+          <Text style={{ ...typography.caption, flexShrink: 1, color: colors.ink }}>
+            {error ?? (slow ? 'Карта ещё загружается. Адрес можно ввести вручную.' : 'Загружаем карту…')}
+          </Text>
+        </View>
+        {!!error && <AnimatedPressable accessibilityRole="button" onPress={onRetry}
+          style={{ padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: colors.brand }}>
+          <Text style={{ ...typography.bodyStrong, color: colors.brandInk }}>Повторить</Text>
+        </AnimatedPressable>}
+      </View>
+    </View>
+  );
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
     <MapPlaceholder />

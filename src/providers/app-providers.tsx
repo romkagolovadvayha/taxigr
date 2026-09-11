@@ -13,7 +13,7 @@ import { LocationPermissionRegistrar } from '@/providers/location-permission-reg
 import { NotificationRegistrar } from '@/providers/notification-registrar';
 import { PassengerLocationPublisher } from '@/providers/passenger-location-publisher';
 import { PassengerPreferencesProvider } from '@/preferences/passenger-preferences-provider';
-import { RideProvider, useRide } from '@/state/ride-provider';
+import { RideProvider, useRideBootstrapReady } from '@/state/ride-provider';
 import { AppUpdateProvider } from '@/updates/app-update-provider';
 
 onlineManager.setEventListener((setOnline) =>
@@ -21,7 +21,7 @@ onlineManager.setEventListener((setOnline) =>
 );
 
 function PostBootstrapServices() {
-  const { bootstrapReady } = useRide();
+  const bootstrapReady = useRideBootstrapReady();
   if (!bootstrapReady) return null;
   return <NotificationRegistrar />;
 }

@@ -124,6 +124,7 @@ export function PassengerLocationPublisher() {
         },
         publishPosition,
       );
+      if (cancelled) subscription.remove();
     })().catch(() => undefined);
 
     return () => {

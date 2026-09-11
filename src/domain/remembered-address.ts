@@ -24,6 +24,7 @@ export function rememberedHouse(address: Address, coordinates: Coordinates, id: 
 
 /** Reliable map data wins; a remembered point replaces only an approximate anchor. */
 export function overlayRememberedAddresses(directory: readonly Address[], remembered: readonly Address[]): Address[] {
+  if (!remembered.length) return [...directory];
   const points = new Map(remembered.map(address => [houseAddressKey(address), address]));
   const used = new Set<string>();
   const result = directory.map(address => {

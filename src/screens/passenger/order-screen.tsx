@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +23,7 @@ import { UserAvatar } from '@/components/user-avatar';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-tracking';
+import { useScreenClock } from '@/hooks/use-screen-clock';
 import { useRide } from '@/state/ride-provider';
 import { spacing, typography } from '@/theme/tokens';
 import { formatEstimatedArrivalTime } from '@/utils/format';
@@ -124,7 +125,6 @@ export function OrderScreen() {
   const insets = useSafeAreaInsets();
   const { isPhone, isDesktop } = useResponsiveLayout();
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
-  const [arrivalClock, setArrivalClock] = useState(() => new Date());
   const {
     pickup,
     destinations,
@@ -152,16 +152,8 @@ export function OrderScreen() {
     !driverIsFinishingPreviousRide &&
     (currentRide?.status === 'driver_arriving' || rideInProgress);
   const selectedPreviewTariff = tariffs.find((tariff) => tariff.code === selectedTariff);
-
-  useEffect(() => {
-    if (currentRide || !pickup || !destination || !routeSummary) return;
-    const refreshTimer = setTimeout(() => setArrivalClock(new Date()), 0);
-    const timer = setInterval(() => setArrivalClock(new Date()), 30_000);
-    return () => {
-      clearTimeout(refreshTimer);
-      clearInterval(timer);
-    };
-  }, [currentRide, destination, pickup, routeSummary]);
+  const clock = useScreenClock(30_000, !currentRide && !!pickup && !!destination && !!routeSummary);
+  const arrivalClock = useMemo(() => new Date(clock), [clock]);
 
   useEffect(() => {
     if (!token?.startsWith('demo:passenger') || !currentRide) return;

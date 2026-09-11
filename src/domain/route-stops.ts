@@ -1,6 +1,13 @@
 import type { Address, Coordinates } from './models';
 import { distanceBetweenCoordinates } from './navigation';
 
+/** A stale editor index must not silently discard a selected destination. */
+export function replaceRouteStop(destinations: readonly Address[], index: number, address: Address): Address[] {
+  if (!Number.isInteger(index) || index < 0) return [...destinations];
+  if (index >= destinations.length) return [...destinations, address].slice(0, 5);
+  return destinations.map((item, itemIndex) => itemIndex === index ? address : item);
+}
+
 /** Address identity matters: different houses can share an approximate centre. */
 export function sameRouteStop(left: Address, right: Address): boolean {
   const label = (value: string) => value.trim().toLocaleLowerCase('ru').replace(/\s+/gu, ' ');

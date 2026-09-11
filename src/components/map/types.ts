@@ -30,4 +30,5 @@ export type TaxiMapProps = {
   onMapError?: (message: string) => void;
   selectionCenter?: Coordinates;
   onCoordinateSelect?: (coordinates: Coordinates) => void;
+  onSelectionInteraction?: () => void;
 };

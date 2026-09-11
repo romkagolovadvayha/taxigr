@@ -10,20 +10,20 @@ type AddressLike = {
 
 const HOUSE_NUMBER = String.raw`\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?`;
 const ROAD_CODE = /^\d{1,3}[рк]-\d+$/iu;
+const TRAILING_HOUSE = new RegExp(String.raw`(?:,\s*|\s+)(${HOUSE_NUMBER})\s*$`, 'iu');
+const EXPLICIT_HOUSE = new RegExp(String.raw`\b(?:дом|д\.)\s*(${HOUSE_NUMBER})(?:\b|$)`, 'iu');
 
 export function extractHouseNumber(address: AddressLike): string | null {
   const structured = address.houseNumber?.trim();
   if (structured) return structured;
 
   const label = address.label.trim().replace(/\s+/g, ' ');
-  const trailing = label.match(new RegExp(String.raw`(?:,\s*|\s+)(${HOUSE_NUMBER})\s*$`, 'iu'));
+  const trailing = label.match(TRAILING_HOUSE);
   const candidate = trailing?.[1];
   if (candidate && !ROAD_CODE.test(candidate)) return candidate;
 
   const details = address.details?.trim() ?? '';
-  const explicit = details.match(
-    new RegExp(String.raw`\b(?:дом|д\.)\s*(${HOUSE_NUMBER})(?:\b|$)`, 'iu'),
-  );
+  const explicit = details.match(EXPLICIT_HOUSE);
   return explicit?.[1] ?? null;
 }
 
@@ -58,7 +58,7 @@ export function queryHasHouseNumber(query: string): boolean {
 
 export function extractQueryHouseNumber(query: string): string | null {
   const normalized = query.trim().replace(/\s+/g, ' ');
-  const match = normalized.match(new RegExp(String.raw`(?:,\s*|\s+)(${HOUSE_NUMBER})\s*$`, 'iu'));
+  const match = normalized.match(TRAILING_HOUSE);
   if (!match?.[1] || match.index == null || ROAD_CODE.test(match[1])) return null;
 
   const streetPart = normalized

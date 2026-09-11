@@ -1,3 +1,32 @@
+import { readApiCache, writeApiCache } from '../storage/api-cache-storage';
+import { mutationCacheTags, responseCachePolicy } from './cache-policy';
+import { ResponseCache } from './response-cache';
+
+const responseCache = new ResponseCache({ read: readApiCache, write: writeApiCache });
+const sessionOwners = new Map<string, string>();
+let cacheOwner: string | null = null;
+
+export function setApiCacheSession(token: string, userId: string): void {
+  if (cacheOwner && cacheOwner !== userId) {
+    responseCache.invalidate();
+    sessionOwners.clear();
+  }
+  cacheOwner = userId;
+  sessionOwners.set(token, userId);
+  if (sessionOwners.size > 4) sessionOwners.delete(sessionOwners.keys().next().value!);
+}
+
+export function invalidateApiCache(tags?: readonly string[]): void {
+  if (!tags || tags.length) responseCache.invalidate(tags);
+}
+
+export async function clearApiCache(): Promise<void> {
+  responseCache.invalidate();
+  sessionOwners.clear();
+  cacheOwner = null;
+  await responseCache.flush();
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -38,6 +67,30 @@ export function resolveApiUrl(pathOrUrl: string): string {
 }
 
 export async function apiRequest<T>(
+  path: string,
+  options: RequestInit & { token?: string; timeoutMs?: number } = {},
+): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' || options.headers) {
+    const result = await requestFromNetwork<T>(path, options);
+    if (method !== 'GET') invalidateApiCache(mutationCacheTags(path));
+    return result;
+  }
+  const policy = responseCachePolicy(path);
+  const owner = options.token ? sessionOwners.get(options.token) : 'public';
+  const scope = owner ?? `token:${options.token}`;
+  const url = new URL(path, `${getApiUrl()}/`);
+  url.searchParams.sort();
+  try {
+    return await responseCache.read<T>(`${scope}:${url}`, { ...policy, persist: policy.persist && Boolean(owner) },
+      signal => requestFromNetwork<T>(path, { ...options, signal }), options.signal, options.cache === 'reload' || options.cache === 'no-store');
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw new ApiError('Запрос отменён', 0, 'REQUEST_ABORTED');
+    throw error;
+  }
+}
+
+async function requestFromNetwork<T>(
   path: string,
   options: RequestInit & { token?: string; timeoutMs?: number } = {},
 ): Promise<T> {

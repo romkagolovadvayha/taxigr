@@ -5,11 +5,11 @@ import { useCallback, useRef, useState } from 'react';
 import { resolvePickupAddress } from '@/api/pickup-address';
 import { useSession } from '@/auth/session-provider';
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
-import { useRide } from '@/state/ride-provider';
+import { useRideAddresses } from '@/state/ride-provider';
 
 export function usePassengerPickupLocation() {
   const { token } = useSession();
-  const { setPickup } = useRide();
+  const { setPickup } = useRideAddresses();
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const locationRequest = useRef<AbortController | null>(null);

@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { ApiError, apiRequest } from '@/api/client';
+import { ApiError, apiRequest, clearApiCache, setApiCacheSession } from '@/api/client';
 import type { DemoPersona, SessionUser, UserRole } from '@/domain/models';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
-import { clearSessionToken, readSessionToken, writeSessionToken } from '@/storage/auth-storage';
+import { clearSessionToken, readSessionToken, readStoredSession, writeSessionToken, writeStoredSession } from '@/storage/auth-storage';
 import { getInstallationId } from '@/storage/device-id';
 import { createVkMiniAppSessionHandoff } from '@/vk-mini-app/session-handoff';
 
@@ -151,31 +151,48 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [vkCommunityPromptUrl, setVkCommunityPromptUrl] = useState<string | null>(null);
   const [initialLegalConsentRequired, setInitialLegalConsentRequired] = useState(false);
   const [vkMiniAppSessionHandoff] = useState(createVkMiniAppSessionHandoff);
+  const sessionRevision = useRef(0);
 
   const applySession = useCallback(async (result: {
     token: string;
     user: SessionUser;
     legalConsentRequired?: boolean;
   }) => {
+    const revision = ++sessionRevision.current;
     await writeSessionToken(result.token);
+    if (revision !== sessionRevision.current) return;
+    setApiCacheSession(result.token, result.user.id);
     setToken(result.token);
     setUser(result.user);
     setInitialLegalConsentRequired(Boolean(result.legalConsentRequired));
     setAuthError(null);
+    await writeStoredSession(result).catch(() => undefined);
   }, []);
 
   const restore = useCallback(async () => {
+    const revision = sessionRevision.current;
     try {
       const stored = await readSessionToken();
-      if (!stored) return;
+      if (!stored || revision !== sessionRevision.current) return;
       setLoading(true);
       if (stored.startsWith('demo:') && demoEnabled) {
         const storedPersona = stored.slice(5);
         const persona: DemoPersona =
           storedPersona === 'driver' || storedPersona === 'admin' ? storedPersona : 'passenger';
         setToken(stored);
+        setApiCacheSession(stored, demoUser(persona).id);
         setUser(demoUser(persona));
         return;
+      }
+      const cached = await readStoredSession(stored);
+      if (revision !== sessionRevision.current) return;
+      if (cached) {
+        setApiCacheSession(stored, cached.user.id);
+        setToken(stored);
+        setUser(cached.user);
+        setInitialLegalConsentRequired(Boolean(cached.legalConsentRequired));
+        setLoading(false);
+        setSessionReady(true);
       }
       const refreshed = await apiRequest<{
         token: string;
@@ -185,10 +202,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         '/v1/auth/refresh',
         { method: 'POST', token: stored },
       );
-      await applySession(refreshed);
-    } catch {
-      await clearSessionToken();
-      await syncDriverBackgroundLocation(false).catch(() => undefined);
+      if (revision === sessionRevision.current) await applySession(refreshed);
+    } catch (error) {
+      if (revision !== sessionRevision.current) return;
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setToken(null);
+        setUser(null);
+        await clearSessionToken();
+        await clearApiCache();
+        await syncDriverBackgroundLocation(false).catch(() => undefined);
+      } else {
+        setAuthError(error instanceof Error ? error.message : 'Не удалось проверить сессию');
+      }
     } finally {
       setLoading(false);
       setSessionReady(true);
@@ -448,9 +473,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const resetSessionForEmbeddedAuth = useCallback(async () => {
+    sessionRevision.current += 1;
     vkMiniAppSessionHandoff.clear();
     await syncDriverBackgroundLocation(false).catch(() => undefined);
     await clearSessionToken();
+    await clearApiCache();
     setToken(null);
     setUser(null);
     setAuthError(null);
@@ -506,8 +533,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     _legalAcceptance: InitialLegalAcceptance,
   ) => {
     if (!demoEnabled) return;
+    sessionRevision.current += 1;
     const demoToken = `demo:${persona}`;
     await writeSessionToken(demoToken);
+    setApiCacheSession(demoToken, demoUser(persona).id);
     setToken(demoToken);
     setUser(demoUser(persona));
     router.replace(persona === 'admin' ? '/admin' : persona === 'driver' ? '/driver' : '/');
@@ -570,9 +599,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const signOut = useCallback(async () => {
+    sessionRevision.current += 1;
     vkMiniAppSessionHandoff.clear();
     await syncDriverBackgroundLocation(false).catch(() => undefined);
     await clearSessionToken();
+    await clearApiCache();
     setToken(null);
     setUser(null);
     setAuthError(null);
@@ -583,6 +614,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refreshSession = useCallback(async () => {
     if (!token || token.startsWith('demo:')) return;
+    const revision = sessionRevision.current;
     const refreshed = await apiRequest<{
       token: string;
       user: SessionUser;
@@ -591,7 +623,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       '/v1/auth/refresh',
       { method: 'POST', token },
     );
-    await applySession(refreshed);
+    if (revision === sessionRevision.current) await applySession(refreshed);
   }, [applySession, token]);
 
   useEffect(() => {

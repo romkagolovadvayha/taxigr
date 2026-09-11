@@ -78,7 +78,7 @@ export function OrderConfirmationScreen() {
       return;
     }
     const ride = await createRide(comment.trim() || undefined);
-    if (ride) router.replace('/');
+    if (ride) router.dismissTo('/');
   };
 
   const acceptAndConfirm = async () => {
@@ -89,7 +89,7 @@ export function OrderConfirmationScreen() {
     );
     if (!ride) return;
     setConsentVisible(false);
-    router.replace('/');
+    router.dismissTo('/');
   };
 
   return (
