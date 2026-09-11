@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../server/db', () => ({ db: { query: vi.fn(async () => [[]]), execute: vi.fn(async () => []) } }));
+
 import {
   buildNominatimQueries,
   filterExactHouseResults,
   prioritizeGrahovoDistrict,
   searchAddresses,
+  streetGeocoderQuery,
 } from '../server/geocoding';
 
 afterEach(() => {
@@ -12,6 +15,30 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it('finds imported house coordinates immediately without upstream requests', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses('Грахово Колпакова 8');
+    expect(results[0]).toMatchObject({ houseNumber: '8', coordinatePrecision: 'precise' });
+    expect(results[0]?.id).toMatch(/^osm-house:/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('bypasses an approximate GAR match only for explicit house resolution', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify([{ place_id: 'unit-test-house',
+      display_name: 'Благодатновская, 1, Благодатное', lat: '56.001', lon: '51.87',
+      address: { house_number: '1', road: 'Благодатновская улица', village: 'Благодатное', county: 'Граховский район' } }])));
+    vi.stubGlobal('fetch', fetch);
+    const local = await searchAddresses('д. Благодатное, ул. Благодатновская, 1');
+    expect(local[0]?.coordinatePrecision).toBe('approximate');
+    expect(fetch).not.toHaveBeenCalled();
+    const resolved = await searchAddresses('д. Благодатное, ул. Благодатновская, 1', false, true);
+    expect(resolved[0]?.id).toBe('osm-unit-test-house');
+    expect(resolved.some(a => a.id.startsWith('gar:'))).toBe(false);
+  });
+  it('expands address-directory abbreviations for the street geocoder', () => {
+    expect(streetGeocoderQuery('с. Грахово, ул. Ачинцева')).toBe('Грахово, улица Ачинцева');
+    expect(streetGeocoderQuery('г. Ижевск, пер. Северный')).toBe('Ижевск, переулок Северный');
+    expect(streetGeocoderQuery('Грахово, улица 70 лет Октября')).toBe('Грахово, улица 70 лет Октября');
+  });
   it('finds Grahovo addresses without an external request', async () => {
     const results = await searchAddresses('Ачинцева');
     expect(results.length).toBeGreaterThan(20);

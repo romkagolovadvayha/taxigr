@@ -40,6 +40,7 @@ export function fitRouteLocation(
   margin: MapMargin,
   minZoom = 6,
   maxZoom = 17,
+  tileSize = TILE_SIZE,
 ): RouteLocation | null {
   if (coordinates.length < 2 || width <= 0 || height <= 0) return null;
 
@@ -55,8 +56,8 @@ export function fitRouteLocation(
   const availableHeight = Math.max(32, height - top - bottom);
   const spanX = Math.max(maximumX - minimumX, Number.EPSILON);
   const spanY = Math.max(maximumY - minimumY, Number.EPSILON);
-  const zoomX = Math.log2(availableWidth / (TILE_SIZE * spanX));
-  const zoomY = Math.log2(availableHeight / (TILE_SIZE * spanY));
+  const zoomX = Math.log2(availableWidth / (tileSize * spanX));
+  const zoomY = Math.log2(availableHeight / (tileSize * spanY));
   const zoom = Math.max(minZoom, Math.min(maxZoom, zoomX, zoomY));
   const boundsCenterX = (minimumX + maximumX) / 2;
   const boundsCenterY = (minimumY + maximumY) / 2;

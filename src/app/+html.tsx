@@ -5,7 +5,6 @@ import {
 import type { PropsWithChildren } from 'react';
 import { Asset } from 'expo-asset';
 
-import { yandexMapCancellationScript } from '@/components/map/yandex-map-errors';
 import { inlineTariffImageSources } from '@/components/passenger/tariff-image-sources';
 
 export default function RootHtml({ children }: PropsWithChildren) {
@@ -13,7 +12,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
   return (
     <html lang="ru" {...htmlAttributes}>
       <head>
-        <script id="map-request-cancellation" dangerouslySetInnerHTML={{ __html: yandexMapCancellationScript }} />
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -27,15 +25,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
             fetchPriority="high"
           />
         ))}
-        {process.env.NODE_ENV === 'development' && process.env.EXPO_PUBLIC_DEMO_MODE === 'true' && (
-          <script
-            id="demo-localhost"
-            // Yandex JS API authorizes the localhost domain, not the loopback IP.
-            dangerouslySetInnerHTML={{
-              __html: "if(window.location.hostname==='127.0.0.1'){var demoUrl=new URL(window.location.href);demoUrl.hostname='localhost';window.location.replace(demoUrl.href)}",
-            }}
-          />
-        )}
         <meta name="theme-color" content="#F6C945" />
         <meta name="color-scheme" content="light dark" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

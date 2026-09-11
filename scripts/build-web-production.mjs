@@ -16,18 +16,12 @@ if (!publicUrl) {
 
 const environment = {
   ...process.env,
+  EXPO_NO_DOTENV: '1',
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || publicUrl,
   EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || publicUrl,
   EXPO_PUBLIC_SITE_URL: process.env.EXPO_PUBLIC_SITE_URL || publicUrl,
-  EXPO_PUBLIC_YANDEX_MAPS_API_KEY:
-    process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY ||
-    process.env.YANDEX_MAPS_API_KEY ||
-    production.YANDEX_MAPS_API_KEY ||
-    '',
-  EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY:
-    process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY ||
-    production.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY ||
-    '',
+  EXPO_PUBLIC_MAP_TILES_URL: process.env.EXPO_PUBLIC_MAP_TILES_URL || production.EXPO_PUBLIC_MAP_TILES_URL || '',
+  EXPO_PUBLIC_MAP_GLYPHS_URL: process.env.EXPO_PUBLIC_MAP_GLYPHS_URL || production.EXPO_PUBLIC_MAP_GLYPHS_URL || '',
   EXPO_PUBLIC_DEMO_MODE: 'false',
   EXPO_PUBLIC_VK_COMMUNITY_ID:
     process.env.EXPO_PUBLIC_VK_COMMUNITY_ID ||
@@ -37,7 +31,9 @@ const environment = {
 };
 
 const expoCli = resolve(process.cwd(), 'node_modules', 'expo', 'bin', 'cli');
-const result = spawnSync(process.execPath, [expoCli, 'export', '--platform', 'web'], {
+// Metro caches inlined public variables; a preceding demo export must not leak
+// demo authentication into the production bundle.
+const result = spawnSync(process.execPath, [expoCli, 'export', '--platform', 'web', '--clear'], {
   cwd: process.cwd(),
   env: environment,
   stdio: 'inherit',

@@ -1,0 +1,6038 @@
+{
+  "version": 1,
+  "districtOsmRelation": 956094,
+  "dataDate": "2026-09-11T00:27:59Z",
+  "source": "OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "sourceUrl": "https://www.openstreetmap.org/copyright",
+  "points": [
+    {
+      "id": "osm-house:way:963585262",
+      "garId": "gar:д-иж-бобья-ул-кооперативная:д-9",
+      "label": "д. Иж-Бобья, ул. Кооперативная, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0346024,
+        "longitude": 52.061913
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963585262"
+    },
+    {
+      "id": "osm-house:way:963591596",
+      "garId": "gar:д-каменное-ул-клубная:д-4",
+      "label": "д. Каменное, ул. Клубная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0390191,
+        "longitude": 52.0197742
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963591596"
+    },
+    {
+      "id": "osm-house:way:963590085",
+      "garId": "gar:д-каменное-ул-молодежная:д-4",
+      "label": "д. Каменное, ул. Молодежная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0345253,
+        "longitude": 52.0218058
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963590085"
+    },
+    {
+      "id": "osm-house:way:1315938687",
+      "garId": "gar:д-каменное-ул-советская:д-1а",
+      "label": "д. Каменное, ул. Советская, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0374928,
+        "longitude": 52.0195709
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1315938687"
+    },
+    {
+      "id": "osm-house:way:963590524",
+      "garId": "gar:д-каменное-ул-советская:д-29",
+      "label": "д. Каменное, ул. Советская, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0358619,
+        "longitude": 52.0284243
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963590524"
+    },
+    {
+      "id": "osm-house:way:878562685",
+      "garId": "gar:д-лолошур-возжи-ул-луговая:д-22",
+      "label": "д. Лолошур-Возжи, ул. Луговая, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0053019,
+        "longitude": 51.7898569
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562685"
+    },
+    {
+      "id": "osm-house:way:878562887",
+      "garId": "gar:д-лолошур-возжи-ул-м-горького:д-9",
+      "label": "д. Лолошур-Возжи, ул. М.Горького, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 55.9997442,
+        "longitude": 51.7695705
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562887"
+    },
+    {
+      "id": "osm-house:way:878562683",
+      "garId": "gar:д-лолошур-возжи-ул-пановская:д-29",
+      "label": "д. Лолошур-Возжи, ул. Пановская, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.005961,
+        "longitude": 51.7897976
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562683"
+    },
+    {
+      "id": "osm-house:way:878562684",
+      "garId": "gar:д-лолошур-возжи-ул-пановская:д-31",
+      "label": "д. Лолошур-Возжи, ул. Пановская, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0057156,
+        "longitude": 51.7902074
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562684"
+    },
+    {
+      "id": "osm-house:way:1536092330",
+      "garId": "gar:д-лолошур-возжи-ул-пановская:д-33",
+      "label": "д. Лолошур-Возжи, ул. Пановская, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0055024,
+        "longitude": 51.7902794
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1536092330"
+    },
+    {
+      "id": "osm-house:way:878562686",
+      "garId": "gar:д-лолошур-возжи-ул-пановская:зд-33-1",
+      "label": "д. Лолошур-Возжи, ул. Пановская, 33/1",
+      "houseNumber": "33/1",
+      "coordinates": {
+        "latitude": 56.0052499,
+        "longitude": 51.7906357
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562686"
+    },
+    {
+      "id": "osm-house:way:878562761",
+      "garId": "gar:д-лолошур-возжи-ул-советская:д-2б",
+      "label": "д. Лолошур-Возжи, ул. Советская, 2б",
+      "houseNumber": "2б",
+      "coordinates": {
+        "latitude": 56.0010191,
+        "longitude": 51.7809833
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878562761"
+    },
+    {
+      "id": "osm-house:way:878571021",
+      "garId": "gar:д-мари-возжай-ул-бельского:д-7а",
+      "label": "д. Мари-Возжай, ул. Бельского, 7а",
+      "houseNumber": "7а",
+      "coordinates": {
+        "latitude": 56.0102603,
+        "longitude": 52.1128552
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878571021"
+    },
+    {
+      "id": "osm-house:way:878571026",
+      "garId": "gar:д-мари-возжай-ул-бельского:д-9а",
+      "label": "д. Мари-Возжай, ул. Бельского, 9а",
+      "houseNumber": "9а",
+      "coordinates": {
+        "latitude": 56.0099477,
+        "longitude": 52.112948
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878571026"
+    },
+    {
+      "id": "osm-house:way:448355765",
+      "garId": "gar:д-мари-возжай-ул-советская:зд-38а",
+      "label": "д. Мари-Возжай, ул. Советская, 38а",
+      "houseNumber": "38а",
+      "coordinates": {
+        "latitude": 56.0120874,
+        "longitude": 52.108047
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/448355765"
+    },
+    {
+      "id": "osm-house:way:878571059",
+      "garId": "gar:д-мари-возжай-ул-школьная:д-34",
+      "label": "д. Мари-Возжай, ул. Школьная, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.010657,
+        "longitude": 52.1191995
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878571059"
+    },
+    {
+      "id": "osm-house:way:1258476428",
+      "label": "д. Мари-Возжай, улица Бельского, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0061172,
+        "longitude": 52.1161862
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1258476428"
+    },
+    {
+      "id": "osm-house:way:1092005760",
+      "garId": "gar:д-мишкино-ул-колхозная:д-33",
+      "label": "д. Мишкино, ул. Колхозная, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 55.9298513,
+        "longitude": 52.0781578
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1092005760"
+    },
+    {
+      "id": "osm-house:way:963633538",
+      "garId": "gar:д-порым-ул-центральная:д-22",
+      "label": "д. Порым, ул. Центральная, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0153895,
+        "longitude": 51.9736281
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963633538"
+    },
+    {
+      "id": "osm-house:way:963879496",
+      "garId": "gar:д-старая-игра-пер-ключевой:д-1",
+      "label": "д. Старая Игра, пер. Ключевой, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 55.9325562,
+        "longitude": 52.1471317
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963879496"
+    },
+    {
+      "id": "osm-house:way:963880049",
+      "garId": "gar:д-старая-игра-ул-п-усольцева:д-41",
+      "label": "д. Старая Игра, ул. П.Усольцева, 41",
+      "houseNumber": "41",
+      "coordinates": {
+        "latitude": 55.935263,
+        "longitude": 52.1482726
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963880049"
+    },
+    {
+      "id": "osm-house:way:1280777110",
+      "garId": "gar:д-старая-игра-ул-удмуртская:зд-59а",
+      "label": "д. Старая Игра, ул. Удмуртская, 59а",
+      "houseNumber": "59а",
+      "coordinates": {
+        "latitude": 55.9338186,
+        "longitude": 52.1454316
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1280777110"
+    },
+    {
+      "id": "osm-house:way:963861447",
+      "garId": "gar:с-верхняя-игра-ул-10-й-пятилетки:д-4",
+      "label": "с. Верхняя Игра, ул. 10-й Пятилетки, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 55.9454676,
+        "longitude": 52.1025619
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963861447"
+    },
+    {
+      "id": "osm-house:way:963861440",
+      "garId": "gar:с-верхняя-игра-ул-10-й-пятилетки:д-12а",
+      "label": "с. Верхняя Игра, ул. 10-й Пятилетки, 12а",
+      "houseNumber": "12а",
+      "coordinates": {
+        "latitude": 55.9460383,
+        "longitude": 52.1003397
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963861440"
+    },
+    {
+      "id": "osm-house:way:963861432",
+      "garId": "gar:с-верхняя-игра-ул-10-й-пятилетки:д-24",
+      "label": "с. Верхняя Игра, ул. 10-й Пятилетки, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 55.946889,
+        "longitude": 52.0960516
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963861432"
+    },
+    {
+      "id": "osm-house:way:963862136",
+      "garId": "gar:с-верхняя-игра-ул-д-майорова:д-21",
+      "label": "с. Верхняя Игра, ул. Д.Майорова, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 55.9470562,
+        "longitude": 52.1068014
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963862136"
+    },
+    {
+      "id": "osm-house:way:963862138",
+      "garId": "gar:с-верхняя-игра-ул-д-майорова:д-23",
+      "label": "с. Верхняя Игра, ул. Д.Майорова, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 55.947185,
+        "longitude": 52.1063947
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963862138"
+    },
+    {
+      "id": "osm-house:way:963860950",
+      "garId": "gar:с-верхняя-игра-ул-д-майорова:д-48",
+      "label": "с. Верхняя Игра, ул. Д.Майорова, 48",
+      "houseNumber": "48",
+      "coordinates": {
+        "latitude": 55.9485278,
+        "longitude": 52.0988792
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963860950"
+    },
+    {
+      "id": "osm-house:way:963860938",
+      "garId": "gar:с-верхняя-игра-ул-д-майорова:д-72",
+      "label": "с. Верхняя Игра, ул. Д.Майорова, 72",
+      "houseNumber": "72",
+      "coordinates": {
+        "latitude": 55.9496852,
+        "longitude": 52.091104
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/963860938"
+    },
+    {
+      "id": "osm-house:way:718283580",
+      "label": "с. Грахово, Больничная улица, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0487889,
+        "longitude": 51.9599896
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283580"
+    },
+    {
+      "id": "osm-house:node:13996664637",
+      "label": "с. Грахово, Заречная улица, 10/2",
+      "houseNumber": "10/2",
+      "coordinates": {
+        "latitude": 56.0417635,
+        "longitude": 51.9702621
+      },
+      "sourceUrl": "https://www.openstreetmap.org/node/13996664637"
+    },
+    {
+      "id": "osm-house:way:718298672",
+      "label": "с. Грахово, Набережная улица, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.04094,
+        "longitude": 51.9528758
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298672"
+    },
+    {
+      "id": "osm-house:way:718298800",
+      "label": "с. Грахово, Нижняя улица, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0439694,
+        "longitude": 51.9680597
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298800"
+    },
+    {
+      "id": "osm-house:way:718298707",
+      "label": "с. Грахово, Нижняя улица, 19Г",
+      "houseNumber": "19Г",
+      "coordinates": {
+        "latitude": 56.0418947,
+        "longitude": 51.9665808
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298707"
+    },
+    {
+      "id": "osm-house:way:717520460",
+      "garId": "gar:с-грахово-пер-лесхозский:д-3",
+      "label": "с. Грахово, пер. Лесхозский, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0529468,
+        "longitude": 51.9807579
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520460"
+    },
+    {
+      "id": "osm-house:way:717520457",
+      "garId": "gar:с-грахово-пер-лесхозский:д-7-1",
+      "label": "с. Грахово, пер. Лесхозский, 7/1",
+      "houseNumber": "7/1",
+      "coordinates": {
+        "latitude": 56.0535731,
+        "longitude": 51.9801972
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520457"
+    },
+    {
+      "id": "osm-house:way:718298612",
+      "garId": "gar:с-грахово-пер-октябрьский:д-8",
+      "label": "с. Грахово, пер. Октябрьский, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0458582,
+        "longitude": 51.9692235
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298612"
+    },
+    {
+      "id": "osm-house:way:718283809",
+      "garId": "gar:с-грахово-пер-октябрьский:д-13",
+      "label": "с. Грахово, пер. Октябрьский, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0468086,
+        "longitude": 51.9713973
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283809"
+    },
+    {
+      "id": "osm-house:way:718283792",
+      "garId": "gar:с-грахово-пер-октябрьский:д-31",
+      "label": "с. Грахово, пер. Октябрьский, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0481049,
+        "longitude": 51.9746756
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283792"
+    },
+    {
+      "id": "osm-house:way:718283775",
+      "garId": "gar:с-грахово-пер-октябрьский:д-35",
+      "label": "с. Грахово, пер. Октябрьский, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.0491743,
+        "longitude": 51.97709
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283775"
+    },
+    {
+      "id": "osm-house:way:718298791",
+      "garId": "gar:с-грахово-пер-строительный:д-1",
+      "label": "с. Грахово, пер. Строительный, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0419002,
+        "longitude": 51.9692054
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298791"
+    },
+    {
+      "id": "osm-house:way:718298719",
+      "garId": "gar:с-грахово-пер-строительный:д-2",
+      "label": "с. Грахово, пер. Строительный, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0410696,
+        "longitude": 51.9669997
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298719"
+    },
+    {
+      "id": "osm-house:way:718298782",
+      "garId": "gar:с-грахово-пер-строительный:д-7",
+      "label": "с. Грахово, пер. Строительный, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0409947,
+        "longitude": 51.9699435
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298782"
+    },
+    {
+      "id": "osm-house:way:718298738",
+      "garId": "gar:с-грахово-пер-строительный:д-10",
+      "label": "с. Грахово, пер. Строительный, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0399618,
+        "longitude": 51.9703385
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298738"
+    },
+    {
+      "id": "osm-house:way:718298741",
+      "garId": "gar:с-грахово-пер-строительный:д-11",
+      "label": "с. Грахово, пер. Строительный, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0400152,
+        "longitude": 51.9711767
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298741"
+    },
+    {
+      "id": "osm-house:way:718298742",
+      "garId": "gar:с-грахово-пер-строительный:д-12",
+      "label": "с. Грахово, пер. Строительный, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0396873,
+        "longitude": 51.970707
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298742"
+    },
+    {
+      "id": "osm-house:way:718298740",
+      "garId": "gar:с-грахово-пер-строительный:д-15",
+      "label": "с. Грахово, пер. Строительный, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0397605,
+        "longitude": 51.9714439
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298740"
+    },
+    {
+      "id": "osm-house:way:718298744",
+      "garId": "gar:с-грахово-пер-строительный:д-16",
+      "label": "с. Грахово, пер. Строительный, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0390829,
+        "longitude": 51.9714179
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298744"
+    },
+    {
+      "id": "osm-house:way:718298743",
+      "garId": "gar:с-грахово-пер-строительный:д-17",
+      "label": "с. Грахово, пер. Строительный, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0394045,
+        "longitude": 51.9719709
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298743"
+    },
+    {
+      "id": "osm-house:way:718298746",
+      "garId": "gar:с-грахово-пер-строительный:д-19",
+      "label": "с. Грахово, пер. Строительный, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0391599,
+        "longitude": 51.9721338
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298746"
+    },
+    {
+      "id": "osm-house:way:718298745",
+      "garId": "gar:с-грахово-пер-строительный:д-21",
+      "label": "с. Грахово, пер. Строительный, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0389853,
+        "longitude": 51.9723494
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298745"
+    },
+    {
+      "id": "osm-house:way:718298756",
+      "garId": "gar:с-грахово-пер-строительный:д-25",
+      "label": "с. Грахово, пер. Строительный, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0383815,
+        "longitude": 51.9730629
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298756"
+    },
+    {
+      "id": "osm-house:way:718298759",
+      "garId": "gar:с-грахово-пер-строительный:д-30",
+      "label": "с. Грахово, пер. Строительный, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.0371063,
+        "longitude": 51.9738639
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298759"
+    },
+    {
+      "id": "osm-house:way:718298757",
+      "garId": "gar:с-грахово-пер-строительный:д-31",
+      "label": "с. Грахово, пер. Строительный, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0375204,
+        "longitude": 51.974203
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298757"
+    },
+    {
+      "id": "osm-house:way:718298758",
+      "garId": "gar:с-грахово-пер-строительный:д-33",
+      "label": "с. Грахово, пер. Строительный, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0372358,
+        "longitude": 51.9746351
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298758"
+    },
+    {
+      "id": "osm-house:way:718417748",
+      "label": "с. Грахово, Первомайская улица, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0442164,
+        "longitude": 51.9772432
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417748"
+    },
+    {
+      "id": "osm-house:way:717520261",
+      "garId": "gar:с-грахово-ул-50-лет-победы:д-1",
+      "label": "с. Грахово, ул. 50 лет Победы, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0552764,
+        "longitude": 51.9564921
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520261"
+    },
+    {
+      "id": "osm-house:way:717520232",
+      "garId": "gar:с-грахово-ул-50-лет-победы:д-2",
+      "label": "с. Грахово, ул. 50 лет Победы, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.054839,
+        "longitude": 51.9562669
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520232"
+    },
+    {
+      "id": "osm-house:way:717520289",
+      "garId": "gar:с-грахово-ул-50-лет-победы:д-6",
+      "label": "с. Грахово, ул. 50 лет Победы, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0546444,
+        "longitude": 51.9576402
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520289"
+    },
+    {
+      "id": "osm-house:way:717520286",
+      "garId": "gar:с-грахово-ул-50-лет-победы:д-10",
+      "label": "с. Грахово, ул. 50 лет Победы, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0547822,
+        "longitude": 51.9591047
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520286"
+    },
+    {
+      "id": "osm-house:way:136073889",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-2а",
+      "label": "с. Грахово, ул. 70 лет Октября, 2а",
+      "houseNumber": "2а",
+      "coordinates": {
+        "latitude": 56.0477772,
+        "longitude": 51.9596489
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073889"
+    },
+    {
+      "id": "osm-house:way:718283576",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-7",
+      "label": "с. Грахово, ул. 70 лет Октября, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0488612,
+        "longitude": 51.9611714
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283576"
+    },
+    {
+      "id": "osm-house:way:718283586",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-11а",
+      "label": "с. Грахово, ул. 70 лет Октября, 11а",
+      "houseNumber": "11а",
+      "coordinates": {
+        "latitude": 56.0491244,
+        "longitude": 51.962012
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283586"
+    },
+    {
+      "id": "osm-house:way:718283657",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-12",
+      "label": "с. Грахово, ул. 70 лет Октября, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0500127,
+        "longitude": 51.9650588
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283657"
+    },
+    {
+      "id": "osm-house:way:718283593",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-13",
+      "label": "с. Грахово, ул. 70 лет Октября, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0493933,
+        "longitude": 51.962539
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283593"
+    },
+    {
+      "id": "osm-house:way:718283639",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-15",
+      "label": "с. Грахово, ул. 70 лет Октября, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0495623,
+        "longitude": 51.9628833
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283639"
+    },
+    {
+      "id": "osm-house:way:718283636",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-16",
+      "label": "с. Грахово, ул. 70 лет Октября, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0496952,
+        "longitude": 51.9644877
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283636"
+    },
+    {
+      "id": "osm-house:way:718283640",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-19",
+      "label": "с. Грахово, ул. 70 лет Октября, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0499163,
+        "longitude": 51.9640816
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283640"
+    },
+    {
+      "id": "osm-house:way:718283668",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-22",
+      "label": "с. Грахово, ул. 70 лет Октября, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.050643,
+        "longitude": 51.9668663
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283668"
+    },
+    {
+      "id": "osm-house:way:718283642",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-23",
+      "label": "с. Грахово, ул. 70 лет Октября, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0502852,
+        "longitude": 51.9649036
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283642"
+    },
+    {
+      "id": "osm-house:way:718283669",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-24",
+      "label": "с. Грахово, ул. 70 лет Октября, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 56.0508303,
+        "longitude": 51.9673585
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283669"
+    },
+    {
+      "id": "osm-house:way:718283660",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-25",
+      "label": "с. Грахово, ул. 70 лет Октября, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0504229,
+        "longitude": 51.9652078
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283660"
+    },
+    {
+      "id": "osm-house:way:718283670",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-26",
+      "label": "с. Грахово, ул. 70 лет Октября, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.0509737,
+        "longitude": 51.9677134
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283670"
+    },
+    {
+      "id": "osm-house:way:718283661",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-27",
+      "label": "с. Грахово, ул. 70 лет Октября, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0505351,
+        "longitude": 51.9655534
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283661"
+    },
+    {
+      "id": "osm-house:way:718283686",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-28",
+      "label": "с. Грахово, ул. 70 лет Октября, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0512293,
+        "longitude": 51.9682691
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283686"
+    },
+    {
+      "id": "osm-house:way:718283666",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-29а",
+      "label": "с. Грахово, ул. 70 лет Октября, 29а",
+      "houseNumber": "29а",
+      "coordinates": {
+        "latitude": 56.0508877,
+        "longitude": 51.9660591
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283666"
+    },
+    {
+      "id": "osm-house:way:718283687",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-30",
+      "label": "с. Грахово, ул. 70 лет Октября, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.0513962,
+        "longitude": 51.9687548
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283687"
+    },
+    {
+      "id": "osm-house:way:718283664",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-31",
+      "label": "с. Грахово, ул. 70 лет Октября, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0508876,
+        "longitude": 51.9664759
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283664"
+    },
+    {
+      "id": "osm-house:way:718283688",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-32",
+      "label": "с. Грахово, ул. 70 лет Октября, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0515787,
+        "longitude": 51.9692078
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283688"
+    },
+    {
+      "id": "osm-house:way:718283685",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-36",
+      "label": "с. Грахово, ул. 70 лет Октября, 36",
+      "houseNumber": "36",
+      "coordinates": {
+        "latitude": 56.0518737,
+        "longitude": 51.9700118
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283685"
+    },
+    {
+      "id": "osm-house:way:718283678",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-39",
+      "label": "с. Грахово, ул. 70 лет Октября, 39",
+      "houseNumber": "39",
+      "coordinates": {
+        "latitude": 56.0515214,
+        "longitude": 51.9680684
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283678"
+    },
+    {
+      "id": "osm-house:way:717520421",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-40",
+      "label": "с. Грахово, ул. 70 лет Октября, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.0523136,
+        "longitude": 51.9710476
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520421"
+    },
+    {
+      "id": "osm-house:way:717520425",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-40а",
+      "label": "с. Грахово, ул. 70 лет Октября, 40а",
+      "houseNumber": "40а",
+      "coordinates": {
+        "latitude": 56.0516885,
+        "longitude": 51.971652
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520425"
+    },
+    {
+      "id": "osm-house:way:718283681",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-41",
+      "label": "с. Грахово, ул. 70 лет Октября, 41",
+      "houseNumber": "41",
+      "coordinates": {
+        "latitude": 56.0516126,
+        "longitude": 51.9683485
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283681"
+    },
+    {
+      "id": "osm-house:way:717520396",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-46",
+      "label": "с. Грахово, ул. 70 лет Октября, 46",
+      "houseNumber": "46",
+      "coordinates": {
+        "latitude": 56.0530156,
+        "longitude": 51.9728858
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520396"
+    },
+    {
+      "id": "osm-house:way:717520363",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-47",
+      "label": "с. Грахово, ул. 70 лет Октября, 47",
+      "houseNumber": "47",
+      "coordinates": {
+        "latitude": 56.052036,
+        "longitude": 51.9693507
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520363"
+    },
+    {
+      "id": "osm-house:way:717520397",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-48",
+      "label": "с. Грахово, ул. 70 лет Октября, 48",
+      "houseNumber": "48",
+      "coordinates": {
+        "latitude": 56.052731,
+        "longitude": 51.9732023
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520397"
+    },
+    {
+      "id": "osm-house:way:717520366",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-49",
+      "label": "с. Грахово, ул. 70 лет Октября, 49",
+      "houseNumber": "49",
+      "coordinates": {
+        "latitude": 56.0524315,
+        "longitude": 51.9704021
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520366"
+    },
+    {
+      "id": "osm-house:way:717520364",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-49а",
+      "label": "с. Грахово, ул. 70 лет Октября, 49а",
+      "houseNumber": "49а",
+      "coordinates": {
+        "latitude": 56.0521978,
+        "longitude": 51.9697423
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520364"
+    },
+    {
+      "id": "osm-house:way:717520398",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-50",
+      "label": "с. Грахово, ул. 70 лет Октября, 50",
+      "houseNumber": "50",
+      "coordinates": {
+        "latitude": 56.0525513,
+        "longitude": 51.973535
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520398"
+    },
+    {
+      "id": "osm-house:way:717520367",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-51",
+      "label": "с. Грахово, ул. 70 лет Октября, 51",
+      "houseNumber": "51",
+      "coordinates": {
+        "latitude": 56.0525603,
+        "longitude": 51.9706972
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520367"
+    },
+    {
+      "id": "osm-house:way:717520395",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-52",
+      "label": "с. Грахово, ул. 70 лет Октября, 52",
+      "houseNumber": "52",
+      "coordinates": {
+        "latitude": 56.052758,
+        "longitude": 51.9741733
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520395"
+    },
+    {
+      "id": "osm-house:way:717520394",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-54",
+      "label": "с. Грахово, ул. 70 лет Октября, 54",
+      "houseNumber": "54",
+      "coordinates": {
+        "latitude": 56.0529168,
+        "longitude": 51.9739105
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520394"
+    },
+    {
+      "id": "osm-house:way:717520393",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-56",
+      "label": "с. Грахово, ул. 70 лет Октября, 56",
+      "houseNumber": "56",
+      "coordinates": {
+        "latitude": 56.0532972,
+        "longitude": 51.9734759
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520393"
+    },
+    {
+      "id": "osm-house:way:717520369",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-57",
+      "label": "с. Грахово, ул. 70 лет Октября, 57",
+      "houseNumber": "57",
+      "coordinates": {
+        "latitude": 56.0528479,
+        "longitude": 51.9714643
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520369"
+    },
+    {
+      "id": "osm-house:way:717520399",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-58",
+      "label": "с. Грахово, ул. 70 лет Октября, 58",
+      "houseNumber": "58",
+      "coordinates": {
+        "latitude": 56.0537196,
+        "longitude": 51.9745649
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520399"
+    },
+    {
+      "id": "osm-house:way:717520370",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-59",
+      "label": "с. Грахово, ул. 70 лет Октября, 59",
+      "houseNumber": "59",
+      "coordinates": {
+        "latitude": 56.0530277,
+        "longitude": 51.9718827
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520370"
+    },
+    {
+      "id": "osm-house:way:717520405",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-60",
+      "label": "с. Грахово, ул. 70 лет Октября, 60",
+      "houseNumber": "60",
+      "coordinates": {
+        "latitude": 56.0539143,
+        "longitude": 51.9751014
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520405"
+    },
+    {
+      "id": "osm-house:way:717520371",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-61",
+      "label": "с. Грахово, ул. 70 лет Октября, 61",
+      "houseNumber": "61",
+      "coordinates": {
+        "latitude": 56.0532463,
+        "longitude": 51.972403
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520371"
+    },
+    {
+      "id": "osm-house:way:717520404",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-62",
+      "label": "с. Грахово, ул. 70 лет Октября, 62",
+      "houseNumber": "62",
+      "coordinates": {
+        "latitude": 56.0540491,
+        "longitude": 51.9754071
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520404"
+    },
+    {
+      "id": "osm-house:way:717520372",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-63",
+      "label": "с. Грахово, ул. 70 лет Октября, 63",
+      "houseNumber": "63",
+      "coordinates": {
+        "latitude": 56.053453,
+        "longitude": 51.9729234
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520372"
+    },
+    {
+      "id": "osm-house:way:717520373",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-65",
+      "label": "с. Грахово, ул. 70 лет Октября, 65",
+      "houseNumber": "65",
+      "coordinates": {
+        "latitude": 56.0536448,
+        "longitude": 51.9733955
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520373"
+    },
+    {
+      "id": "osm-house:way:717520391",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-66",
+      "label": "с. Грахово, ул. 70 лет Октября, 66",
+      "houseNumber": "66",
+      "coordinates": {
+        "latitude": 56.0543577,
+        "longitude": 51.9761582
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520391"
+    },
+    {
+      "id": "osm-house:way:717520390",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-67",
+      "label": "с. Грахово, ул. 70 лет Октября, 67",
+      "houseNumber": "67",
+      "coordinates": {
+        "latitude": 56.0537945,
+        "longitude": 51.973771
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520390"
+    },
+    {
+      "id": "osm-house:way:717520386",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-71",
+      "label": "с. Грахово, ул. 70 лет Октября, 71",
+      "houseNumber": "71",
+      "coordinates": {
+        "latitude": 56.0542588,
+        "longitude": 51.9749619
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520386"
+    },
+    {
+      "id": "osm-house:way:717520385",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-73",
+      "label": "с. Грахово, ул. 70 лет Октября, 73",
+      "houseNumber": "73",
+      "coordinates": {
+        "latitude": 56.0545075,
+        "longitude": 51.9755037
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520385"
+    },
+    {
+      "id": "osm-house:way:717520384",
+      "garId": "gar:с-грахово-ул-70-лет-октября:д-77",
+      "label": "с. Грахово, ул. 70 лет Октября, 77",
+      "houseNumber": "77",
+      "coordinates": {
+        "latitude": 56.0549058,
+        "longitude": 51.9764478
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520384"
+    },
+    {
+      "id": "osm-house:way:717501302",
+      "garId": "gar:с-грахово-ул-азина:д-1",
+      "label": "с. Грахово, ул. Азина, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0454621,
+        "longitude": 51.9549454
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501302"
+    },
+    {
+      "id": "osm-house:way:717501303",
+      "garId": "gar:с-грахово-ул-азина:д-3",
+      "label": "с. Грахово, ул. Азина, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0454758,
+        "longitude": 51.9554384
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501303"
+    },
+    {
+      "id": "osm-house:way:717501292",
+      "garId": "gar:с-грахово-ул-азина:д-5",
+      "label": "с. Грахово, ул. Азина, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0453588,
+        "longitude": 51.9520184
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501292"
+    },
+    {
+      "id": "osm-house:way:717501281",
+      "garId": "gar:с-грахово-ул-азина:д-6",
+      "label": "с. Грахово, ул. Азина, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0457443,
+        "longitude": 51.9552104
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501281"
+    },
+    {
+      "id": "osm-house:way:717501300",
+      "garId": "gar:с-грахово-ул-азина:д-7",
+      "label": "с. Грахово, ул. Азина, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0454483,
+        "longitude": 51.9544093
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501300"
+    },
+    {
+      "id": "osm-house:way:717501267",
+      "garId": "gar:с-грахово-ул-азина:д-8",
+      "label": "с. Грахово, ул. Азина, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0467871,
+        "longitude": 51.9521724
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501267"
+    },
+    {
+      "id": "osm-house:way:717501299",
+      "garId": "gar:с-грахово-ул-азина:д-9",
+      "label": "с. Грахово, ул. Азина, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0454552,
+        "longitude": 51.9541197
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501299"
+    },
+    {
+      "id": "osm-house:way:717501297",
+      "garId": "gar:с-грахово-ул-азина:д-11",
+      "label": "с. Грахово, ул. Азина, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0454208,
+        "longitude": 51.9535281
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501297"
+    },
+    {
+      "id": "osm-house:way:717501285",
+      "garId": "gar:с-грахово-ул-азина:д-12",
+      "label": "с. Грахово, ул. Азина, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0457168,
+        "longitude": 51.953602
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501285"
+    },
+    {
+      "id": "osm-house:way:717501295",
+      "garId": "gar:с-грахово-ул-азина:д-15",
+      "label": "с. Грахово, ул. Азина, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0453967,
+        "longitude": 51.9529674
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501295"
+    },
+    {
+      "id": "osm-house:way:717501286",
+      "garId": "gar:с-грахово-ул-азина:д-16",
+      "label": "с. Грахово, ул. Азина, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0457408,
+        "longitude": 51.9532138
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501286"
+    },
+    {
+      "id": "osm-house:way:717501288",
+      "garId": "gar:с-грахово-ул-азина:д-18",
+      "label": "с. Грахово, ул. Азина, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0457408,
+        "longitude": 51.952271
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501288"
+    },
+    {
+      "id": "osm-house:way:136072851",
+      "garId": "gar:с-грахово-ул-азина:зд-23",
+      "label": "с. Грахово, ул. Азина, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0451309,
+        "longitude": 51.9506207
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072851"
+    },
+    {
+      "id": "osm-house:way:1087856146",
+      "garId": "gar:с-грахово-ул-азина:д-23б",
+      "label": "с. Грахово, ул. Азина, 23б",
+      "houseNumber": "23б",
+      "coordinates": {
+        "latitude": 56.044816,
+        "longitude": 51.9491876
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087856146"
+    },
+    {
+      "id": "osm-house:way:1087856147",
+      "garId": "gar:с-грахово-ул-азина:д-23в",
+      "label": "с. Грахово, ул. Азина, 23в",
+      "houseNumber": "23в",
+      "coordinates": {
+        "latitude": 56.0447942,
+        "longitude": 51.9502139
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087856147"
+    },
+    {
+      "id": "osm-house:way:136068081",
+      "garId": "gar:с-грахово-ул-азина:д-25",
+      "label": "с. Грахово, ул. Азина, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0452527,
+        "longitude": 51.9489505
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136068081"
+    },
+    {
+      "id": "osm-house:way:717501308",
+      "garId": "gar:с-грахово-ул-азина:д-27",
+      "label": "с. Грахово, ул. Азина, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0451833,
+        "longitude": 51.9470413
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501308"
+    },
+    {
+      "id": "osm-house:way:136072829",
+      "garId": "gar:с-грахово-ул-азина:д-27а",
+      "label": "с. Грахово, ул. Азина, 27а",
+      "houseNumber": "27а",
+      "coordinates": {
+        "latitude": 56.0438948,
+        "longitude": 51.9483935
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072829"
+    },
+    {
+      "id": "osm-house:way:717501307",
+      "garId": "gar:с-грахово-ул-азина:д-27б",
+      "label": "с. Грахово, ул. Азина, 27б",
+      "houseNumber": "27б",
+      "coordinates": {
+        "latitude": 56.0447929,
+        "longitude": 51.9480081
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501307"
+    },
+    {
+      "id": "osm-house:way:717501223",
+      "garId": "gar:с-грахово-ул-азина:зд-34",
+      "label": "с. Грахово, ул. Азина, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.0464071,
+        "longitude": 51.9489341
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501223"
+    },
+    {
+      "id": "osm-house:way:136068894",
+      "garId": "gar:с-грахово-ул-азина:д-35",
+      "label": "с. Грахово, ул. Азина, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.0451062,
+        "longitude": 51.9443498
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136068894"
+    },
+    {
+      "id": "osm-house:way:717501218",
+      "garId": "gar:с-грахово-ул-азина:д-38",
+      "label": "с. Грахово, ул. Азина, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.046209,
+        "longitude": 51.9456246
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501218"
+    },
+    {
+      "id": "osm-house:way:1087854376",
+      "garId": "gar:с-грахово-ул-ачинцева:зд-2",
+      "label": "с. Грахово, ул. Ачинцева, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0456967,
+        "longitude": 51.9624954
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087854376"
+    },
+    {
+      "id": "osm-house:way:1268733062",
+      "garId": "gar:с-грахово-ул-ачинцева:д-5",
+      "label": "с. Грахово, ул. Ачинцева, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0465508,
+        "longitude": 51.9578665
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1268733062"
+    },
+    {
+      "id": "osm-house:way:136074062",
+      "garId": "gar:с-грахово-ул-ачинцева:д-7",
+      "label": "с. Грахово, ул. Ачинцева, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0467442,
+        "longitude": 51.9585765
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136074062"
+    },
+    {
+      "id": "osm-house:way:136074064",
+      "garId": "gar:с-грахово-ул-ачинцева:д-9",
+      "label": "с. Грахово, ул. Ачинцева, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0470501,
+        "longitude": 51.9581918
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136074064"
+    },
+    {
+      "id": "osm-house:way:136074065",
+      "garId": "gar:с-грахово-ул-ачинцева:д-11",
+      "label": "с. Грахово, ул. Ачинцева, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0473951,
+        "longitude": 51.9576658
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136074065"
+    },
+    {
+      "id": "osm-house:way:136074063",
+      "garId": "gar:с-грахово-ул-ачинцева:д-13",
+      "label": "с. Грахово, ул. Ачинцева, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0477332,
+        "longitude": 51.9571849
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136074063"
+    },
+    {
+      "id": "osm-house:way:718283582",
+      "garId": "gar:с-грахово-ул-ачинцева:д-14",
+      "label": "с. Грахово, ул. Ачинцева, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0485678,
+        "longitude": 51.958924
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283582"
+    },
+    {
+      "id": "osm-house:way:136073888",
+      "garId": "gar:с-грахово-ул-ачинцева:д-16",
+      "label": "с. Грахово, ул. Ачинцева, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0480918,
+        "longitude": 51.9587458
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073888"
+    },
+    {
+      "id": "osm-house:way:717501123",
+      "garId": "gar:с-грахово-ул-ачинцева:д-17",
+      "label": "с. Грахово, ул. Ачинцева, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0507512,
+        "longitude": 51.9545579
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501123"
+    },
+    {
+      "id": "osm-house:way:493241764",
+      "garId": "gar:с-грахово-ул-ачинцева:д-20",
+      "label": "с. Грахово, ул. Ачинцева, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0502584,
+        "longitude": 51.9570143
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/493241764"
+    },
+    {
+      "id": "osm-house:way:136073887",
+      "garId": "gar:с-грахово-ул-ачинцева:д-22",
+      "label": "с. Грахово, ул. Ачинцева, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0482778,
+        "longitude": 51.9580488
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073887"
+    },
+    {
+      "id": "osm-house:way:493241759",
+      "garId": "gar:с-грахово-ул-ачинцева:д-26",
+      "label": "с. Грахово, ул. Ачинцева, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.0519394,
+        "longitude": 51.9551975
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/493241759"
+    },
+    {
+      "id": "osm-house:way:717501149",
+      "garId": "gar:с-грахово-ул-ачинцева:д-27",
+      "label": "с. Грахово, ул. Ачинцева, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0517219,
+        "longitude": 51.9526857
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501149"
+    },
+    {
+      "id": "osm-house:way:717520263",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-6",
+      "label": "с. Грахово, ул. Ашальчи Оки, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0551753,
+        "longitude": 51.9550236
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520263"
+    },
+    {
+      "id": "osm-house:way:717520324",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-8а",
+      "label": "с. Грахово, ул. Ашальчи Оки, 8а",
+      "houseNumber": "8а",
+      "coordinates": {
+        "latitude": 56.0534889,
+        "longitude": 51.9625701
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520324"
+    },
+    {
+      "id": "osm-house:way:717520282",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-14",
+      "label": "с. Грахово, ул. Ашальчи Оки, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0547642,
+        "longitude": 51.9611325
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520282"
+    },
+    {
+      "id": "osm-house:way:717520281",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-16",
+      "label": "с. Грахово, ул. Ашальчи Оки, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0551925,
+        "longitude": 51.9613308
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520281"
+    },
+    {
+      "id": "osm-house:way:717520280",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-18а",
+      "label": "с. Грахово, ул. Ашальчи Оки, 18а",
+      "houseNumber": "18а",
+      "coordinates": {
+        "latitude": 56.0554142,
+        "longitude": 51.9612343
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520280"
+    },
+    {
+      "id": "osm-house:way:717520279",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-20",
+      "label": "с. Грахово, ул. Ашальчи Оки, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0556389,
+        "longitude": 51.9611645
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520279"
+    },
+    {
+      "id": "osm-house:way:717520278",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-22",
+      "label": "с. Грахово, ул. Ашальчи Оки, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0559354,
+        "longitude": 51.9613685
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520278"
+    },
+    {
+      "id": "osm-house:way:717520274",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-24",
+      "label": "с. Грахово, ул. Ашальчи Оки, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 56.056238,
+        "longitude": 51.9614167
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520274"
+    },
+    {
+      "id": "osm-house:way:717520275",
+      "garId": "gar:с-грахово-ул-ашальчи-оки:д-26",
+      "label": "с. Грахово, ул. Ашальчи Оки, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.0564506,
+        "longitude": 51.9614489
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520275"
+    },
+    {
+      "id": "osm-house:way:718283607",
+      "garId": "gar:с-грахово-ул-аэродромная:д-2",
+      "label": "с. Грахово, ул. Аэродромная, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0502958,
+        "longitude": 51.9611832
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283607"
+    },
+    {
+      "id": "osm-house:way:718283608",
+      "garId": "gar:с-грахово-ул-аэродромная:д-4",
+      "label": "с. Грахово, ул. Аэродромная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0503084,
+        "longitude": 51.9616019
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283608"
+    },
+    {
+      "id": "osm-house:way:718283603",
+      "garId": "gar:с-грахово-ул-аэродромная:д-5",
+      "label": "с. Грахово, ул. Аэродромная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0507482,
+        "longitude": 51.9615507
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283603"
+    },
+    {
+      "id": "osm-house:way:718283609",
+      "garId": "gar:с-грахово-ул-аэродромная:д-6",
+      "label": "с. Грахово, ул. Аэродромная, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0505234,
+        "longitude": 51.961786
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283609"
+    },
+    {
+      "id": "osm-house:way:718283604",
+      "garId": "gar:с-грахово-ул-аэродромная:д-7",
+      "label": "с. Грахово, ул. Аэродромная, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0509399,
+        "longitude": 51.9620282
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283604"
+    },
+    {
+      "id": "osm-house:way:718283610",
+      "garId": "gar:с-грахово-ул-аэродромная:д-8",
+      "label": "с. Грахово, ул. Аэродромная, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0506301,
+        "longitude": 51.9620998
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283610"
+    },
+    {
+      "id": "osm-house:way:718283605",
+      "garId": "gar:с-грахово-ул-аэродромная:д-9",
+      "label": "с. Грахово, ул. Аэродромная, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0510687,
+        "longitude": 51.9622642
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283605"
+    },
+    {
+      "id": "osm-house:way:718283611",
+      "garId": "gar:с-грахово-ул-аэродромная:д-10",
+      "label": "с. Грахово, ул. Аэродромная, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0508172,
+        "longitude": 51.9625952
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283611"
+    },
+    {
+      "id": "osm-house:way:718283606",
+      "garId": "gar:с-грахово-ул-аэродромная:д-11",
+      "label": "с. Грахово, ул. Аэродромная, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0514154,
+        "longitude": 51.9631763
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283606"
+    },
+    {
+      "id": "osm-house:way:718283612",
+      "garId": "gar:с-грахово-ул-аэродромная:д-12",
+      "label": "с. Грахово, ул. Аэродромная, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0510448,
+        "longitude": 51.9632298
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283612"
+    },
+    {
+      "id": "osm-house:way:717520338",
+      "garId": "gar:с-грахово-ул-аэродромная:д-13",
+      "label": "с. Грахово, ул. Аэродромная, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0519941,
+        "longitude": 51.9646729
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520338"
+    },
+    {
+      "id": "osm-house:way:718283613",
+      "garId": "gar:с-грахово-ул-аэродромная:д-14",
+      "label": "с. Грахово, ул. Аэродромная, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0511855,
+        "longitude": 51.9636482
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283613"
+    },
+    {
+      "id": "osm-house:way:717520339",
+      "garId": "gar:с-грахово-ул-аэродромная:д-15",
+      "label": "с. Грахово, ул. Аэродромная, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0522158,
+        "longitude": 51.9651986
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520339"
+    },
+    {
+      "id": "osm-house:way:718283614",
+      "garId": "gar:с-грахово-ул-аэродромная:д-16",
+      "label": "с. Грахово, ул. Аэродромная, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0514222,
+        "longitude": 51.9642115
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283614"
+    },
+    {
+      "id": "osm-house:way:717520341",
+      "garId": "gar:с-грахово-ул-аэродромная:д-17",
+      "label": "с. Грахово, ул. Аэродромная, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0523626,
+        "longitude": 51.9656117
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520341"
+    },
+    {
+      "id": "osm-house:way:718283615",
+      "garId": "gar:с-грахово-ул-аэродромная:д-18",
+      "label": "с. Грахово, ул. Аэродромная, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0515331,
+        "longitude": 51.9645977
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283615"
+    },
+    {
+      "id": "osm-house:way:717520344",
+      "garId": "gar:с-грахово-ул-аэродромная:д-19",
+      "label": "с. Грахово, ул. Аэродромная, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0525933,
+        "longitude": 51.9662447
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520344"
+    },
+    {
+      "id": "osm-house:way:718283673",
+      "garId": "gar:с-грахово-ул-аэродромная:д-20",
+      "label": "с. Грахово, ул. Аэродромная, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0517013,
+        "longitude": 51.9650329
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283673"
+    },
+    {
+      "id": "osm-house:way:717520346",
+      "garId": "gar:с-грахово-ул-аэродромная:д-21",
+      "label": "с. Грахово, ул. Аэродромная, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0528628,
+        "longitude": 51.9667812
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520346"
+    },
+    {
+      "id": "osm-house:way:718283677",
+      "garId": "gar:с-грахово-ул-аэродромная:д-22",
+      "label": "с. Грахово, ул. Аэродромная, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0519334,
+        "longitude": 51.9656166
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283677"
+    },
+    {
+      "id": "osm-house:way:718283676",
+      "garId": "gar:с-грахово-ул-аэродромная:д-22а",
+      "label": "с. Грахово, ул. Аэродромная, 22а",
+      "houseNumber": "22а",
+      "coordinates": {
+        "latitude": 56.0520977,
+        "longitude": 51.9660929
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283676"
+    },
+    {
+      "id": "osm-house:way:717520348",
+      "garId": "gar:с-грахово-ул-аэродромная:д-23",
+      "label": "с. Грахово, ул. Аэродромная, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0531175,
+        "longitude": 51.967441
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520348"
+    },
+    {
+      "id": "osm-house:way:718283674",
+      "garId": "gar:с-грахово-ул-аэродромная:д-24",
+      "label": "с. Грахово, ул. Аэродромная, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 56.0522307,
+        "longitude": 51.9663824
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283674"
+    },
+    {
+      "id": "osm-house:way:717520352",
+      "garId": "gar:с-грахово-ул-аэродромная:д-25",
+      "label": "с. Грахово, ул. Аэродромная, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0535998,
+        "longitude": 51.968546
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520352"
+    },
+    {
+      "id": "osm-house:way:718283675",
+      "garId": "gar:с-грахово-ул-аэродромная:д-26",
+      "label": "с. Грахово, ул. Аэродромная, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.0524289,
+        "longitude": 51.9667514
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283675"
+    },
+    {
+      "id": "osm-house:way:717520353",
+      "garId": "gar:с-грахово-ул-аэродромная:д-27",
+      "label": "с. Грахово, ул. Аэродромная, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0537705,
+        "longitude": 51.9691361
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520353"
+    },
+    {
+      "id": "osm-house:way:717520362",
+      "garId": "gar:с-грахово-ул-аэродромная:д-28",
+      "label": "с. Грахово, ул. Аэродромная, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0526172,
+        "longitude": 51.9671298
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520362"
+    },
+    {
+      "id": "osm-house:way:717520354",
+      "garId": "gar:с-грахово-ул-аэродромная:д-29",
+      "label": "с. Грахово, ул. Аэродромная, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0539562,
+        "longitude": 51.9696297
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520354"
+    },
+    {
+      "id": "osm-house:way:718283683",
+      "garId": "gar:с-грахово-ул-аэродромная:д-30",
+      "label": "с. Грахово, ул. Аэродромная, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.0533,
+        "longitude": 51.9690303
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283683"
+    },
+    {
+      "id": "osm-house:way:717520355",
+      "garId": "gar:с-грахово-ул-аэродромная:д-31",
+      "label": "с. Грахово, ул. Аэродромная, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0541629,
+        "longitude": 51.9701071
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520355"
+    },
+    {
+      "id": "osm-house:way:717520356",
+      "garId": "gar:с-грахово-ул-аэродромная:д-32",
+      "label": "с. Грахово, ул. Аэродромная, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0534111,
+        "longitude": 51.9693561
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520356"
+    },
+    {
+      "id": "osm-house:way:717520376",
+      "garId": "gar:с-грахово-ул-аэродромная:д-33",
+      "label": "с. Грахово, ул. Аэродромная, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0545344,
+        "longitude": 51.9710673
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520376"
+    },
+    {
+      "id": "osm-house:way:717520377",
+      "garId": "gar:с-грахово-ул-аэродромная:д-35",
+      "label": "с. Грахово, ул. Аэродромная, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.054768,
+        "longitude": 51.971636
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520377"
+    },
+    {
+      "id": "osm-house:way:717520358",
+      "garId": "gar:с-грахово-ул-аэродромная:д-36",
+      "label": "с. Грахово, ул. Аэродромная, 36",
+      "houseNumber": "36",
+      "coordinates": {
+        "latitude": 56.0537136,
+        "longitude": 51.9701607
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520358"
+    },
+    {
+      "id": "osm-house:way:717520382",
+      "garId": "gar:с-грахово-ул-аэродромная:д-37",
+      "label": "с. Грахово, ул. Аэродромная, 37",
+      "houseNumber": "37",
+      "coordinates": {
+        "latitude": 56.055071,
+        "longitude": 51.9723666
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520382"
+    },
+    {
+      "id": "osm-house:way:717520359",
+      "garId": "gar:с-грахово-ул-аэродромная:д-38",
+      "label": "с. Грахово, ул. Аэродромная, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.0538813,
+        "longitude": 51.9705416
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520359"
+    },
+    {
+      "id": "osm-house:way:717520381",
+      "garId": "gar:с-грахово-ул-аэродромная:д-39",
+      "label": "с. Грахово, ул. Аэродромная, 39",
+      "houseNumber": "39",
+      "coordinates": {
+        "latitude": 56.0552414,
+        "longitude": 51.9727732
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520381"
+    },
+    {
+      "id": "osm-house:way:717520360",
+      "garId": "gar:с-грахово-ул-аэродромная:д-40",
+      "label": "с. Грахово, ул. Аэродромная, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.0540551,
+        "longitude": 51.971019
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520360"
+    },
+    {
+      "id": "osm-house:way:717520361",
+      "garId": "gar:с-грахово-ул-аэродромная:д-42",
+      "label": "с. Грахово, ул. Аэродромная, 42",
+      "houseNumber": "42",
+      "coordinates": {
+        "latitude": 56.054181,
+        "longitude": 51.9712819
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520361"
+    },
+    {
+      "id": "osm-house:way:717520375",
+      "garId": "gar:с-грахово-ул-аэродромная:д-44",
+      "label": "с. Грахово, ул. Аэродромная, 44",
+      "houseNumber": "44",
+      "coordinates": {
+        "latitude": 56.0542768,
+        "longitude": 51.9715126
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520375"
+    },
+    {
+      "id": "osm-house:way:717520378",
+      "garId": "gar:с-грахово-ул-аэродромная:д-46",
+      "label": "с. Грахово, ул. Аэродромная, 46",
+      "houseNumber": "46",
+      "coordinates": {
+        "latitude": 56.0545044,
+        "longitude": 51.9721348
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520378"
+    },
+    {
+      "id": "osm-house:way:717520379",
+      "garId": "gar:с-грахово-ул-аэродромная:д-48",
+      "label": "с. Грахово, ул. Аэродромная, 48",
+      "houseNumber": "48",
+      "coordinates": {
+        "latitude": 56.0546512,
+        "longitude": 51.9724728
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520379"
+    },
+    {
+      "id": "osm-house:way:717520380",
+      "garId": "gar:с-грахово-ул-аэродромная:д-52",
+      "label": "с. Грахово, ул. Аэродромная, 52",
+      "houseNumber": "52",
+      "coordinates": {
+        "latitude": 56.0549029,
+        "longitude": 51.9731702
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520380"
+    },
+    {
+      "id": "osm-house:way:718298650",
+      "garId": "gar:с-грахово-ул-береговая:д-2",
+      "label": "с. Грахово, ул. Береговая, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0435179,
+        "longitude": 51.9603729
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298650"
+    },
+    {
+      "id": "osm-house:way:718298646",
+      "garId": "gar:с-грахово-ул-береговая:д-3",
+      "label": "с. Грахово, ул. Береговая, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0430427,
+        "longitude": 51.9590364
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298646"
+    },
+    {
+      "id": "osm-house:way:718298645",
+      "garId": "gar:с-грахово-ул-береговая:д-4",
+      "label": "с. Грахово, ул. Береговая, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0426197,
+        "longitude": 51.9591521
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298645"
+    },
+    {
+      "id": "osm-house:way:718298660",
+      "garId": "gar:с-грахово-ул-береговая:д-9",
+      "label": "с. Грахово, ул. Береговая, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0436497,
+        "longitude": 51.9584986
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298660"
+    },
+    {
+      "id": "osm-house:way:718298658",
+      "garId": "gar:с-грахово-ул-береговая:д-14д",
+      "label": "с. Грахово, ул. Береговая, 14д",
+      "houseNumber": "14д",
+      "coordinates": {
+        "latitude": 56.0441072,
+        "longitude": 51.9587766
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298658"
+    },
+    {
+      "id": "osm-house:way:717501322",
+      "garId": "gar:с-грахово-ул-береговая:соор-15",
+      "label": "с. Грахово, ул. Береговая, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0433166,
+        "longitude": 51.9569439
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501322"
+    },
+    {
+      "id": "osm-house:way:134118370",
+      "garId": "gar:с-грахово-ул-береговая:д-16",
+      "label": "с. Грахово, ул. Береговая, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.045122,
+        "longitude": 51.9575436
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134118370"
+    },
+    {
+      "id": "osm-house:way:134118376",
+      "garId": "gar:с-грахово-ул-береговая:д-16а",
+      "label": "с. Грахово, ул. Береговая, 16а",
+      "houseNumber": "16а",
+      "coordinates": {
+        "latitude": 56.0456137,
+        "longitude": 51.9570648
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134118376"
+    },
+    {
+      "id": "osm-house:way:717501324",
+      "garId": "gar:с-грахово-ул-береговая:д-17",
+      "label": "с. Грахово, ул. Береговая, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0445259,
+        "longitude": 51.9573424
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501324"
+    },
+    {
+      "id": "osm-house:way:134118374",
+      "garId": "gar:с-грахово-ул-береговая:д-30",
+      "label": "с. Грахово, ул. Береговая, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.045651,
+        "longitude": 51.9577216
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134118374"
+    },
+    {
+      "id": "osm-house:way:717501278",
+      "garId": "gar:с-грахово-ул-береговая:д-32",
+      "label": "с. Грахово, ул. Береговая, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0462946,
+        "longitude": 51.957361
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501278"
+    },
+    {
+      "id": "osm-house:way:718283571",
+      "garId": "gar:с-грахово-ул-больничная:д-1",
+      "label": "с. Грахово, ул. Больничная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0486885,
+        "longitude": 51.9580853
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283571"
+    },
+    {
+      "id": "osm-house:way:718283577",
+      "garId": "gar:с-грахово-ул-больничная:д-2",
+      "label": "с. Грахово, ул. Больничная, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.049081,
+        "longitude": 51.9605985
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283577"
+    },
+    {
+      "id": "osm-house:way:718283572",
+      "garId": "gar:с-грахово-ул-больничная:д-7",
+      "label": "с. Грахово, ул. Больничная, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0487615,
+        "longitude": 51.9590536
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283572"
+    },
+    {
+      "id": "osm-house:way:718283573",
+      "garId": "gar:с-грахово-ул-больничная:д-13",
+      "label": "с. Грахово, ул. Больничная, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0491004,
+        "longitude": 51.9600432
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283573"
+    },
+    {
+      "id": "osm-house:way:718283575",
+      "garId": "gar:с-грахово-ул-больничная:д-15",
+      "label": "с. Грахово, ул. Больничная, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0493341,
+        "longitude": 51.9605557
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283575"
+    },
+    {
+      "id": "osm-house:way:718298730",
+      "garId": "gar:с-грахово-ул-верхняя:д-1",
+      "label": "с. Грахово, ул. Верхняя, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0398602,
+        "longitude": 51.9643559
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298730"
+    },
+    {
+      "id": "osm-house:way:1449303805",
+      "garId": "gar:с-грахово-ул-верхняя:д-29",
+      "label": "с. Грахово, ул. Верхняя, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0360781,
+        "longitude": 51.9688026
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1449303805"
+    },
+    {
+      "id": "osm-house:way:718298731",
+      "garId": "gar:с-грахово-ул-восточная:д-1",
+      "label": "с. Грахово, ул. Восточная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0397116,
+        "longitude": 51.9667933
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298731"
+    },
+    {
+      "id": "osm-house:way:718298732",
+      "garId": "gar:с-грахово-ул-восточная:д-3",
+      "label": "с. Грахово, ул. Восточная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.039274,
+        "longitude": 51.9674253
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298732"
+    },
+    {
+      "id": "osm-house:way:718298729",
+      "garId": "gar:с-грахово-ул-восточная:д-4",
+      "label": "с. Грахово, ул. Восточная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0396619,
+        "longitude": 51.9661639
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298729"
+    },
+    {
+      "id": "osm-house:way:718298733",
+      "garId": "gar:с-грахово-ул-восточная:д-5",
+      "label": "с. Грахово, ул. Восточная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0389699,
+        "longitude": 51.9677069
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298733"
+    },
+    {
+      "id": "osm-house:way:718298747",
+      "garId": "gar:с-грахово-ул-восточная:д-11",
+      "label": "с. Грахово, ул. Восточная, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0382192,
+        "longitude": 51.9686347
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298747"
+    },
+    {
+      "id": "osm-house:way:717501182",
+      "garId": "gar:с-грахово-ул-гагарина:д-1а",
+      "label": "с. Грахово, ул. Гагарина, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0494663,
+        "longitude": 51.9549107
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501182"
+    },
+    {
+      "id": "osm-house:way:717501180",
+      "garId": "gar:с-грахово-ул-гагарина:д-3а",
+      "label": "с. Грахово, ул. Гагарина, 3А",
+      "houseNumber": "3А",
+      "coordinates": {
+        "latitude": 56.0494123,
+        "longitude": 51.9542509
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501180"
+    },
+    {
+      "id": "osm-house:way:717501181",
+      "garId": "gar:с-грахово-ул-гагарина:д-5",
+      "label": "с. Грахово, ул. Гагарина, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0494213,
+        "longitude": 51.9544762
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501181"
+    },
+    {
+      "id": "osm-house:way:717501177",
+      "garId": "gar:с-грахово-ул-гагарина:д-9",
+      "label": "с. Грахово, ул. Гагарина, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0492805,
+        "longitude": 51.952545
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501177"
+    },
+    {
+      "id": "osm-house:way:717501176",
+      "garId": "gar:с-грахово-ул-гагарина:д-11",
+      "label": "с. Грахово, ул. Гагарина, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0492416,
+        "longitude": 51.9520837
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501176"
+    },
+    {
+      "id": "osm-house:way:717501175",
+      "garId": "gar:с-грахово-ул-гагарина:д-13",
+      "label": "с. Грахово, ул. Гагарина, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0493794,
+        "longitude": 51.9516008
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501175"
+    },
+    {
+      "id": "osm-house:way:717501165",
+      "garId": "gar:с-грахово-ул-гагарина:д-16",
+      "label": "с. Грахово, ул. Гагарина, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0487203,
+        "longitude": 51.9508874
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501165"
+    },
+    {
+      "id": "osm-house:way:717501144",
+      "garId": "gar:с-грахово-ул-гагарина:д-19а",
+      "label": "с. Грахово, ул. Гагарина, 19а",
+      "houseNumber": "19а",
+      "coordinates": {
+        "latitude": 56.050979,
+        "longitude": 51.9512104
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501144"
+    },
+    {
+      "id": "osm-house:way:717501137",
+      "garId": "gar:с-грахово-ул-гагарина:д-19б",
+      "label": "с. Грахово, ул. Гагарина, 19б",
+      "houseNumber": "19б",
+      "coordinates": {
+        "latitude": 56.0506733,
+        "longitude": 51.9513231
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501137"
+    },
+    {
+      "id": "osm-house:way:717520224",
+      "garId": "gar:с-грахово-ул-гагарина:д-21",
+      "label": "с. Грахово, ул. Гагарина, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0498835,
+        "longitude": 51.9496402
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520224"
+    },
+    {
+      "id": "osm-house:way:717501166",
+      "garId": "gar:с-грахово-ул-гагарина:д-22",
+      "label": "с. Грахово, ул. Гагарина, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0486933,
+        "longitude": 51.9505334
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501166"
+    },
+    {
+      "id": "osm-house:way:717501203",
+      "garId": "gar:с-грахово-ул-гагарина:д-28",
+      "label": "с. Грахово, ул. Гагарина, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0484986,
+        "longitude": 51.9483501
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501203"
+    },
+    {
+      "id": "osm-house:way:717501207",
+      "garId": "gar:с-грахово-ул-гагарина:д-32",
+      "label": "с. Грахово, ул. Гагарина, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0483697,
+        "longitude": 51.9467515
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501207"
+    },
+    {
+      "id": "osm-house:way:717501171",
+      "garId": "gar:с-грахово-ул-гагарина:д-33",
+      "label": "с. Грахово, ул. Гагарина, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0491277,
+        "longitude": 51.9506084
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501171"
+    },
+    {
+      "id": "osm-house:way:717501208",
+      "garId": "gar:с-грахово-ул-гагарина:д-34",
+      "label": "с. Грахово, ул. Гагарина, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.0483248,
+        "longitude": 51.9462525
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501208"
+    },
+    {
+      "id": "osm-house:way:717501163",
+      "garId": "gar:с-грахово-ул-гагарина:д-35",
+      "label": "с. Грахово, ул. Гагарина, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.0491466,
+        "longitude": 51.9555365
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501163"
+    },
+    {
+      "id": "osm-house:way:717520207",
+      "garId": "gar:с-грахово-ул-гагарина:д-55",
+      "label": "с. Грахово, ул. Гагарина, 55",
+      "houseNumber": "55",
+      "coordinates": {
+        "latitude": 56.0489908,
+        "longitude": 51.9492432
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520207"
+    },
+    {
+      "id": "osm-house:way:718298785",
+      "garId": "gar:с-грахово-ул-заречная:д-13",
+      "label": "с. Грахово, ул. Заречная, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0417642,
+        "longitude": 51.9711747
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298785"
+    },
+    {
+      "id": "osm-house:way:718298773",
+      "garId": "gar:с-грахово-ул-заречная:д-18",
+      "label": "с. Грахово, ул. Заречная, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.040352,
+        "longitude": 51.9720985
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298773"
+    },
+    {
+      "id": "osm-house:way:718298774",
+      "garId": "gar:с-грахово-ул-заречная:д-20",
+      "label": "с. Грахово, ул. Заречная, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0401804,
+        "longitude": 51.972541
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298774"
+    },
+    {
+      "id": "osm-house:way:718298772",
+      "garId": "gar:с-грахово-ул-заречная:д-21",
+      "label": "с. Грахово, ул. Заречная, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0402382,
+        "longitude": 51.9733832
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298772"
+    },
+    {
+      "id": "osm-house:way:718298775",
+      "garId": "gar:с-грахово-ул-заречная:д-22",
+      "label": "с. Грахово, ул. Заречная, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0399468,
+        "longitude": 51.9728055
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298775"
+    },
+    {
+      "id": "osm-house:way:718298771",
+      "garId": "gar:с-грахово-ул-заречная:д-23",
+      "label": "с. Грахово, ул. Заречная, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0400411,
+        "longitude": 51.9735855
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298771"
+    },
+    {
+      "id": "osm-house:way:718298770",
+      "garId": "gar:с-грахово-ул-заречная:д-25",
+      "label": "с. Грахово, ул. Заречная, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0398719,
+        "longitude": 51.9738506
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298770"
+    },
+    {
+      "id": "osm-house:way:718298769",
+      "garId": "gar:с-грахово-ул-заречная:д-27",
+      "label": "с. Грахово, ул. Заречная, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0396892,
+        "longitude": 51.9741123
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298769"
+    },
+    {
+      "id": "osm-house:way:718298768",
+      "garId": "gar:с-грахово-ул-заречная:д-29",
+      "label": "с. Грахово, ул. Заречная, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0395742,
+        "longitude": 51.9745447
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298768"
+    },
+    {
+      "id": "osm-house:way:718298766",
+      "garId": "gar:с-грахово-ул-заречная:д-33",
+      "label": "с. Грахово, ул. Заречная, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0391679,
+        "longitude": 51.9748717
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298766"
+    },
+    {
+      "id": "osm-house:way:718298765",
+      "garId": "gar:с-грахово-ул-заречная:д-35",
+      "label": "с. Грахово, ул. Заречная, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.0388838,
+        "longitude": 51.9753648
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298765"
+    },
+    {
+      "id": "osm-house:way:718298763",
+      "garId": "gar:с-грахово-ул-заречная:д-37",
+      "label": "с. Грахово, ул. Заречная, 37",
+      "houseNumber": "37",
+      "coordinates": {
+        "latitude": 56.0386625,
+        "longitude": 51.9754675
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298763"
+    },
+    {
+      "id": "osm-house:way:718298762",
+      "garId": "gar:с-грахово-ул-заречная:д-43",
+      "label": "с. Грахово, ул. Заречная, 43",
+      "houseNumber": "43",
+      "coordinates": {
+        "latitude": 56.0380773,
+        "longitude": 51.9762914
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298762"
+    },
+    {
+      "id": "osm-house:way:718298761",
+      "garId": "gar:с-грахово-ул-заречная:д-45",
+      "label": "с. Грахово, ул. Заречная, 45",
+      "houseNumber": "45",
+      "coordinates": {
+        "latitude": 56.0378513,
+        "longitude": 51.9766292
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298761"
+    },
+    {
+      "id": "osm-house:way:134118371",
+      "garId": "gar:с-грахово-ул-колпакова:д-1",
+      "label": "с. Грахово, ул. Колпакова, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0449207,
+        "longitude": 51.9580708
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134118371"
+    },
+    {
+      "id": "osm-house:way:1087854375",
+      "garId": "gar:с-грахово-ул-колпакова:зд-1а",
+      "label": "с. Грахово, ул. Колпакова, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0454281,
+        "longitude": 51.9623723
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087854375"
+    },
+    {
+      "id": "osm-house:way:134117842",
+      "garId": "gar:с-грахово-ул-колпакова:д-1б",
+      "label": "с. Грахово, ул. Колпакова, 1б",
+      "houseNumber": "1б",
+      "coordinates": {
+        "latitude": 56.0456963,
+        "longitude": 51.9618298
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134117842"
+    },
+    {
+      "id": "osm-house:way:1087854373",
+      "garId": "gar:с-грахово-ул-колпакова:зд-2",
+      "label": "с. Грахово, ул. Колпакова, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0446214,
+        "longitude": 51.9584429
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087854373"
+    },
+    {
+      "id": "osm-house:way:134117835",
+      "garId": "gar:с-грахово-ул-колпакова:д-5",
+      "label": "с. Грахово, ул. Колпакова, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0454037,
+        "longitude": 51.959233
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134117835"
+    },
+    {
+      "id": "osm-house:way:134118372",
+      "garId": "gar:с-грахово-ул-колпакова:д-6",
+      "label": "с. Грахово, ул. Колпакова, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0450084,
+        "longitude": 51.9595743
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134118372"
+    },
+    {
+      "id": "osm-house:way:136072841",
+      "garId": "gar:с-грахово-ул-колпакова:д-8",
+      "label": "с. Грахово, ул. Колпакова, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0452114,
+        "longitude": 51.9601278
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072841"
+    },
+    {
+      "id": "osm-house:way:136072839",
+      "garId": "gar:с-грахово-ул-колпакова:зд-10",
+      "label": "с. Грахово, ул. Колпакова, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0452594,
+        "longitude": 51.9606594
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072839"
+    },
+    {
+      "id": "osm-house:way:136072837",
+      "garId": "gar:с-грахово-ул-колпакова:зд-11",
+      "label": "с. Грахово, ул. Колпакова, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0466907,
+        "longitude": 51.960817
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072837"
+    },
+    {
+      "id": "osm-house:way:136072832",
+      "garId": "gar:с-грахово-ул-колпакова:д-12",
+      "label": "с. Грахово, ул. Колпакова, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0459509,
+        "longitude": 51.9614666
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072832"
+    },
+    {
+      "id": "osm-house:way:136072830",
+      "garId": "gar:с-грахово-ул-колпакова:д-16",
+      "label": "с. Грахово, ул. Колпакова, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0462495,
+        "longitude": 51.9628913
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072830"
+    },
+    {
+      "id": "osm-house:way:718283689",
+      "garId": "gar:с-грахово-ул-колпакова:д-18",
+      "label": "с. Грахово, ул. Колпакова, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0464454,
+        "longitude": 51.9640031
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283689"
+    },
+    {
+      "id": "osm-house:way:718283709",
+      "garId": "gar:с-грахово-ул-колпакова:д-22",
+      "label": "с. Грахово, ул. Колпакова, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0468539,
+        "longitude": 51.9642575
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283709"
+    },
+    {
+      "id": "osm-house:way:718283695",
+      "garId": "gar:с-грахово-ул-колпакова:д-23",
+      "label": "с. Грахово, ул. Колпакова, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0464585,
+        "longitude": 51.9618227
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283695"
+    },
+    {
+      "id": "osm-house:way:718283696",
+      "garId": "gar:с-грахово-ул-колпакова:д-25",
+      "label": "с. Грахово, ул. Колпакова, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0466157,
+        "longitude": 51.9621458
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283696"
+    },
+    {
+      "id": "osm-house:way:718283722",
+      "garId": "gar:с-грахово-ул-колпакова:д-28",
+      "label": "с. Грахово, ул. Колпакова, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0476688,
+        "longitude": 51.965616
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283722"
+    },
+    {
+      "id": "osm-house:way:718283697",
+      "garId": "gar:с-грахово-ул-колпакова:д-29",
+      "label": "с. Грахово, ул. Колпакова, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0467518,
+        "longitude": 51.962565
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283697"
+    },
+    {
+      "id": "osm-house:way:718283721",
+      "garId": "gar:с-грахово-ул-колпакова:д-30",
+      "label": "с. Грахово, ул. Колпакова, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.0478253,
+        "longitude": 51.9659803
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283721"
+    },
+    {
+      "id": "osm-house:way:718283698",
+      "garId": "gar:с-грахово-ул-колпакова:д-31",
+      "label": "с. Грахово, ул. Колпакова, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0468614,
+        "longitude": 51.9628187
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283698"
+    },
+    {
+      "id": "osm-house:way:718283699",
+      "garId": "gar:с-грахово-ул-колпакова:д-33",
+      "label": "с. Грахово, ул. Колпакова, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0469991,
+        "longitude": 51.963042
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283699"
+    },
+    {
+      "id": "osm-house:way:718283734",
+      "garId": "gar:с-грахово-ул-колпакова:д-34",
+      "label": "с. Грахово, ул. Колпакова, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.0481636,
+        "longitude": 51.966839
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283734"
+    },
+    {
+      "id": "osm-house:way:718283735",
+      "garId": "gar:с-грахово-ул-колпакова:д-36",
+      "label": "с. Грахово, ул. Колпакова, 36",
+      "houseNumber": "36",
+      "coordinates": {
+        "latitude": 56.0484067,
+        "longitude": 51.9674745
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283735"
+    },
+    {
+      "id": "osm-house:way:718283702",
+      "garId": "gar:с-грахово-ул-колпакова:д-39",
+      "label": "с. Грахово, ул. Колпакова, 39",
+      "houseNumber": "39",
+      "coordinates": {
+        "latitude": 56.0472858,
+        "longitude": 51.9638027
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283702"
+    },
+    {
+      "id": "osm-house:way:718283739",
+      "garId": "gar:с-грахово-ул-колпакова:д-40",
+      "label": "с. Грахово, ул. Колпакова, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.048749,
+        "longitude": 51.9683438
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283739"
+    },
+    {
+      "id": "osm-house:way:718283738",
+      "garId": "gar:с-грахово-ул-колпакова:д-40а",
+      "label": "с. Грахово, ул. Колпакова, 40а",
+      "houseNumber": "40а",
+      "coordinates": {
+        "latitude": 56.0489454,
+        "longitude": 51.9687526
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283738"
+    },
+    {
+      "id": "osm-house:way:718283703",
+      "garId": "gar:с-грахово-ул-колпакова:д-41",
+      "label": "с. Грахово, ул. Колпакова, 41",
+      "houseNumber": "41",
+      "coordinates": {
+        "latitude": 56.0473601,
+        "longitude": 51.9640214
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283703"
+    },
+    {
+      "id": "osm-house:way:718283749",
+      "garId": "gar:с-грахово-ул-колпакова:д-42",
+      "label": "с. Грахово, ул. Колпакова, 42",
+      "houseNumber": "42",
+      "coordinates": {
+        "latitude": 56.0491988,
+        "longitude": 51.9692535
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283749"
+    },
+    {
+      "id": "osm-house:way:718283746",
+      "garId": "gar:с-грахово-ул-колпакова:д-46",
+      "label": "с. Грахово, ул. Колпакова, 46",
+      "houseNumber": "46",
+      "coordinates": {
+        "latitude": 56.049461,
+        "longitude": 51.9698896
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283746"
+    },
+    {
+      "id": "osm-house:way:718283728",
+      "garId": "gar:с-грахово-ул-колпакова:д-47",
+      "label": "с. Грахово, ул. Колпакова, 47",
+      "houseNumber": "47",
+      "coordinates": {
+        "latitude": 56.0469412,
+        "longitude": 51.967084
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283728"
+    },
+    {
+      "id": "osm-house:way:718283756",
+      "garId": "gar:с-грахово-ул-колпакова:д-50",
+      "label": "с. Грахово, ул. Колпакова, 50",
+      "houseNumber": "50",
+      "coordinates": {
+        "latitude": 56.049162,
+        "longitude": 51.9719238
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283756"
+    },
+    {
+      "id": "osm-house:way:718283719",
+      "garId": "gar:с-грахово-ул-колпакова:д-51",
+      "label": "с. Грахово, ул. Колпакова, 51",
+      "houseNumber": "51",
+      "coordinates": {
+        "latitude": 56.048065,
+        "longitude": 51.965672
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283719"
+    },
+    {
+      "id": "osm-house:way:717520437",
+      "garId": "gar:с-грахово-ул-колпакова:д-52",
+      "label": "с. Грахово, ул. Колпакова, 52",
+      "houseNumber": "52",
+      "coordinates": {
+        "latitude": 56.0500115,
+        "longitude": 51.9710649
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520437"
+    },
+    {
+      "id": "osm-house:way:718283720",
+      "garId": "gar:с-грахово-ул-колпакова:д-53",
+      "label": "с. Грахово, ул. Колпакова, 53",
+      "houseNumber": "53",
+      "coordinates": {
+        "latitude": 56.0481876,
+        "longitude": 51.9659805
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283720"
+    },
+    {
+      "id": "osm-house:way:717520436",
+      "garId": "gar:с-грахово-ул-колпакова:д-54",
+      "label": "с. Грахово, ул. Колпакова, 54",
+      "houseNumber": "54",
+      "coordinates": {
+        "latitude": 56.0501629,
+        "longitude": 51.9714038
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520436"
+    },
+    {
+      "id": "osm-house:way:718283652",
+      "garId": "gar:с-грахово-ул-колпакова:д-57",
+      "label": "с. Грахово, ул. Колпакова, 57",
+      "houseNumber": "57",
+      "coordinates": {
+        "latitude": 56.0485307,
+        "longitude": 51.9667995
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283652"
+    },
+    {
+      "id": "osm-house:way:718283651",
+      "garId": "gar:с-грахово-ул-колпакова:д-61",
+      "label": "с. Грахово, ул. Колпакова, 61",
+      "houseNumber": "61",
+      "coordinates": {
+        "latitude": 56.048655,
+        "longitude": 51.9671892
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283651"
+    },
+    {
+      "id": "osm-house:way:717520431",
+      "garId": "gar:с-грахово-ул-колпакова:д-62",
+      "label": "с. Грахово, ул. Колпакова, 62",
+      "houseNumber": "62",
+      "coordinates": {
+        "latitude": 56.0511134,
+        "longitude": 51.9740714
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520431"
+    },
+    {
+      "id": "osm-house:way:134119368",
+      "garId": "gar:с-грахово-ул-колпакова:зд-63",
+      "label": "с. Грахово, ул. Колпакова, 63",
+      "houseNumber": "63",
+      "coordinates": {
+        "latitude": 56.0503463,
+        "longitude": 51.9695288
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/134119368"
+    },
+    {
+      "id": "osm-house:way:1087854377",
+      "garId": "gar:с-грахово-ул-колпакова:д-63б",
+      "label": "с. Грахово, ул. Колпакова, 63б",
+      "houseNumber": "63б",
+      "coordinates": {
+        "latitude": 56.0496791,
+        "longitude": 51.9677732
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1087854377"
+    },
+    {
+      "id": "osm-house:way:717520432",
+      "garId": "gar:с-грахово-ул-колпакова:д-64",
+      "label": "с. Грахово, ул. Колпакова, 64",
+      "houseNumber": "64",
+      "coordinates": {
+        "latitude": 56.0512722,
+        "longitude": 51.9744791
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520432"
+    },
+    {
+      "id": "osm-house:way:717520439",
+      "garId": "gar:с-грахово-ул-колпакова:д-65",
+      "label": "с. Грахово, ул. Колпакова, 65",
+      "houseNumber": "65",
+      "coordinates": {
+        "latitude": 56.0504773,
+        "longitude": 51.9710846
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520439"
+    },
+    {
+      "id": "osm-house:way:717520427",
+      "garId": "gar:с-грахово-ул-колпакова:д-67а",
+      "label": "с. Грахово, ул. Колпакова, 67а",
+      "houseNumber": "67а",
+      "coordinates": {
+        "latitude": 56.0509576,
+        "longitude": 51.9720383
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520427"
+    },
+    {
+      "id": "osm-house:way:717520429",
+      "garId": "gar:с-грахово-ул-колпакова:д-69",
+      "label": "с. Грахово, ул. Колпакова, 69",
+      "houseNumber": "69",
+      "coordinates": {
+        "latitude": 56.0511583,
+        "longitude": 51.972961
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520429"
+    },
+    {
+      "id": "osm-house:way:717520426",
+      "garId": "gar:с-грахово-ул-колпакова:д-69а",
+      "label": "с. Грахово, ул. Колпакова, 69а",
+      "houseNumber": "69а",
+      "coordinates": {
+        "latitude": 56.0514579,
+        "longitude": 51.9719202
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520426"
+    },
+    {
+      "id": "osm-house:way:717520419",
+      "garId": "gar:с-грахово-ул-колпакова:д-71",
+      "label": "с. Грахово, ул. Колпакова, 71",
+      "houseNumber": "71",
+      "coordinates": {
+        "latitude": 56.0522482,
+        "longitude": 51.9736192
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520419"
+    },
+    {
+      "id": "osm-house:way:717520412",
+      "garId": "gar:с-грахово-ул-колпакова:д-72",
+      "label": "с. Грахово, ул. Колпакова, 72",
+      "houseNumber": "72",
+      "coordinates": {
+        "latitude": 56.0528269,
+        "longitude": 51.9777943
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520412"
+    },
+    {
+      "id": "osm-house:way:717520417",
+      "garId": "gar:с-грахово-ул-колпакова:д-73",
+      "label": "с. Грахово, ул. Колпакова, 73",
+      "houseNumber": "73",
+      "coordinates": {
+        "latitude": 56.0522149,
+        "longitude": 51.9750507
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520417"
+    },
+    {
+      "id": "osm-house:way:717520400",
+      "garId": "gar:с-грахово-ул-колпакова:д-77",
+      "label": "с. Грахово, ул. Колпакова, 77",
+      "houseNumber": "77",
+      "coordinates": {
+        "latitude": 56.052746,
+        "longitude": 51.9766087
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520400"
+    },
+    {
+      "id": "osm-house:way:717520402",
+      "garId": "gar:с-грахово-ул-колпакова:д-79",
+      "label": "с. Грахово, ул. Колпакова, 79",
+      "houseNumber": "79",
+      "coordinates": {
+        "latitude": 56.0529707,
+        "longitude": 51.9771559
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520402"
+    },
+    {
+      "id": "osm-house:way:717520410",
+      "garId": "gar:с-грахово-ул-колпакова:д-83",
+      "label": "с. Грахово, ул. Колпакова, 83",
+      "houseNumber": "83",
+      "coordinates": {
+        "latitude": 56.0538934,
+        "longitude": 51.9790925
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520410"
+    },
+    {
+      "id": "osm-house:way:717520407",
+      "garId": "gar:с-грахово-ул-колпакова:д-85",
+      "label": "с. Грахово, ул. Колпакова, 85",
+      "houseNumber": "85",
+      "coordinates": {
+        "latitude": 56.054124,
+        "longitude": 51.9795324
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520407"
+    },
+    {
+      "id": "osm-house:way:936987000",
+      "garId": "gar:с-грахово-ул-колпакова:д-86",
+      "label": "с. Грахово, ул. Колпакова, 86",
+      "houseNumber": "86",
+      "coordinates": {
+        "latitude": 56.0551411,
+        "longitude": 51.9823182
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/936987000"
+    },
+    {
+      "id": "osm-house:way:717520406",
+      "garId": "gar:с-грахово-ул-колпакова:д-87",
+      "label": "с. Грахово, ул. Колпакова, 87",
+      "houseNumber": "87",
+      "coordinates": {
+        "latitude": 56.0542798,
+        "longitude": 51.9797899
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520406"
+    },
+    {
+      "id": "osm-house:way:717520408",
+      "garId": "gar:с-грахово-ул-колпакова:д-89",
+      "label": "с. Грахово, ул. Колпакова, 89",
+      "houseNumber": "89",
+      "coordinates": {
+        "latitude": 56.0544805,
+        "longitude": 51.9801224
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520408"
+    },
+    {
+      "id": "osm-house:way:717501245",
+      "garId": "gar:с-грахово-ул-комарова:д-1а",
+      "label": "с. Грахово, ул. Комарова, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0482016,
+        "longitude": 51.9566153
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501245"
+    },
+    {
+      "id": "osm-house:way:717501243",
+      "garId": "gar:с-грахово-ул-комарова:д-3",
+      "label": "с. Грахово, ул. Комарова, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0480467,
+        "longitude": 51.9553891
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501243"
+    },
+    {
+      "id": "osm-house:way:717501167",
+      "garId": "gar:с-грахово-ул-комарова:д-6",
+      "label": "с. Грахово, ул. Комарова, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0486544,
+        "longitude": 51.9500183
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501167"
+    },
+    {
+      "id": "osm-house:way:717501236",
+      "garId": "gar:с-грахово-ул-комарова:д-19",
+      "label": "с. Грахово, ул. Комарова, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0475718,
+        "longitude": 51.9514453
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501236"
+    },
+    {
+      "id": "osm-house:way:717501233",
+      "garId": "gar:с-грахово-ул-комарова:д-25",
+      "label": "с. Грахово, ул. Комарова, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0473565,
+        "longitude": 51.9497502
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501233"
+    },
+    {
+      "id": "osm-house:way:717501199",
+      "garId": "gar:с-грахово-ул-комарова:д-28",
+      "label": "с. Грахово, ул. Комарова, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0476537,
+        "longitude": 51.9498092
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501199"
+    },
+    {
+      "id": "osm-house:way:717501230",
+      "garId": "gar:с-грахово-ул-комарова:д-29",
+      "label": "с. Грахово, ул. Комарова, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0471317,
+        "longitude": 51.9482107
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501230"
+    },
+    {
+      "id": "osm-house:way:717501200",
+      "garId": "gar:с-грахово-ул-комарова:д-30",
+      "label": "с. Грахово, ул. Комарова, 30",
+      "houseNumber": "30",
+      "coordinates": {
+        "latitude": 56.0476267,
+        "longitude": 51.9494819
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501200"
+    },
+    {
+      "id": "osm-house:way:717501201",
+      "garId": "gar:с-грахово-ул-комарова:д-32",
+      "label": "с. Грахово, ул. Комарова, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0475339,
+        "longitude": 51.9489562
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501201"
+    },
+    {
+      "id": "osm-house:way:717501211",
+      "garId": "gar:с-грахово-ул-комарова:д-38",
+      "label": "с. Грахово, ул. Комарова, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.0472433,
+        "longitude": 51.9467354
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501211"
+    },
+    {
+      "id": "osm-house:way:717501318",
+      "garId": "gar:с-грахово-ул-кооперативная:д-1",
+      "label": "с. Грахово, ул. Кооперативная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0441163,
+        "longitude": 51.9549577
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501318"
+    },
+    {
+      "id": "osm-house:way:717501321",
+      "garId": "gar:с-грахово-ул-кооперативная:д-3",
+      "label": "с. Грахово, ул. Кооперативная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0439374,
+        "longitude": 51.953485
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501321"
+    },
+    {
+      "id": "osm-house:way:717501310",
+      "garId": "gar:с-грахово-ул-кооперативная:д-16",
+      "label": "с. Грахово, ул. Кооперативная, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0445603,
+        "longitude": 51.9521971
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501310"
+    },
+    {
+      "id": "osm-house:way:717520317",
+      "garId": "gar:с-грахово-ул-луговая:д-1",
+      "label": "с. Грахово, ул. Луговая, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0515551,
+        "longitude": 51.9621787
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520317"
+    },
+    {
+      "id": "osm-house:way:717520315",
+      "garId": "gar:с-грахово-ул-луговая:д-2",
+      "label": "с. Грахово, ул. Луговая, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0518967,
+        "longitude": 51.9624791
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520315"
+    },
+    {
+      "id": "osm-house:way:717520302",
+      "garId": "gar:с-грахово-ул-луговая:д-9",
+      "label": "с. Грахово, ул. Луговая, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0518038,
+        "longitude": 51.9597003
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520302"
+    },
+    {
+      "id": "osm-house:way:717520349",
+      "garId": "gar:с-грахово-ул-майская:д-1",
+      "label": "с. Грахово, ул. Майская, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0543158,
+        "longitude": 51.9663573
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520349"
+    },
+    {
+      "id": "osm-house:way:717520350",
+      "garId": "gar:с-грахово-ул-майская:д-3",
+      "label": "с. Грахово, ул. Майская, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0544266,
+        "longitude": 51.9661696
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520350"
+    },
+    {
+      "id": "osm-house:way:717520351",
+      "garId": "gar:с-грахово-ул-майская:д-5",
+      "label": "с. Грахово, ул. Майская, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0546212,
+        "longitude": 51.9659443
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520351"
+    },
+    {
+      "id": "osm-house:way:718283600",
+      "garId": "gar:с-грахово-ул-мелиоративная:д-3",
+      "label": "с. Грахово, ул. Мелиоративная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0512275,
+        "longitude": 51.9604456
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283600"
+    },
+    {
+      "id": "osm-house:way:717520307",
+      "garId": "gar:с-грахово-ул-мелиоративная:д-7",
+      "label": "с. Грахово, ул. Мелиоративная, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0527295,
+        "longitude": 51.9606981
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520307"
+    },
+    {
+      "id": "osm-house:way:717520304",
+      "garId": "gar:с-грахово-ул-мелиоративная:д-13",
+      "label": "с. Грахово, ул. Мелиоративная, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0526257,
+        "longitude": 51.958768
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520304"
+    },
+    {
+      "id": "osm-house:way:717520299",
+      "garId": "gar:с-грахово-ул-мелиоративная:д-19",
+      "label": "с. Грахово, ул. Мелиоративная, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0528433,
+        "longitude": 51.9585256
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520299"
+    },
+    {
+      "id": "osm-house:way:718298721",
+      "garId": "gar:с-грахово-ул-молодежная:д-1",
+      "label": "с. Грахово, ул. Молодежная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0415307,
+        "longitude": 51.9672716
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298721"
+    },
+    {
+      "id": "osm-house:way:718298722",
+      "garId": "gar:с-грахово-ул-молодежная:д-3",
+      "label": "с. Грахово, ул. Молодежная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0412246,
+        "longitude": 51.9675351
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298722"
+    },
+    {
+      "id": "osm-house:way:718298712",
+      "garId": "gar:с-грахово-ул-молодежная:д-7",
+      "label": "с. Грахово, ул. Молодежная, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.041152,
+        "longitude": 51.9659117
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298712"
+    },
+    {
+      "id": "osm-house:way:718298714",
+      "garId": "gar:с-грахово-ул-молодежная:д-11",
+      "label": "с. Грахово, ул. Молодежная, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0407272,
+        "longitude": 51.96421
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298714"
+    },
+    {
+      "id": "osm-house:way:718298632",
+      "garId": "gar:с-грахово-ул-муфтеева:д-1",
+      "label": "с. Грахово, ул. Муфтеева, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0448984,
+        "longitude": 51.9632254
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298632"
+    },
+    {
+      "id": "osm-house:way:718298619",
+      "garId": "gar:с-грахово-ул-муфтеева:д-2",
+      "label": "с. Грахово, ул. Муфтеева, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0455096,
+        "longitude": 51.9660704
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298619"
+    },
+    {
+      "id": "osm-house:way:136073886",
+      "garId": "gar:с-грахово-ул-муфтеева:д-3",
+      "label": "с. Грахово, ул. Муфтеева, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0473808,
+        "longitude": 51.9612933
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073886"
+    },
+    {
+      "id": "osm-house:way:136073891",
+      "garId": "gar:с-грахово-ул-муфтеева:д-3а",
+      "label": "с. Грахово, ул. Муфтеева, 3а",
+      "houseNumber": "3а",
+      "coordinates": {
+        "latitude": 56.0480456,
+        "longitude": 51.9615284
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073891"
+    },
+    {
+      "id": "osm-house:way:718283588",
+      "garId": "gar:с-грахово-ул-муфтеева:д-4",
+      "label": "с. Грахово, ул. Муфтеева, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.049459,
+        "longitude": 51.9607849
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283588"
+    },
+    {
+      "id": "osm-house:way:718283710",
+      "garId": "gar:с-грахово-ул-муфтеева:д-4а",
+      "label": "с. Грахово, ул. Муфтеева, 4а",
+      "houseNumber": "4а",
+      "coordinates": {
+        "latitude": 56.0465894,
+        "longitude": 51.9646125
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283710"
+    },
+    {
+      "id": "osm-house:way:718283616",
+      "garId": "gar:с-грахово-ул-муфтеева:д-5",
+      "label": "с. Грахово, ул. Муфтеева, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0485763,
+        "longitude": 51.9615129
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283616"
+    },
+    {
+      "id": "osm-house:way:718283589",
+      "garId": "gar:с-грахово-ул-муфтеева:д-6",
+      "label": "с. Грахово, ул. Муфтеева, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0497642,
+        "longitude": 51.9605767
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283589"
+    },
+    {
+      "id": "osm-house:way:718283590",
+      "garId": "gar:с-грахово-ул-муфтеева:д-8",
+      "label": "с. Грахово, ул. Муфтеева, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0499498,
+        "longitude": 51.9603034
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283590"
+    },
+    {
+      "id": "osm-house:way:718283598",
+      "garId": "gar:с-грахово-ул-муфтеева:д-13",
+      "label": "с. Грахово, ул. Муфтеева, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0502433,
+        "longitude": 51.959393
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283598"
+    },
+    {
+      "id": "osm-house:way:718283594",
+      "garId": "gar:с-грахово-ул-муфтеева:д-20",
+      "label": "с. Грахово, ул. Муфтеева, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0510515,
+        "longitude": 51.9590142
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283594"
+    },
+    {
+      "id": "osm-house:way:718298662",
+      "garId": "gar:с-грахово-ул-набережная:д-1",
+      "label": "с. Грахово, ул. Набережная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0415371,
+        "longitude": 51.9522474
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298662"
+    },
+    {
+      "id": "osm-house:way:718298677",
+      "garId": "gar:с-грахово-ул-набережная:д-4",
+      "label": "с. Грахово, ул. Набережная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.040379,
+        "longitude": 51.9512127
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298677"
+    },
+    {
+      "id": "osm-house:way:718298671",
+      "garId": "gar:с-грахово-ул-набережная:д-9",
+      "label": "с. Грахово, ул. Набережная, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.041094,
+        "longitude": 51.9524647
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298671"
+    },
+    {
+      "id": "osm-house:way:718298680",
+      "garId": "gar:с-грахово-ул-набережная:д-19",
+      "label": "с. Грахово, ул. Набережная, 19",
+      "houseNumber": "19",
+      "coordinates": {
+        "latitude": 56.0401232,
+        "longitude": 51.950867
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298680"
+    },
+    {
+      "id": "osm-house:way:718298682",
+      "garId": "gar:с-грахово-ул-набережная:д-21",
+      "label": "с. Грахово, ул. Набережная, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0402902,
+        "longitude": 51.9504979
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298682"
+    },
+    {
+      "id": "osm-house:way:718298802",
+      "garId": "gar:с-грахово-ул-нижняя:д-5",
+      "label": "с. Грахово, ул. Нижняя, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0438681,
+        "longitude": 51.9690558
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298802"
+    },
+    {
+      "id": "osm-house:way:718298801",
+      "garId": "gar:с-грахово-ул-нижняя:д-12а",
+      "label": "с. Грахово, ул. Нижняя, 12а",
+      "houseNumber": "12а",
+      "coordinates": {
+        "latitude": 56.0441299,
+        "longitude": 51.9685553
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298801"
+    },
+    {
+      "id": "osm-house:way:718298690",
+      "garId": "gar:с-грахово-ул-нижняя:д-19а",
+      "label": "с. Грахово, ул. Нижняя, 19а",
+      "houseNumber": "19а",
+      "coordinates": {
+        "latitude": 56.0431771,
+        "longitude": 51.9656967
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298690"
+    },
+    {
+      "id": "osm-house:way:718298687",
+      "garId": "gar:с-грахово-ул-нижняя:зд-19б",
+      "label": "с. Грахово, ул. Нижняя, 19б",
+      "houseNumber": "19б",
+      "coordinates": {
+        "latitude": 56.0430965,
+        "longitude": 51.9665237
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298687"
+    },
+    {
+      "id": "osm-house:way:718298688",
+      "garId": "gar:с-грахово-ул-нижняя:зд-19в",
+      "label": "с. Грахово, ул. Нижняя, 19в",
+      "houseNumber": "19в",
+      "coordinates": {
+        "latitude": 56.0425113,
+        "longitude": 51.9658645
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298688"
+    },
+    {
+      "id": "osm-house:way:718298691",
+      "garId": "gar:с-грахово-ул-нижняя:д-25",
+      "label": "с. Грахово, ул. Нижняя, 25",
+      "houseNumber": "25",
+      "coordinates": {
+        "latitude": 56.0425456,
+        "longitude": 51.9650333
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298691"
+    },
+    {
+      "id": "osm-house:way:717501261",
+      "garId": "gar:с-грахово-ул-новая:д-2",
+      "label": "с. Грахово, ул. Новая, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0472104,
+        "longitude": 51.9567201
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501261"
+    },
+    {
+      "id": "osm-house:way:717501259",
+      "garId": "gar:с-грахово-ул-новая:д-6",
+      "label": "с. Грахово, ул. Новая, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0471898,
+        "longitude": 51.955882
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501259"
+    },
+    {
+      "id": "osm-house:way:717501275",
+      "garId": "gar:с-грахово-ул-новая:д-7",
+      "label": "с. Грахово, ул. Новая, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.046856,
+        "longitude": 51.9558759
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501275"
+    },
+    {
+      "id": "osm-house:way:717501257",
+      "garId": "gar:с-грахово-ул-новая:д-8",
+      "label": "с. Грахово, ул. Новая, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0471691,
+        "longitude": 51.9551179
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501257"
+    },
+    {
+      "id": "osm-house:way:717501254",
+      "garId": "gar:с-грахово-ул-новая:д-10",
+      "label": "с. Грахово, ул. Новая, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0471141,
+        "longitude": 51.9538362
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501254"
+    },
+    {
+      "id": "osm-house:way:717501271",
+      "garId": "gar:с-грахово-ул-новая:д-11",
+      "label": "с. Грахово, ул. Новая, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0468181,
+        "longitude": 51.9538239
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501271"
+    },
+    {
+      "id": "osm-house:way:717501256",
+      "garId": "gar:с-грахово-ул-новая:д-12",
+      "label": "с. Грахово, ул. Новая, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0471278,
+        "longitude": 51.9545942
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501256"
+    },
+    {
+      "id": "osm-house:way:717501269",
+      "garId": "gar:с-грахово-ул-новая:д-15",
+      "label": "с. Грахово, ул. Новая, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0468043,
+        "longitude": 51.9528195
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501269"
+    },
+    {
+      "id": "osm-house:way:717501237",
+      "garId": "gar:с-грахово-ул-новая:д-18",
+      "label": "с. Грахово, ул. Новая, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0476372,
+        "longitude": 51.9519259
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501237"
+    },
+    {
+      "id": "osm-house:way:717501252",
+      "garId": "gar:с-грахово-ул-новая:д-20",
+      "label": "с. Грахово, ул. Новая, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0470796,
+        "longitude": 51.9529612
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501252"
+    },
+    {
+      "id": "osm-house:way:717501251",
+      "garId": "gar:с-грахово-ул-новая:д-22",
+      "label": "с. Грахово, ул. Новая, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0470762,
+        "longitude": 51.952536
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501251"
+    },
+    {
+      "id": "osm-house:way:717501273",
+      "garId": "gar:с-грахово-ул-новая:д-27",
+      "label": "с. Грахово, ул. Новая, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0468353,
+        "longitude": 51.9550193
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501273"
+    },
+    {
+      "id": "osm-house:way:717501247",
+      "garId": "gar:с-грахово-ул-новая:д-28",
+      "label": "с. Грахово, ул. Новая, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0471657,
+        "longitude": 51.9503731
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501247"
+    },
+    {
+      "id": "osm-house:way:718298830",
+      "garId": "gar:с-грахово-ул-первомайская:д-1",
+      "label": "с. Грахово, ул. Первомайская, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0438865,
+        "longitude": 51.975438
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298830"
+    },
+    {
+      "id": "osm-house:way:718417747",
+      "garId": "gar:с-грахово-ул-первомайская:д-2",
+      "label": "с. Грахово, ул. Первомайская, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0440097,
+        "longitude": 51.9768491
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417747"
+    },
+    {
+      "id": "osm-house:way:718417750",
+      "garId": "gar:с-грахово-ул-первомайская:д-10",
+      "label": "с. Грахово, ул. Первомайская, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0447033,
+        "longitude": 51.9781014
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417750"
+    },
+    {
+      "id": "osm-house:way:718417777",
+      "garId": "gar:с-грахово-ул-первомайская:д-21",
+      "label": "с. Грахово, ул. Первомайская, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0468525,
+        "longitude": 51.9811092
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417777"
+    },
+    {
+      "id": "osm-house:way:718283630",
+      "garId": "gar:с-грахово-ул-пионерская:д-1",
+      "label": "с. Грахово, ул. Пионерская, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0481765,
+        "longitude": 51.9626508
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283630"
+    },
+    {
+      "id": "osm-house:way:718283625",
+      "garId": "gar:с-грахово-ул-пионерская:д-4",
+      "label": "с. Грахово, ул. Пионерская, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0480869,
+        "longitude": 51.9632278
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283625"
+    },
+    {
+      "id": "osm-house:way:718283632",
+      "garId": "gar:с-грахово-ул-пионерская:д-5",
+      "label": "с. Грахово, ул. Пионерская, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0485712,
+        "longitude": 51.9636488
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283632"
+    },
+    {
+      "id": "osm-house:way:718283624",
+      "garId": "gar:с-грахово-ул-пионерская:д-6",
+      "label": "с. Грахово, ул. Пионерская, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0482308,
+        "longitude": 51.9636113
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283624"
+    },
+    {
+      "id": "osm-house:way:718283623",
+      "garId": "gar:с-грахово-ул-пионерская:д-8",
+      "label": "с. Грахово, ул. Пионерская, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0483436,
+        "longitude": 51.9639688
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283623"
+    },
+    {
+      "id": "osm-house:way:718283635",
+      "garId": "gar:с-грахово-ул-пионерская:д-11",
+      "label": "с. Грахово, ул. Пионерская, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0492646,
+        "longitude": 51.9652488
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283635"
+    },
+    {
+      "id": "osm-house:way:718283655",
+      "garId": "gar:с-грахово-ул-пионерская:зд-13",
+      "label": "с. Грахово, ул. Пионерская, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.049581,
+        "longitude": 51.9658268
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283655"
+    },
+    {
+      "id": "osm-house:way:718283628",
+      "garId": "gar:с-грахово-ул-пионерская:д-14",
+      "label": "с. Грахово, ул. Пионерская, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.049045,
+        "longitude": 51.9655907
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283628"
+    },
+    {
+      "id": "osm-house:way:717520327",
+      "garId": "gar:с-грахово-ул-полевая:д-1",
+      "label": "с. Грахово, ул. Полевая, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0533481,
+        "longitude": 51.9648178
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520327"
+    },
+    {
+      "id": "osm-house:way:717520330",
+      "garId": "gar:с-грахово-ул-полевая:д-2",
+      "label": "с. Грахово, ул. Полевая, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0537465,
+        "longitude": 51.9651879
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520330"
+    },
+    {
+      "id": "osm-house:way:717520328",
+      "garId": "gar:с-грахово-ул-полевая:д-3",
+      "label": "с. Грахово, ул. Полевая, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0536417,
+        "longitude": 51.9645335
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520328"
+    },
+    {
+      "id": "osm-house:way:717520336",
+      "garId": "gar:с-грахово-ул-полевая:д-4",
+      "label": "с. Грахово, ул. Полевая, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0541929,
+        "longitude": 51.9653864
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520336"
+    },
+    {
+      "id": "osm-house:way:717520332",
+      "garId": "gar:с-грахово-ул-полевая:д-5",
+      "label": "с. Грахово, ул. Полевая, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0538534,
+        "longitude": 51.9642289
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520332"
+    },
+    {
+      "id": "osm-house:way:717520333",
+      "garId": "gar:с-грахово-ул-полевая:д-6",
+      "label": "с. Грахово, ул. Полевая, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0542167,
+        "longitude": 51.9646601
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520333"
+    },
+    {
+      "id": "osm-house:way:717520329",
+      "garId": "gar:с-грахово-ул-полевая:д-7",
+      "label": "с. Грахово, ул. Полевая, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0540341,
+        "longitude": 51.9640131
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520329"
+    },
+    {
+      "id": "osm-house:way:718298696",
+      "garId": "gar:с-грахово-ул-промкомбинатская:д-1",
+      "label": "с. Грахово, ул. Промкомбинатская, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0408196,
+        "longitude": 51.9624967
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298696"
+    },
+    {
+      "id": "osm-house:way:718298697",
+      "garId": "gar:с-грахово-ул-промкомбинатская:д-5",
+      "label": "с. Грахово, ул. Промкомбинатская, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0409067,
+        "longitude": 51.9631179
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298697"
+    },
+    {
+      "id": "osm-house:way:718298700",
+      "garId": "gar:с-грахово-ул-промкомбинатская:д-11",
+      "label": "с. Грахово, ул. Промкомбинатская, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0412643,
+        "longitude": 51.9642158
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298700"
+    },
+    {
+      "id": "osm-house:way:718298702",
+      "garId": "gar:с-грахово-ул-промкомбинатская:д-13",
+      "label": "с. Грахово, ул. Промкомбинатская, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0414917,
+        "longitude": 51.9647879
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298702"
+    },
+    {
+      "id": "osm-house:way:718298705",
+      "garId": "gar:с-грахово-ул-промкомбинатская:д-21",
+      "label": "с. Грахово, ул. Промкомбинатская, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0416453,
+        "longitude": 51.9658182
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298705"
+    },
+    {
+      "id": "osm-house:way:717501104",
+      "garId": "gar:с-грахово-ул-радужная:д-1",
+      "label": "с. Грахово, ул. Радужная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0552747,
+        "longitude": 51.9513606
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501104"
+    },
+    {
+      "id": "osm-house:way:717501108",
+      "garId": "gar:с-грахово-ул-радужная:д-2",
+      "label": "с. Грахово, ул. Радужная, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0544239,
+        "longitude": 51.951012
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501108"
+    },
+    {
+      "id": "osm-house:way:717501103",
+      "garId": "gar:с-грахово-ул-радужная:д-3",
+      "label": "с. Грахово, ул. Радужная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.055068,
+        "longitude": 51.951425
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501103"
+    },
+    {
+      "id": "osm-house:way:717501107",
+      "garId": "gar:с-грахово-ул-радужная:д-4",
+      "label": "с. Грахово, ул. Радужная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0541094,
+        "longitude": 51.9510978
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501107"
+    },
+    {
+      "id": "osm-house:way:717501101",
+      "garId": "gar:с-грахово-ул-радужная:д-5",
+      "label": "с. Грахово, ул. Радужная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0548343,
+        "longitude": 51.9515215
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501101"
+    },
+    {
+      "id": "osm-house:way:717501105",
+      "garId": "gar:с-грахово-ул-радужная:д-7",
+      "label": "с. Грахово, ул. Радужная, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0545048,
+        "longitude": 51.9516128
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501105"
+    },
+    {
+      "id": "osm-house:way:717501110",
+      "garId": "gar:с-грахово-ул-радужная:д-11",
+      "label": "с. Грахово, ул. Радужная, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0539806,
+        "longitude": 51.9518005
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501110"
+    },
+    {
+      "id": "osm-house:way:717501091",
+      "garId": "gar:с-грахово-ул-радужная:д-12",
+      "label": "с. Грахово, ул. Радужная, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0526086,
+        "longitude": 51.951291
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501091"
+    },
+    {
+      "id": "osm-house:way:717501090",
+      "garId": "gar:с-грахово-ул-радужная:д-14",
+      "label": "с. Грахово, ул. Радужная, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0524948,
+        "longitude": 51.9508135
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501090"
+    },
+    {
+      "id": "osm-house:way:717501113",
+      "garId": "gar:с-грахово-ул-радужная:д-15",
+      "label": "с. Грахово, ул. Радужная, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0533605,
+        "longitude": 51.9519669
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501113"
+    },
+    {
+      "id": "osm-house:way:717501089",
+      "garId": "gar:с-грахово-ул-радужная:д-18",
+      "label": "с. Грахово, ул. Радужная, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0522641,
+        "longitude": 51.9500571
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501089"
+    },
+    {
+      "id": "osm-house:way:717501067",
+      "garId": "gar:с-грахово-ул-радужная:д-22",
+      "label": "с. Грахово, ул. Радужная, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0519286,
+        "longitude": 51.9490486
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501067"
+    },
+    {
+      "id": "osm-house:way:717501155",
+      "garId": "gar:с-грахово-ул-радужная:д-23",
+      "label": "с. Грахово, ул. Радужная, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0526595,
+        "longitude": 51.9523262
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501155"
+    },
+    {
+      "id": "osm-house:way:717501061",
+      "garId": "gar:с-грахово-ул-радужная:д-26",
+      "label": "с. Грахово, ул. Радужная, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.0521562,
+        "longitude": 51.9482225
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501061"
+    },
+    {
+      "id": "osm-house:way:717501152",
+      "garId": "gar:с-грахово-ул-радужная:д-27",
+      "label": "с. Грахово, ул. Радужная, 27",
+      "houseNumber": "27",
+      "coordinates": {
+        "latitude": 56.0522431,
+        "longitude": 51.9514572
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501152"
+    },
+    {
+      "id": "osm-house:way:717501059",
+      "garId": "gar:с-грахово-ул-радужная:д-28",
+      "label": "с. Грахово, ул. Радужная, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0524828,
+        "longitude": 51.9478737
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501059"
+    },
+    {
+      "id": "osm-house:way:717501151",
+      "garId": "gar:с-грахово-ул-радужная:д-29",
+      "label": "с. Грахово, ул. Радужная, 29",
+      "houseNumber": "29",
+      "coordinates": {
+        "latitude": 56.0520604,
+        "longitude": 51.9508832
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501151"
+    },
+    {
+      "id": "osm-house:way:717501153",
+      "garId": "gar:с-грахово-ул-радужная:д-31",
+      "label": "с. Грахово, ул. Радужная, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0518177,
+        "longitude": 51.9499927
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501153"
+    },
+    {
+      "id": "osm-house:way:717501057",
+      "garId": "gar:с-грахово-ул-радужная:д-32",
+      "label": "с. Грахово, ул. Радужная, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0528989,
+        "longitude": 51.947395
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501057"
+    },
+    {
+      "id": "osm-house:way:717501064",
+      "garId": "gar:с-грахово-ул-радужная:д-34",
+      "label": "с. Грахово, ул. Радужная, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.0530879,
+        "longitude": 51.9471761
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501064"
+    },
+    {
+      "id": "osm-house:way:717501148",
+      "garId": "gar:с-грахово-ул-радужная:д-35",
+      "label": "с. Грахово, ул. Радужная, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.0515497,
+        "longitude": 51.9492623
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501148"
+    },
+    {
+      "id": "osm-house:way:717501146",
+      "garId": "gar:с-грахово-ул-радужная:д-37",
+      "label": "с. Грахово, ул. Радужная, 37",
+      "houseNumber": "37",
+      "coordinates": {
+        "latitude": 56.050925,
+        "longitude": 51.9488715
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501146"
+    },
+    {
+      "id": "osm-house:way:717501088",
+      "garId": "gar:с-грахово-ул-радужная:д-39",
+      "label": "с. Грахово, ул. Радужная, 39",
+      "houseNumber": "39",
+      "coordinates": {
+        "latitude": 56.0513983,
+        "longitude": 51.9477021
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501088"
+    },
+    {
+      "id": "osm-house:way:717501147",
+      "garId": "gar:с-грахово-ул-радужная:д-39а",
+      "label": "с. Грахово, ул. Радужная, 39А",
+      "houseNumber": "39А",
+      "coordinates": {
+        "latitude": 56.0507602,
+        "longitude": 51.9480991
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501147"
+    },
+    {
+      "id": "osm-house:way:718298737",
+      "garId": "gar:с-грахово-ул-рябиновая:д-1",
+      "label": "с. Грахово, ул. Рябиновая, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0395741,
+        "longitude": 51.9693733
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298737"
+    },
+    {
+      "id": "osm-house:way:718298739",
+      "garId": "gar:с-грахово-ул-рябиновая:д-1а",
+      "label": "с. Грахово, ул. Рябиновая, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0400386,
+        "longitude": 51.9688828
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298739"
+    },
+    {
+      "id": "osm-house:way:718298718",
+      "garId": "gar:с-грахово-ул-рябиновая:д-2",
+      "label": "с. Грахово, ул. Рябиновая, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0401003,
+        "longitude": 51.9678634
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298718"
+    },
+    {
+      "id": "osm-house:way:718298736",
+      "garId": "gar:с-грахово-ул-рябиновая:д-4",
+      "label": "с. Грахово, ул. Рябиновая, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0397754,
+        "longitude": 51.9681173
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298736"
+    },
+    {
+      "id": "osm-house:way:718298735",
+      "garId": "gar:с-грахово-ул-рябиновая:д-6",
+      "label": "с. Грахово, ул. Рябиновая, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0395037,
+        "longitude": 51.9685894
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298735"
+    },
+    {
+      "id": "osm-house:way:718298734",
+      "garId": "gar:с-грахово-ул-рябиновая:д-10",
+      "label": "с. Грахово, ул. Рябиновая, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0389213,
+        "longitude": 51.9692459
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298734"
+    },
+    {
+      "id": "osm-house:way:718298755",
+      "garId": "gar:с-грахово-ул-рябиновая:д-11",
+      "label": "с. Грахово, ул. Рябиновая, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0382193,
+        "longitude": 51.9710389
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298755"
+    },
+    {
+      "id": "osm-house:way:718298754",
+      "garId": "gar:с-грахово-ул-рябиновая:д-13",
+      "label": "с. Грахово, ул. Рябиновая, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0378154,
+        "longitude": 51.9715166
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298754"
+    },
+    {
+      "id": "osm-house:way:718298748",
+      "garId": "gar:с-грахово-ул-рябиновая:д-14",
+      "label": "с. Грахово, ул. Рябиновая, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0380527,
+        "longitude": 51.9703572
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298748"
+    },
+    {
+      "id": "osm-house:way:718298753",
+      "garId": "gar:с-грахово-ул-рябиновая:д-15",
+      "label": "с. Грахово, ул. Рябиновая, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0375009,
+        "longitude": 51.9718047
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298753"
+    },
+    {
+      "id": "osm-house:way:718298749",
+      "garId": "gar:с-грахово-ул-рябиновая:д-16",
+      "label": "с. Грахово, ул. Рябиновая, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0377385,
+        "longitude": 51.9706301
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298749"
+    },
+    {
+      "id": "osm-house:way:718298752",
+      "garId": "gar:с-грахово-ул-рябиновая:д-17",
+      "label": "с. Грахово, ул. Рябиновая, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0372602,
+        "longitude": 51.9721643
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298752"
+    },
+    {
+      "id": "osm-house:way:718298750",
+      "garId": "gar:с-грахово-ул-рябиновая:д-18",
+      "label": "с. Грахово, ул. Рябиновая, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.037528,
+        "longitude": 51.9709198
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298750"
+    },
+    {
+      "id": "osm-house:way:718298751",
+      "garId": "gar:с-грахово-ул-рябиновая:д-20",
+      "label": "с. Грахово, ул. Рябиновая, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0371699,
+        "longitude": 51.9713593
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298751"
+    },
+    {
+      "id": "osm-house:way:717501136",
+      "garId": "gar:с-грахово-ул-садовая:д-6",
+      "label": "с. Грахово, ул. Садовая, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0502449,
+        "longitude": 51.9525623
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501136"
+    },
+    {
+      "id": "osm-house:way:717520265",
+      "garId": "gar:с-грахово-ул-северная:д-3",
+      "label": "с. Грахово, ул. Северная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0560163,
+        "longitude": 51.956342
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520265"
+    },
+    {
+      "id": "osm-house:way:717520266",
+      "garId": "gar:с-грахово-ул-северная:д-5",
+      "label": "с. Грахово, ул. Северная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0560912,
+        "longitude": 51.9566692
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520266"
+    },
+    {
+      "id": "osm-house:way:717520246",
+      "garId": "gar:с-грахово-ул-северная:д-10",
+      "label": "с. Грахово, ул. Северная, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0559235,
+        "longitude": 51.9581445
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520246"
+    },
+    {
+      "id": "osm-house:way:717520269",
+      "garId": "gar:с-грахово-ул-северная:д-13",
+      "label": "с. Грахово, ул. Северная, 13",
+      "houseNumber": "13",
+      "coordinates": {
+        "latitude": 56.0562798,
+        "longitude": 51.9579406
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520269"
+    },
+    {
+      "id": "osm-house:way:717520251",
+      "garId": "gar:с-грахово-ул-северная:д-20",
+      "label": "с. Грахово, ул. Северная, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.056235,
+        "longitude": 51.9600917
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520251"
+    },
+    {
+      "id": "osm-house:way:717520252",
+      "garId": "gar:с-грахово-ул-северная:д-22",
+      "label": "с. Грахово, ул. Северная, 22",
+      "houseNumber": "22",
+      "coordinates": {
+        "latitude": 56.0562978,
+        "longitude": 51.9604726
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520252"
+    },
+    {
+      "id": "osm-house:way:718298656",
+      "garId": "gar:с-грахово-ул-советская:д-1а",
+      "label": "с. Грахово, ул. Советская, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0436975,
+        "longitude": 51.959257
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298656"
+    },
+    {
+      "id": "osm-house:way:718298655",
+      "garId": "gar:с-грахово-ул-советская:д-3",
+      "label": "с. Грахово, ул. Советская, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0440985,
+        "longitude": 51.95942
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298655"
+    },
+    {
+      "id": "osm-house:way:136072838",
+      "garId": "gar:с-грахово-ул-советская:д-7",
+      "label": "с. Грахово, ул. Советская, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0448579,
+        "longitude": 51.9590763
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072838"
+    },
+    {
+      "id": "osm-house:way:718298636",
+      "garId": "gar:с-грахово-ул-советская:д-11",
+      "label": "с. Грахово, ул. Советская, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0444295,
+        "longitude": 51.9610769
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298636"
+    },
+    {
+      "id": "osm-house:way:718298641",
+      "garId": "gar:с-грахово-ул-советская:зд-15а",
+      "label": "с. Грахово, ул. Советская, 15а",
+      "houseNumber": "15а",
+      "coordinates": {
+        "latitude": 56.0449793,
+        "longitude": 51.9620233
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298641"
+    },
+    {
+      "id": "osm-house:way:718298637",
+      "garId": "gar:с-грахово-ул-советская:д-16",
+      "label": "с. Грахово, ул. Советская, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0441913,
+        "longitude": 51.9614524
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298637"
+    },
+    {
+      "id": "osm-house:way:718298640",
+      "garId": "gar:с-грахово-ул-советская:зд-17",
+      "label": "с. Грахово, ул. Советская, 17",
+      "houseNumber": "17",
+      "coordinates": {
+        "latitude": 56.0451203,
+        "longitude": 51.9625854
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298640"
+    },
+    {
+      "id": "osm-house:way:718298642",
+      "garId": "gar:с-грахово-ул-советская:д-18",
+      "label": "с. Грахово, ул. Советская, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0442118,
+        "longitude": 51.9621405
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298642"
+    },
+    {
+      "id": "osm-house:way:718283690",
+      "garId": "gar:с-грахово-ул-советская:д-23",
+      "label": "с. Грахово, ул. Советская, 23",
+      "houseNumber": "23",
+      "coordinates": {
+        "latitude": 56.0454649,
+        "longitude": 51.9633425
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283690"
+    },
+    {
+      "id": "osm-house:way:718298631",
+      "garId": "gar:с-грахово-ул-советская:д-24",
+      "label": "с. Грахово, ул. Советская, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 56.0447621,
+        "longitude": 51.9627963
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298631"
+    },
+    {
+      "id": "osm-house:way:718298629",
+      "garId": "gar:с-грахово-ул-советская:д-28",
+      "label": "с. Грахово, ул. Советская, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0451186,
+        "longitude": 51.9636572
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298629"
+    },
+    {
+      "id": "osm-house:way:718283694",
+      "garId": "gar:с-грахово-ул-советская:д-31",
+      "label": "с. Грахово, ул. Советская, 31",
+      "houseNumber": "31",
+      "coordinates": {
+        "latitude": 56.0460067,
+        "longitude": 51.9647668
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283694"
+    },
+    {
+      "id": "osm-house:way:718283711",
+      "garId": "gar:с-грахово-ул-советская:д-33",
+      "label": "с. Грахово, ул. Советская, 33",
+      "houseNumber": "33",
+      "coordinates": {
+        "latitude": 56.0461041,
+        "longitude": 51.965043
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283711"
+    },
+    {
+      "id": "osm-house:way:718283712",
+      "garId": "gar:с-грахово-ул-советская:д-35",
+      "label": "с. Грахово, ул. Советская, 35",
+      "houseNumber": "35",
+      "coordinates": {
+        "latitude": 56.046257,
+        "longitude": 51.9654334
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283712"
+    },
+    {
+      "id": "osm-house:way:718283713",
+      "garId": "gar:с-грахово-ул-советская:д-37",
+      "label": "с. Грахово, ул. Советская, 37",
+      "houseNumber": "37",
+      "coordinates": {
+        "latitude": 56.0463676,
+        "longitude": 51.965686
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283713"
+    },
+    {
+      "id": "osm-house:way:718298627",
+      "garId": "gar:с-грахово-ул-советская:д-38",
+      "label": "с. Грахово, ул. Советская, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.0453733,
+        "longitude": 51.964266
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298627"
+    },
+    {
+      "id": "osm-house:way:718283714",
+      "garId": "gar:с-грахово-ул-советская:д-39",
+      "label": "с. Грахово, ул. Советская, 39",
+      "houseNumber": "39",
+      "coordinates": {
+        "latitude": 56.0465364,
+        "longitude": 51.9659845
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283714"
+    },
+    {
+      "id": "osm-house:way:718298625",
+      "garId": "gar:с-грахово-ул-советская:д-40",
+      "label": "с. Грахово, ул. Советская, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.0455441,
+        "longitude": 51.9646738
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298625"
+    },
+    {
+      "id": "osm-house:way:718283715",
+      "garId": "gar:с-грахово-ул-советская:д-41",
+      "label": "с. Грахово, ул. Советская, 41",
+      "houseNumber": "41",
+      "coordinates": {
+        "latitude": 56.0465957,
+        "longitude": 51.9662552
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283715"
+    },
+    {
+      "id": "osm-house:way:718283742",
+      "garId": "gar:с-грахово-ул-советская:д-55",
+      "label": "с. Грахово, ул. Советская, 55",
+      "houseNumber": "55",
+      "coordinates": {
+        "latitude": 56.047942,
+        "longitude": 51.9693374
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283742"
+    },
+    {
+      "id": "osm-house:way:718298607",
+      "garId": "gar:с-грахово-ул-советская:д-56",
+      "label": "с. Грахово, ул. Советская, 56",
+      "houseNumber": "56",
+      "coordinates": {
+        "latitude": 56.0465132,
+        "longitude": 51.9671342
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298607"
+    },
+    {
+      "id": "osm-house:way:718283740",
+      "garId": "gar:с-грахово-ул-советская:д-57",
+      "label": "с. Грахово, ул. Советская, 57",
+      "houseNumber": "57",
+      "coordinates": {
+        "latitude": 56.0478017,
+        "longitude": 51.9689098
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283740"
+    },
+    {
+      "id": "osm-house:way:717520442",
+      "garId": "gar:с-грахово-ул-советская:д-69",
+      "label": "с. Грахово, ул. Советская, 69",
+      "houseNumber": "69",
+      "coordinates": {
+        "latitude": 56.0495469,
+        "longitude": 51.9727666
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520442"
+    },
+    {
+      "id": "osm-house:way:718298622",
+      "garId": "gar:с-грахово-ул-советская:д-70",
+      "label": "с. Грахово, ул. Советская, 70",
+      "houseNumber": "70",
+      "coordinates": {
+        "latitude": 56.0476066,
+        "longitude": 51.9695761
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298622"
+    },
+    {
+      "id": "osm-house:way:718283808",
+      "garId": "gar:с-грахово-ул-советская:д-74",
+      "label": "с. Грахово, ул. Советская, 74",
+      "houseNumber": "74",
+      "coordinates": {
+        "latitude": 56.0478116,
+        "longitude": 51.969957
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283808"
+    },
+    {
+      "id": "osm-house:way:718283799",
+      "garId": "gar:с-грахово-ул-советская:д-82",
+      "label": "с. Грахово, ул. Советская, 82",
+      "houseNumber": "82",
+      "coordinates": {
+        "latitude": 56.0482044,
+        "longitude": 51.9707923
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283799"
+    },
+    {
+      "id": "osm-house:way:717520446",
+      "garId": "gar:с-грахово-ул-советская:д-91",
+      "label": "с. Грахово, ул. Советская, 91",
+      "houseNumber": "91",
+      "coordinates": {
+        "latitude": 56.0504417,
+        "longitude": 51.97483
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520446"
+    },
+    {
+      "id": "osm-house:way:718283806",
+      "garId": "gar:с-грахово-ул-советская:д-98",
+      "label": "с. Грахово, ул. Советская, 98",
+      "houseNumber": "98",
+      "coordinates": {
+        "latitude": 56.049096,
+        "longitude": 51.9728076
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283806"
+    },
+    {
+      "id": "osm-house:way:718283803",
+      "garId": "gar:с-грахово-ул-советская:д-104",
+      "label": "с. Грахово, ул. Советская, 104",
+      "houseNumber": "104",
+      "coordinates": {
+        "latitude": 56.0487973,
+        "longitude": 51.9723759
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283803"
+    },
+    {
+      "id": "osm-house:way:717520451",
+      "garId": "gar:с-грахово-ул-советская:д-107",
+      "label": "с. Грахово, ул. Советская, 107",
+      "houseNumber": "107",
+      "coordinates": {
+        "latitude": 56.0516736,
+        "longitude": 51.9771531
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520451"
+    },
+    {
+      "id": "osm-house:way:718283787",
+      "garId": "gar:с-грахово-ул-советская:д-110",
+      "label": "с. Грахово, ул. Советская, 110",
+      "houseNumber": "110",
+      "coordinates": {
+        "latitude": 56.0499736,
+        "longitude": 51.9745757
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283787"
+    },
+    {
+      "id": "osm-house:way:718283785",
+      "garId": "gar:с-грахово-ул-советская:д-112",
+      "label": "с. Грахово, ул. Советская, 112",
+      "houseNumber": "112",
+      "coordinates": {
+        "latitude": 56.0502109,
+        "longitude": 51.9751942
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283785"
+    },
+    {
+      "id": "osm-house:way:718283795",
+      "garId": "gar:с-грахово-ул-советская:д-114",
+      "label": "с. Грахово, ул. Советская, 114",
+      "houseNumber": "114",
+      "coordinates": {
+        "latitude": 56.049602,
+        "longitude": 51.973849
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283795"
+    },
+    {
+      "id": "osm-house:way:718283783",
+      "garId": "gar:с-грахово-ул-советская:д-116",
+      "label": "с. Грахово, ул. Советская, 116",
+      "houseNumber": "116",
+      "coordinates": {
+        "latitude": 56.0507116,
+        "longitude": 51.9763361
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283783"
+    },
+    {
+      "id": "osm-house:way:718283779",
+      "garId": "gar:с-грахово-ул-советская:д-118б",
+      "label": "с. Грахово, ул. Советская, 118б",
+      "houseNumber": "118б",
+      "coordinates": {
+        "latitude": 56.0498397,
+        "longitude": 51.9763568
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283779"
+    },
+    {
+      "id": "osm-house:way:718283772",
+      "garId": "gar:с-грахово-ул-советская:зд-118в",
+      "label": "с. Грахово, ул. Советская, 118в",
+      "houseNumber": "118в",
+      "coordinates": {
+        "latitude": 56.0507789,
+        "longitude": 51.9789305
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283772"
+    },
+    {
+      "id": "osm-house:way:718283758",
+      "garId": "gar:с-грахово-ул-советская:д-119",
+      "label": "с. Грахово, ул. Советская, 119",
+      "houseNumber": "119",
+      "coordinates": {
+        "latitude": 56.0514302,
+        "longitude": 51.9800321
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283758"
+    },
+    {
+      "id": "osm-house:way:718283784",
+      "garId": "gar:с-грахово-ул-советская:д-120",
+      "label": "с. Грахово, ул. Советская, 120",
+      "houseNumber": "120",
+      "coordinates": {
+        "latitude": 56.0508431,
+        "longitude": 51.9766999
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283784"
+    },
+    {
+      "id": "osm-house:way:718283788",
+      "garId": "gar:с-грахово-ул-советская:д-122",
+      "label": "с. Грахово, ул. Советская, 122",
+      "houseNumber": "122",
+      "coordinates": {
+        "latitude": 56.0498583,
+        "longitude": 51.974992
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283788"
+    },
+    {
+      "id": "osm-house:way:718283760",
+      "garId": "gar:с-грахово-ул-советская:д-123",
+      "label": "с. Грахово, ул. Советская, 123",
+      "houseNumber": "123",
+      "coordinates": {
+        "latitude": 56.0520874,
+        "longitude": 51.9796352
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283760"
+    },
+    {
+      "id": "osm-house:way:718283766",
+      "garId": "gar:с-грахово-ул-советская:д-124",
+      "label": "с. Грахово, ул. Советская, 124",
+      "houseNumber": "124",
+      "coordinates": {
+        "latitude": 56.0512737,
+        "longitude": 51.977515
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283766"
+    },
+    {
+      "id": "osm-house:way:718283764",
+      "garId": "gar:с-грахово-ул-советская:д-128",
+      "label": "с. Грахово, ул. Советская, 128",
+      "houseNumber": "128",
+      "coordinates": {
+        "latitude": 56.0514145,
+        "longitude": 51.9778466
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283764"
+    },
+    {
+      "id": "osm-house:way:718283757",
+      "garId": "gar:с-грахово-ул-советская:д-129",
+      "label": "с. Грахово, ул. Советская, 129",
+      "houseNumber": "129",
+      "coordinates": {
+        "latitude": 56.0511615,
+        "longitude": 51.9801906
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283757"
+    },
+    {
+      "id": "osm-house:way:718283762",
+      "garId": "gar:с-грахово-ул-советская:д-130",
+      "label": "с. Грахово, ул. Советская, 130",
+      "houseNumber": "130",
+      "coordinates": {
+        "latitude": 56.0516518,
+        "longitude": 51.978449
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283762"
+    },
+    {
+      "id": "osm-house:way:717501065",
+      "garId": "gar:с-грахово-ул-солнечная:д-1",
+      "label": "с. Грахово, ул. Солнечная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0529441,
+        "longitude": 51.9494134
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501065"
+    },
+    {
+      "id": "osm-house:way:717501092",
+      "garId": "gar:с-грахово-ул-солнечная:д-3",
+      "label": "с. Грахово, ул. Солнечная, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0531987,
+        "longitude": 51.949129
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501092"
+    },
+    {
+      "id": "osm-house:way:717501094",
+      "garId": "gar:с-грахово-ул-солнечная:д-4",
+      "label": "с. Грахово, ул. Солнечная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0536361,
+        "longitude": 51.9494562
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501094"
+    },
+    {
+      "id": "osm-house:way:1436428873",
+      "garId": "gar:с-грахово-ул-солнечная:д-5",
+      "label": "с. Грахово, ул. Солнечная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0535894,
+        "longitude": 51.948812
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1436428873"
+    },
+    {
+      "id": "osm-house:way:717501093",
+      "garId": "gar:с-грахово-ул-солнечная:д-6",
+      "label": "с. Грахово, ул. Солнечная, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0534773,
+        "longitude": 51.9495474
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501093"
+    },
+    {
+      "id": "osm-house:way:717520241",
+      "garId": "gar:с-грахово-ул-сосновая:д-1",
+      "label": "с. Грахово, ул. Сосновая, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0531046,
+        "longitude": 51.9557171
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520241"
+    },
+    {
+      "id": "osm-house:way:717520239",
+      "garId": "gar:с-грахово-ул-сосновая:д-1а",
+      "label": "с. Грахово, ул. Сосновая, 1а",
+      "houseNumber": "1а",
+      "coordinates": {
+        "latitude": 56.0529279,
+        "longitude": 51.9552155
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520239"
+    },
+    {
+      "id": "osm-house:way:717520240",
+      "garId": "gar:с-грахово-ул-сосновая:д-1б",
+      "label": "с. Грахово, ул. Сосновая, 1б",
+      "houseNumber": "1б",
+      "coordinates": {
+        "latitude": 56.0532994,
+        "longitude": 51.9549097
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520240"
+    },
+    {
+      "id": "osm-house:way:717520238",
+      "garId": "gar:с-грахово-ул-сосновая:д-5",
+      "label": "с. Грахово, ул. Сосновая, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0533803,
+        "longitude": 51.9565995
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520238"
+    },
+    {
+      "id": "osm-house:way:717520236",
+      "garId": "gar:с-грахово-ул-сосновая:д-9",
+      "label": "с. Грахово, ул. Сосновая, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.053527,
+        "longitude": 51.9578333
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520236"
+    },
+    {
+      "id": "osm-house:way:717520231",
+      "garId": "gar:с-грахово-ул-спортивная:д-1",
+      "label": "с. Грахово, ул. Спортивная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0546503,
+        "longitude": 51.9556124
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520231"
+    },
+    {
+      "id": "osm-house:way:717520234",
+      "garId": "gar:с-грахово-ул-спортивная:д-5",
+      "label": "с. Грахово, ул. Спортивная, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0542369,
+        "longitude": 51.9575114
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520234"
+    },
+    {
+      "id": "osm-house:way:717520287",
+      "garId": "gar:с-грахово-ул-спортивная:д-9",
+      "label": "с. Грахово, ул. Спортивная, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0539554,
+        "longitude": 51.9594802
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520287"
+    },
+    {
+      "id": "osm-house:way:717501081",
+      "garId": "gar:с-грахово-ул-удмуртская:д-3",
+      "label": "с. Грахово, ул. Удмуртская, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0521862,
+        "longitude": 51.9455242
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501081"
+    },
+    {
+      "id": "osm-house:way:717501102",
+      "garId": "gar:с-грахово-ул-удмуртская:д-4",
+      "label": "с. Грахово, ул. Удмуртская, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0547654,
+        "longitude": 51.9506311
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501102"
+    },
+    {
+      "id": "osm-house:way:717501082",
+      "garId": "gar:с-грахово-ул-удмуртская:д-5",
+      "label": "с. Грахово, ул. Удмуртская, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.0520004,
+        "longitude": 51.9455188
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501082"
+    },
+    {
+      "id": "osm-house:way:717501099",
+      "garId": "gar:с-грахово-ул-удмуртская:д-6",
+      "label": "с. Грахово, ул. Удмуртская, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0545468,
+        "longitude": 51.9500624
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501099"
+    },
+    {
+      "id": "osm-house:way:717501083",
+      "garId": "gar:с-грахово-ул-удмуртская:д-7",
+      "label": "с. Грахово, ул. Удмуртская, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0517488,
+        "longitude": 51.945551
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501083"
+    },
+    {
+      "id": "osm-house:way:717501098",
+      "garId": "gar:с-грахово-ул-удмуртская:д-8",
+      "label": "с. Грахово, ул. Удмуртская, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0544569,
+        "longitude": 51.9498157
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501098"
+    },
+    {
+      "id": "osm-house:way:717501084",
+      "garId": "gar:с-грахово-ул-удмуртская:д-9",
+      "label": "с. Грахово, ул. Удмуртская, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0515211,
+        "longitude": 51.9455939
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501084"
+    },
+    {
+      "id": "osm-house:way:717501097",
+      "garId": "gar:с-грахово-ул-удмуртская:д-10",
+      "label": "с. Грахово, ул. Удмуртская, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0543191,
+        "longitude": 51.9493865
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501097"
+    },
+    {
+      "id": "osm-house:way:717501085",
+      "garId": "gar:с-грахово-ул-удмуртская:д-11",
+      "label": "с. Грахово, ул. Удмуртская, 11",
+      "houseNumber": "11",
+      "coordinates": {
+        "latitude": 56.0512605,
+        "longitude": 51.9456154
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501085"
+    },
+    {
+      "id": "osm-house:way:717501071",
+      "garId": "gar:с-грахово-ул-удмуртская:д-14",
+      "label": "с. Грахово, ул. Удмуртская, 14",
+      "houseNumber": "14",
+      "coordinates": {
+        "latitude": 56.0539686,
+        "longitude": 51.9482761
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501071"
+    },
+    {
+      "id": "osm-house:way:717501070",
+      "garId": "gar:с-грахово-ул-удмуртская:д-16",
+      "label": "с. Грахово, ул. Удмуртская, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.0537829,
+        "longitude": 51.9477987
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501070"
+    },
+    {
+      "id": "osm-house:way:717501069",
+      "garId": "gar:с-грахово-ул-удмуртская:д-18",
+      "label": "с. Грахово, ул. Удмуртская, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0536451,
+        "longitude": 51.9473159
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501069"
+    },
+    {
+      "id": "osm-house:way:717501076",
+      "garId": "gar:с-грахово-ул-удмуртская:д-20",
+      "label": "с. Грахово, ул. Удмуртская, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0534983,
+        "longitude": 51.9469242
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501076"
+    },
+    {
+      "id": "osm-house:way:717501073",
+      "garId": "gar:с-грахово-ул-удмуртская:д-24",
+      "label": "с. Грахово, ул. Удмуртская, 24",
+      "houseNumber": "24",
+      "coordinates": {
+        "latitude": 56.0531358,
+        "longitude": 51.9458943
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501073"
+    },
+    {
+      "id": "osm-house:way:717501074",
+      "garId": "gar:с-грахово-ул-удмуртская:д-26",
+      "label": "с. Грахово, ул. Удмуртская, 26",
+      "houseNumber": "26",
+      "coordinates": {
+        "latitude": 56.05301,
+        "longitude": 51.9455403
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501074"
+    },
+    {
+      "id": "osm-house:way:717501075",
+      "garId": "gar:с-грахово-ул-удмуртская:д-28",
+      "label": "с. Грахово, ул. Удмуртская, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0529411,
+        "longitude": 51.9453096
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501075"
+    },
+    {
+      "id": "osm-house:way:717501077",
+      "garId": "gar:с-грахово-ул-удмуртская:д-32",
+      "label": "с. Грахово, ул. Удмуртская, 32",
+      "houseNumber": "32",
+      "coordinates": {
+        "latitude": 56.0525397,
+        "longitude": 51.9449234
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501077"
+    },
+    {
+      "id": "osm-house:way:717501078",
+      "garId": "gar:с-грахово-ул-удмуртская:д-34",
+      "label": "с. Грахово, ул. Удмуртская, 34",
+      "houseNumber": "34",
+      "coordinates": {
+        "latitude": 56.0522282,
+        "longitude": 51.9449019
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501078"
+    },
+    {
+      "id": "osm-house:way:717501079",
+      "garId": "gar:с-грахово-ул-удмуртская:д-36",
+      "label": "с. Грахово, ул. Удмуртская, 36",
+      "houseNumber": "36",
+      "coordinates": {
+        "latitude": 56.0520004,
+        "longitude": 51.9449448
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501079"
+    },
+    {
+      "id": "osm-house:way:717501080",
+      "garId": "gar:с-грахово-ул-удмуртская:д-38",
+      "label": "с. Грахово, ул. Удмуртская, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.0517218,
+        "longitude": 51.9448375
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501080"
+    },
+    {
+      "id": "osm-house:way:717501086",
+      "garId": "gar:с-грахово-ул-удмуртская:д-40",
+      "label": "с. Грахово, ул. Удмуртская, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.0514103,
+        "longitude": 51.9449341
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501086"
+    },
+    {
+      "id": "osm-house:way:717520216",
+      "garId": "gar:с-грахово-ул-удмуртская:д-44",
+      "label": "с. Грахово, ул. Удмуртская, 44",
+      "houseNumber": "44",
+      "coordinates": {
+        "latitude": 56.0509471,
+        "longitude": 51.9446942
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520216"
+    },
+    {
+      "id": "osm-house:way:717520215",
+      "garId": "gar:с-грахово-ул-удмуртская:д-48",
+      "label": "с. Грахово, ул. Удмуртская, 48",
+      "houseNumber": "48",
+      "coordinates": {
+        "latitude": 56.0503928,
+        "longitude": 51.9449302
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520215"
+    },
+    {
+      "id": "osm-house:way:717520212",
+      "garId": "gar:с-грахово-ул-удмуртская:д-52",
+      "label": "с. Грахово, ул. Удмуртская, 52",
+      "houseNumber": "52",
+      "coordinates": {
+        "latitude": 56.0498715,
+        "longitude": 51.9448927
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520212"
+    },
+    {
+      "id": "osm-house:way:717520337",
+      "garId": "gar:с-грахово-ул-цветочная:д-2",
+      "label": "с. Грахово, ул. Цветочная, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0523506,
+        "longitude": 51.964217
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520337"
+    },
+    {
+      "id": "osm-house:way:717520340",
+      "garId": "gar:с-грахово-ул-цветочная:д-4",
+      "label": "с. Грахово, ул. Цветочная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0526112,
+        "longitude": 51.9648607
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520340"
+    },
+    {
+      "id": "osm-house:way:717520343",
+      "garId": "gar:с-грахово-ул-цветочная:д-6",
+      "label": "с. Грахово, ул. Цветочная, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0529287,
+        "longitude": 51.9656546
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520343"
+    },
+    {
+      "id": "osm-house:way:717520345",
+      "garId": "gar:с-грахово-ул-цветочная:д-8",
+      "label": "с. Грахово, ул. Цветочная, 8",
+      "houseNumber": "8",
+      "coordinates": {
+        "latitude": 56.0531504,
+        "longitude": 51.9664164
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520345"
+    },
+    {
+      "id": "osm-house:way:717520347",
+      "garId": "gar:с-грахово-ул-цветочная:д-10",
+      "label": "с. Грахово, ул. Цветочная, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0533391,
+        "longitude": 51.9667329
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520347"
+    },
+    {
+      "id": "osm-house:way:718417759",
+      "garId": "gar:с-грахово-ул-чапаева:д-4",
+      "label": "с. Грахово, ул. Чапаева, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0465298,
+        "longitude": 51.9771129
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417759"
+    },
+    {
+      "id": "osm-house:way:718417762",
+      "garId": "gar:с-грахово-ул-чапаева:д-5",
+      "label": "с. Грахово, ул. Чапаева, 5",
+      "houseNumber": "5",
+      "coordinates": {
+        "latitude": 56.046119,
+        "longitude": 51.9777475
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417762"
+    },
+    {
+      "id": "osm-house:way:718417758",
+      "garId": "gar:с-грахово-ул-чапаева:д-6",
+      "label": "с. Грахово, ул. Чапаева, 6",
+      "houseNumber": "6",
+      "coordinates": {
+        "latitude": 56.0463355,
+        "longitude": 51.9769085
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417758"
+    },
+    {
+      "id": "osm-house:way:718417761",
+      "garId": "gar:с-грахово-ул-чапаева:д-9",
+      "label": "с. Грахово, ул. Чапаева, 9",
+      "houseNumber": "9",
+      "coordinates": {
+        "latitude": 56.0460111,
+        "longitude": 51.9772776
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417761"
+    },
+    {
+      "id": "osm-house:way:718417765",
+      "garId": "gar:с-грахово-ул-чапаева:д-15",
+      "label": "с. Грахово, ул. Чапаева, 15",
+      "houseNumber": "15",
+      "coordinates": {
+        "latitude": 56.0464785,
+        "longitude": 51.9780586
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417765"
+    },
+    {
+      "id": "osm-house:way:718417736",
+      "garId": "gar:с-грахово-ул-чапаева:д-18",
+      "label": "с. Грахово, ул. Чапаева, 18",
+      "houseNumber": "18",
+      "coordinates": {
+        "latitude": 56.0450436,
+        "longitude": 51.9745729
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417736"
+    },
+    {
+      "id": "osm-house:way:718417734",
+      "garId": "gar:с-грахово-ул-чапаева:д-20",
+      "label": "с. Грахово, ул. Чапаева, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0449941,
+        "longitude": 51.9739318
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417734"
+    },
+    {
+      "id": "osm-house:way:718298829",
+      "garId": "gar:с-грахово-ул-чапаева:д-25а",
+      "label": "с. Грахово, ул. Чапаева, 25а",
+      "houseNumber": "25а",
+      "coordinates": {
+        "latitude": 56.0440784,
+        "longitude": 51.9747906
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298829"
+    },
+    {
+      "id": "osm-house:way:718298808",
+      "garId": "gar:с-грахово-ул-чапаева:д-38",
+      "label": "с. Грахово, ул. Чапаева, 38",
+      "houseNumber": "38",
+      "coordinates": {
+        "latitude": 56.0435843,
+        "longitude": 51.9710385
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298808"
+    },
+    {
+      "id": "osm-house:way:718298807",
+      "garId": "gar:с-грахово-ул-чапаева:д-40",
+      "label": "с. Грахово, ул. Чапаева, 40",
+      "houseNumber": "40",
+      "coordinates": {
+        "latitude": 56.0433324,
+        "longitude": 51.9704876
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298807"
+    },
+    {
+      "id": "osm-house:way:718298799",
+      "garId": "gar:с-грахово-ул-чапаева:д-44",
+      "label": "с. Грахово, ул. Чапаева, 44",
+      "houseNumber": "44",
+      "coordinates": {
+        "latitude": 56.043127,
+        "longitude": 51.9697483
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298799"
+    },
+    {
+      "id": "osm-house:way:718417803",
+      "garId": "gar:с-грахово-ул-юбилейная:д-1",
+      "label": "с. Грахово, ул. Юбилейная, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0435602,
+        "longitude": 51.9788306
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417803"
+    },
+    {
+      "id": "osm-house:way:718417790",
+      "garId": "gar:с-грахово-ул-юбилейная:д-16",
+      "label": "с. Грахово, ул. Юбилейная, 16",
+      "houseNumber": "16",
+      "coordinates": {
+        "latitude": 56.045316,
+        "longitude": 51.9821457
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417790"
+    },
+    {
+      "id": "osm-house:way:718417783",
+      "garId": "gar:с-грахово-ул-юбилейная:д-20",
+      "label": "с. Грахово, ул. Юбилейная, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.0459557,
+        "longitude": 51.98243
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718417783"
+    },
+    {
+      "id": "osm-house:way:717520285",
+      "label": "с. Грахово, улица 50 лет Победы, 12",
+      "houseNumber": "12",
+      "coordinates": {
+        "latitude": 56.0549289,
+        "longitude": 51.9600059
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520285"
+    },
+    {
+      "id": "osm-house:way:136073890",
+      "label": "с. Грахово, улица 70 лет Октября, 2",
+      "houseNumber": "2",
+      "coordinates": {
+        "latitude": 56.0479155,
+        "longitude": 51.9599323
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136073890"
+    },
+    {
+      "id": "osm-house:way:718283641",
+      "label": "с. Грахово, улица 70 лет Октября, 21",
+      "houseNumber": "21",
+      "coordinates": {
+        "latitude": 56.0500838,
+        "longitude": 51.9645017
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283641"
+    },
+    {
+      "id": "osm-house:way:718283679",
+      "label": "с. Грахово, улица 70 лет Октября, 37",
+      "houseNumber": "37",
+      "coordinates": {
+        "latitude": 56.0513831,
+        "longitude": 51.9677928
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718283679"
+    },
+    {
+      "id": "osm-house:way:717520420",
+      "label": "с. Грахово, улица 70 лет Октября, 38/2",
+      "houseNumber": "38/2",
+      "coordinates": {
+        "latitude": 56.0521529,
+        "longitude": 51.970665
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520420"
+    },
+    {
+      "id": "osm-house:way:717520422",
+      "label": "с. Грахово, улица 70 лет Октября, 42/2",
+      "houseNumber": "42/2",
+      "coordinates": {
+        "latitude": 56.0524824,
+        "longitude": 51.9714321
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520422"
+    },
+    {
+      "id": "osm-house:way:717520423",
+      "label": "с. Грахово, улица 70 лет Октября, 44/2",
+      "houseNumber": "44/2",
+      "coordinates": {
+        "latitude": 56.0527131,
+        "longitude": 51.972049
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520423"
+    },
+    {
+      "id": "osm-house:way:717520368",
+      "label": "с. Грахово, улица 70 лет Октября, 55",
+      "houseNumber": "55",
+      "coordinates": {
+        "latitude": 56.0527011,
+        "longitude": 51.9710566
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520368"
+    },
+    {
+      "id": "osm-house:way:717520389",
+      "label": "с. Грахово, улица 70 лет Октября, 69",
+      "houseNumber": "69",
+      "coordinates": {
+        "latitude": 56.0539593,
+        "longitude": 51.9741948
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520389"
+    },
+    {
+      "id": "osm-house:way:717501217",
+      "label": "с. Грахово, улица Азина, 36А",
+      "houseNumber": "36А",
+      "coordinates": {
+        "latitude": 56.0461573,
+        "longitude": 51.9464739
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501217"
+    },
+    {
+      "id": "osm-house:way:136072836",
+      "label": "с. Грахово, улица Колпакова, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 56.0451022,
+        "longitude": 51.9610012
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072836"
+    },
+    {
+      "id": "osm-house:way:717520438",
+      "label": "с. Грахово, улица Колпакова, 58",
+      "houseNumber": "58",
+      "coordinates": {
+        "latitude": 56.050569,
+        "longitude": 51.9722665
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717520438"
+    },
+    {
+      "id": "osm-house:way:717501244",
+      "label": "с. Грахово, улица Комарова, 1",
+      "houseNumber": "1",
+      "coordinates": {
+        "latitude": 56.0481234,
+        "longitude": 51.9558515
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/717501244"
+    },
+    {
+      "id": "osm-house:way:718298823",
+      "label": "с. Грахово, улица Чапаева, 26/1",
+      "houseNumber": "26/1",
+      "coordinates": {
+        "latitude": 56.0444992,
+        "longitude": 51.9731276
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298823"
+    },
+    {
+      "id": "osm-house:way:718298822",
+      "label": "с. Грахово, улица Чапаева, 28",
+      "houseNumber": "28",
+      "coordinates": {
+        "latitude": 56.0448674,
+        "longitude": 51.9723172
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298822"
+    },
+    {
+      "id": "osm-house:way:878850411",
+      "garId": "gar:с-новогорское-ул-кавказская:д-20",
+      "label": "с. Новогорское, ул. Кавказская, 20",
+      "houseNumber": "20",
+      "coordinates": {
+        "latitude": 56.077701,
+        "longitude": 52.1733658
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878850411"
+    },
+    {
+      "id": "osm-house:way:878850405",
+      "garId": "gar:с-новогорское-ул-школьная:д-10",
+      "label": "с. Новогорское, ул. Школьная, 10",
+      "houseNumber": "10",
+      "coordinates": {
+        "latitude": 56.0769205,
+        "longitude": 52.174208
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/878850405"
+    }
+  ]
+}

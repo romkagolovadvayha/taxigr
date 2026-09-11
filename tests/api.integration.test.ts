@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type {
   AdminDriverDetail,
   AdminPassengerDetail,
+  Address,
   RideChatMessage,
   RideChatThread,
   RideOrder,
@@ -148,6 +149,7 @@ function socketEvent<T = unknown>(socket: Socket, event: string): Promise<T> {
 
 async function cleanup(): Promise<void> {
   const phonePlaceholders = integrationPhones.map(() => '?').join(', ');
+  await connection.execute(`DELETE p FROM remembered_address_points p JOIN users u ON u.id = p.created_by WHERE u.phone IN (${phonePlaceholders})`, integrationPhones);
   await connection.execute(
     `DELETE o FROM orders o
      JOIN users passenger ON passenger.id = o.passenger_id
@@ -697,6 +699,63 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       houseNumber: '32',
     });
     expect(porshur.data?.[0]?.coordinates.latitude).toBeCloseTo(56.0248498, 6);
+  });
+
+  it('selects mapped district houses directly and keeps unmapped houses approximate', async () => {
+    const search = (query: string) => api<Address[]>(`/v1/addresses/search?query=${encodeURIComponent(query)}`, { token: passengerToken });
+    const from = await search('Грахово Колпакова 8');
+    const to = await search('Грахово Ачинцева 16');
+    expect(from.status).toBe(200);
+    expect(from.data).toHaveLength(1);
+    expect(from.data?.[0]).toMatchObject({ houseNumber: '8', coordinatePrecision: 'precise' });
+    expect(to.data?.[0]).toMatchObject({ houseNumber: '16', coordinatePrecision: 'precise' });
+    const quote = await api<{ route: { coordinates: unknown[]; distanceMeters: number } }>('/v1/quotes', {
+      method: 'POST', token: passengerToken, body: { pickup: from.data![0], destination: to.data![0] },
+    });
+    expect(quote.status).toBe(200);
+    expect(quote.data?.route.distanceMeters).toBeGreaterThan(100);
+    expect(quote.data?.route.coordinates.length).toBeGreaterThan(2);
+    const unresolved = await search('д. Благодатное, ул. Благодатновская, 1');
+    expect(unresolved.data).toHaveLength(1);
+    expect(unresolved.data?.[0]).toMatchObject({ houseNumber: '1', coordinatePrecision: 'approximate' });
+  });
+
+  it('remembers confirmed houses across sessions, retries and concurrent requests', async () => {
+    const address: Address = { id: 'manual:integration-point', label: 'с. Грахово, ул. Проверочная Интеграционная, 999999',
+      houseNumber: '999999', coordinatePrecision: 'approximate', coordinates: { latitude: 56.04, longitude: 51.96 } };
+    const coordinates = { latitude: 56.041, longitude: 51.961 };
+    const save = (token = passengerToken, point = coordinates, label = address.label) => api<Address>('/v1/addresses/points', {
+      method: 'POST', token, body: { address: { ...address, label }, coordinates: point },
+    });
+    expect((await save('')).status).toBe(401);
+    const [first, second] = await Promise.all([save(), save()]);
+    expect(first.status).toBe(200);
+    expect(second.data).toEqual(first.data);
+    expect(first.data).toMatchObject({ coordinatePrecision: 'precise', coordinates });
+    expect(first.data?.id).toMatch(/^saved-house:/);
+    expect((await save(outsiderToken)).data).toEqual(first.data);
+    const search = await api<Address[]>(`/v1/addresses/search?kind=house&query=${encodeURIComponent('Грахово Проверочная Интеграционная 999999')}`, { token: outsiderToken });
+    expect(search.data).toHaveLength(1);
+    expect(search.data?.[0]).toEqual(first.data);
+    expect((await save(passengerToken, { latitude: 56.05, longitude: 51.96 })).error?.code).toBe('ADDRESS_POINT_CONFLICT');
+    const another = await save(passengerToken, { latitude: 56.05, longitude: 51.96 }, 'д. Поршур, ул. Проверочная Интеграционная, 999999');
+    expect(another.status).toBe(200);
+    expect(another.data?.id).not.toBe(first.data?.id);
+    const [rows] = await connection.query('SELECT address_json FROM remembered_address_points WHERE created_by = ?', [fixture.passengerId]);
+    expect(rows).toHaveLength(2);
+  });
+
+  it('rejects invalid or distant house confirmations and protects known mapped buildings', async () => {
+    const known = (await api<Address[]>(`/v1/addresses/search?query=${encodeURIComponent('Грахово Колпакова 8')}`, { token: passengerToken })).data![0]!;
+    const save = (address: Address, coordinates = address.coordinates) => api<Address>('/v1/addresses/points', {
+      method: 'POST', token: passengerToken, body: { address, coordinates },
+    });
+    expect((await save({ ...known, coordinatePrecision: 'approximate' })).error?.code).toBe('ADDRESS_POINT_KNOWN');
+    const unknown: Address = { id: 'manual:invalid', label: 'с. Грахово, ул. Проверочная, 999999', houseNumber: '999999',
+      coordinatePrecision: 'approximate', coordinates: { latitude: 56.04, longitude: 51.96 } };
+    expect((await save(unknown, { latitude: 60, longitude: 50 })).status).toBe(400);
+    expect((await save({ ...unknown, houseNumber: '1' })).status).toBe(400);
+    expect((await save(unknown, { latitude: 200, longitude: 50 })).status).toBe(400);
   });
 
   it('calculates both tariffs and validates malformed requests', async () => {

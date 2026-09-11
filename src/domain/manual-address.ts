@@ -72,7 +72,13 @@ export function buildManualAddress(query: string, anchor: Address | null): Addre
   const houseNumber = extractQueryHouseNumber(query);
   if (!houseNumber || !anchor) return null;
 
-  const label = normalizeLabel(query);
+  let label = normalizeLabel(query);
+  const locality = anchor.label.split(',')[0]!;
+  const localityName = locality.replace(/^(?:д|с|г|п|деревня|село|город|пос[её]лок)\.?\s+/iu, '');
+  // A street-only query still needs its selected locality in the saved address.
+  if (!label.includes(',') && !label.toLocaleLowerCase('ru').includes(localityName.toLocaleLowerCase('ru'))) {
+    label = `${locality}, ${label}`;
+  }
   return {
     id: manualId(label),
     label,

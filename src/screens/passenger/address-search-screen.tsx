@@ -1,10 +1,14 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { resolveStreetCenter } from '@/api/street-center';
+import { resolveHouseAddress } from '@/api/house-address';
+import { rememberAddressPoint } from '@/api/remember-address';
+import { readDemoAddressPoints } from '@/storage/demo-address-points';
+import { overlayRememberedAddresses } from '@/domain/remembered-address';
 import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
@@ -14,10 +18,11 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { demoAddresses } from '@/data/demo';
-import { grahovoDirectoryAddresses } from '@/data/grahovo-address-directory';
+import { grahovoAddressCatalog } from '@/data/grahovo-address-catalog';
 import type { DestinationHistoryItem } from '@/domain/address-history';
 import {
   addressSearchScore,
+  filterRequestedHouse,
   rankAddressSearchResults,
   uniqueAddressesByLabel,
 } from '@/domain/address-search';
@@ -33,7 +38,6 @@ import { formatAddressSuggestionLines } from '@/domain/address-suggestion-displa
 import { buildStreetSuggestions, toStreetSuggestion } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address, Coordinates } from '@/domain/models';
-import { confirmAddressPoint } from '@/domain/route-stops';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
@@ -61,8 +65,8 @@ function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
 
 const localAddressDirectory = uniqueAddressesByLabel([
   ...demoAddresses,
-  ...grahovoDirectoryAddresses,
-  ...buildStreetSuggestions(grahovoDirectoryAddresses),
+  ...grahovoAddressCatalog,
+  ...buildStreetSuggestions(grahovoAddressCatalog),
 ]);
 
 function searchTokens(value: string): string[] {
@@ -220,6 +224,9 @@ function AddressResult({
             Укажите точку дома на карте
           </Text>
         )}
+        {address.id.startsWith('saved-') && (
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Точка запомнена</Text>
+        )}
         {!!place?.description && (
           <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
             {place.description}
@@ -283,6 +290,13 @@ function AddressResult({
 }
 
 export function AddressSearchScreen() {
+  const [rememberedAddresses, setRememberedAddresses] = useState<Address[]>([]);
+  const [savingPoint, setSavingPoint] = useState(false);
+  const [savePointError, setSavePointError] = useState<string | null>(null);
+  const pointSaveInFlight = useRef(false);
+  const mounted = useRef(true);
+  const [resolvingHouse, setResolvingHouse] = useState(false);
+  const houseResolveController = useRef<AbortController | null>(null);
   const colors = useThemeColors();
   const { field, initialQuery, destinationIndex, append } = useLocalSearchParams<{
     field?: 'pickup' | 'destination';
@@ -309,6 +323,18 @@ export function AddressSearchScreen() {
   const searchAbortController = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
   const { token } = useSession();
+  useEffect(() => {
+    let active = true;
+    if (token?.startsWith('demo:')) {
+      void readDemoAddressPoints().then(points => {
+        if (active) setRememberedAddresses(points);
+      }).catch(() => {
+        if (active) setSearchError('Не удалось прочитать сохранённые адреса');
+      });
+    }
+    return () => { active = false; };
+  }, [token]);
+  const addressDirectory = useMemo(() => overlayRememberedAddresses(localAddressDirectory, rememberedAddresses), [rememberedAddresses]);
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     setPickup,
@@ -328,8 +354,8 @@ export function AddressSearchScreen() {
   const normalizedQuery = query.trim().toLocaleLowerCase('ru');
   const localResults = useMemo(() => {
     if (!normalizedQuery) return mergeAddresses(buildStreetSuggestions(demoAddresses), demoAddresses);
-    return rankAddressSearchResults(localAddressDirectory, normalizedQuery);
-  }, [normalizedQuery]);
+    return filterRequestedHouse(rankAddressSearchResults(addressDirectory, normalizedQuery), normalizedQuery);
+  }, [addressDirectory, normalizedQuery]);
   const matchingHistory = useMemo(
     () =>
       field === 'destination'
@@ -345,13 +371,17 @@ export function AddressSearchScreen() {
   const canSearchRemote = query.trim().length >= 2 && !!token;
   const showPersonalSuggestions =
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
-  const baseResults = canSearchRemote && edited && remoteResults.length ? remoteResults : localResults;
+  const overlaidResults = overlayRememberedAddresses(
+    canSearchRemote && edited && remoteResults.length ? remoteResults : localResults, rememberedAddresses,
+  );
+  const baseResults = filterRequestedHouse(normalizedQuery ? rankAddressSearchResults(overlaidResults, normalizedQuery) : overlaidResults, query);
   const queryTokens = searchTokens(query);
   const queryMatchesKnownStreetName = queryTokens.some((token) => knownStreetTokens.has(token));
   const showHouseSuggestions =
     !!selectedStreet || queryHasHouseNumber(query) || queryMatchesKnownStreetName;
   const results = mergeAddresses(
-    matchingHistory.map((item) => item.address),
+    overlayRememberedAddresses(matchingHistory.map((item) => item.address), rememberedAddresses)
+      .filter(address => matchesAddress(address, normalizedQuery)),
     baseResults,
   ).filter(
     (address) =>
@@ -402,9 +432,8 @@ export function AddressSearchScreen() {
     const anchor = pendingStreet ?? pendingAddress;
     void (pendingStreet
       ? resolveStreetCenter(pendingStreet, {
-          apiKey: process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY,
+          token,
           signal: controller.signal,
-          referer: Platform.OS === 'web' ? undefined : 'https://taxigr.ru/',
         })
       : Promise.resolve(null)
     ).then((coordinates) => {
@@ -414,7 +443,7 @@ export function AddressSearchScreen() {
       active = false;
       controller.abort();
     };
-  }, [pendingAddress, pendingStreet]);
+  }, [pendingAddress, pendingStreet, token]);
 
   const runRemoteSearch = useCallback(() => {
     const normalized = query.trim();
@@ -456,8 +485,13 @@ export function AddressSearchScreen() {
   }, [canSearchRemote, edited, runRemoteSearch]);
 
   useEffect(
-    () => () => {
-      searchAbortController.current?.abort();
+    () => {
+      mounted.current = true;
+      return () => {
+        mounted.current = false;
+        searchAbortController.current?.abort();
+        houseResolveController.current?.abort();
+      };
     },
     [],
   );
@@ -467,16 +501,27 @@ export function AddressSearchScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const selectAddress = (address: Address) => {
+  const selectAddress = async (address: Address) => {
+    houseResolveController.current?.abort();
     if (hasApproximateCoordinates(address) &&
       (hasHouseNumber(address) || address.placeId) &&
       !(field === 'destination' && address.kind === 'settlement')) {
+      const controller = new AbortController();
+      houseResolveController.current = controller;
+      setResolvingHouse(true);
+      const resolved = await resolveHouseAddress(address, { token, signal: controller.signal });
+      if (controller.signal.aborted) return;
+      houseResolveController.current = null;
+      setResolvingHouse(false);
+      if (resolved) { await selectAddress(resolved); return; }
       setPendingAddress(address);
       setPointMapCenter(null);
       setSelectedPoint(null);
       setPointMapError(null);
+      setSavePointError(null);
       return;
     }
+    setResolvingHouse(false);
     if (
       !hasHouseNumber(address) &&
       !address.placeId &&
@@ -512,11 +557,27 @@ export function AddressSearchScreen() {
     goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
   };
 
+  const saveSelectedPoint = async () => {
+    if (!pendingAddress || !selectedPoint || pointSaveInFlight.current) return;
+    pointSaveInFlight.current = true;
+    setSavingPoint(true);
+    setSavePointError(null);
+    try {
+      const saved = await rememberAddressPoint(pendingAddress, selectedPoint, token);
+      if (mounted.current) await selectAddress(saved);
+    } catch (error) {
+      if (mounted.current) setSavePointError(error instanceof Error ? error.message : 'Не удалось сохранить адрес. Повторите попытку.');
+    } finally {
+      pointSaveInFlight.current = false;
+      if (mounted.current) setSavingPoint(false);
+    }
+  };
+
   if (pendingAddress) {
     return (
       <Screen contentStyle={{ maxWidth: 760 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-          <IconButton icon="back" label="Назад к адресам" onPress={() => setPendingAddress(null)} />
+          <IconButton icon="back" label="Назад к адресам" disabled={savingPoint} onPress={() => setPendingAddress(null)} />
           <Text accessibilityRole="header" style={{ ...typography.pageTitle, color: colors.ink }}>
             Укажите точку дома
           </Text>
@@ -524,12 +585,13 @@ export function AddressSearchScreen() {
         <Text style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
         <Text style={{ ...typography.body, color: colors.inkSecondary }}>
           Точное расположение дома пока неизвестно. Нажмите на карте на дом или удобный подъезд к нему.
+          {!pendingAddress.placeId && ` После подтверждения запомним этот адрес${demoSession ? ' на этом устройстве' : ''}.`}
         </Text>
         <View style={{ height: 360, overflow: 'hidden', borderRadius: radius.lg }}>
           {pendingCenter ? <TaxiMap
             selectionCenter={pendingCenter}
             pickup={selectedPoint ? { ...pendingAddress, coordinates: selectedPoint } : null}
-            onCoordinateSelect={setSelectedPoint}
+            onCoordinateSelect={point => { if (!pointSaveInFlight.current) setSelectedPoint(point); }}
             onMapError={setPointMapError}
             onMapReady={() => setPointMapError(null)}
           /> : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.x3 }}>
@@ -538,10 +600,9 @@ export function AddressSearchScreen() {
           </View>}
         </View>
         {pointMapError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pointMapError}</Text>}
-        <AppButton disabled={!selectedPoint || Boolean(pointMapError)} onPress={() => {
-          if (selectedPoint) selectAddress(confirmAddressPoint(pendingAddress, selectedPoint));
-        }}>
-          Подтвердить точку
+        {savePointError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{savePointError}</Text>}
+        <AppButton disabled={!selectedPoint || Boolean(pointMapError)} loading={savingPoint} onPress={() => { void saveSelectedPoint(); }}>
+          {savingPoint ? 'Сохраняем адрес…' : pendingAddress.placeId ? 'Подтвердить точку' : 'Подтвердить и запомнить'}
         </AppButton>
       </Screen>
     );
@@ -549,6 +610,9 @@ export function AddressSearchScreen() {
 
   return (
     <Screen contentStyle={{ maxWidth: 760 }}>
+      {resolvingHouse && <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.inkSecondary }}>
+        Уточняем расположение дома…
+      </Text>}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <View>
@@ -578,6 +642,8 @@ export function AddressSearchScreen() {
           ref={inputRef}
           value={query}
           onChangeText={(value) => {
+            houseResolveController.current?.abort();
+            setResolvingHouse(false);
             searchRequestId.current += 1;
             searchAbortController.current?.abort();
             setEdited(true);
@@ -699,9 +765,9 @@ export function AddressSearchScreen() {
           </Text>
         </View>
       )}
-      {!!searchError && (
+      {!!searchError && !(searchError === 'Точного совпадения нет' && hasExactHouseResult) && (
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.warning }}>
-          {searchError}. Полный адрес с номером дома можно использовать вручную.
+          {searchError}.{results.length ? ' Можно выбрать адрес из подсказок.' : ' Полный адрес с номером дома можно использовать вручную.'}
         </Text>
       )}
       {!!manualAddress && (
@@ -775,7 +841,7 @@ export function AddressSearchScreen() {
       )}
       {!remoteResults.length && edited && !!results.length && (
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted, textAlign: 'center' }}>
-          Адресный справочник ГАР/ФИАС · координаты OpenStreetMap
+          ГАР/ФИАС · OpenStreetMap · сохранённые точки
         </Text>
       )}
     </Screen>

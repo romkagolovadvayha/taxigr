@@ -20,6 +20,8 @@ export type TaxiMapProps = {
   passenger?: Coordinates | null;
   followDriver?: boolean;
   followZoom?: number;
+  /** Explicitly resume following after the user pans the map. */
+  followRequestId?: number;
   trimCompletedRoute?: boolean;
   navigationMode?: boolean;
   routeTarget?: DriverRouteTarget | null;

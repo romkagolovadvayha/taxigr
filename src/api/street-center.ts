@@ -1,64 +1,21 @@
 import { addressSearchScore } from '../domain/address-search';
 import type { Address, Coordinates } from '../domain/models';
+import { validMapCoordinate } from '../domain/map-coordinates';
+import { searchMapAddresses, type MapAddressOptions } from './map-addresses';
 
-type GeocoderResponse = {
-  response?: {
-    GeoObjectCollection?: {
-      featureMember?: {
-        GeoObject?: {
-          Point?: { pos?: string };
-          metaDataProperty?: { GeocoderMetaData?: { kind?: string; text?: string } };
-        };
-      }[];
-    };
-  };
-};
-
-export async function resolveStreetCenter(
-  street: Address,
-  options: { apiKey?: string; signal?: AbortSignal; referer?: string },
-): Promise<Coordinates | null> {
-  if (!options.apiKey || options.signal?.aborted) return null;
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  options.signal?.addEventListener('abort', abort, { once: true });
-  const timeout = setTimeout(abort, 5_000);
+export async function resolveStreetCenter(street: Address, options: MapAddressOptions): Promise<Coordinates | null> {
+  if (!validMapCoordinate(street.coordinates) || options.signal?.aborted) return null;
   try {
-    const params = new URLSearchParams({
-      apikey: options.apiKey,
-      geocode: street.label,
-      lang: 'ru_RU',
-      format: 'json',
-      results: '5',
-      // Scope common names to the selected settlement, not another town's street.
-      ll: `${street.coordinates.longitude},${street.coordinates.latitude}`,
-      spn: '0.2,0.2',
-      rspn: '1',
-    });
-    const response = await fetch(`https://geocode-maps.yandex.ru/v1?${params}`, {
-      signal: controller.signal,
-      ...(options.referer ? { headers: { Referer: options.referer } } : {}),
-    });
-    if (!response.ok) return null;
-    const data = await response.json() as GeocoderResponse;
-    for (const member of data.response?.GeoObjectCollection?.featureMember ?? []) {
-      const metadata = member.GeoObject?.metaDataProperty?.GeocoderMetaData;
-      if (metadata?.kind !== 'street' ||
-          addressSearchScore({ label: metadata.text ?? '' }, street.label) === 0) continue;
-      const position = member.GeoObject?.Point?.pos?.trim().split(/\s+/).map(Number);
-      if (position?.length !== 2) continue;
-      const [longitude, latitude] = position;
-      if (longitude == null || latitude == null ||
-          !Number.isFinite(longitude) || !Number.isFinite(latitude) ||
-          Math.abs(longitude) > 180 || Math.abs(latitude) > 90) continue;
-      return { latitude, longitude };
+    const addresses = await searchMapAddresses(street.label, options, 'street');
+    if (options.signal?.aborted) return null;
+    for (const item of addresses) {
+      if (item.kind !== 'street' || addressSearchScore(item, street.label) === 0 || !validMapCoordinate(item.coordinates)) continue;
+      // Common street names must stay near the selected settlement.
+      const latitudeDelta = item.coordinates.latitude - street.coordinates.latitude;
+      const longitudeDelta = (item.coordinates.longitude - street.coordinates.longitude) * Math.cos(street.coordinates.latitude * Math.PI / 180);
+      if (Math.hypot(latitudeDelta, longitudeDelta) * 111_320 > 15_000) continue;
+      return item.coordinates;
     }
     return null;
-  } catch {
-    // The existing street/house anchor remains usable if geocoding is unavailable.
-    return null;
-  } finally {
-    clearTimeout(timeout);
-    options.signal?.removeEventListener('abort', abort);
-  }
+  } catch { return null; }
 }

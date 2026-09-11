@@ -1,6 +1,12 @@
 import type { Address } from './models';
+import { extractHouseNumber, extractQueryHouseNumber } from './address-precision';
 
 type SearchableAddress = Pick<Address, 'label' | 'details'>;
+
+export function filterRequestedHouse<T extends SearchableAddress>(addresses: T[], query: string): T[] {
+  const house = extractQueryHouseNumber(query)?.toLocaleLowerCase('ru');
+  return house ? addresses.filter(address => extractHouseNumber(address)?.toLocaleLowerCase('ru') === house) : addresses;
+}
 
 type SearchIndex = {
   labelTokens: string[];
@@ -30,6 +36,7 @@ const INFRASTRUCTURE_TOKENS = new Set([
 function tokens(value: string): string[] {
   return value
     .toLocaleLowerCase('ru')
+    .replace(/ё/g, 'е')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
     .split(' ')

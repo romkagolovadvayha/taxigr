@@ -1,6 +1,9 @@
 import type { RowDataPacket } from 'mysql2/promise';
 
-import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
+import { getAddressDirectory } from './address-directory';
+import { getRememberedAddresses } from './remembered-addresses';
+import { overlayRememberedAddresses } from '../src/domain/remembered-address';
+import { hasApproximateCoordinates } from '../src/domain/address-precision';
 import { addressSearchScore } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import type { AddressKind } from '../src/domain/models';
@@ -13,6 +16,7 @@ export type GeocodedAddress = {
   details?: string;
   houseNumber?: string;
   kind?: AddressKind;
+  coordinatePrecision?: 'approximate' | 'precise';
   coordinates: { latitude: number; longitude: number };
 };
 
@@ -57,7 +61,6 @@ const localAddresses: GeocodedAddress[] = [
     houseNumber: '6',
     coordinates: { latitude: 56.445658, longitude: 52.1972249 },
   },
-  ...grahovoDirectoryAddresses,
 ];
 
 const memoryCache = new Map<string, MemoryEntry>();
@@ -93,7 +96,7 @@ const NOMINATIM_SETTLEMENT_TYPES = new Set([
 ]);
 
 function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase('ru').replace(/\s+/g, ' ');
+  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
 }
 
 function normalizeForSearch(value: string): string {
@@ -207,7 +210,8 @@ export function filterExactHouseResults(
   });
 }
 
-function localMatches(query: string): GeocodedAddress[] {
+function localMatches(query: string, directory: GeocodedAddress[]): GeocodedAddress[] {
+  const localAddresses = [...directory];
   const normalized = normalizeForSearch(query);
   const queryTokens = normalized
     .split(' ')
@@ -293,6 +297,14 @@ export function buildNominatimQueries(query: string): string[] {
     ];
   }
   return [`${query}, Граховский район, Удмуртская Республика`, query];
+}
+
+export function streetGeocoderQuery(query: string): string {
+  return query
+    .replace(/(^|[\s,])(?:с|д|п|г)\.\s*/giu, '$1')
+    .replace(/(^|[\s,])ул\.\s*/giu, '$1улица ')
+    .replace(/(^|[\s,])пер\.\s*/giu, '$1переулок ')
+    .trim();
 }
 
 async function readPersistentCache(key: string): Promise<GeocodedAddress[] | null> {
@@ -473,16 +485,21 @@ async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
   return prioritizeGrahovoDistrict(preciseResults);
 }
 
-export async function searchAddresses(query: string): Promise<GeocodedAddress[]> {
-  const local = localMatches(query);
-  if (local.length && hasStrongLocalMatch(query, local)) {
+export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false): Promise<GeocodedAddress[]> {
+  // Street anchors in GAR are approximate. Point selection needs an actual
+  // street from OSM when available, bypassing the local-address shortcut.
+  const local = streetOnly ? [] : localMatches(query, overlayRememberedAddresses(
+    [...localAddresses, ...await getAddressDirectory()], await getRememberedAddresses(),
+  ));
+  if (local.length && hasStrongLocalMatch(query, local) &&
+      (!resolveHouse || local.some(address => address.houseNumber && !hasApproximateCoordinates(address)))) {
     return prioritizeGrahovoDistrict(local);
   }
 
-  const key = `v11:${normalize(query)}`;
+  const key = `${streetOnly ? 'street-v2' : resolveHouse ? 'house-v1' : 'v12'}:${normalize(query)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) {
-    return mergeLocalAndExternalResults(query, local, memory.value);
+    return mergeLocalAndExternalResults(query, resolveHouse && memory.value.length ? [] : local, memory.value);
   }
   if (memory) memoryCache.delete(key);
 
@@ -492,12 +509,14 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
       value: persisted,
       expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
     });
-    return mergeLocalAndExternalResults(query, local, persisted);
+    return mergeLocalAndExternalResults(query, resolveHouse && persisted.length ? [] : local, persisted);
   }
 
   let results: GeocodedAddress[];
   try {
-    results = await requestNominatim(query);
+    results = streetOnly
+      ? (await requestNominatimOnce(streetGeocoderQuery(query))).filter(item => item.kind === 'street')
+      : await requestNominatim(resolveHouse ? streetGeocoderQuery(query) : query);
   } catch (error) {
     if (local.length) return prioritizeGrahovoDistrict(local);
     throw error;
@@ -507,5 +526,5 @@ export async function searchAddresses(query: string): Promise<GeocodedAddress[]>
     expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
   });
   await writePersistentCache(key, results);
-  return mergeLocalAndExternalResults(query, local, results);
+  return mergeLocalAndExternalResults(query, resolveHouse && results.length ? [] : local, results);
 }

@@ -20,6 +20,8 @@ import {
   isPickupAddressComplete,
 } from '../src/domain/address-precision';
 import { buildDestinationHistory } from '../src/domain/address-history';
+import { filterRequestedHouse } from '../src/domain/address-search';
+import { rememberAddressPoint } from './remembered-addresses';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import { normalizeRouteStops } from '../src/domain/route-stops';
 import {
@@ -3377,12 +3379,23 @@ export async function registerRoutes(
     },
   );
 
+  app.post('/v1/addresses/points', {
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+  }, async request => {
+    const session = await auth(request, 'passenger');
+    const input = parse(z.object({
+      address: addressSchema.extend({ id: z.string().min(1).max(255) }),
+      coordinates: pointSchema,
+    }), request.body);
+    return { data: await rememberAddressPoint(session.id, input.address, input.coordinates) };
+  });
+
   app.get('/v1/addresses/search', async (request) => {
     await auth(request, 'passenger');
-    const { query } = parse(z.object({ query: z.string().trim().min(2).max(180) }), request.query);
-    const placeResults = (await searchPlaces(query)).map(placeToAddress);
+    const { query, kind } = parse(z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional() }), request.query);
+    const placeResults = kind ? [] : filterRequestedHouse((await searchPlaces(query)).map(placeToAddress), query);
     try {
-      const addressResults = await searchAddresses(query);
+      const addressResults = await searchAddresses(query, kind === 'street', kind === 'house');
       return { data: [...placeResults, ...addressResults].slice(0, 30) };
     } catch {
       if (placeResults.length) return { data: placeResults };
@@ -3405,13 +3418,13 @@ export async function registerRoutes(
           code: 'NOT_FOUND',
         });
       }
-      const { query } = parse(
-        z.object({ query: z.string().trim().min(2).max(180) }),
+      const { query, kind } = parse(
+        z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional() }),
         request.query,
       );
-      const placeResults = (await searchPlaces(query)).map(placeToAddress);
+      const placeResults = kind ? [] : filterRequestedHouse((await searchPlaces(query)).map(placeToAddress), query);
       try {
-        const addressResults = await searchAddresses(query);
+        const addressResults = await searchAddresses(query, kind === 'street', kind === 'house');
         return { data: [...placeResults, ...addressResults].slice(0, 30) };
       } catch {
         if (placeResults.length) return { data: placeResults };

@@ -1,553 +1,247 @@
+import type { GeoJSONSource, Map as LibreMap, Marker, MapLibreEvent } from 'maplibre-gl';
 import { useIsFocused } from 'expo-router';
-import { memo, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 
-import type { MapViewportInsets, TaxiMapProps } from '@/components/map/types';
-import { POINT_SELECTION_ZOOM, pointSelectionLocation } from '@/components/map/selection-viewport';
-import { AppButton } from '@/components/ui/app-button';
-import { subscribeToYandexMapFailures } from '@/components/map/yandex-map-errors';
-import {
-  DRIVER_MARKER_HEIGHT,
-  DRIVER_MARKER_WIDTH,
-  driverMarkerPngMarkup,
-} from '@/components/map/driver-marker';
-import { remainingRouteCoordinates } from '@/domain/route-tracking';
-import { routeDestinationMapLabel } from '@/domain/route-label';
-import {
-  fitRouteLocation,
-  routePointSizeForZoom,
-} from '@/components/map/route-viewport';
-import {
-  loadYandexMap,
-  type YandexMap,
-  type YandexMapEntity,
-} from '@/components/map/yandex-map-loader';
 import { grahovoCenter } from '@/data/demo';
-import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
-import { motion, spacing, typography, type ColorPalette } from '@/theme/tokens';
+import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
+import { motion } from '@/theme/tokens';
+import { driverMarkerPngMarkup } from './driver-marker';
+import { MapLoadingOverlay } from './map-loading-overlay';
+import { loadMapLibre } from './maplibre-loader.web';
+import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
+import { taxiMapStyle } from './map-style';
+import type { TaxiMapProps } from './types';
+import { useMapScene } from './use-map-scene';
 
-type MapMargin = [number, number, number, number];
+type MapApi = typeof import('maplibre-gl');
+const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-const ROUTE_PADDING = 18;
-const ROUTE_POINT_BASE_SIZE = 18;
-const reduceMotion =
-  typeof window !== 'undefined' &&
-  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-function mapMargin(insets?: MapViewportInsets, hasPreviewCallouts = false): MapMargin {
-  const horizontalPadding = hasPreviewCallouts ? 86 : ROUTE_PADDING;
-  return [
-    Math.max(0, insets?.top ?? 0) + ROUTE_PADDING,
-    Math.max(0, insets?.right ?? 0) + horizontalPadding,
-    Math.max(0, insets?.bottom ?? 0) + ROUTE_PADDING,
-    Math.max(0, insets?.left ?? 0) + horizontalPadding,
-  ];
-}
-
-function setRoutePointZoom(element: HTMLDivElement, zoom: number): void {
-  const size = routePointSizeForZoom(zoom);
-  const dot = element.querySelector<HTMLDivElement>('[data-route-dot]');
-  const callout = element.querySelector<HTMLDivElement>('[data-route-callout]');
-  if (dot) {
-    dot.style.transform = `translate(-50%, -50%) scale(${size / ROUTE_POINT_BASE_SIZE})`;
-  }
-  if (callout) callout.style.bottom = `${Math.round(size / 2) + 8}px`;
-}
-
-function routePointElement(
-  colors: ColorPalette,
-  kind: 'pickup' | 'stop' | 'destination',
-  calloutLabel: string | undefined,
-  zoom: number,
-): HTMLDivElement {
-  const element = document.createElement('div');
-  element.setAttribute('role', 'img');
-  element.setAttribute(
-    'aria-label',
-    kind === 'pickup'
-      ? 'Старт маршрута'
-      : kind === 'stop'
-        ? 'Промежуточная остановка'
-        : 'Финиш маршрута',
-  );
-  element.style.position = 'relative';
-  element.style.width = '1px';
-  element.style.height = '1px';
-  element.style.pointerEvents = 'none';
-
-  const dot = document.createElement('div');
-  dot.dataset.routeDot = 'true';
-  dot.style.position = 'absolute';
-  dot.style.left = '0';
-  dot.style.top = '0';
-  dot.style.width = `${ROUTE_POINT_BASE_SIZE}px`;
-  dot.style.height = `${ROUTE_POINT_BASE_SIZE}px`;
-  dot.style.borderRadius = '999px';
-  dot.style.background =
-    kind === 'pickup' ? colors.brand : kind === 'stop' ? colors.surface : colors.ink;
-  dot.style.border = kind === 'stop' ? `2px solid ${colors.ink}` : '2px solid white';
-  dot.style.boxSizing = 'border-box';
-  dot.style.boxShadow = '0 1px 5px rgba(0,0,0,.24)';
-  dot.style.transform = 'translate(-50%, -50%)';
-  dot.style.transition = reduceMotion
-    ? 'none'
-    : `transform ${motion.duration.quick}ms cubic-bezier(${motion.easing.out.join(', ')})`;
-  element.appendChild(dot);
-
-  if (calloutLabel) {
-    const background =
-      kind === 'pickup' ? colors.brand : kind === 'destination' ? colors.ink : colors.surface;
-    const callout = document.createElement('div');
-    callout.dataset.routeCallout = 'true';
-    callout.textContent = calloutLabel;
-    callout.style.position = 'absolute';
-    callout.style.left = '0';
-    callout.style.transform = 'translateX(-50%)';
-    callout.style.whiteSpace = 'nowrap';
-    callout.style.padding = '5px 11px';
-    callout.style.borderRadius = '12px';
-    callout.style.background = background;
-    callout.style.color = kind === 'destination' ? colors.surface : kind === 'pickup' ? colors.brandInk : colors.ink;
-    callout.style.boxShadow = '0 2px 10px rgba(0,0,0,.16)';
-    callout.style.fontFamily = 'Manrope, system-ui, sans-serif';
-    callout.style.fontSize = '15px';
-    callout.style.fontWeight = '650';
-    callout.style.lineHeight = '20px';
-    callout.style.letterSpacing = '-0.15px';
-    callout.style.zIndex = '2';
-
-    const pointer = document.createElement('div');
-    pointer.style.position = 'absolute';
-    pointer.style.left = '50%';
-    pointer.style.bottom = '-5px';
-    pointer.style.transform = 'translateX(-50%)';
-    pointer.style.width = '0';
-    pointer.style.height = '0';
-    pointer.style.borderLeft = '5px solid transparent';
-    pointer.style.borderRight = '5px solid transparent';
-    pointer.style.borderTop = `6px solid ${background}`;
-    callout.appendChild(pointer);
-    element.appendChild(callout);
-  }
-
-  setRoutePointZoom(element, zoom);
-  return element;
-}
-
-function markerElement(
-  colors: ColorPalette,
-  kind: 'driver' | 'passenger',
-  heading?: number | null,
-  navigationMode = false,
-): HTMLDivElement {
-  const element = document.createElement('div');
-  element.setAttribute('role', 'img');
-  element.setAttribute('aria-label', kind === 'passenger' ? 'Пассажир' : 'Водитель');
-  element.style.width = kind === 'driver' ? `${DRIVER_MARKER_WIDTH}px` : '22px';
-  element.style.height = kind === 'driver' ? `${DRIVER_MARKER_HEIGHT}px` : '22px';
-  element.style.boxSizing = 'border-box';
-  element.style.transform = 'translate(-50%, -50%)';
-  if (kind === 'driver') {
-    element.style.background = 'transparent';
-    element.style.border = '0';
-    element.style.boxShadow = 'none';
-    element.innerHTML = driverMarkerPngMarkup();
-    const rotation = navigationMode ? 0 : (heading ?? 0);
-    element.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-    element.style.transition = reduceMotion
-      ? 'none'
-      : `transform ${motion.duration.tracking}ms linear`;
-  } else {
-    element.style.borderRadius = '999px';
-    element.style.background = colors.info;
-    element.style.border = '4px solid white';
-    element.style.boxShadow = '0 3px 12px rgba(0,0,0,.25)';
-  }
-  return element;
-}
-
-const ActiveTaxiMap = memo(function ActiveTaxiMap({
-  pickup,
-  destinations,
-  destination,
-  routeCoordinates,
-  pickupEtaMinutes,
-  destinationArrivalLabel,
-  driver,
-  driverHeading,
-  passenger,
-  followDriver = false,
-  followZoom,
-  trimCompletedRoute = false,
-  navigationMode = false,
-  routeTarget,
-  viewportInsets,
-  onMapReady,
-  onMapError,
-  selectionCenter,
-  onCoordinateSelect,
-  onRetry,
-}: TaxiMapProps & { onRetry: () => void }) {
+const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry: () => void }) {
+  // Imperative map updates must follow each committed route/position change.
+  'use no memo';
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
-  const [initialColorScheme] = useState(colorScheme);
-  const onReady = useEffectEvent(() => onMapReady?.());
-  const onError = useEffectEvent((message: string) => onMapError?.(message));
-  const initialLocation = useEffectEvent(() => selectionCenter
-    ? pointSelectionLocation(selectionCenter)
-    : { center: [grahovoCenter.longitude, grahovoCenter.latitude], zoom: 14 });
-  const fittedViewportRef = useRef('');
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<YandexMap | null>(null);
-  const staticEntitiesRef = useRef<YandexMapEntity[]>([]);
-  const driverMarkerRef = useRef<YandexMapEntity | null>(null);
-  const driverElementRef = useRef<HTMLDivElement | null>(null);
-  const passengerMarkerRef = useRef<YandexMapEntity | null>(null);
-  const apiRef = useRef<Awaited<ReturnType<typeof loadYandexMap>> | null>(null);
-  const routePointElementsRef = useRef<HTMLDivElement[]>([]);
-  const zoomRef = useRef(14);
+  const scene = useMapScene(props);
+  const latest = useRef({ props, scene, colors, colorScheme });
+  useLayoutEffect(() => { latest.current = { props, scene, colors, colorScheme }; });
+  const container = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<LibreMap | null>(null);
+  const apiRef = useRef<MapApi | null>(null);
+  const driverRef = useRef<Marker | null>(null);
+  const passengerRef = useRef<Marker | null>(null);
+  const pointsRef = useRef(new Map<string, Marker>());
+  const fitted = useRef('');
+  const selectionKey = useRef('');
+  const followRef = useRef(true);
+  const driverAnimation = useRef(0);
+  const previousStyle = useRef(colorScheme);
+  const styleLoaded = useRef(false);
+  const [initialized, setInitialized] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const routeDriver = trimCompletedRoute ? driver : null;
-  const coordinateSelectRef = useRef(onCoordinateSelect);
-  useEffect(() => { coordinateSelectRef.current = onCoordinateSelect; }, [onCoordinateSelect]);
-
-  const selectionLatitude = selectionCenter?.latitude;
-  const selectionLongitude = selectionCenter?.longitude;
-  useEffect(() => {
-    if (!mapReady) return;
-    const center = selectionLatitude != null && selectionLongitude != null
-      ? { latitude: selectionLatitude, longitude: selectionLongitude }
-      : null;
-    mapRef.current?.update({
-      zoomRange: { min: 6, max: center ? POINT_SELECTION_ZOOM : 17 },
-      ...(center ? { location: pointSelectionLocation(center) } : {}),
-    });
-  }, [mapReady, selectionLatitude, selectionLongitude]);
-
-  useEffect(() => {
-    let active = true;
-    let failed = false;
-    const clearMap = () => {
-      mapRef.current?.destroy();
-      mapRef.current = null;
-      apiRef.current = null;
-      staticEntitiesRef.current = [];
-      driverMarkerRef.current = null;
-      driverElementRef.current = null;
-      passengerMarkerRef.current = null;
-      routePointElementsRef.current = [];
-    };
-    const fail = (message: string) => {
-      if (!active || failed) return;
-      failed = true;
-      clearMap();
-      setMapReady(false);
-      setError(message);
-      onError(message);
-    };
-    const unsubscribe = subscribeToYandexMapFailures(window, fail);
-
-    void loadYandexMap()
-      .then((api) => {
-        if (!active || failed || !containerRef.current) return;
-        apiRef.current = api;
-        const location = initialLocation();
-        mapRef.current = new api.YMap(
-          containerRef.current,
-          {
-            location,
-            theme: initialColorScheme,
-            zoomRange: { min: 6, max: Math.max(17, location.zoom) },
-            showScaleInCopyrights: true,
-          },
-          [new api.YMapDefaultSchemeLayer({}), new api.YMapDefaultFeaturesLayer({})],
-        );
-        mapRef.current.addChild(
-          new api.YMapListener({
-            layer: 'any',
-            onClick: (_object, event) => coordinateSelectRef.current?.({
-              latitude: event.coordinates[1], longitude: event.coordinates[0],
-            }),
-            onUpdate: ({ location }) => {
-              zoomRef.current = location.zoom;
-              routePointElementsRef.current.forEach((element) =>
-                setRoutePointZoom(element, location.zoom),
-              );
-            },
-          }),
-        );
-        setMapReady(true);
-        onReady();
-      })
-      .catch((reason: unknown) => {
-        const message = reason instanceof Error ? reason.message : 'Карта недоступна';
-        fail(message);
-      });
-
-    return () => {
-      active = false;
-      unsubscribe();
-      clearMap();
-    };
-  }, [initialColorScheme]);
-
-  useEffect(() => { mapRef.current?.update({ theme: colorScheme }); }, [colorScheme, mapReady]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    const api = apiRef.current;
-    if (!map || !api) return;
-
-    staticEntitiesRef.current.forEach((entity) => map.removeChild(entity));
-    staticEntitiesRef.current = [];
-    routePointElementsRef.current = [];
-
-    const add = (entity: YandexMapEntity) => {
-      map.addChild(entity);
-      staticEntitiesRef.current.push(entity);
-    };
-    const margin = mapMargin(
-      viewportInsets,
-      Boolean(pickup || destination || destinations?.length),
-    );
-    map.update({ margin });
-    const renderedRouteCoordinates = trimCompletedRoute
-      ? remainingRouteCoordinates(routeCoordinates, routeDriver)
-      : routeCoordinates ?? [];
-    const pickupMarkerCoordinates =
-      (routeTarget === 'pickup'
-        ? renderedRouteCoordinates[renderedRouteCoordinates.length - 1]
-        : renderedRouteCoordinates[0]) ?? pickup?.coordinates;
-    const destinationMarkerCoordinates =
-      renderedRouteCoordinates[renderedRouteCoordinates.length - 1] ?? destination?.coordinates;
-
-    if (pickup && pickupMarkerCoordinates) {
-      const pickupElement = routePointElement(
-        colors,
-        'pickup',
-        pickupEtaMinutes ? `Старт · ${pickupEtaMinutes} мин` : 'Старт',
-        zoomRef.current,
-      );
-      routePointElementsRef.current.push(pickupElement);
-      add(
-        new api.YMapMarker(
-          {
-            coordinates: [
-              pickupMarkerCoordinates.longitude,
-              pickupMarkerCoordinates.latitude,
-            ],
-            zIndex: 1100,
-          },
-          pickupElement,
-        ),
-      );
+  const [slow, setSlow] = useState(false);
+  const sync = useCallback(() => {
+    const { props, scene, colors } = latest.current;
+    const map = mapRef.current, api = apiRef.current, host = container.current;
+    if (!map || !api || !host || !styleLoaded.current) return;
+    if (!map.getSource('taxi-route')) {
+      map.addSource('taxi-route', { type: 'geojson', data: scene.route, tolerance: 0 });
+      map.addLayer({ id: 'taxi-route-outline', type: 'line', source: 'taxi-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colors.surface, 'line-width': 10 } });
+      map.addLayer({ id: 'taxi-route-line', type: 'line', source: 'taxi-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colors.route, 'line-width': 7 } });
+    } else {
+      (map.getSource('taxi-route') as GeoJSONSource).setData(scene.route);
+      map.setPaintProperty('taxi-route-outline', 'line-color', colors.surface);
+      map.setPaintProperty('taxi-route-line', 'line-color', colors.route);
     }
-    const orderedDestinations = destinations?.length
-      ? destinations
-      : destination
-        ? [destination]
-        : [];
-    orderedDestinations.forEach((item, index) => {
-      const final = index === orderedDestinations.length - 1;
-      const markerCoordinates = final && destinationMarkerCoordinates
-        ? destinationMarkerCoordinates
-        : item.coordinates;
-      const destinationElement = routePointElement(
-        colors,
-        final ? 'destination' : 'stop',
-        routeDestinationMapLabel(
-          index,
-          orderedDestinations.length,
-          final ? destinationArrivalLabel : undefined,
-        ),
-        zoomRef.current,
-      );
-      routePointElementsRef.current.push(destinationElement);
-      add(
-        new api.YMapMarker(
-          {
-            coordinates: [markerCoordinates.longitude, markerCoordinates.latitude],
-            zIndex: 1100 + index,
-          },
-          destinationElement,
-        ),
-      );
-    });
-    const visibleCoordinates =
-      renderedRouteCoordinates.length >= 2
-        ? renderedRouteCoordinates
-        : pickup && destination
-          ? [pickup.coordinates, destination.coordinates]
-          : [];
-    if (visibleCoordinates.length >= 2) {
-      if (renderedRouteCoordinates.length >= 2) {
-        add(
-          new api.YMapFeature({
-            geometry: {
-              type: 'LineString',
-              coordinates: renderedRouteCoordinates.map((point) => [
-                point.longitude,
-                point.latitude,
-              ]),
-            },
-            style: {
-              simplificationRate: 0,
-              zIndex: 1000,
-              stroke: [{ width: 7, color: colors.route }],
-            },
-          }),
-        );
+    const active = new Set(scene.points.map(point => point.id));
+    for (const [id, marker] of pointsRef.current) if (!active.has(id)) { marker.remove(); pointsRef.current.delete(id); }
+    const updatePoint = (point: RouteMapPoint) => {
+      let marker = pointsRef.current.get(point.id);
+      if (!marker) {
+        const element = document.createElement('div');
+        element.setAttribute('role', 'img');
+        Object.assign(element.style, { display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' });
+        const label = document.createElement('div');
+        Object.assign(label.style, { whiteSpace: 'nowrap', padding: '5px 10px', marginBottom: '6px', borderRadius: '12px',
+          fontFamily: 'Manrope, system-ui, sans-serif', fontSize: '14px', fontWeight: '600', lineHeight: '20px',
+          boxShadow: '0 2px 8px rgba(0,0,0,.16)' });
+        const dot = document.createElement('div');
+        Object.assign(dot.style, { width: '16px', height: '16px', borderRadius: '50%', border: '2px solid white', boxSizing: 'border-box' });
+        element.append(label, dot);
+        marker = new api.Marker({ element, anchor: 'bottom', offset: [0, 8] }).setLngLat(point.coordinates).addTo(map);
+        pointsRef.current.set(point.id, marker);
       }
-      const viewportKey = JSON.stringify([visibleCoordinates, margin, followDriver]);
-      if (!followDriver && fittedViewportRef.current !== viewportKey) {
-        const container = containerRef.current;
-        const location = container
-          ? fitRouteLocation(
-              visibleCoordinates,
-              container.clientWidth,
-              container.clientHeight,
-              margin,
-            )
-          : null;
-        if (location) {
-          fittedViewportRef.current = viewportKey;
-          map.update({
-            margin,
-            location: { ...location, duration: reduceMotion ? 0 : motion.duration.tracking },
-          });
+      const element = marker.getElement();
+      element.setAttribute('aria-label', point.label);
+      const label = element.children[0] as HTMLDivElement, dot = element.children[1] as HTMLDivElement;
+      label.textContent = point.label;
+      label.style.background = dot.style.background = point.kind === 'pickup' ? colors.brand : point.kind === 'destination' ? colors.ink : colors.surface;
+      label.style.color = point.kind === 'destination' ? colors.surface : point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      marker.setLngLat(point.coordinates);
+    };
+    scene.points.forEach(updatePoint);
+    if (validMapCoordinate(props.driver)) {
+      const destination = lngLat(props.driver);
+      if (!driverRef.current) {
+        const element = document.createElement('div');
+        element.setAttribute('role', 'img'); element.setAttribute('aria-label', 'Водитель');
+        element.innerHTML = driverMarkerPngMarkup();
+        driverRef.current = new api.Marker({ element, rotationAlignment: 'map', pitchAlignment: 'viewport' }).setLngLat(destination).addTo(map);
+      }
+      const marker = driverRef.current;
+      marker.setRotation(mapBearing(props.driverHeading));
+      cancelAnimationFrame(driverAnimation.current);
+      const start = marker.getLngLat(), started = performance.now();
+      const animate = (now: number) => {
+        const t = reduceMotion ? 1 : Math.min(1, (now - started) / motion.duration.tracking);
+        marker.setLngLat([start.lng + (destination[0] - start.lng) * t, start.lat + (destination[1] - start.lat) * t]);
+        if (t < 1) driverAnimation.current = requestAnimationFrame(animate);
+      };
+      driverAnimation.current = requestAnimationFrame(animate);
+    } else { cancelAnimationFrame(driverAnimation.current); driverRef.current?.remove(); driverRef.current = null; }
+    if (validMapCoordinate(props.passenger)) {
+      if (!passengerRef.current) {
+        const element = document.createElement('div');
+        element.setAttribute('role', 'img'); element.setAttribute('aria-label', 'Пассажир');
+        Object.assign(element.style, { width: '22px', height: '22px', borderRadius: '50%', border: '3px solid white', boxSizing: 'border-box' });
+        passengerRef.current = new api.Marker({ element }).setLngLat(lngLat(props.passenger)).addTo(map);
+      }
+      passengerRef.current.getElement().style.background = colors.info;
+      passengerRef.current.setLngLat(lngLat(props.passenger));
+    } else { passengerRef.current?.remove(); passengerRef.current = null; }
+    const width = host.clientWidth, height = host.clientHeight;
+    if (!width || !height) return;
+    const padding = taxiMapPadding(width, height, props.viewportInsets, scene.points.length > 0);
+    host.style.setProperty('--taxi-map-attribution-bottom', String((props.viewportInsets?.bottom ?? 0) + 4) + 'px');
+    host.style.setProperty('--taxi-map-control-top', String((props.viewportInsets?.top ?? 0) + 8) + 'px');
+    if (validMapCoordinate(props.selectionCenter)) {
+      const key = JSON.stringify([props.selectionCenter, padding]);
+      if (selectionKey.current !== key) {
+        selectionKey.current = key;
+        map.jumpTo({ center: lngLat(props.selectionCenter), zoom: MAP_SELECTION_ZOOM, pitch: 0, bearing: 0, padding });
+      }
+      return;
+    }
+    if (props.followDriver && followRef.current && validMapCoordinate(props.driver)) {
+      fitted.current = '';
+      map.easeTo({ center: lngLat(props.driver), zoom: props.followZoom ?? (props.navigationMode ? 16.5 : 15),
+        pitch: props.navigationMode ? 40 : 25, bearing: props.navigationMode ? mapBearing(props.driverHeading) : 0,
+        padding, duration: reduceMotion ? 0 : motion.duration.tracking, easing: t => t });
+    } else if (!props.followDriver) {
+      const key = JSON.stringify([scene.fitCoordinates, width, height, padding, props.followRequestId]);
+      if (key === fitted.current) return;
+      const location = taxiMapFit(scene.fitCoordinates, width, height, padding);
+      if (location) {
+        fitted.current = key;
+        map.easeTo({ ...location, pitch: 0, bearing: 0, padding, duration: reduceMotion ? 0 : motion.duration.tracking });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true, rendered = false, baseMapFailed = false;
+    const pointMarkers = pointsRef.current;
+    const onError = (message: string) => latest.current.props.onMapError?.(message);
+    let observer: ResizeObserver | undefined;
+    let attribution: HTMLDetailsElement | null = null;
+    const collapseAttribution = () => {
+      // Set compact before source metadata arrives so MapLibre cannot auto-expand it.
+      attribution?.classList.add('maplibregl-compact');
+      attribution?.classList.remove('maplibregl-compact-show');
+      attribution?.removeAttribute('open');
+    };
+    const slowTimer = setTimeout(() => { if (active && !rendered) setSlow(true); }, 8_000);
+    const timeout = setTimeout(() => {
+      if (!active || rendered) return;
+      const message = 'Карта не загрузилась. Проверьте соединение и нажмите «Повторить».';
+      setError(message); onError(message);
+    }, 30_000);
+    const contextLost = (event: Event) => { event.preventDefault(); const message = 'Карта была остановлена браузером. Нажмите «Повторить».'; setError(message); onError(message); };
+    void loadMapLibre().then(api => {
+      if (!active || !container.current) return;
+      apiRef.current = api;
+      const current = latest.current;
+      const selection = current.props.selectionCenter;
+      const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme),
+        center: lngLat(validMapCoordinate(selection) ? selection : grahovoCenter),
+        zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, pitch: selection ? 0 : 25, minZoom: 5, maxZoom: MAP_MAX_ZOOM,
+        attributionControl: false, locale: { 'AttributionControl.ToggleAttribution': 'Источники карты' },
+        canvasContextAttributes: { antialias: true }, renderWorldCopies: false });
+      mapRef.current = map;
+      map.addControl(new api.AttributionControl({ compact: true }), 'bottom-right');
+      attribution = container.current.querySelector<HTMLDetailsElement>('.maplibregl-ctrl-attrib');
+      collapseAttribution();
+      map.addControl(new api.NavigationControl({ showZoom: false, showCompass: true, visualizePitch: true }), 'top-right');
+      map.getCanvas().setAttribute('aria-label', 'Карта поездки');
+      map.getCanvas().addEventListener('webglcontextlost', contextLost);
+      map.on('style.load', () => { if (!active) return; styleLoaded.current = true; fitted.current = ''; setInitialized(true); sync(); });
+      const loaded = () => {
+        if (!active || rendered || baseMapFailed) return;
+        rendered = true; setReady(true); setError(null); latest.current.props.onMapReady?.();
+      };
+      map.on('load', loaded);
+      map.on('sourcedata', event => {
+        if (event.sourceId === 'openmaptiles' && event.sourceDataType === 'content' && event.coord) {
+          baseMapFailed = false;
+          if (map.loaded()) loaded();
         }
-      }
-    }
-  }, [
-    colors,
-    destination,
-    destinationArrivalLabel,
-    destinations,
-    followDriver,
-    mapReady,
-    pickup,
-    pickupEtaMinutes,
-    routeCoordinates,
-    routeDriver,
-    routeTarget,
-    trimCompletedRoute,
-    viewportInsets,
-  ]);
+      });
+      map.on('error', event => {
+        if (!active) return;
+        // A failed tile must not tear down an already usable map.
+        if (!rendered) {
+          baseMapFailed = true;
+          setError('Не удалось открыть карту. Нажмите «Повторить».'); onError(event.error.message);
+        }
+      });
+      map.on('click', event => {
+        const point = { latitude: event.lngLat.lat, longitude: event.lngLat.lng };
+        if (validMapCoordinate(point)) latest.current.props.onCoordinateSelect?.(point);
+      });
+      const stopFollowing = (event: MapLibreEvent) => {
+        if (event.originalEvent) { followRef.current = false; collapseAttribution(); }
+      };
+      map.on('dragstart', stopFollowing); map.on('rotatestart', stopFollowing); map.on('zoomstart', stopFollowing);
+      observer = new ResizeObserver(() => { map.resize(); fitted.current = ''; sync(); });
+      observer.observe(container.current);
+    }).catch((reason: unknown) => {
+      if (!active) return;
+      const message = reason instanceof Error ? reason.message : 'Карта недоступна';
+      setError('Не удалось открыть карту. Проверьте поддержку WebGL и повторите.'); onError(message);
+    });
+    return () => {
+      active = false; clearTimeout(slowTimer); clearTimeout(timeout); cancelAnimationFrame(driverAnimation.current);
+      observer?.disconnect();
+      driverRef.current?.remove(); passengerRef.current?.remove();
+      pointMarkers.forEach(marker => marker.remove()); pointMarkers.clear();
+      mapRef.current?.getCanvas().removeEventListener('webglcontextlost', contextLost);
+      mapRef.current?.remove(); mapRef.current = null; apiRef.current = null;
+    };
+  }, [sync]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    const api = apiRef.current;
-    if (!map || !api) return;
+    if (previousStyle.current === colorScheme) return;
+    previousStyle.current = colorScheme;
+    styleLoaded.current = false;
+    mapRef.current?.setStyle(taxiMapStyle(colors, colorScheme));
+  }, [colors, colorScheme]);
 
-    if (driver) {
-      const coordinates = [driver.longitude, driver.latitude];
-      if (driverMarkerRef.current) {
-        driverMarkerRef.current.update({ coordinates });
-      } else {
-        const element = markerElement(colors, 'driver', driverHeading, navigationMode);
-        const marker = new api.YMapMarker({ coordinates, zIndex: 1200 }, element);
-        map.addChild(marker);
-        driverMarkerRef.current = marker;
-        driverElementRef.current = element;
-      }
-      const rotation = navigationMode ? 0 : (driverHeading ?? 0);
-      if (driverElementRef.current) {
-        driverElementRef.current.style.transform =
-          `translate(-50%, -50%) rotate(${rotation}deg)`;
-      }
-      if (followDriver) {
-        const margin = mapMargin(
-          viewportInsets,
-          Boolean(pickup || destination || destinations?.length),
-        );
-        map.update({
-          margin,
-          location: {
-            center: coordinates,
-            zoom: followZoom ?? (navigationMode ? 17 : 16),
-            duration: reduceMotion ? 0 : motion.duration.tracking,
-            easing: 'linear',
-          },
-          camera: navigationMode
-            ? {
-                tilt: (35 * Math.PI) / 180,
-                azimuth: ((driverHeading ?? 0) * Math.PI) / 180,
-                duration: reduceMotion ? 0 : motion.duration.tracking,
-                easing: 'linear',
-              }
-            : {
-                tilt: 0,
-                azimuth: 0,
-                duration: reduceMotion ? 0 : motion.duration.tracking,
-              },
-        });
-      }
-    } else if (driverMarkerRef.current) {
-      map.removeChild(driverMarkerRef.current);
-      driverMarkerRef.current = null;
-      driverElementRef.current = null;
-    }
+  useEffect(() => { followRef.current = true; sync(); }, [props.followDriver, props.followRequestId, sync]);
+  useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.passenger,
+    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, sync]);
 
-    if (passenger) {
-      const coordinates = [passenger.longitude, passenger.latitude];
-      if (passengerMarkerRef.current) {
-        passengerMarkerRef.current.update({ coordinates });
-      } else {
-        const marker = new api.YMapMarker(
-          { coordinates, zIndex: 32 },
-          markerElement(colors, 'passenger'),
-        );
-        map.addChild(marker);
-        passengerMarkerRef.current = marker;
-      }
-    } else if (passengerMarkerRef.current) {
-      map.removeChild(passengerMarkerRef.current);
-      passengerMarkerRef.current = null;
-    }
-  }, [
-    colors,
-    destinationArrivalLabel,
-    driver,
-    driverHeading,
-    followDriver,
-    followZoom,
-    mapReady,
-    navigationMode,
-    passenger,
-    pickup,
-    pickupEtaMinutes,
-    destination,
-    destinations,
-    viewportInsets,
-  ]);
-
-  if (error) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.x6, gap: spacing.x4 }}>
-        <Text selectable style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
-          {error}
-        </Text>
-        <AppButton onPress={onRetry} fullWidth={false}>Повторить загрузку карты</AppButton>
-      </View>
-    );
-  }
-
-  return (
-    <View
-      ref={containerRef as never}
-      style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}
-      accessibilityLabel="Карта поездки"
-    />
-  );
+  return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
+    <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />
+    <style>{'[data-taxi-map="maplibre"] .maplibregl-ctrl-bottom-right{bottom:var(--taxi-map-attribution-bottom,4px)}[data-taxi-map="maplibre"] .maplibregl-ctrl-top-right{top:var(--taxi-map-control-top,8px)}'}</style>
+    {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} onRetry={props.retry} insets={props.viewportInsets} />}
+  </View>;
 });
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const focused = useIsFocused();
   const [attempt, setAttempt] = useState(0);
-  // Stack screens stay mounted behind /profile and address search. Release their SDK maps.
-  return focused
-    ? <ActiveTaxiMap key={attempt} {...props} onRetry={() => setAttempt((value) => value + 1)} />
-    : null;
+  return focused ? <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} /> : null;
 });

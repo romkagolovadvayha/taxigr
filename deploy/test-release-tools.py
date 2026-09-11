@@ -30,7 +30,12 @@ class ReleaseToolsTests(unittest.TestCase):
         required = ['dist/index.html', 'dist/assets/map.webp', 'dist/assets/voice.mp3',
                     'server/index.ts', 'server/package-lock.json', 'server/migrations/001.sql',
                     'src/domain/models.ts', 'src/domain/app-updates.ts', 'package.json',
-                    'package-lock.json', 'tsconfig.json', 'app.json']
+                    'package-lock.json', 'tsconfig.json', 'app.json',
+                    'dist/vendor/maplibre/6.9.0/entry.mjs',
+                    'dist/vendor/maplibre/6.9.0/maplibre-gl-worker.mjs',
+                    'src/data/grahovo-house-points.json',
+                    'server/scripts/import-address-directory.ts',
+                    'server/migrations/047_remembered_address_points.sql']
         unwanted = ['video-promo/film.mp4', 'assets/vk-community/design.zip',
                     'credentials/secret.json', 'docs/private.md', 'server/.env.local',
                     'server/node_modules/dependency/index.js', 'src/domain/models.test.ts',

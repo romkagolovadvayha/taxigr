@@ -1,5 +1,8 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+const { prepareMapLibreWeb } = require('./scripts/prepare-maplibre-web.cjs');
+prepareMapLibreWeb();
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const rustorePushEnabled = process.env.RUSTORE_PUSH_ENABLED === 'true';
   const rustorePushProjectId = process.env.RUSTORE_PUSH_PROJECT_ID?.trim();
@@ -21,6 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       ...(config.plugins ?? []),
       'expo-image',
+      '@maplibre/maplibre-react-native',
       ...rustorePlugins,
     ],
     extra: {

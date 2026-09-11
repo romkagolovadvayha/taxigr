@@ -1,187 +1,145 @@
-import { memo, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { Camera, GeoJSONSource, Images, Layer, Map as MapLibreMap, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
+import { useIsFocused } from 'expo-router';
+import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { useReducedMotion } from 'react-native-reanimated';
 
-import { buildNativeMapHtml, serializeNativeMapState } from '@/components/map/native-map-html';
-import type { TaxiMapProps } from '@/components/map/types';
-import { remainingRouteCoordinates } from '@/domain/route-tracking';
-import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
-import { spacing, typography } from '@/theme/tokens';
+import { grahovoCenter } from '@/data/demo';
+import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
+import { motion } from '@/theme/tokens';
 import { MapLoadingOverlay } from './map-loading-overlay';
-import { prepareMapWebView } from './webview-startup';
+import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate } from './map-scene';
+import { taxiMapStyle } from './map-style';
+import type { TaxiMapProps } from './types';
+import { useMapScene } from './use-map-scene';
 
-export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
+const driverImages = { 'taxi-driver': require('../../../assets/vehicles/driver-map-car.png') };
+
+const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry: () => void }) {
+  'use no memo';
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
-  const [initialColorScheme] = useState(colorScheme);
-  const [initialSelectionCenter] = useState(props.selectionCenter);
-  const webViewRef = useRef<WebView>(null);
-  const [canMountWebView, setCanMountWebView] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const camera = useRef<CameraRef>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const [initialized, setInitialized] = useState(false);
   const [ready, setReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const reportMapError = useEffectEvent((message: string) => props.onMapError?.(message));
-  const apiKey = process.env.EXPO_PUBLIC_YANDEX_MAPS_API_KEY;
-  const html = useMemo(
-    () => (canMountWebView && apiKey ? buildNativeMapHtml(apiKey, initialColorScheme, initialSelectionCenter) : ''),
-    [apiKey, canMountWebView, initialColorScheme, initialSelectionCenter],
-  );
-  const source = useMemo(() => ({ html, baseUrl: 'https://taxigr.ru/' }), [html]);
-  const state = useMemo(
-    () =>
-      canMountWebView
-        ? serializeNativeMapState({
-            pickup: props.pickup,
-            destinations: props.destinations,
-            destination: props.destination,
-            routeCoordinates: props.trimCompletedRoute
-              ? remainingRouteCoordinates(props.routeCoordinates, props.driver)
-              : props.routeCoordinates,
-            pickupEtaMinutes: props.pickupEtaMinutes,
-            destinationArrivalLabel: props.destinationArrivalLabel,
-            driver: props.driver,
-            driverHeading: props.driverHeading,
-            passenger: props.passenger,
-            followDriver: props.followDriver,
-            followZoom: props.followZoom,
-            navigationMode: props.navigationMode,
-            routeTarget: props.routeTarget,
-            viewportInsets: props.viewportInsets,
-            colorScheme,
-            selectionCenter: props.selectionCenter,
-            coordinateSelectionEnabled: Boolean(props.onCoordinateSelect),
-          })
-        : '',
-    [
-      canMountWebView,
-      props.destination,
-      props.destinations,
-      props.destinationArrivalLabel,
-      props.driver,
-      props.driverHeading,
-      props.followDriver,
-      props.followZoom,
-      props.navigationMode,
-      props.passenger,
-      props.pickup,
-      props.pickupEtaMinutes,
-      props.routeCoordinates,
-      props.routeTarget,
-      props.trimCompletedRoute,
-      props.viewportInsets,
-      props.selectionCenter,
-      props.onCoordinateSelect,
-      colorScheme,
-    ],
-  );
+  const [following, setFollowing] = useState(true);
+  const readyRef = useRef(false);
+  const fitted = useRef('');
+  const scene = useMapScene(props);
+  const style = useMemo(() => JSON.stringify(taxiMapStyle(colors, colorScheme)), [colors, colorScheme]);
+  const padding = useMemo(() => taxiMapPadding(size.width, size.height, props.viewportInsets, scene.points.length > 0),
+    [size, props.viewportInsets, scene.points.length]);
+  const onReady = useEffectEvent(() => props.onMapReady?.());
+  const onError = useEffectEvent((message: string) => props.onMapError?.(message));
+  const [initialView] = useState(() => ({
+    center: lngLat(validMapCoordinate(props.selectionCenter) ? props.selectionCenter : grahovoCenter),
+    zoom: props.selectionCenter ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM,
+    pitch: props.selectionCenter ? 0 : 25,
+  }));
 
   useEffect(() => {
-    if (!apiKey) return;
-    let active = true;
-    const frame = requestAnimationFrame(() => {
-      void prepareMapWebView().then(() => {
-        if (active) setCanMountWebView(true);
-      }).catch(() => {
-        if (!active) return;
-        const message = 'Не удалось открыть карту. Перезапустите приложение.';
-        setLoadError(message);
-        reportMapError(message);
-      });
-    });
-    return () => { active = false; cancelAnimationFrame(frame); };
-  }, [attempt, apiKey]);
-
-  useEffect(() => {
-    if (ready || !apiKey) return;
+    if (ready) return;
     const slowTimer = setTimeout(() => setSlow(true), 8_000);
-    const errorTimer = setTimeout(() => {
-      const message = 'Карта не ответила. Проверьте соединение и попробуйте ещё раз.';
-      setLoadError((current) => current ?? message);
-      reportMapError(message);
+    const timeout = setTimeout(() => {
+      const message = 'Карта не загрузилась. Проверьте соединение и нажмите «Повторить».';
+      setError(message); onError(message);
     }, 30_000);
-    return () => { clearTimeout(slowTimer); clearTimeout(errorTimer); };
-  }, [ready, attempt, apiKey]);
+    return () => { clearTimeout(slowTimer); clearTimeout(timeout); };
+  }, [ready]);
 
-  const retry = () => {
-    setCanMountWebView(false);
-    setInitialized(false);
-    setReady(false);
-    setLoadError(null);
-    setSlow(false);
-    setAttempt((value) => value + 1);
-  };
+  useEffect(() => { setFollowing(true); }, [props.followDriver, props.followRequestId]);
 
-  const pushState = useCallback(() => {
-    if (!initialized) return;
-    webViewRef.current?.postMessage(state);
-  }, [initialized, state]);
+  const selectionLatitude = props.selectionCenter?.latitude, selectionLongitude = props.selectionCenter?.longitude;
+  useEffect(() => {
+    if (!initialized || selectionLatitude == null || selectionLongitude == null) return;
+    const point = { latitude: selectionLatitude, longitude: selectionLongitude };
+    if (validMapCoordinate(point)) camera.current?.jumpTo({ center: lngLat(point), zoom: MAP_SELECTION_ZOOM, pitch: 0, bearing: 0, padding });
+  }, [initialized, selectionLatitude, selectionLongitude, padding]);
 
   useEffect(() => {
-    pushState();
-  }, [pushState]);
-
-  const onMessage = (event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data) as { type: string; message?: string; coordinates?: {latitude: number; longitude: number} };
-      if (message.type === 'coordinate' && message.coordinates &&
-        Number.isFinite(message.coordinates.latitude) && Math.abs(message.coordinates.latitude) <= 90 &&
-        Number.isFinite(message.coordinates.longitude) && Math.abs(message.coordinates.longitude) <= 180) {
-        props.onCoordinateSelect?.(message.coordinates);
-      }
-      if (message.type === 'initialized') setInitialized(true);
-      if (message.type === 'ready') {
-        setLoadError(null);
-        setReady(true);
-        props.onMapReady?.();
-      }
-      if (message.type === 'error') {
-        setLoadError('Не удалось загрузить карту. Проверьте соединение и попробуйте ещё раз.');
-        props.onMapError?.(message.message ?? 'Карта недоступна');
-      }
-    } catch {
-      props.onMapError?.('Некорректный ответ карты');
+    if (!initialized || !size.width || !size.height || props.selectionCenter) return;
+    if (props.followDriver && following && validMapCoordinate(props.driver)) {
+      camera.current?.easeTo({ center: lngLat(props.driver),
+        zoom: props.followZoom ?? (props.navigationMode ? 16.5 : 15),
+        pitch: props.navigationMode ? 40 : 25,
+        bearing: props.navigationMode ? mapBearing(props.driverHeading) : 0,
+        padding, duration: reducedMotion ? 0 : motion.duration.tracking, easing: 'linear' });
+      fitted.current = '';
+      return;
     }
-  };
+    if (props.followDriver) return;
+    const key = JSON.stringify([scene.fitCoordinates, size, padding, props.followRequestId]);
+    if (key === fitted.current) return;
+    const location = taxiMapFit(scene.fitCoordinates, size.width, size.height, padding);
+    if (location) {
+      fitted.current = key;
+      camera.current?.easeTo({ ...location, padding, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : motion.duration.tracking });
+    }
+  }, [initialized, size, props.selectionCenter, props.followDriver, props.followRequestId, props.driver, props.driverHeading,
+    props.followZoom, props.navigationMode, following, scene.fitCoordinates, padding, reducedMotion]);
 
-  if (!apiKey) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.x6 }}>
-        <Text selectable style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
-          Не настроен ключ Яндекс Карт
-        </Text>
-      </View>
-    );
-  }
+  const driverData = useMemo(() => ({ type: 'FeatureCollection' as const, features: validMapCoordinate(props.driver) ? [{
+    type: 'Feature' as const, properties: { heading: mapBearing(props.driverHeading) },
+    geometry: { type: 'Point' as const, coordinates: lngLat(props.driver) },
+  }] : [] }), [props.driver, props.driverHeading]);
+  const passengerData = useMemo(() => ({ type: 'FeatureCollection' as const, features: validMapCoordinate(props.passenger) ? [{
+    type: 'Feature' as const, properties: {}, geometry: { type: 'Point' as const, coordinates: lngLat(props.passenger) },
+  }] : [] }), [props.passenger]);
 
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.mapFallback }}>
-    {canMountWebView && <WebView
-      key={attempt}
-      ref={webViewRef}
-      source={source}
-      style={{ flex: 1, backgroundColor: colors.mapFallback }}
-      onMessage={onMessage}
-      onLoadEnd={pushState}
-      onError={() => {
-        setReady(false);
-        setLoadError('Не удалось загрузить карту. Проверьте соединение и попробуйте ещё раз.');
+  return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}
+    onLayout={event => { const { width, height } = event.nativeEvent.layout; setSize(current => current.width === width && current.height === height ? current : { width, height }); }}>
+    <MapLibreMap mapStyle={style} style={{ flex: 1 }} attribution logo={false} compass
+      attributionPosition={{ bottom: (props.viewportInsets?.bottom ?? 0) + 8, right: 8 }}
+      compassPosition={{ top: (props.viewportInsets?.top ?? 0) + 8, right: 8 }}
+      onDidFinishLoadingStyle={() => { setInitialized(true); fitted.current = ''; }}
+      onDidFinishRenderingMapFully={() => {
+        setError(null);
+        if (readyRef.current) return;
+        readyRef.current = true; setReady(true); onReady();
       }}
-      onRenderProcessGone={() => {
-        setCanMountWebView(false);
-        setInitialized(false);
-        setReady(false);
-        setLoadError('Карта была закрыта системой. Нажмите «Повторить».');
-      }}
-      originWhitelist={['*']}
-      javaScriptEnabled
-      domStorageEnabled
-      cacheEnabled
-      setSupportMultipleWindows={false}
-      androidLayerType="hardware"
-    />}
-    {(!ready || loadError) && <MapLoadingOverlay error={loadError} slow={slow} onRetry={retry} insets={props.viewportInsets} />}
-    </View>
-  );
+      onDidFailLoadingMap={() => { const message = 'Не удалось загрузить карту. Проверьте соединение и повторите.'; setError(message); onError(message); }}
+      onRegionWillChange={event => { if (event.nativeEvent.userInteraction) setFollowing(false); }}
+      onPress={event => {
+        const [longitude, latitude] = event.nativeEvent.lngLat;
+        if (validMapCoordinate({ latitude, longitude })) props.onCoordinateSelect?.({ latitude, longitude });
+      }}>
+      <Camera ref={camera} initialViewState={initialView} minZoom={5} maxZoom={MAP_MAX_ZOOM} />
+      <GeoJSONSource id="taxi-route" data={scene.route} tolerance={0}>
+        <Layer id="taxi-route-outline" type="line" layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+          paint={{ 'line-color': colors.surface, 'line-width': 10 }} />
+        <Layer id="taxi-route-line" type="line" layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+          paint={{ 'line-color': colors.route, 'line-width': 7 }} />
+      </GeoJSONSource>
+      <GeoJSONSource id="taxi-passenger" data={passengerData}>
+        <Layer id="taxi-passenger-dot" type="circle" paint={{ 'circle-radius': 8, 'circle-color': colors.info,
+          'circle-stroke-width': 3, 'circle-stroke-color': '#FFFFFF' }} />
+      </GeoJSONSource>
+      <Images images={driverImages} />
+      <GeoJSONSource id="taxi-driver" data={driverData}>
+        <Layer id="taxi-driver-icon" type="symbol" layout={{ 'icon-image': 'taxi-driver', 'icon-size': 1 / 3,
+          'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotate': ['get', 'heading'],
+          'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'viewport' }} />
+      </GeoJSONSource>
+      {scene.points.map(point => <Marker key={point.id} id={point.id} lngLat={point.coordinates} anchor="bottom" offset={[0, 8]}>
+        <View collapsable={false} pointerEvents="none" style={{ alignItems: 'center' }} accessibilityLabel={point.label}>
+          <Text numberOfLines={1} style={{ maxWidth: 200, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
+            fontSize: 14, fontWeight: '600', color: point.kind === 'destination' ? colors.surface : colors.ink,
+            backgroundColor: point.kind === 'pickup' ? colors.brand : point.kind === 'destination' ? colors.ink : colors.surface }}>{point.label}</Text>
+          <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#FFFFFF',
+            backgroundColor: point.kind === 'pickup' ? colors.brand : point.kind === 'stop' ? colors.surface : colors.ink }} />
+        </View>
+      </Marker>)}
+    </MapLibreMap>
+    {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} onRetry={props.retry} insets={props.viewportInsets} />}
+  </View>;
+});
+
+export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
+  const focused = useIsFocused();
+  const [attempt, setAttempt] = useState(0);
+  return focused ? <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} /> : null;
 });

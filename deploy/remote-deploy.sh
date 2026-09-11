@@ -135,6 +135,8 @@ echo 'Installing API dependencies'
 npm ci --omit=dev --prefix server --no-audit --no-fund
 echo 'Running database migrations'
 ./server/node_modules/.bin/tsx server/scripts/migrate.ts
+echo 'Importing district house addresses'
+./server/node_modules/.bin/tsx server/scripts/import-address-directory.ts
 if [[ -f "$DEPLOY_PATH/incoming/gateway-project.json" ]]; then
   ./server/node_modules/.bin/tsx server/scripts/import-gateway-settings.ts \
     "$DEPLOY_PATH/incoming/gateway-project.json" 'https://api.taxigr.ru'

@@ -1,92 +1,66 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pickupAddressAtCoordinates, resolvePickupAddress } from '../src/api/pickup-address';
 import { isPickupAddressComplete } from '../src/domain/address-precision';
 
 const coordinates = { latitude: 56.0477, longitude: 51.9586 };
-const result = (kind = 'house') => ({
-  GeoObject: {
-    name: kind === 'house' ? 'улица Ачинцева, 5' : 'улица Ачинцева',
-    Point: { pos: '51.9590 56.0480' },
-    metaDataProperty: { GeocoderMetaData: {
-      kind,
-      text: 'Россия, Удмуртская Республика, Граховский район, село Грахово, улица Ачинцева',
-      Address: { Components: [
-        { kind: 'country', name: 'Россия' },
-        { kind: 'locality', name: 'село Грахово' },
-        { kind: 'street', name: 'улица Ачинцева' },
-        ...(kind === 'house' ? [{ kind: 'house', name: '5' }] : []),
-      ] },
-    } },
-  },
-});
-const mockResponse = (members = [result()]) => {
-  const fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ response: { GeoObjectCollection: { featureMember: members } } }),
-  });
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
+const result = { id: 'osm-house', label: 'улица Ачинцева, 5', houseNumber: '5', details: 'село Грахово',
+  kind: 'house', coordinates: { latitude: 56.048, longitude: 51.959 } };
+const mockResponse = (data: unknown = [result]) => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) });
+  vi.stubGlobal('fetch', fetch); return fetch;
 };
-
+beforeEach(() => vi.stubGlobal('window', { location: { hostname: 'localhost' } }));
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-describe('pickup address from device location', () => {
-  it('reverse-geocodes longitude/latitude into a concrete street and house', async () => {
+describe('pickup address without a map-provider key', () => {
+  it('reverse-geocodes on our API while retaining the exact GPS position', async () => {
     const fetch = mockResponse();
-    const address = await resolvePickupAddress(coordinates, { apiKey: 'test-key' });
-    expect(address).toMatchObject({ label: 'село Грахово, улица Ачинцева, 5', houseNumber: '5' });
-    expect(new URL(fetch.mock.calls[0]![0]).searchParams.get('geocode')).toBe('51.9586,56.0477');
-    expect(address?.coordinates).toEqual(coordinates);
+    const address = await resolvePickupAddress(coordinates, { token: 'session-token' });
+    const url = new URL(fetch.mock.calls[0]![0]);
+    expect(url.origin).toBe('http://localhost:4100');
+    expect(url.pathname).toBe('/v1/addresses/search');
+    expect(url.searchParams.get('query')).toBe('51.9586,56.0477');
+    expect(fetch.mock.calls[0]![1].headers.Authorization).toBe('Bearer session-token');
+    expect(address).toMatchObject({ label: result.label, houseNumber: '5', coordinates });
     expect(isPickupAddressComplete(address)).toBe(true);
   });
-
-  it('keeps the GPS pickup point and the known street when no house number exists', async () => {
-    mockResponse([result('street')]);
-    const address = await resolvePickupAddress(coordinates, { apiKey: 'test-key' });
-    expect(address?.label).toBe('село Грахово, улица Ачинцева');
-    expect(address?.houseNumber).toBeUndefined();
+  it('uses the local preview endpoint without transmitting a demo token', async () => {
+    const fetch = mockResponse([{ ...result, houseNumber: undefined, label: 'улица Ачинцева' }]);
+    const address = await resolvePickupAddress(coordinates, { token: 'demo:passenger' });
+    expect(new URL(fetch.mock.calls[0]![0]).pathname).toBe('/v1/addresses/preview');
+    expect(fetch.mock.calls[0]![1].headers.Authorization).toBeUndefined();
     expect(address?.coordinates).toEqual(coordinates);
-    expect(isPickupAddressComplete(address)).toBe(true);
   });
-
-  it('uses a backend street address without replacing GPS with the street centre', () => {
-    const address = pickupAddressAtCoordinates({
-      label: 'улица Ачинцева', details: 'село Грахово, Граховский район',
-    }, coordinates);
-    expect(address?.label).toBe('улица Ачинцева');
-    expect(address?.coordinates).toEqual(coordinates);
-    expect(address?.details).toContain('Граховский район');
-    expect(address?.id).toMatch(/^location:/);
-    expect(isPickupAddressComplete(address)).toBe(true);
-  });
-
-  it('does not treat a missing address or generic location label as a resolved address', async () => {
+  it('rejects empty, generic and invalid GPS addresses', async () => {
     mockResponse([]);
-    await expect(resolvePickupAddress(coordinates, { apiKey: 'test-key' })).resolves.toBeNull();
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
     expect(pickupAddressAtCoordinates({ label: 'Моё местоположение' }, coordinates)).toBeNull();
-    expect(pickupAddressAtCoordinates({ label: '  ' }, coordinates)).toBeNull();
+    expect(pickupAddressAtCoordinates({ label: ' ' }, coordinates)).toBeNull();
+    expect(pickupAddressAtCoordinates(result, { latitude: NaN, longitude: 52 })).toBeNull();
   });
-
-  it('allows backend fallback when the geocoder is not configured or is unavailable', async () => {
+  it('does not send a request without a session or after cancellation', async () => {
     const fetch = mockResponse();
     await expect(resolvePickupAddress(coordinates, {})).resolves.toBeNull();
+    const abort = new AbortController(); abort.abort();
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger', signal: abort.signal })).resolves.toBeNull();
     expect(fetch).not.toHaveBeenCalled();
-    fetch.mockResolvedValue({ ok: false });
-    await expect(resolvePickupAddress(coordinates, { apiKey: 'test-key' })).resolves.toBeNull();
   });
-
-  it('cancels a lookup after leaving the screen and bounds network waiting', async () => {
+  it('returns control to manual address selection after server errors', async () => {
+    const fetch = mockResponse();
+    fetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({}) });
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
+    mockResponse({ unexpected: true });
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
+  });
+  it('cancels when leaving the screen and limits the request to five seconds', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('fetch', vi.fn((_url, { signal }) => new Promise((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(new Error('Aborted')));
     })));
     const controller = new AbortController();
-    const request = resolvePickupAddress(coordinates, { apiKey: 'test-key', signal: controller.signal });
-    controller.abort();
-    await expect(request).resolves.toBeNull();
-    const timeout = resolvePickupAddress(coordinates, { apiKey: 'test-key' });
-    await vi.advanceTimersByTimeAsync(5000);
-    await expect(timeout).resolves.toBeNull();
+    const request = resolvePickupAddress(coordinates, { token: 'demo:passenger', signal: controller.signal });
+    controller.abort(); await expect(request).resolves.toBeNull();
+    const timeout = resolvePickupAddress(coordinates, { token: 'demo:passenger' });
+    await vi.advanceTimersByTimeAsync(5000); await expect(timeout).resolves.toBeNull();
   });
 });

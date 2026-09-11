@@ -19,7 +19,6 @@ import { IconButton } from '@/components/ui/icon-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
 import { headingBetweenCoordinates } from '@/domain/route-tracking';
-import type { Coordinates } from '@/domain/models';
 import {
   formatRoutePointCount,
   formatMultiStopRouteAddresses,
@@ -39,7 +38,6 @@ import { ensureForegroundLocationPermission } from '@/location/foreground-locati
 import { useRide } from '@/state/ride-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatMoney } from '@/utils/format';
-import { openYandexNavigatorRoute } from '@/utils/open-yandex-navigator';
 import { useThemeColors } from '@/theme/theme-provider';
 import { UserAvatar } from '@/components/user-avatar';
 
@@ -48,17 +46,15 @@ function DriverOrderCard({
   remainingDistanceMeters,
   remainingDurationSeconds,
   navigationLoading,
-  navigationOrigin,
+  onNavigate,
 }: {
   demo: boolean;
   remainingDistanceMeters?: number;
   remainingDurationSeconds?: number;
   navigationLoading: boolean;
-  navigationOrigin?: Coordinates | null;
+  onNavigate: () => void;
 }) {
   const colors = useThemeColors();
-  const [navigatorBusy, setNavigatorBusy] = useState(false);
-  const [navigatorMessage, setNavigatorMessage] = useState<string | null>(null);
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
@@ -208,10 +204,6 @@ function DriverOrderCard({
             1,
             Math.round(currentRide.durationSeconds / 60),
           )} мин`;
-  const navigatorTargets =
-    routeTarget === 'pickup'
-      ? [currentRide.passengerCoordinates ?? currentRide.pickup.coordinates]
-      : rideDestinations.slice(nextDestinationIndex).map((destination) => destination.coordinates);
   const passengerPhone = currentRide.passenger?.phone;
   const paymentLabel =
     currentRide.paymentMethod === 'direct'
@@ -219,31 +211,6 @@ function DriverOrderCard({
       : currentRide.paymentMethod === 'transfer'
       ? 'Перевод водителю'
       : 'Оплата наличными';
-
-  const openNavigator = async () => {
-    setNavigatorBusy(true);
-    setNavigatorMessage(null);
-
-    try {
-      const result = await openYandexNavigatorRoute(
-        navigatorTargets,
-        navigationOrigin ?? currentRide.driver?.coordinates,
-      );
-      if (result === 'store') {
-        setNavigatorMessage(
-          'Яндекс Навигатор не установлен — открыли страницу установки.',
-        );
-      } else if (result === 'maps') {
-        setNavigatorMessage('Маршрут открыт в Яндекс Картах.');
-      }
-    } catch {
-      setNavigatorMessage(
-        'Не удалось открыть Яндекс Навигатор. Проверьте настройки устройства.',
-      );
-    } finally {
-      setNavigatorBusy(false);
-    }
-  };
 
   const requestCurrentRideRelease = () => {
     setReleaseOrderId(currentRide.id);
@@ -450,30 +417,20 @@ function DriverOrderCard({
                 variant="secondary"
                 compact
                 fullWidth={false}
-                loading={navigatorBusy}
                 accessibilityLabel={
                   routeTarget === 'pickup'
-                    ? 'Открыть маршрут к пассажиру в Яндекс Навигаторе'
-                    : 'Открыть маршрут до места назначения в Яндекс Навигаторе'
+                    ? 'Показать маршрут к пассажиру на карте'
+                    : 'Показать маршрут до места назначения на карте'
                 }
                 icon={<AppIcon name="location" size={20} color={colors.ink} />}
                 style={{ flex: 1, minWidth: 0 }}
-                onPress={() => void openNavigator()}
+                onPress={onNavigate}
               >
                 Маршрут
               </AppButton>
             )}
           </View>
         )}
-      {!!navigatorMessage && (
-        <Text
-          accessibilityRole="alert"
-          selectable
-          style={{ ...typography.caption, color: colors.inkSecondary }}
-        >
-          {navigatorMessage}
-        </Text>
-      )}
       {nextDriverRide ? (
         <View
           style={{
@@ -765,6 +722,7 @@ export function DriverHomeScreen() {
   const [online, setOnline] = useState<boolean | null>(demo ? true : null);
   const statusRequestRef = useRef(0);
   const [mapVisible, setMapVisible] = useState(false);
+  const [mapFollowRequestId, setMapFollowRequestId] = useState(0);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone } = useResponsiveLayout();
   const { driverRide: currentRide, refresh } = useRide();
@@ -894,7 +852,7 @@ export function DriverHomeScreen() {
           remainingDistanceMeters={navigation.summary?.distanceMeters}
           remainingDurationSeconds={navigation.summary?.durationSeconds}
           navigationLoading={navigation.loading}
-          navigationOrigin={driverCoordinates}
+          onNavigate={() => { setMapVisible(true); setMapFollowRequestId(value => value + 1); }}
         />
       ) : (
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -940,6 +898,8 @@ export function DriverHomeScreen() {
           passenger={currentRide?.passengerCoordinates}
           followDriver={navigation.active || !currentRide}
           navigationMode={navigation.active}
+          followRequestId={mapFollowRequestId}
+          trimCompletedRoute={navigation.active}
         />
       </View>}
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}

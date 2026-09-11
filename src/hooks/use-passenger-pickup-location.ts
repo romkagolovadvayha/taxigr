@@ -1,13 +1,9 @@
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Platform } from 'react-native';
 
-import { apiRequest } from '@/api/client';
-import { pickupAddressAtCoordinates, resolvePickupAddress } from '@/api/pickup-address';
+import { resolvePickupAddress } from '@/api/pickup-address';
 import { useSession } from '@/auth/session-provider';
-import { hasHouseNumber } from '@/domain/address-precision';
-import type { Address } from '@/domain/models';
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
 
@@ -50,23 +46,10 @@ export function usePassengerPickupLocation() {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
-      let address = await resolvePickupAddress(coordinates, {
-        apiKey: process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY,
+      const address = await resolvePickupAddress(coordinates, {
+        token,
         signal: controller.signal,
-        referer: Platform.OS === 'web' ? undefined : 'https://taxigr.ru/',
       });
-      if (controller.signal.aborted) return null;
-      if (!address) {
-        const demoSession = token.startsWith('demo:');
-        const endpoint = demoSession ? '/v1/addresses/preview' : '/v1/addresses/search';
-        const found = await apiRequest<Address[]>(
-          `${endpoint}?query=${encodeURIComponent(`${coordinates.longitude},${coordinates.latitude}`)}`,
-          { token: demoSession ? undefined : token, signal: controller.signal, timeoutMs: 5_000 },
-        ).catch(() => []);
-        const candidates = Array.isArray(found) ? found : [];
-        const nearest = candidates.find(hasHouseNumber) ?? candidates.find((item) => item.label?.trim());
-        if (nearest) address = pickupAddressAtCoordinates(nearest, coordinates);
-      }
       if (controller.signal.aborted) return null;
       if (!address) {
         setLocationError('Геопозиция определена, но адрес найти не удалось. Выберите адрес вручную.');

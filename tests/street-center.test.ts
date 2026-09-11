@@ -1,78 +1,51 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveStreetCenter } from '../src/api/street-center';
 import type { Address } from '../src/domain/models';
 
-const street: Address = {
-  id: 'gar:kokshan-novaya',
-  label: 'д. Кокшан, ул. Новая',
-  kind: 'street',
-  coordinates: { latitude: 56.1113066, longitude: 52.125052 },
-};
-const result = (kind = 'street', text = 'деревня Кокшан, Новая улица', pos = '52.125607 56.115589') => ({
-  GeoObject: { Point: { pos }, metaDataProperty: { GeocoderMetaData: { kind, text } } },
-});
-const mockResponse = (members = [result()]) => {
-  const fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ response: { GeoObjectCollection: { featureMember: members } } }),
-  });
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
-};
+const street: Address = { id: 'gar:kokshan-novaya', label: 'д. Кокшан, ул. Новая', kind: 'street',
+  coordinates: { latitude: 56.1113066, longitude: 52.125052 } };
+const result: Address = { id: 'osm-street', label: 'Новая улица', details: 'деревня Кокшан', kind: 'street',
+  coordinates: { latitude: 56.115589, longitude: 52.125607 } };
+function mockResponse(data: unknown = [result]) {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) }); vi.stubGlobal('fetch', fetch); return fetch;
+}
+beforeEach(() => vi.stubGlobal('window', { location: { hostname: 'localhost' } }));
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
-});
-
-describe('street center for house point selection', () => {
-  it('finds the selected street inside the selected settlement', async () => {
+describe('street center for map point selection', () => {
+  it('requests actual street geometry through our authenticated API', async () => {
     const fetch = mockResponse();
-    await expect(resolveStreetCenter(street, { apiKey: 'test-key' })).resolves.toEqual({
-      latitude: 56.115589, longitude: 52.125607,
-    });
+    await expect(resolveStreetCenter(street, { token: 'session-token' })).resolves.toEqual(result.coordinates);
     const url = new URL(fetch.mock.calls[0]![0]);
-    expect(url.searchParams.get('geocode')).toBe(street.label);
-    expect(url.searchParams.get('ll')).toBe('52.125052,56.1113066');
-    expect(url.searchParams.get('rspn')).toBe('1');
+    expect(url.pathname).toBe('/v1/addresses/search');
+    expect(url.searchParams.get('query')).toBe(street.label);
+    expect(url.searchParams.get('kind')).toBe('street');
   });
-
-  it('does not mistake a settlement or a different town/street for the requested street', async () => {
+  it('rejects a settlement, a different street and an identically named faraway settlement', async () => {
     mockResponse([
-      result('locality'),
-      result('street', 'деревня Каменное, Новая улица'),
-      result('street', 'деревня Кокшан, Грузлевская улица'),
+      { ...result, kind: 'settlement' },
+      { ...result, details: 'деревня Каменное' },
+      { ...result, label: 'Грузлевская улица' },
+      { ...result, coordinates: { latitude: 59, longitude: 55 } },
     ]);
-    await expect(resolveStreetCenter(street, { apiKey: 'test-key' })).resolves.toBeNull();
+    await expect(resolveStreetCenter(street, { token: 'demo:passenger' })).resolves.toBeNull();
   });
-
-  it('ignores malformed coordinates and uses a valid street result', async () => {
-    mockResponse([result('street', undefined, 'NaN 56'), result('street', undefined, '52 99'), result()]);
-    await expect(resolveStreetCenter(street, { apiKey: 'test-key' })).resolves.toEqual({
-      latitude: 56.115589, longitude: 52.125607,
-    });
+  it('skips malformed coordinates', async () => {
+    mockResponse([{ ...result, coordinates: { latitude: NaN, longitude: 52 } }, { ...result, coordinates: { latitude: 99, longitude: 52 } }, result]);
+    await expect(resolveStreetCenter(street, { token: 'demo:passenger' })).resolves.toEqual(result.coordinates);
   });
-
-  it('keeps the existing anchor available when the key is missing or the service fails', async () => {
+  it('keeps the current anchor usable when the service is unavailable', async () => {
     const fetch = mockResponse();
-    await expect(resolveStreetCenter(street, {})).resolves.toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
-    fetch.mockResolvedValue({ ok: false });
-    await expect(resolveStreetCenter(street, { apiKey: 'test-key' })).resolves.toBeNull();
+    await expect(resolveStreetCenter(street, {})).resolves.toBeNull(); expect(fetch).not.toHaveBeenCalled();
+    fetch.mockRejectedValue(new Error('offline'));
+    await expect(resolveStreetCenter(street, { token: 'demo:passenger' })).resolves.toBeNull();
   });
-
-  it('cancels lookup when leaving the point picker and bounds the wait to five seconds', async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal('fetch', vi.fn((_url, { signal }: RequestInit) => new Promise((_resolve, reject) => {
-      signal?.addEventListener('abort', () => reject(new Error('Aborted')));
+  it('aborts a pending lookup and does not overwrite a newly selected point', async () => {
+    vi.stubGlobal('fetch', vi.fn((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('Aborted')));
     })));
     const controller = new AbortController();
-    const canceled = resolveStreetCenter(street, { apiKey: 'test-key', signal: controller.signal });
-    controller.abort();
-    await expect(canceled).resolves.toBeNull();
-    const timedOut = resolveStreetCenter(street, { apiKey: 'test-key' });
-    await vi.advanceTimersByTimeAsync(5_000);
-    await expect(timedOut).resolves.toBeNull();
+    const request = resolveStreetCenter(street, { token: 'demo:passenger', signal: controller.signal });
+    controller.abort(); await expect(request).resolves.toBeNull();
   });
 });

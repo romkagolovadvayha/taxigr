@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { smoothRouteCoordinates } from '../src/components/map/route-geometry';
 import { normalizeRouteStops } from '../src/domain/route-stops';
-import { buildYandexNavigatorRouteUrl } from '../src/domain/yandex-navigation';
+import { taxiMapScene } from '../src/components/map/map-scene';
 import { formatRouteLabel } from '../src/domain/route-label';
 import type { Address } from '../src/domain/models';
 
@@ -24,7 +24,7 @@ describe('route operations in browsers without Array.prototype.at', () => {
           emptyStops: normalizeRouteStops(null, []),
           route: smoothRouteCoordinates([a.coordinates, b.coordinates, c.coordinates]),
           emptyRoute: smoothRouteCoordinates([]),
-          navigation: buildYandexNavigatorRouteUrl([b.coordinates, c.coordinates], a.coordinates),
+          navigation: taxiMapScene({ pickup: a, destinations: [b, c], routeCoordinates: [a.coordinates, b.coordinates, c.coordinates] }),
           label: formatRouteLabel({ label: 'с. Грахово, ул. Юбилейная, 5' }, { label: 'с. Грахово, ул. Ачинцева, 2а' }),
         };
       } finally {
@@ -40,7 +40,7 @@ describe('route operations in browsers without Array.prototype.at', () => {
     expect(result.route[result.route.length - 1]).toEqual(c.coordinates);
     expect(result.emptyRoute).toEqual([]);
     expect(result.label).toBe('ул. Юбилейная, 5 → ул. Ачинцева, 2а');
-    expect(result.navigation).toContain('lat_to=56.0477&lon_to=51.9582');
-    expect(result.navigation).toContain('lat_via_0=56.0475&lon_via_0=51.9582');
+    expect(result.navigation.points[2]?.coordinates).toEqual([51.9582, 56.0477]);
+    expect(result.navigation.points[1]?.coordinates).toEqual([51.9582, 56.0475]);
   });
 });
