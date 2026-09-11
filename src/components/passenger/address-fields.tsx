@@ -135,22 +135,6 @@ function AddressRow({
 
   return (
     <Animated.View style={[{ position: 'relative' }, shakeStyle]}>
-      {invalid && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 2,
-            bottom: 2,
-            left: -spacing.x2,
-            right: -spacing.x2,
-            borderRadius: radius.sm,
-            borderWidth: 1,
-            borderColor: colors.danger,
-            backgroundColor: colors.dangerSoft,
-          }}
-        />
-      )}
       <AnimatedPressable
         feedback="subtle"
         accessibilityRole="button"
