@@ -195,56 +195,50 @@ export const opacity = {
   visible: 1,
 } as const;
 
+// Use static faces: the variable font defaults to ExtraLight, and native font
+// loading does not reliably apply its weight axis. Avoid synthetic font weights.
 export const typography = {
   display: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 40,
     lineHeight: 44,
-    fontWeight: '600',
     letterSpacing: -1.2,
   },
   pageTitle: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: '600',
     letterSpacing: -0.6,
   },
   sectionTitle: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 20,
     lineHeight: 26,
-    fontWeight: '600',
   },
   bodyStrong: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 17,
     lineHeight: 22,
-    fontWeight: '600',
   },
   body: {
     fontFamily: 'Manrope',
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: '400',
   },
   caption: {
     fontFamily: 'Manrope',
     fontSize: 13,
     lineHeight: 17,
-    fontWeight: '500',
   },
   micro: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: '600',
   },
   money: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Manrope-SemiBold',
     fontSize: 24,
     lineHeight: 28,
-    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
 } satisfies Record<string, TextStyle>;

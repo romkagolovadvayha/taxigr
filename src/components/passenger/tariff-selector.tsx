@@ -60,7 +60,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
           {tariff.title}
         </Text>
         {loading ? <SkeletonBlock width={inline ? '100%' : 84} height={17} /> : (
-          <Text selectable style={{ ...typography.caption, fontSize: compact ? 11 : 13, lineHeight: compact ? 15 : 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
+          <Text selectable style={{ ...typography.caption, fontSize: compact ? 12 : 13, lineHeight: 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
             {tariff.code === 'child'
               ? estimateAvailable ? `С креслом · ~ ${tariff.etaMinutes} мин` : 'С креслом'
               : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}

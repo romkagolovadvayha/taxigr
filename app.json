@@ -58,7 +58,8 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/Manrope.ttf"
+            "./assets/fonts/Manrope-Medium.ttf",
+            "./assets/fonts/Manrope-SemiBold.ttf"
           ]
         }
       ],

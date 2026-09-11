@@ -1,5 +1,6 @@
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +25,7 @@ import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-locatio
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-tracking';
 import { useScreenClock } from '@/hooks/use-screen-clock';
+import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { useRide } from '@/state/ride-provider';
 import { spacing, typography } from '@/theme/tokens';
 import { formatEstimatedArrivalTime } from '@/utils/format';
@@ -31,7 +33,12 @@ import { useThemeColors } from '@/theme/theme-provider';
 
 const mapInsets = { top: 44, bottom: 60, left: 28, right: 28 };
 
-function BookingPanel({ pickupEtaMinutes, section = 'content' }: { pickupEtaMinutes?: number | null; section?: 'content' | 'action' }) {
+function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt, onInvalidRoute }: {
+  pickupEtaMinutes?: number | null;
+  section?: 'content' | 'action';
+  validationAttempt: number;
+  onInvalidRoute: () => void;
+}) {
   const colors = useThemeColors();
   const {
     pickup,
@@ -63,11 +70,11 @@ function BookingPanel({ pickupEtaMinutes, section = 'content' }: { pickupEtaMinu
     return <BookingSubmitButton
       priceMinor={selected.priceMinor}
       etaMinutes={selected.etaMinutes}
-      disabled={!routeIsPrecise}
       loading={quotePending}
       estimateAvailable={quoteReady}
       canRetry={routeIsPrecise && quoteStatus === 'error'}
       onPress={() => {
+        if (!routeIsPrecise) { onInvalidRoute(); return; }
         if (quoteReady) { router.push('/order-confirmation'); return; }
         void requestQuote();
       }}
@@ -100,6 +107,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content' }: { pickupEtaMinu
         pickup={pickup}
         destinations={destinations}
         destination={destination}
+        validationAttempt={validationAttempt}
         compact
         hideAddDestination
       />
@@ -124,6 +132,16 @@ export function OrderScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { isPhone, isDesktop } = useResponsiveLayout();
+  const { vibrationEnabled } = useFeedbackPreferences();
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  const bookingScrollRef = useRef<ScrollView>(null);
+  const handleInvalidRoute = () => {
+    setValidationAttempt((attempt) => attempt + 1);
+    bookingScrollRef.current?.scrollTo({ y: 0, animated: false });
+    if (vibrationEnabled) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    }
+  };
   const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
@@ -248,12 +266,12 @@ export function OrderScreen() {
         <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1, flexBasis: isPhone ? 'auto' : 0,
           width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, maxHeight: isPhone ? '72%' : undefined, backgroundColor: colors.surface }}
         >
-        <ScrollView style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
+        <ScrollView ref={bookingScrollRef} style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
           contentContainerStyle={{ padding: spacing.x4, paddingTop: spacing.x5, paddingBottom: currentRide ? spacing.x4 : spacing.x2 }}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} />
+          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
         </ScrollView>
-        {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" /></View>}
+        {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} /></View>}
         </View>
       </View>
     </PassengerWorkspace>

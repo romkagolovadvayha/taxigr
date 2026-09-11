@@ -1,5 +1,14 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
@@ -24,6 +33,7 @@ type Props = {
   compact?: boolean;
   reducedActions?: boolean;
   hideAddDestination?: boolean;
+  validationAttempt?: number;
 };
 
 const addressActionSizing = componentSizing.addressFieldAction;
@@ -74,6 +84,7 @@ function AddressRow({
   destinations,
   onAddDestination,
   reducedActions,
+  validationAttempt,
 }: {
   kind: 'pickup' | 'destination';
   label: string;
@@ -84,6 +95,7 @@ function AddressRow({
   destinations?: Address[];
   onAddDestination?: () => void;
   reducedActions: boolean;
+  validationAttempt: number;
 }) {
   const colors = useThemeColors();
   const compactLocationAction = kind === 'pickup' && compact && !!onUseLocation;
@@ -98,8 +110,47 @@ function AddressRow({
           ? !isPickupAddressComplete(address)
           : !isDestinationAddressComplete(address)
       );
+  const invalid = validationAttempt > 0 && (!address || !!needsAddressDetails);
+  const shake = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    cancelAnimation(shake);
+    shake.value = 0;
+    if (invalid && !reduceMotion) {
+      shake.value = withSequence(
+        withTiming(-6, { duration: 50 }),
+        withTiming(6, { duration: 70 }),
+        withTiming(-5, { duration: 70 }),
+        withTiming(5, { duration: 70 }),
+        withTiming(0, { duration: 70 }),
+      );
+    }
+    return () => cancelAnimation(shake);
+  }, [invalid, reduceMotion, shake, validationAttempt]);
+
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shake.value }],
+  }));
+
   return (
-    <View style={{ position: 'relative' }}>
+    <Animated.View style={[{ position: 'relative' }, shakeStyle]}>
+      {invalid && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 2,
+            bottom: 2,
+            left: -spacing.x2,
+            right: -spacing.x2,
+            borderRadius: radius.sm,
+            borderWidth: 1,
+            borderColor: colors.danger,
+            backgroundColor: colors.dangerSoft,
+          }}
+        />
+      )}
       <AnimatedPressable
         feedback="subtle"
         accessibilityRole="button"
@@ -109,7 +160,7 @@ function AddressRow({
                 .map((item, index) => `${routeDestinationTitle(index, routeDestinations.length)}: ${item.label}`)
                 .join('; ')}`
             : `${label}: ${address?.label ?? (kind === 'pickup' ? 'Где вы?' : 'не указано')}`
-        }${needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
+        }${invalid ? ', укажите точный адрес' : needsAddressDetails ? ', требуется уточнить адрес' : ''}`}
         onPress={() => {
           if (kind === 'destination' && address) {
             router.push('/stops' as never);
@@ -138,13 +189,13 @@ function AddressRow({
               marginHorizontal: 4,
               borderRadius: kind === 'pickup' ? 999 : 3,
               borderWidth: kind === 'pickup' ? 2 : 0,
-              borderColor: colors.brand,
-              backgroundColor: kind === 'pickup' ? colors.transparent : colors.brand,
+              borderColor: invalid ? colors.danger : colors.brand,
+              backgroundColor: kind === 'pickup' ? colors.transparent : invalid ? colors.danger : colors.brand,
             }}
           />
         )}
         <View style={{ flex: 1 }}>
-          <Text selectable style={{ ...typography.micro, fontSize: 10, color: colors.inkSecondary }}>
+          <Text selectable style={{ ...typography.micro, fontSize: 11, color: invalid ? colors.dangerText : colors.inkSecondary }}>
             {multipleDestinations
               ? `Маршрут · ${formatRoutePointCount(routeDestinations.length)}`
               : label}
@@ -203,7 +254,7 @@ function AddressRow({
             <Text
               selectable
               numberOfLines={1}
-              style={{ ...typography.body, fontSize: compact ? 14 : 16, fontWeight: '500', color: address ? colors.ink : colors.inkSecondary }}
+              style={{ ...typography.bodyStrong, fontSize: compact ? 15 : 16, color: invalid ? colors.dangerText : colors.ink }}
             >
               {address?.label ??
                 (kind === 'pickup'
@@ -213,9 +264,9 @@ function AddressRow({
                   : 'Куда поедем?')}
             </Text>
           )}
-          {needsAddressDetails && (
-            <Text selectable style={{ ...typography.micro, color: colors.warningText }}>
-              Уточните адрес
+          {(invalid || needsAddressDetails) && (
+            <Text accessibilityRole={invalid ? 'alert' : undefined} selectable style={{ ...typography.micro, color: invalid ? colors.dangerText : colors.warningText }}>
+              {address ? 'Уточните адрес' : kind === 'pickup' ? 'Укажите, откуда вас забрать' : 'Укажите, куда поедем'}
             </Text>
           )}
         </View>
@@ -281,7 +332,7 @@ function AddressRow({
           />
         </AnimatedPressable>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -294,6 +345,7 @@ export function AddressFields({
   compact = false,
   reducedActions = false,
   hideAddDestination = false,
+  validationAttempt = 0,
 }: Props) {
   const colors = useThemeColors();
   return (
@@ -306,6 +358,7 @@ export function AddressFields({
         onUseLocation={onUseLocation}
         locationLoading={locationLoading}
         reducedActions={reducedActions}
+        validationAttempt={validationAttempt}
       />
       {!!onUseLocation && !compact && (
         <AnimatedPressable
@@ -343,6 +396,7 @@ export function AddressFields({
             : undefined
         }
         reducedActions={reducedActions}
+        validationAttempt={validationAttempt}
       />
     </View>
   );

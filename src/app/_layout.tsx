@@ -74,7 +74,8 @@ function RootNavigator() {
   const pathname = usePathname();
   const { dark, ready: themeReady } = useAppTheme();
   const [fontsLoaded, fontError] = useFonts({
-    Manrope: { uri: require('../../assets/fonts/Manrope.ttf'), display: FontDisplay.SWAP },
+    Manrope: { uri: require('../../assets/fonts/Manrope-Medium.ttf'), display: FontDisplay.SWAP },
+    'Manrope-SemiBold': { uri: require('../../assets/fonts/Manrope-SemiBold.ttf'), display: FontDisplay.SWAP },
   });
   // Native builds embed this font. A web font request must not hold the app
   // behind the splash on a cold or slow connection; text uses a fallback.

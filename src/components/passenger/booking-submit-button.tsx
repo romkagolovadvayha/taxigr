@@ -25,7 +25,7 @@ export function BookingSubmitButton({
   loading = false,
   estimateAvailable,
   canRetry = false,
-  label = 'Продолжить',
+  label = 'Заказать такси',
   loadingLabel = 'Рассчитываем…',
   accessibilityLabel,
   onPress,
@@ -43,7 +43,7 @@ export function BookingSubmitButton({
             ? `Перейти к подтверждению заказа за ${priceMinor / 100} рублей, подача около ${etaMinutes} минут`
             : canRetry
               ? 'Повторить расчёт стоимости поездки'
-              : 'Укажите маршрут, чтобы рассчитать стоимость поездки')
+              : `${label}, укажите адреса отправления и назначения`)
       }
       aria-disabled={unavailable}
       aria-busy={loading}
@@ -84,7 +84,7 @@ export function BookingSubmitButton({
             ? loadingLabel
             : estimateAvailable
               ? `${label} · ${formatMoney(priceMinor)}`
-              : canRetry ? 'Повторить расчёт' : 'Укажите маршрут'}
+              : canRetry ? 'Повторить расчёт' : label}
         </Text>
       </View>
     </AnimatedPressable>
