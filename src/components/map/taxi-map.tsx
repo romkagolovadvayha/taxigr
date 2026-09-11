@@ -31,8 +31,10 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const fitted = useRef('');
   const scene = useMapScene(props);
   const style = useMemo(() => JSON.stringify(taxiMapStyle(colors, colorScheme)), [colors, colorScheme]);
-  const padding = useMemo(() => taxiMapPadding(size.width, size.height, props.viewportInsets, scene.points.length > 0),
-    [size, props.viewportInsets, scene.points.length]);
+  // Adding the first selection pin must not change padding and reset a panned camera.
+  const hasCallouts = !props.selectionCenter && scene.points.length > 0;
+  const padding = useMemo(() => taxiMapPadding(size.width, size.height, props.viewportInsets, hasCallouts),
+    [size, props.viewportInsets, hasCallouts]);
   const onReady = useEffectEvent(() => props.onMapReady?.());
   const onError = useEffectEvent((message: string) => props.onMapError?.(message));
   const [initialView] = useState(() => ({
@@ -92,7 +94,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}
     onLayout={event => { const { width, height } = event.nativeEvent.layout; setSize(current => current.width === width && current.height === height ? current : { width, height }); }}>
-    <MapLibreMap mapStyle={style} style={{ flex: 1 }} attribution logo={false} compass
+    <MapLibreMap mapStyle={style} style={{ flex: 1 }} attribution logo={false} compass dragPan touchZoom
       attributionPosition={{ bottom: (props.viewportInsets?.bottom ?? 0) + 8, right: 8 }}
       compassPosition={{ top: (props.viewportInsets?.top ?? 0) + 8, right: 8 }}
       onDidFinishLoadingStyle={() => { setInitialized(true); fitted.current = ''; }}

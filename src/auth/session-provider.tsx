@@ -31,6 +31,8 @@ export type TelegramAuthChallenge = MaxAuthChallenge & {
 
 export type VkAuthChallenge = Omit<MaxAuthChallenge, 'botUrl'> & {
   authorizationUrl: string;
+  appUrl?: string;
+  nativeLoginCode?: string;
   communityUrl: string;
 };
 
@@ -352,7 +354,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const installationId = await getInstallationId();
         return await apiRequest<VkAuthChallenge>('/v1/auth/vk/start', {
           method: 'POST',
-          body: JSON.stringify({ phone, legalAcceptance, installationId }),
+          body: JSON.stringify({ phone, legalAcceptance, installationId, platform: Platform.OS }),
         });
       } catch (error) {
         const message = error instanceof ApiError

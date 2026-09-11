@@ -53,6 +53,8 @@ import {
   type UserRole,
 } from '../src/domain/models';
 import { formatRetryAfter } from '../src/utils/format';
+import { vkNativeLoginCode, vkNativeLoginUrl } from '../src/vk-mini-app/native-login';
+import { confirmVkNativeLogin } from './vk-native-login';
 import {
   buildAuthIdentity,
   consumeAuthRateLimits,
@@ -288,6 +290,13 @@ const phoneAuthStartSchema = requestPhoneCodeSchema.extend({
   legalAcceptance: initialLegalAcceptanceSchema,
 });
 const messengerAuthStartSchema = phoneAuthStartSchema.partial({ phone: true });
+const vkAuthStartSchema = messengerAuthStartSchema.extend({
+  platform: z.enum(['android', 'ios', 'web']).optional(),
+});
+const vkNativeLoginConfirmSchema = z.object({
+  state: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+  launchParams: z.string().min(1).max(8_192),
+});
 const phoneAuthVerifySchema = verifyPhoneCodeSchema;
 const maxAuthStatusSchema = z.object({
   challengeId: z.string().uuid(),
@@ -1920,7 +1929,7 @@ export async function registerRoutes(
         finalized = true;
       };
       try {
-        const input = parse(messengerAuthStartSchema, request.body);
+        const input = parse(vkAuthStartSchema, request.body);
         const phone = input.phone === undefined ? null : normalizeRussianPhone(input.phone);
         if (input.phone !== undefined && !phone) {
           await finalize('invalid_phone');
@@ -1958,6 +1967,12 @@ export async function registerRoutes(
             challengeId,
             exchangeToken,
             authorizationUrl: vkAuthorizationUrl({ state: stateToken, codeChallenge }),
+            ...(input.platform === 'android' && config.VK_MINI_APP_ID && config.VK_MINI_APP_SECRET
+              ? {
+                appUrl: vkNativeLoginUrl(config.VK_MINI_APP_ID, stateToken),
+                nativeLoginCode: vkNativeLoginCode(stateToken),
+              }
+              : {}),
             communityUrl: vkCommunityMessageUrl(config.VK_COMMUNITY_ID),
             expiresInSeconds: config.PHONE_CODE_TTL_MINUTES * 60,
           },
@@ -1968,6 +1983,28 @@ export async function registerRoutes(
       }
     },
   );
+
+  app.post('/v1/auth/vk/native/confirm', {
+    logLevel: 'warn',
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    void reply.header('Cache-Control', 'no-store');
+    requireVkMiniAppConfiguration();
+    const session = await auth(request);
+    const input = parse(vkNativeLoginConfirmSchema, request.body);
+    const launch = verifyVkMiniAppLaunchParams({
+      launchParams: input.launchParams,
+      appId: config.VK_MINI_APP_ID,
+      secret: config.VK_MINI_APP_SECRET,
+      maxAgeSeconds: config.VK_MINI_APP_MAX_AGE_SECONDS,
+    });
+    await withTransaction((connection) => confirmVkNativeLogin(connection, {
+      state: input.state,
+      sessionUserId: session.id,
+      vkUserId: launch.userId,
+    }));
+    return { data: { confirmed: true } };
+  });
 
   app.get('/v1/auth/vk/callback', { logLevel: 'warn' }, async (request, reply) => {
     void reply.header('Cache-Control', 'no-store');

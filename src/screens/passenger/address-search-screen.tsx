@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { resolveStreetCenter } from '@/api/street-center';
@@ -514,6 +514,7 @@ export function AddressSearchScreen() {
       houseResolveController.current = null;
       setResolvingHouse(false);
       if (resolved) { await selectAddress(resolved); return; }
+      Keyboard.dismiss();
       setPendingAddress(address);
       setPointMapCenter(null);
       setSelectedPoint(null);
@@ -575,19 +576,21 @@ export function AddressSearchScreen() {
 
   if (pendingAddress) {
     return (
-      <Screen contentStyle={{ maxWidth: 760 }}>
+      <Screen scroll={false} contentStyle={{ maxWidth: 760, paddingVertical: spacing.x3, gap: spacing.x3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <IconButton icon="back" label="Назад к адресам" disabled={savingPoint} onPress={() => setPendingAddress(null)} />
-          <Text accessibilityRole="header" style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" style={{ ...typography.sectionTitle, color: colors.ink, flex: 1 }}>
             Укажите точку дома
           </Text>
         </View>
-        <Text style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
-        <Text style={{ ...typography.body, color: colors.inkSecondary }}>
-          Точное расположение дома пока неизвестно. Нажмите на карте на дом или удобный подъезд к нему.
-          {!pendingAddress.placeId && ` После подтверждения запомним этот адрес${demoSession ? ' на этом устройстве' : ''}.`}
-        </Text>
-        <View style={{ height: 360, overflow: 'hidden', borderRadius: radius.lg }}>
+        <ScrollView style={{ flexGrow: 0, maxHeight: '25%' }} contentContainerStyle={{ gap: spacing.x2 }}>
+          <Text style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
+          <Text style={{ ...typography.body, color: colors.inkSecondary }}>
+            Двигайте и приближайте карту, затем нажмите на дом или удобный подъезд к нему.
+            {!pendingAddress.placeId && ` После подтверждения запомним этот адрес${demoSession ? ' на этом устройстве' : ''}.`}
+          </Text>
+        </ScrollView>
+        <View style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: radius.lg }}>
           {pendingCenter ? <TaxiMap
             selectionCenter={pendingCenter}
             pickup={selectedPoint ? { ...pendingAddress, coordinates: selectedPoint } : null}

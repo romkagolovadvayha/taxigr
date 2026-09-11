@@ -1,5 +1,7 @@
 import * as Linking from 'expo-linking';
 
+import nativeExternalAuth from '../../modules/taxigr-external-auth';
+
 export class ExternalAuthWindowBlockedError extends Error {
   constructor() {
     super('The browser blocked the messenger authorization window.');
@@ -8,6 +10,36 @@ export class ExternalAuthWindowBlockedError extends Error {
 }
 
 export type PreparedExternalAuthWindow = Window | null;
+
+type ExternalAuthChallenge =
+  | { botUrl: string; appUrl?: string }
+  | { authorizationUrl: string; appUrl?: string };
+
+// Initial launch and "Open again" must use the same native link and fallback,
+// and keep the original challenge token instead of starting another login.
+export async function openExternalAuthChallenge(
+  challenge: ExternalAuthChallenge,
+  preparedWindow: PreparedExternalAuthWindow,
+): Promise<void> {
+  if ('authorizationUrl' in challenge) {
+    if (process.env.EXPO_OS === 'android' && challenge.appUrl) {
+      const opened = await nativeExternalAuth?.openVkMiniAppUrl?.(challenge.appUrl).catch(() => false);
+      if (opened) return;
+    }
+    return openExternalAuthUrl(challenge.authorizationUrl, preparedWindow);
+  }
+  return openExternalAuthUrl(
+    challenge.appUrl ?? challenge.botUrl,
+    preparedWindow,
+    challenge.appUrl ? challenge.botUrl : undefined,
+  );
+}
+
+export function externalAuthOpenErrorMessage(error: unknown, provider: string): string {
+  return error instanceof ExternalAuthWindowBlockedError
+    ? 'Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.'
+    : `Не удалось открыть ${provider}. Попробуйте ещё раз.`;
+}
 
 export function prepareExternalAuthWindow(): PreparedExternalAuthWindow {
   if (process.env.EXPO_OS !== 'web' || typeof window === 'undefined') return null;
@@ -38,6 +70,12 @@ export async function openExternalAuthUrl(
     externalWindow.location.replace(nativeFallbackUrl ?? url);
     externalWindow.focus();
     return;
+  }
+
+  if (process.env.EXPO_OS === 'android' && url.startsWith('https://max.ru/')) {
+    // Older binaries / Expo Go do not include the optional native module.
+    const opened = await nativeExternalAuth?.openMaxUrl(url).catch(() => false);
+    if (opened) return;
   }
 
   try {

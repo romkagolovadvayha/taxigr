@@ -33,8 +33,8 @@ import { radius, typography } from "@/theme/tokens";
 import { formatRetryAfter } from "@/utils/format";
 import {
   closePreparedExternalAuthWindow,
-  ExternalAuthWindowBlockedError,
-  openExternalAuthUrl,
+  externalAuthOpenErrorMessage,
+  openExternalAuthChallenge,
   prepareExternalAuthWindow,
   type PreparedExternalAuthWindow,
 } from "@/utils/open-external-auth";
@@ -218,14 +218,10 @@ export function SignInScreen() {
     try {
       const challenge = await startMaxPhoneAuth(undefined, confirmedAcceptance);
       setMaxChallenge(challenge);
-      await openExternalAuthUrl(challenge.botUrl, externalWindow);
+      await openExternalAuthChallenge(challenge, externalWindow);
     } catch (error) {
       closeExternalAuthWindow();
-      if (error instanceof ExternalAuthWindowBlockedError) {
-        setExternalWindowError(
-          "Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.",
-        );
-      }
+      setExternalWindowError(externalAuthOpenErrorMessage(error, "MAX"));
     } finally {
       setAuthAction(null);
     }
@@ -250,18 +246,10 @@ export function SignInScreen() {
         confirmedAcceptance,
       );
       setTelegramChallenge(challenge);
-      await openExternalAuthUrl(
-        challenge.appUrl,
-        externalWindow,
-        challenge.botUrl,
-      );
+      await openExternalAuthChallenge(challenge, externalWindow);
     } catch (error) {
       closeExternalAuthWindow();
-      if (error instanceof ExternalAuthWindowBlockedError) {
-        setExternalWindowError(
-          "Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.",
-        );
-      }
+      setExternalWindowError(externalAuthOpenErrorMessage(error, "Telegram"));
     } finally {
       setAuthAction(null);
     }
@@ -281,14 +269,10 @@ export function SignInScreen() {
     try {
       const challenge = await startVkPhoneAuth(undefined, confirmedAcceptance);
       setVkChallenge(challenge);
-      await openExternalAuthUrl(challenge.authorizationUrl, externalWindow);
+      await openExternalAuthChallenge(challenge, externalWindow);
     } catch (error) {
       closeExternalAuthWindow();
-      if (error instanceof ExternalAuthWindowBlockedError) {
-        setExternalWindowError(
-          "Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.",
-        );
-      }
+      setExternalWindowError(externalAuthOpenErrorMessage(error, "VK"));
     } finally {
       setAuthAction(null);
     }
@@ -389,17 +373,12 @@ export function SignInScreen() {
   };
 
   const reopenProvider = () => {
-    const url =
-      maxChallenge?.botUrl ??
-      telegramChallenge?.botUrl ??
-      vkChallenge?.authorizationUrl;
-    if (!url) return;
+    if (!challenge) return;
+    setExternalWindowError(null);
     const externalWindow = prepareManagedExternalAuthWindow();
-    void openExternalAuthUrl(url, externalWindow).catch(() => {
+    void openExternalAuthChallenge(challenge, externalWindow).catch((error) => {
       closeExternalAuthWindow();
-      setExternalWindowError(
-        "Браузер заблокировал новое окно. Разрешите всплывающие окна и попробуйте снова.",
-      );
+      setExternalWindowError(externalAuthOpenErrorMessage(error, providerName));
     });
   };
 
@@ -882,7 +861,9 @@ export function SignInScreen() {
                 ? "В MAX нажмите «Поделиться номером», затем вернитесь сюда."
                 : telegramChallenge
                   ? "В Telegram нажмите «Запустить», затем «Поделиться номером» и вернитесь сюда."
-                  : "Разрешите VK передать номер телефона. Вход завершится автоматически."}
+                  : vkChallenge?.nativeLoginCode
+                    ? `Подтвердите вход в VK и вернитесь сюда. Код этой попытки: ${vkChallenge.nativeLoginCode}.`
+                    : "Разрешите VK передать номер телефона. Вход завершится автоматически."}
             </Text>
             <AppButton compact onPress={reopenProvider}>
               {"Открыть " + providerName}

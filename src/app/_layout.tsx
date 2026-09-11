@@ -183,11 +183,9 @@ function RootNavigator() {
           <Stack.Screen
             name="address-search"
             options={{
-              presentation: 'formSheet',
-              sheetAllowedDetents: [0.78, 1],
-              sheetInitialDetentIndex: 'last',
-              sheetGrabberVisible: true,
-              sheetCornerRadius: radius.sheet,
+              // Android form sheets intercept the embedded map's pan/pinch gestures.
+              presentation: 'fullScreenModal',
+              gestureEnabled: false,
             }}
           />
           <Stack.Screen

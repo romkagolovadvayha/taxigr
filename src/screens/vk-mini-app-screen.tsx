@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { BrandMark } from '@/components/brand-mark';
 import { VkLogo } from '@/components/auth/vk-logo';
+import { VkNativeLoginConfirmation } from '@/components/auth/vk-native-login-confirmation';
 import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
 import { Screen } from '@/components/ui/screen';
@@ -20,6 +21,7 @@ import {
   type VkMiniAppProfileIdentity,
 } from '@/vk-mini-app/bridge';
 import { useThemeColors } from '@/theme/theme-provider';
+import { parseVkNativeLoginState } from '@/vk-mini-app/native-login';
 
 export function VkMiniAppScreen() {
   const colors = useThemeColors();
@@ -44,6 +46,8 @@ export function VkMiniAppScreen() {
   const pendingPhone = useRef<Awaited<ReturnType<typeof requestVkMiniAppPhone>> | null>(null);
   const finishingAuthorization = useRef(false);
   const started = useRef(false);
+  const [nativeLoginState, setNativeLoginState] = useState(() =>
+    typeof window === 'undefined' ? null : parseVkNativeLoginState(window.location.hash));
 
   const authorize = useCallback(async () => {
     setAuthorizing(true);
@@ -151,11 +155,20 @@ export function VkMiniAppScreen() {
     void authorize();
   }, [authorize, sessionReady]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setNativeLoginState(parseVkNativeLoginState(window.location.hash));
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+
   const visibleError = bridgeError ?? authError;
   return (
     <>
       {user && sessionVerified ? (
-        user.blockedAt ? <BlockedAccountScreen /> : <OrderScreen />
+        user.blockedAt ? <BlockedAccountScreen /> : nativeLoginState && token ? (
+          <VkNativeLoginConfirmation key={nativeLoginState} state={nativeLoginState} token={token} />
+        ) : <OrderScreen />
       ) : (
         <Screen
           contentStyle={{

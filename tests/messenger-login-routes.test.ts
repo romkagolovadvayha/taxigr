@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { createHmac } from "node:crypto";
 import {
   afterAll,
   beforeAll,
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   linkMessengerIdentity: vi.fn(),
   recordInitialConsents: vi.fn(),
   exchangeVkAuthorizationCode: vi.fn(),
+  authenticate: vi.fn(),
 }));
 
 // No real database, credentials or provider requests are used by these API tests.
@@ -36,11 +38,18 @@ vi.mock("../server/config", () => ({
     TELEGRAM_WEBHOOK_SECRET: "test",
     VK_APP_ID: "1",
     VK_REDIRECT_URI: "https://example.test/callback",
+    VK_MINI_APP_ID: "54638428",
+    VK_MINI_APP_SECRET: "test-mini-app-secret",
+    VK_MINI_APP_MAX_AGE_SECONDS: 900,
     VK_COMMUNITY_ID: "1",
     VK_BOT_TOKEN: "test",
     VK_CALLBACK_SECRET: "test",
     VK_CALLBACK_CONFIRMATION: "test",
   },
+}));
+vi.mock("../server/security", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../server/security")>()),
+  authenticate: mocks.authenticate,
 }));
 vi.mock("../server/db", () => ({
   db: { execute: mocks.execute },
@@ -91,6 +100,8 @@ beforeAll(async () => {
 afterAll(() => app.close());
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.authenticate.mockResolvedValue({ id: "test-user", roles: ["passenger"] });
+  mocks.firstRow.mockResolvedValue({ blocked_at: null });
   mocks.execute.mockResolvedValue([{ affectedRows: 1 }]);
   mocks.findOrCreatePhoneUser.mockResolvedValue("test-user");
   mocks.findUserWithRoles.mockResolvedValue({
@@ -200,6 +211,85 @@ describe.each(providers)("%s login without manual phone entry", (provider) => {
     });
     expect(response.statusCode).toBe(404);
     expect(mocks.findOrCreatePhoneUser).not.toHaveBeenCalled();
+  });
+});
+
+it.each([undefined, 'web', 'ios', 'android'])("VK start chooses the launch for platform %s", async (platform) => {
+  const response = await app.inject({
+    method: 'POST', url: '/v1/auth/vk/start',
+    payload: { legalAcceptance, installationId, platform },
+  });
+  expect(response.statusCode).toBe(200);
+  const data = response.json().data;
+  if (platform === 'android') {
+    const state = mocks.execute.mock.calls[0]![1][1];
+    expect(data.appUrl).toBe(`https://vk.com/app54638428#native_auth=${state}`);
+    expect(data.nativeLoginCode).toBe(state.slice(0, 6).toUpperCase());
+    expect(data.appUrl).not.toContain(data.exchangeToken);
+  } else {
+    expect(data.appUrl).toBeUndefined();
+    expect(data.nativeLoginCode).toBeUndefined();
+  }
+  expect(data.authorizationUrl).toBe('https://example.test/auth');
+});
+
+function signedNativeLaunch(): string {
+  const query = new URLSearchParams({
+    vk_app_id: '54638428', vk_ts: String(Math.floor(Date.now() / 1000)), vk_user_id: '42',
+  }).toString();
+  const sign = createHmac('sha256', 'test-mini-app-secret').update(query).digest('base64url');
+  return `${query}&sign=${sign}`;
+}
+
+describe('VK native confirmation API', () => {
+  const state = 'x'.repeat(43);
+  const pending = () => ({
+    id: challengeId, expected_phone: null, vk_user_id: null, verified_at: null,
+    completed_at: null, failure_code: null, expires_at: new Date(Date.now() + 60_000),
+  });
+
+  it('requires signed VK launch and a matching authenticated taxi account', async () => {
+    mocks.query.mockResolvedValueOnce([[pending()]])
+      .mockResolvedValueOnce([[{ phone: '+79990000000', first_name: 'Test', last_name: null }]]);
+    const response = await app.inject({
+      method: 'POST', url: '/v1/auth/vk/native/confirm',
+      payload: { state, launchParams: signedNativeLaunch() },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual({ confirmed: true });
+    expect(mocks.query).toHaveBeenNthCalledWith(2, expect.stringContaining('account.external_user_id = ?'), ['test-user', '42']);
+    expect(mocks.execute).toHaveBeenCalledWith(expect.stringContaining('UPDATE vk_auth_challenges'),
+      ['+79990000000', '42', 'Test', null, challengeId]);
+  });
+
+  it('rejects forged VK identity before looking up a challenge', async () => {
+    const response = await app.inject({
+      method: 'POST', url: '/v1/auth/vk/native/confirm',
+      payload: { state, launchParams: signedNativeLaunch().replace('vk_user_id=42', 'vk_user_id=43') },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects approval without an authenticated taxi session', async () => {
+    mocks.authenticate.mockRejectedValueOnce(Object.assign(new Error('Unauthorized'), { statusCode: 401 }));
+    const response = await app.inject({
+      method: 'POST', url: '/v1/auth/vk/native/confirm',
+      payload: { state, launchParams: signedNativeLaunch() },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects a signed VK identity linked to a different taxi account', async () => {
+    mocks.query.mockResolvedValueOnce([[pending()]]).mockResolvedValueOnce([[]]);
+    const response = await app.inject({
+      method: 'POST', url: '/v1/auth/vk/native/confirm',
+      payload: { state, launchParams: signedNativeLaunch() },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
 });
 

@@ -114,7 +114,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     } else { passengerRef.current?.remove(); passengerRef.current = null; }
     const width = host.clientWidth, height = host.clientHeight;
     if (!width || !height) return;
-    const padding = taxiMapPadding(width, height, props.viewportInsets, scene.points.length > 0);
+    // Keep the viewport stable when the user places the first selection pin.
+    const padding = taxiMapPadding(width, height, props.viewportInsets, !props.selectionCenter && scene.points.length > 0);
     host.style.setProperty('--taxi-map-attribution-bottom', String((props.viewportInsets?.bottom ?? 0) + 4) + 'px');
     host.style.setProperty('--taxi-map-control-top', String((props.viewportInsets?.top ?? 0) + 8) + 'px');
     if (validMapCoordinate(props.selectionCenter)) {
