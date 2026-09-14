@@ -1,11 +1,11 @@
-import type { LegalSection } from '@/legal/content';
+import type { LegalSections } from '@/legal/content';
 import { LEGAL_UPDATED_AT } from '@/legal/documents';
 import { LegalScreen } from '@/screens/legal-screen';
 
 type Props = {
   title: string;
   lead: string;
-  sections: LegalSection[];
+  sections: LegalSections;
   showOperatorWarning?: boolean;
 };
 

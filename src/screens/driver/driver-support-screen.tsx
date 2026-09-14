@@ -7,12 +7,13 @@ import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { Screen } from '@/components/ui/screen';
 import { SurfaceCard } from '@/components/ui/surface-card';
-import { operatorDetails } from '@/legal/operator';
+import { useOperatorDetails } from '@/legal/use-operator-details';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 export function DriverSupportScreen() {
   const colors = useThemeColors();
+  const { operatorDetails } = useOperatorDetails();
   const [message, setMessage] = useState<string | null>(null);
   const supportPhoneAvailable = operatorDetails.phone !== 'не указан';
 

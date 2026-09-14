@@ -8,7 +8,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { legalDocuments } from '@/legal/documents';
-import { operatorDetails, operatorDetailsReady } from '@/legal/operator';
+import { useOperatorDetails } from '@/legal/use-operator-details';
 import { goBackOrReplace } from '@/navigation/back';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
@@ -32,6 +32,7 @@ const groups = [
 
 export function LegalHubScreen() {
   const colors = useThemeColors();
+  const { operatorDetails, operatorDetailsReady, isPending } = useOperatorDetails();
   return (
     <Screen contentStyle={{ maxWidth: 920 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -48,7 +49,7 @@ export function LegalHubScreen() {
         </Text>
       </View>
 
-      {!operatorDetailsReady && (
+      {!isPending && !operatorDetailsReady && (
         <View
           accessibilityRole="alert"
           style={{ padding: spacing.x4, borderRadius: radius.lg, backgroundColor: colors.brandSoft, gap: spacing.x2 }}

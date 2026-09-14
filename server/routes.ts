@@ -75,6 +75,7 @@ import { db, firstRow, withTransaction } from './db';
 import { searchAddresses } from './geocoding';
 import { telegramDispatcher } from './gateway-proxy';
 import { registerGatewayRoutes } from './gateway-routes';
+import { registerOperatorRoutes } from './operator-routes';
 import {
   driverLegalAcceptanceSchema,
   hasCurrentInitialConsents,
@@ -6771,6 +6772,7 @@ export async function registerRoutes(
   });
 
   registerGatewayRoutes(app, (request) => auth(request, 'admin'));
+  registerOperatorRoutes(app, (request) => auth(request, 'admin'));
 
   app.get('/v1/admin/driver-dispatch-settings', async (request) => {
     await auth(request, 'admin');

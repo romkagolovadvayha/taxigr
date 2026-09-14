@@ -1,5 +1,6 @@
 import { Link } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { useOperatorDetails } from '@/legal/use-operator-details';
 
 import "./public-landing.css";
 
@@ -216,6 +217,7 @@ function useLandingMotion(paused: boolean) {
 }
 
 export function PublicLandingScreen() {
+  const { details: operator } = useOperatorDetails();
   const [step, setStep] = useState(1);
   const [tariff, setTariff] = useState<"economy" | "child">("economy");
   const [paused, setPaused] = useState(false);
@@ -671,6 +673,13 @@ export function PublicLandingScreen() {
           машин и дорожной обстановки. На иллюстрациях показан пример заказа, а
           не предложение поездки по указанной цене.
         </p>
+        {(operator.legalName || operator.inn) && (
+          <div className="lp-footer-operator" aria-label="Реквизиты оператора">
+            {operator.legalName && <span>{operator.legalName}</span>}
+            {operator.inn && <span>ИНН {operator.inn}</span>}
+            {operator.registrationNumber && <span>ОГРНИП / ОГРН {operator.registrationNumber}</span>}
+          </div>
+        )}
         <div className="lp-footer-bottom">
           <span>© {new Date().getFullYear()} Такси Грахово</span>
           <span>Сделано для своих дорог.</span>

@@ -7,14 +7,14 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
-import { operatorDetails } from '@/legal/operator';
+import { useOperatorDetails } from '@/legal/use-operator-details';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
-const requestSteps = [
+const getRequestSteps = (email: string) => [
   {
     title: 'Отправьте запрос',
-    text: `Напишите на ${operatorDetails.email} с темой «Удаление аккаунта — Такси Грахово».`,
+    text: `Напишите на ${email} с темой «Удаление аккаунта — Такси Грахово».`,
   },
   {
     title: 'Укажите данные аккаунта',
@@ -63,6 +63,8 @@ function BulletList({ items }: { items: readonly string[] }) {
 
 export function AccountDeletionScreen() {
   const colors = useThemeColors();
+  const { operatorDetails } = useOperatorDetails();
+  const requestSteps = getRequestSteps(operatorDetails.email);
   const subject = 'Удаление аккаунта — Такси Грахово';
   const body = [
     'Здравствуйте!',

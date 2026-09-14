@@ -6,11 +6,12 @@
 
 Перед коммерческим запуском:
 
-1. Заполнить в production-окружении `EXPO_PUBLIC_OPERATOR_LEGAL_NAME`,
-   `EXPO_PUBLIC_OPERATOR_STATUS`, `EXPO_PUBLIC_OPERATOR_INN`,
-   `EXPO_PUBLIC_OPERATOR_REGISTRATION_NUMBER`, `EXPO_PUBLIC_OPERATOR_ADDRESS`,
-   `EXPO_PUBLIC_OPERATOR_EMAIL`, `EXPO_PUBLIC_OPERATOR_PHONE` и
-   `EXPO_PUBLIC_TAXI_REGISTRY_NUMBER`.
+1. После применения миграции `048_operator_settings.sql` открыть `/admin/settings`,
+   заполнить блок «Реквизиты ИП» и нажать «Сохранить реквизиты».
+   Проверить данные внизу главной страницы и на `/legal`.
+   Реквизиты хранятся в базе и обновляются без пересборки сайта.
+   До первого сохранения используются прежние значения `EXPO_PUBLIC_OPERATOR_*`
+   и `EXPO_PUBLIC_TAXI_REGISTRY_NUMBER` из окружения API.
 2. Убедиться, что оператор включён в региональный реестр служб заказа легкового
    такси и выполняет применимые требования 580-ФЗ.
 3. Определить, кто фактически заключает договор перевозки и принимает оплату:

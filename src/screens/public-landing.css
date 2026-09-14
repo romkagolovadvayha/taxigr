@@ -1087,6 +1087,16 @@
   max-width: 920px;
   margin-top: 23px;
 }
+.lp-footer-operator {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--lp-muted);
+  overflow-wrap: anywhere;
+}
 .lp-footer-bottom {
   border-top: 1px solid #e6dfca;
   margin-top: 25px;

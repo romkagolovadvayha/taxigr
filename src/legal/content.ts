@@ -1,4 +1,4 @@
-import { operatorDetails } from '@/legal/operator';
+import type { OperatorDetails } from '../domain/operator-details';
 
 export type LegalSection = {
   title: string;
@@ -6,15 +6,17 @@ export type LegalSection = {
   bullets?: string[];
 };
 
-const operator =
+export type LegalSections = LegalSection[] | ((operatorDetails: OperatorDetails) => LegalSection[]);
+
+const describeOperator = (operatorDetails: OperatorDetails) =>
   `${operatorDetails.legalName}, ${operatorDetails.status}, ИНН ${operatorDetails.inn}, ` +
   `регистрационный номер ${operatorDetails.registrationNumber}, адрес: ${operatorDetails.address}`;
 
-export const termsSections: LegalSection[] = [
+export const termsSections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
     title: '1. Термины и стороны',
     paragraphs: [
-      `Оператор сервиса «Такси Грахово» — ${operator}. Сервис предоставляет интерфейс для получения заказа и его передачи допущенному перевозчику или водителю.`,
+      `Оператор сервиса «Такси Грахово» — ${describeOperator(operatorDetails)}. Сервис предоставляет интерфейс для получения заказа и его передачи допущенному перевозчику или водителю.`,
       'Перевозчик — лицо, которое законно выполняет перевозку легковым такси. Договор перевозки заключается между пассажиром и перевозчиком после принятия заказа. Если по закону или фактической модели Оператор сам является перевозчиком, он несёт обязанности перевозчика в полном объёме.',
     ],
   },
@@ -120,11 +122,11 @@ export const passengerRulesSections: LegalSection[] = [
   },
 ];
 
-export const privacySections: LegalSection[] = [
+export const privacySections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
     title: '1. Оператор персональных данных',
     paragraphs: [
-      `Оператор: ${operator}. Контакты по вопросам персональных данных: ${operatorDetails.email}, ${operatorDetails.phone}.`,
+      `Оператор: ${describeOperator(operatorDetails)}. Контакты по вопросам персональных данных: ${operatorDetails.email}, ${operatorDetails.phone}.`,
     ],
   },
   {
@@ -196,11 +198,11 @@ export const privacySections: LegalSection[] = [
   },
 ];
 
-export const personalDataConsentSections: LegalSection[] = [
+export const personalDataConsentSections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
     title: '1. Кому даётся согласие',
     paragraphs: [
-      `Я свободно, своей волей и в своём интересе даю согласие оператору: ${operator}. Контакты: ${operatorDetails.email}, ${operatorDetails.phone}.`,
+      `Я свободно, своей волей и в своём интересе даю согласие оператору: ${describeOperator(operatorDetails)}. Контакты: ${operatorDetails.email}, ${operatorDetails.phone}.`,
     ],
   },
   {
@@ -284,7 +286,7 @@ export const driverTermsSections: LegalSection[] = [
   },
 ];
 
-export const driverDataConsentSections: LegalSection[] = [
+export const driverDataConsentSections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
     title: '1. Состав данных',
     paragraphs: [
@@ -311,7 +313,7 @@ export const driverDataConsentSections: LegalSection[] = [
   },
 ];
 
-export const safetySections: LegalSection[] = [
+export const safetySections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
     title: 'Экстренная ситуация',
     paragraphs: [

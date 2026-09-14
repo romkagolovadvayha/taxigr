@@ -6,9 +6,9 @@ import { BrandMark } from '@/components/brand-mark';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
-import type { LegalSection } from '@/legal/content';
+import type { LegalSections } from '@/legal/content';
 import { goBackOrReplace } from '@/navigation/back';
-import { operatorDetailsReady } from '@/legal/operator';
+import { useOperatorDetails } from '@/legal/use-operator-details';
 import { spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -16,12 +16,14 @@ type Props = {
   title: string;
   updated: string;
   lead: string;
-  sections: LegalSection[];
+  sections: LegalSections;
   showOperatorWarning?: boolean;
 };
 
 export function LegalScreen({ title, updated, lead, sections, showOperatorWarning = true }: Props) {
   const colors = useThemeColors();
+  const { operatorDetails, operatorDetailsReady, isPending } = useOperatorDetails();
+  const resolvedSections = typeof sections === 'function' ? sections(operatorDetails) : sections;
   return (
     <Screen contentStyle={{ maxWidth: 860 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -33,7 +35,7 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>Редакция от {updated}</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>{lead}</Text>
       </View>
-      {showOperatorWarning && !operatorDetailsReady && (
+      {showOperatorWarning && !isPending && !operatorDetailsReady && (
         <View
           accessibilityRole="alert"
           style={{
@@ -52,7 +54,7 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
           </Text>
         </View>
       )}
-      {sections.map((section) => (
+      {resolvedSections.map((section) => (
         <View key={section.title} style={{ gap: spacing.x2 }}>
           <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{section.title}</Text>
           {section.paragraphs.map((paragraph) => (
