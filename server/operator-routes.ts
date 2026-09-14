@@ -1,8 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 
-import { operatorDetailsSchema } from '../src/domain/operator-details';
+import { createOperatorDetailsSchema } from '../src/domain/operator-details';
 import { readOperatorSettings, saveOperatorSettings } from './operator-settings';
 import type { AuthUser } from './security';
+
+const operatorDetailsSchema = createOperatorDetailsSchema(z);
 
 export function registerOperatorRoutes(
   app: FastifyInstance,

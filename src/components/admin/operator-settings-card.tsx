@@ -1,17 +1,19 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { z } from 'zod';
 
 import { apiRequest } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
 import { SurfaceCard } from '@/components/ui/surface-card';
-import { operatorDetailsSchema, type OperatorDetails } from '@/domain/operator-details';
+import { createOperatorDetailsSchema, type OperatorDetails } from '@/domain/operator-details';
 import { defaultOperatorDetails } from '@/legal/operator';
 import { operatorDetailsQueryKey } from '@/legal/use-operator-details';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 const endpoint = '/v1/admin/operator-details';
+const operatorDetailsSchema = createOperatorDetailsSchema(z);
 const fields: { key: keyof OperatorDetails; label: string; placeholder?: string;
   maxLength: number; keyboardType?: KeyboardTypeOptions }[] = [
   { key: 'legalName', label: 'ИП / наименование оператора', placeholder: 'ИП Фамилия Имя Отчество', maxLength: 250 },

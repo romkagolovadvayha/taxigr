@@ -1,6 +1,8 @@
-import { z } from 'zod';
+import type { z as Zod } from 'zod';
 
-export const operatorDetailsSchema = z.object({
+// The API installs dependencies under server/node_modules. Resolve Zod in the
+// caller so this shared source also runs without a root node_modules directory.
+export const createOperatorDetailsSchema = (z: typeof Zod) => z.object({
   legalName: z.string().trim().max(250, 'Наименование должно быть не длиннее 250 символов'),
   status: z.string().trim().max(100),
   inn: z.string().trim().regex(/^(?:\d{10}|\d{12})?$/, 'ИНН должен содержать 12 цифр для ИП или 10 цифр для организации'),
@@ -14,4 +16,4 @@ export const operatorDetailsSchema = z.object({
   taxiRegistryNumber: z.string().trim().max(100),
 });
 
-export type OperatorDetails = z.infer<typeof operatorDetailsSchema>;
+export type OperatorDetails = Zod.infer<ReturnType<typeof createOperatorDetailsSchema>>;
