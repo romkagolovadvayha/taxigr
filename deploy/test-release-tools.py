@@ -33,6 +33,8 @@ class ReleaseToolsTests(unittest.TestCase):
                     'package-lock.json', 'tsconfig.json', 'app.json',
                     'dist/vendor/maplibre/6.9.0/entry.mjs',
                     'dist/vendor/maplibre/6.9.0/maplibre-gl-worker.mjs',
+                    'dist/vendor/maplibre/6.9.0/compat-1/entry.js',
+                    'dist/vendor/maplibre/6.9.0/compat-1/maplibre-gl-worker.cjs',
                     'src/data/grahovo-house-points.json',
                     'server/scripts/import-address-directory.ts',
                     'server/migrations/047_remembered_address_points.sql']

@@ -8,6 +8,7 @@ import { motion } from '@/theme/tokens';
 import { driverMarkerPngMarkup } from './driver-marker';
 import { MapLoadingOverlay } from './map-loading-overlay';
 import { loadMapLibre } from './maplibre-loader.web';
+import { watchBaseMapReady } from './map-readiness.web';
 import { createRouteLayerSync } from './route-layer-sync';
 import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
 import { taxiMapStyle } from './map-style';
@@ -165,11 +166,12 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   }, [syncRoute]);
 
   useEffect(() => {
-    let active = true, rendered = false, baseMapFailed = false;
+    let active = true, rendered = false;
     const pointMarkers = pointsRef.current;
     const cachedPointValues = pointValues.current;
     const onError = (message: string) => latest.current.props.onMapError?.(message);
     let observer: ResizeObserver | undefined;
+    let stopWatchingReadiness: (() => void) | undefined;
     let attribution: HTMLDetailsElement | null = null;
     const collapseAttribution = () => {
       // Set compact before source metadata arrives so MapLibre cannot auto-expand it.
@@ -180,7 +182,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     const slowTimer = setTimeout(() => { if (active && !rendered) setSlow(true); }, 8_000);
     const timeout = setTimeout(() => {
       if (!active || rendered) return;
-      const message = 'Карта не загрузилась. Проверьте соединение и нажмите «Повторить».';
+      const message = 'Не удалось загрузить данные карты. Нажмите «Повторить».';
       setError(message); onError(message);
     }, 30_000);
     const contextLost = (event: Event) => { event.preventDefault(); const message = 'Карта была остановлена браузером. Нажмите «Повторить».'; setError(message); onError(message); };
@@ -202,23 +204,15 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       map.getCanvas().setAttribute('aria-label', 'Карта поездки');
       map.getCanvas().addEventListener('webglcontextlost', contextLost);
       map.on('style.load', () => { if (!active) return; styleLoaded.current = true; fitted.current = ''; setInitialized(true); sync(); });
-      const loaded = () => {
-        if (!active || rendered || baseMapFailed) return;
+      stopWatchingReadiness = watchBaseMapReady(map, () => {
+        if (!active || rendered) return;
         clearTimeout(slowTimer); clearTimeout(timeout);
         rendered = true; setReady(true); setError(null); latest.current.props.onMapReady?.();
-      };
-      map.on('load', loaded);
-      map.on('sourcedata', event => {
-        if (event.sourceId === 'openmaptiles' && event.sourceDataType === 'content' && event.coord) {
-          baseMapFailed = false;
-          if (map.loaded()) loaded();
-        }
       });
       map.on('error', event => {
         if (!active) return;
         // A failed tile must not tear down an already usable map.
         if (!rendered) {
-          baseMapFailed = true;
           setError('Не удалось открыть карту. Нажмите «Повторить».'); onError(event.error.message);
         }
       });
@@ -241,6 +235,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     });
     return () => {
       active = false; clearTimeout(slowTimer); clearTimeout(timeout); cancelAnimationFrame(driverAnimation.current);
+      stopWatchingReadiness?.();
       observer?.disconnect();
       driverRef.current?.remove(); passengerRef.current?.remove();
       driverRef.current = null; passengerRef.current = null;

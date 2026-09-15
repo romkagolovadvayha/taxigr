@@ -1,4 +1,5 @@
 import { version } from 'maplibre-gl/package.json';
+import { revision } from './maplibre-assets.json';
 
 type MapApi = typeof import('maplibre-gl');
 declare global { interface Window { __taxiMapLibre?: MapApi } }
@@ -7,7 +8,7 @@ let failedAttempts = 0;
 
 export function loadMapLibre(): Promise<MapApi> {
   if (pending) return pending;
-  const base = `/vendor/maplibre/${version}`;
+  const base = `/vendor/maplibre/${version}/${revision}`;
   const cssReady = new Promise<void>((resolve, reject) => {
     const existing = document.getElementById('taxi-maplibre-css') as HTMLLinkElement | null;
     if (existing?.sheet) { resolve(); return; }
@@ -23,10 +24,7 @@ export function loadMapLibre(): Promise<MapApi> {
   const apiReady = new Promise<MapApi>((resolve, reject) => {
     if (window.__taxiMapLibre) { resolve(window.__taxiMapLibre); return; }
     const script = document.createElement('script');
-    // The package version already invalidates the HTTP cache after an upgrade.
-    // Only a failed module load needs a fresh URL within this document.
-    script.type = 'module';
-    script.src = `${base}/entry.mjs${failedAttempts ? `?attempt=${failedAttempts}` : ''}`;
+    script.src = `${base}/entry.js${failedAttempts ? `?attempt=${failedAttempts}` : ''}`;
     const fail = () => { clearTimeout(timer); script.remove(); reject(new Error('Не удалось загрузить MapLibre')); };
     const timer = setTimeout(fail, 20_000);
     script.onerror = fail;

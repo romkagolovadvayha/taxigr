@@ -23,8 +23,8 @@ describe('same-origin MapLibre loader', () => {
   it('shares concurrent requests and waits for both the module and stylesheet', async () => {
     const { loadMapLibre } = await import('../src/components/map/maplibre-loader.web');
     const first = loadMapLibre(); expect(loadMapLibre()).toBe(first);
-    expect(script().src).toMatch(/^\/vendor\/maplibre\/[\d.]+\/entry\.mjs$/);
-    expect(script().type).toBe('module');
+    expect(script().src).toMatch(/^\/vendor\/maplibre\/[\d.]+\/compat-\d+\/entry\.js$/);
+    expect(script().type).not.toBe('module');
     browser.__taxiMapLibre = { Map: 'test' }; script().onload?.();
     let resolved = false; void first.then(() => { resolved = true; });
     await Promise.resolve(); expect(resolved).toBe(false);
@@ -45,7 +45,7 @@ describe('same-origin MapLibre loader', () => {
     const first = loadMapLibre(); const rejected = expect(first).rejects.toThrow('MapLibre');
     css().sheet = {}; css().onload?.(); script().onerror?.(); await rejected;
     const retry = loadMapLibre();
-    expect(script().src).toMatch(/entry\.mjs\?attempt=1$/);
+    expect(script().src).toMatch(/entry\.js\?attempt=1$/);
     browser.__taxiMapLibre = {}; script().onload?.();
     expect(await retry).toBe(browser.__taxiMapLibre);
   });
