@@ -261,16 +261,7 @@ jobs:
           curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
           vk_page="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk")"
           grep -q 'Такси Грахово' <<<"$vk_page"
-          maplibre_version="$(node -p "require('maplibre-gl/package.json').version")"
-          for module in entry.mjs maplibre-gl.mjs maplibre-gl-shared.mjs maplibre-gl-worker.mjs; do
-            content_type="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 \
-              --output /dev/null --write-out '%{content_type}' \
-              "https://${WEB_DOMAIN}/vendor/maplibre/${maplibre_version}/${module}")"
-            case "$content_type" in
-              application/javascript*|text/javascript*) ;;
-              *) echo "MapLibre module has an invalid content type: $module ($content_type)" >&2; exit 1 ;;
-            esac
-          done
+          node scripts/verify-maplibre-deployment.cjs "https://${WEB_DOMAIN}"
           health_response="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live")"
           test "$(jq -r '.data.status' <<<"$health_response")" = "ok"
           vk_mini_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
