@@ -15,6 +15,7 @@ const destination = { id: 'qa-destination', label: 'с. Грахово, ул. К
 type Actor = { id: string; token: string; driverId?: string; deviceId: string };
 type Result<T = RideOrder> = { status: number; data?: T; error?: { code?: string; message?: string } };
 let connection: Connection;
+let originalBookingEnabled = 0;
 const passengers: Actor[] = [];
 const drivers: Actor[] = [];
 const sockets: Socket[] = [];
@@ -85,6 +86,9 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
       throw new Error('Concurrency tests require an isolated local taxi_qa_* or taxi_test_* database');
     }
     connection = await mysql.createConnection(databaseUrl);
+    const [settings] = await connection.query<RowDataPacket[]>('SELECT enabled FROM booking_settings WHERE id = 1');
+    originalBookingEnabled = Number(settings[0]?.enabled ?? 0);
+    await connection.execute('UPDATE booking_settings SET enabled = 1 WHERE id = 1');
     for (let index = 0; index < 44; index++) {
       const driver = index >= 32;
       const id = randomUUID();
@@ -115,6 +119,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
   afterAll(async () => {
     sockets.splice(0).forEach((socket) => socket.disconnect());
     if (!connection) return;
+    await connection.execute('UPDATE booking_settings SET enabled = ? WHERE id = 1', [originalBookingEnabled]);
     await connection.query('DELETE FROM orders WHERE passenger_id IN (?)', [passengers.map((actor) => actor.id)]);
     await connection.query('DELETE FROM drivers WHERE id IN (?)', [drivers.map((actor) => actor.driverId)]);
     await connection.query('DELETE FROM users WHERE id IN (?)', [[...passengers, ...drivers].map((actor) => actor.id)]);

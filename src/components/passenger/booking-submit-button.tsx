@@ -4,6 +4,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { formatMoney } from '@/utils/format';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
+import { useBookingAvailability } from '@/providers/booking-availability-provider';
 
 type Props = {
   priceMinor: number;
@@ -31,6 +32,15 @@ export function BookingSubmitButton({
   onPress,
 }: Props) {
   const colors = useThemeColors();
+  const { enabled, checking, checkBooking } = useBookingAvailability();
+  if (enabled !== true) {
+    disabled = false;
+    loading = false;
+    estimateAvailable = false;
+    canRetry = false;
+    accessibilityLabel = label;
+  }
+  if (checking) { loading = true; loadingLabel = 'Проверяем доступность…'; }
   const unavailable = disabled || loading;
 
   return (
@@ -48,7 +58,7 @@ export function BookingSubmitButton({
       aria-disabled={unavailable}
       aria-busy={loading}
       disabled={unavailable}
-      onPress={onPress}
+      onPress={() => { void checkBooking().then((allowed) => { if (allowed) onPress(); }); }}
       style={({ pressed }) => ({
         minHeight: 56,
         alignItems: 'center',

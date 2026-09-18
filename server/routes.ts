@@ -76,6 +76,8 @@ import { searchAddresses } from './geocoding';
 import { telegramDispatcher } from './gateway-proxy';
 import { registerGatewayRoutes } from './gateway-routes';
 import { registerOperatorRoutes } from './operator-routes';
+import { registerBookingRoutes } from './booking-routes';
+import { assertBookingEnabled } from './booking-settings';
 import {
   driverLegalAcceptanceSchema,
   hasCurrentInitialConsents,
@@ -3612,6 +3614,8 @@ export async function registerRoutes(
     );
     if (existing) return { data: presentOrder(existing) };
 
+    await assertBookingEnabled();
+
     let quote: Awaited<ReturnType<typeof verifyOrderQuote>>;
     try {
       quote = await verifyOrderQuote(input.quoteToken, session.id);
@@ -3668,6 +3672,7 @@ export async function registerRoutes(
       if (existingRows[0]) {
         return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
       }
+      await assertBookingEnabled(connection);
       const passenger = userRows[0];
       if (!passenger?.phone || !passenger.phone_verified_at) {
         throw Object.assign(new Error('Подтвердите номер телефона по SMS перед первым заказом'), {
@@ -6773,6 +6778,7 @@ export async function registerRoutes(
 
   registerGatewayRoutes(app, (request) => auth(request, 'admin'));
   registerOperatorRoutes(app, (request) => auth(request, 'admin'));
+  registerBookingRoutes(app, (request) => auth(request, 'admin'));
 
   app.get('/v1/admin/driver-dispatch-settings', async (request) => {
     await auth(request, 'admin');

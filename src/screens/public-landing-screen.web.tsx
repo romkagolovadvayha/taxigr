@@ -1,6 +1,7 @@
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useOperatorDetails } from '@/legal/use-operator-details';
+import { useBookingAvailability } from '@/providers/booking-availability-provider';
 
 import "./public-landing.css";
 
@@ -217,6 +218,11 @@ function useLandingMotion(paused: boolean) {
 }
 
 export function PublicLandingScreen() {
+  const { checkBooking } = useBookingAvailability();
+  const requestBooking = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    void checkBooking().then((allowed) => { if (allowed) router.push('/sign-in'); });
+  };
   const { details: operator } = useOperatorDetails();
   const [step, setStep] = useState(1);
   const [tariff, setTariff] = useState<"economy" | "child">("economy");
@@ -261,7 +267,7 @@ export function PublicLandingScreen() {
               <br className="lp-desktop-break" /> будет на экране.
             </p>
             <div className="lp-hero-actions">
-              <Link href="/sign-in" className="lp-button lp-primary">
+              <Link href="/sign-in" onPress={requestBooking} className="lp-button lp-primary">
                 Заказать такси <Arrow />
               </Link>
               <a className="lp-text-link" href="#how">
@@ -483,7 +489,7 @@ export function PublicLandingScreen() {
                     : "Машина с подходящим детским креслом. Выберите «Детский», чтобы водитель приехал подготовленным."}
                 </p>
               </div>
-              <Link href="/sign-in" className="lp-tariff-link">
+              <Link href="/sign-in" onPress={requestBooking} className="lp-tariff-link">
                 Выбрать в приложении <Arrow diagonal />
               </Link>
             </div>
@@ -642,7 +648,7 @@ export function PublicLandingScreen() {
           <h2>
             Ну что, <span>поехали?</span>
           </h2>
-          <Link href="/sign-in" className="lp-button lp-primary">
+          <Link href="/sign-in" onPress={requestBooking} className="lp-button lp-primary">
             Заказать такси <Arrow />
           </Link>
           <p>Ваш следующий маршрут начинается здесь.</p>

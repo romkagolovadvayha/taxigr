@@ -1,0 +1,114 @@
+// Inlined by the Expo config plugin so these classes share AGP's classloader.
+import com.android.build.api.instrumentation.AsmClassVisitorFactory
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationParameters
+import com.android.build.api.instrumentation.InstrumentationScope
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.Label
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+
+// RN 0.86's precompiled AAR still sets/reads system bar colors on Android 15.
+// Guard the actual bytecode, including AndroidX/cropper compatibility code, via
+// AGP's supported instrumentation API. Keep the legacy path for Android 7–14.
+// This is a runtime fix, not a promise that Play's static lint will stop listing
+// the legacy references. No reflection or warning suppression is used.
+class TaxigrEdgeToEdgeVisitor extends ClassVisitor {
+    TaxigrEdgeToEdgeVisitor(ClassVisitor next) { super(Opcodes.ASM9, next) }
+
+    @Override
+    MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+        def next = super.visitMethod(access, name, descriptor, signature, exceptions)
+        return new MethodVisitor(Opcodes.ASM9, next) {
+            @Override
+            void visitMethodInsn(int opcode, String owner, String method, String desc, boolean itf) {
+                boolean setter = method in ['setStatusBarColor', 'setNavigationBarColor'] && desc == '(I)V'
+                boolean getter = method in ['getStatusBarColor', 'getNavigationBarColor'] && desc == '()I'
+                if (opcode == Opcodes.INVOKEVIRTUAL && owner == 'android/view/Window' && (setter || getter)) {
+                    Label legacy = new Label()
+                    Label done = new Label()
+                    super.visitFieldInsn(Opcodes.GETSTATIC, 'android/os/Build$VERSION', 'SDK_INT', 'I')
+                    super.visitIntInsn(Opcodes.BIPUSH, 35)
+                    super.visitJumpInsn(Opcodes.IF_ICMPLT, legacy)
+                    // Modern windows are transparent; icons/insets are managed by
+                    // WindowInsetsController, and the screen paints the background.
+                    super.visitInsn(setter ? Opcodes.POP2 : Opcodes.POP)
+                    if (getter) super.visitInsn(Opcodes.ICONST_0)
+                    super.visitJumpInsn(Opcodes.GOTO, done)
+                    super.visitLabel(legacy)
+                    super.visitMethodInsn(opcode, owner, method, desc, itf)
+                    super.visitLabel(done)
+                } else {
+                    super.visitMethodInsn(opcode, owner, method, desc, itf)
+                }
+            }
+
+            @Override
+            void visitFieldInsn(int opcode, String owner, String field, String desc) {
+                if (opcode == Opcodes.PUTFIELD && owner == 'android/view/WindowManager$LayoutParams' &&
+                    field == 'layoutInDisplayCutoutMode' && desc == 'I') {
+                    Label legacy = new Label()
+                    super.visitFieldInsn(Opcodes.GETSTATIC, 'android/os/Build$VERSION', 'SDK_INT', 'I')
+                    super.visitIntInsn(Opcodes.BIPUSH, 35)
+                    super.visitJumpInsn(Opcodes.IF_ICMPLT, legacy)
+                    super.visitInsn(Opcodes.POP)
+                    super.visitInsn(Opcodes.ICONST_3) // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    super.visitLabel(legacy)
+                }
+                super.visitFieldInsn(opcode, owner, field, desc)
+            }
+        }
+    }
+}
+
+abstract class TaxigrEdgeToEdgeFactory implements AsmClassVisitorFactory<InstrumentationParameters.None> {
+    @Override
+    boolean isInstrumentable(ClassData data) {
+        // Restrict this adaptation to the UI libraries that own app windows.
+        return ['com.facebook.react.views.view.WindowUtilKt',
+                'com.facebook.react.modules.statusbar.StatusBarModule',
+                'androidx.core.view.WindowCompat', 'androidx.activity.EdgeToEdge',
+                'androidx.core.splashscreen.SplashScreen', 'com.canhub.cropper.CropImageActivity',
+                'com.google.android.material.internal.EdgeToEdgeUtils',
+                'com.google.android.material.bottomsheet.BottomSheetDialog'].any {
+            data.className == it || data.className.startsWith(it + '$') ||
+                (it == 'androidx.activity.EdgeToEdge' && data.className.startsWith(it))
+        }
+    }
+
+    @Override
+    ClassVisitor createClassVisitor(ClassContext context, ClassVisitor next) {
+        return new TaxigrEdgeToEdgeVisitor(next)
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.instrumentation.transformClassesWith(TaxigrEdgeToEdgeFactory, InstrumentationScope.ALL) {}
+        variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
+    }
+}
+
+// Run without an emulator: transform and execute a fixture against fake Android
+// classes, checking both sides of the API boundary with JVM bytecode verification.
+tasks.register('testTaxigrEdgeToEdge') {
+    doLast {
+        def sourceDir = new File(rootProject.projectDir.parentFile, 'tests/android-edge-to-edge')
+        def outputDir = new File(buildDir, 'taxigr-edge-to-edge-test')
+        outputDir.mkdirs()
+        def compiler = javax.tools.ToolProvider.systemJavaCompiler
+        def args = ['-d', outputDir.absolutePath] + fileTree(sourceDir).matching { include '**/*.java' }.files.collect { it.absolutePath }
+        if (compiler.run(null, null, null, *args as String[]) != 0) throw new GradleException('Fixture compilation failed')
+        def fixtureFile = new File(outputDir, 'test/WindowCalls.class')
+        def reader = new org.objectweb.asm.ClassReader(fixtureFile.bytes)
+        def writer = new org.objectweb.asm.ClassWriter(org.objectweb.asm.ClassWriter.COMPUTE_FRAMES | org.objectweb.asm.ClassWriter.COMPUTE_MAXS)
+        reader.accept(new TaxigrEdgeToEdgeVisitor(writer), 0)
+        fixtureFile.bytes = writer.toByteArray()
+        def loader = new URLClassLoader([outputDir.toURI().toURL()] as URL[], (ClassLoader) null)
+        try {
+            loader.loadClass('test.WindowCalls').getMethod('main', String[].class).invoke(null, [new String[0]] as Object[])
+        } finally { loader.close() }
+    }
+}

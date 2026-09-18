@@ -80,6 +80,7 @@ let driverTwoToken = '';
 let applicantToken = '';
 let adminToken = '';
 let originalTariffs: PricingRules;
+let originalBooking: { enabled: boolean } | undefined;
 
 async function api<T>(
   path: string,
@@ -323,6 +324,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     const tariffs = await api<PricingRules>('/v1/admin/tariffs', { token: adminToken });
     expect(tariffs.status).toBe(200);
     originalTariffs = tariffs.data!;
+    originalBooking = (await api<{ enabled: boolean }>('/v1/booking-availability')).data;
+    expect((await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: true } })).status).toBe(200);
   }, 30_000);
 
   beforeEach(async () => {
@@ -345,6 +348,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
   });
 
   afterAll(async () => {
+    if (originalBooking) await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: originalBooking });
     if (originalTariffs) {
       await api('/v1/admin/tariffs', {
         method: 'PUT',
@@ -354,6 +358,28 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     }
     await cleanup();
     await connection.end();
+  });
+
+  it('blocks new bookings while disabled, then allows them when re-enabled and preserves active orders', async () => {
+    try {
+      expect((await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: false } })).status).toBe(200);
+      const blocked = await createOrder(passengerToken);
+      expect(blocked.status).toBe(409);
+      expect(blocked.error?.code).toBe('BOOKING_DISABLED');
+      expect((await api<{ enabled: boolean }>('/v1/booking-availability')).data?.enabled).toBe(false);
+      expect((await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: true } })).status).toBe(200);
+      const key = `booking-toggle-${randomUUID()}`;
+      const created = await createOrder(passengerToken, 'economy', key, 'booking-toggle-device', 'cash', currentInitialLegalAcceptance());
+      expect(created.status, JSON.stringify(created.error)).toBe(201);
+      await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: false } });
+      const retry = await createOrder(passengerToken, 'economy', key, 'booking-toggle-device');
+      expect(retry.status).toBe(200);
+      expect(retry.data?.id).toBe(created.data?.id);
+      expect((await api(`/v1/orders/${created.data!.id}`, { token: passengerToken })).status).toBe(200);
+      expect((await api(`/v1/orders/${created.data!.id}/cancel`, { method: 'POST', token: passengerToken, body: {} })).status).toBe(200);
+    } finally {
+      await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: true } });
+    }
   });
 
   it('rejects an untrusted browser origin without reporting an internal error', async () => {

@@ -6,6 +6,8 @@ import { io, type Socket } from 'socket.io-client';
 import { ApiError, apiRequest, getSocketUrl, invalidateApiCache } from '@/api/client';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import { useSession } from '@/auth/session-provider';
+import { useBookingAvailability } from '@/providers/booking-availability-provider';
+import { bookingUnavailableCode } from '@/domain/booking-availability';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
 import {
   buildDestinationHistory,
@@ -220,6 +222,7 @@ function idempotencyKey(): string {
 
 export function RideProvider({ children }: { children: ReactNode }) {
   const { token, user, refreshSession, markInitialLegalConsentAccepted } = useSession();
+  const { checkBooking, showBookingUnavailable } = useBookingAvailability();
   const demoSession = token?.startsWith('demo:') ?? false;
   const userId = user?.id;
   const isDriver = user?.roles.includes('driver') ?? false;
@@ -870,6 +873,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const createRide = useCallback(
     async (comment?: string, legalAcceptance?: InitialLegalAcceptance) => {
+      if (!(await checkBooking())) return null;
       if (
         !pickup ||
         !destination ||
@@ -966,6 +970,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         if (legalAcceptance) markInitialLegalConsentAccepted();
         return ride;
       } catch (reason) {
+        if (reason instanceof ApiError && reason.code === bookingUnavailableCode) showBookingUnavailable();
         const uncertainFailure =
           reason instanceof ApiError &&
           (reason.code === 'TIMEOUT' || reason.code === 'NETWORK_ERROR' || reason.status >= 500);
@@ -1002,6 +1007,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
     },
     [
       applyPassengerOrder,
+      checkBooking,
+      showBookingUnavailable,
       demoSession,
       destination,
       destinations,

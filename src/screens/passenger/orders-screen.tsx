@@ -14,12 +14,14 @@ import { formatRouteLabel } from '@/domain/route-label';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
+import { useBookingAvailability } from '@/providers/booking-availability-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrdersScreen() {
   const colors = useThemeColors();
+  const { checkBooking, checking } = useBookingAvailability();
   const {
     orders,
     passengerOrdersHasMore,
@@ -82,7 +84,7 @@ export function OrdersScreen() {
                 Здесь появятся активные и завершённые заказы.
               </Text>
             </View>
-            <AppButton fullWidth={false} onPress={() => router.replace('/')}>
+            <AppButton fullWidth={false} loading={checking} onPress={() => { void checkBooking().then((allowed) => { if (allowed) router.replace('/'); }); }}>
               Заказать такси
             </AppButton>
           </View>

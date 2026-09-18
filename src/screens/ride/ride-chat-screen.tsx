@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -31,7 +30,7 @@ import { RIDE_CHAT_IMAGE_MAX_BYTES } from '@/domain/ride-chat';
 import { useRideChat, type RideChatImageUpload } from '@/hooks/use-ride-chat';
 import { useRide } from '@/state/ride-provider';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
-import { base64ByteLength, imageResizeToFit } from '@/utils/image-data';
+import { preparePhoto } from '@/utils/prepare-photo';
 import { useThemeColors } from '@/theme/theme-provider';
 
 type SelectedChatImage = RideChatImageUpload & {
@@ -66,31 +65,8 @@ function optimizedFileName(fileName: string | null | undefined): string {
 async function optimizePickedImage(
   asset: ImagePicker.ImagePickerAsset,
 ): Promise<SelectedChatImage> {
-  for (const step of imageOptimizationSteps) {
-    const context = ImageManipulator.manipulate(asset.uri);
-    const resize = imageResizeToFit(asset.width, asset.height, step.maxDimension);
-    if (resize) context.resize(resize);
-    const rendered = await context.renderAsync();
-    const optimized = await rendered.saveAsync({
-      base64: true,
-      compress: step.compress,
-      format: SaveFormat.JPEG,
-    });
-    if (!optimized.base64) continue;
-    const sizeBytes = base64ByteLength(optimized.base64);
-    if (sizeBytes <= RIDE_CHAT_IMAGE_MAX_BYTES) {
-      return {
-        uri: optimized.uri,
-        base64: optimized.base64,
-        mimeType: 'image/jpeg',
-        sizeBytes,
-        width: optimized.width,
-        height: optimized.height,
-        fileName: optimizedFileName(asset.fileName),
-      };
-    }
-  }
-  throw new Error('Не удалось уменьшить фотографию до 5 МБ');
+  const optimized = await preparePhoto(asset, imageOptimizationSteps, RIDE_CHAT_IMAGE_MAX_BYTES);
+  return { ...optimized, fileName: optimizedFileName(asset.fileName) };
 }
 
 export function RideChatScreen() {
@@ -228,7 +204,8 @@ export function RideChatScreen() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         cameraType: ImagePicker.CameraType.back,
-        quality: 0.9,
+        // Keep the picker on its raw-file path; preparePhoto performs bounded decoding.
+        quality: 1,
       });
       await acceptPickerResult(result);
     } catch {
@@ -246,7 +223,7 @@ export function RideChatScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.9,
+        quality: 1,
       });
       await acceptPickerResult(result);
     } catch {

@@ -1,0 +1,16 @@
+diff --git a/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt b/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
+--- a/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
++++ b/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
+@@ -6,8 +6,11 @@ internal fun LibraryExtension.applySDKVersions(compileSdk: Int, minSdk: Int, targetSdk: Int) {
+   this.compileSdk = compileSdk
+   defaultConfig {
+     this@defaultConfig.minSdk = minSdk
+-    this@defaultConfig.targetSdk = targetSdk
+   }
++  // Library targetSdk was removed in AGP 9. It only configures lint/tests;
++  // the application's targetSdk remains configured by the app module.
++  lint.targetSdk = targetSdk
++  testOptions.targetSdk = targetSdk
+ }
+ 
+ internal fun LibraryExtension.applyLinterOptions() {

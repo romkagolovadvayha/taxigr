@@ -61,6 +61,9 @@ export function UserAvatar({
         accessible={accessible}
         accessibilityLabel={accessible ? `Аватар: ${name}` : undefined}
         contentFit="cover"
+        cachePolicy="memory-disk"
+        allowDownscaling
+        enforceEarlyResizing
         recyclingKey={avatarUrl}
         transition={motion.duration.quick}
         onError={() => setFailedAvatarUrl(avatarUrl)}

@@ -130,6 +130,8 @@ function RideChatImagePreview({
             accessibilityLabel={`Фотография от ${senderName}`}
             accessibilityRole="image"
             cachePolicy="none"
+            allowDownscaling
+            enforceEarlyResizing
             contentFit="contain"
             transition={motion.duration.quick}
             style={{
@@ -229,6 +231,8 @@ export function RideChatMessageRow({
                 source={attachmentSource}
                 accessible={false}
                 cachePolicy="none"
+                allowDownscaling
+                enforceEarlyResizing
                 contentFit="cover"
                 transition={motion.duration.quick}
                 style={{ width: '100%', height: '100%' }}
@@ -256,7 +260,7 @@ export function RideChatMessageRow({
           </Text>
         </View>
       </View>
-      {!!attachmentSource && (
+      {!!attachmentSource && imagePreviewVisible && (
         <RideChatImagePreview
           visible={imagePreviewVisible}
           source={attachmentSource}

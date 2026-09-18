@@ -1,0 +1,32 @@
+diff --git a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt
+--- a/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt
++++ b/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/ReactPlugin.kt
+@@ -94,12 +94,14 @@ class ReactPlugin : Plugin<Project> {
+       configureAutolinking(project, extension)
+       configureCodegen(project, extension, rootExtension, isLibrary = false)
+       configureResources(project, extension)
+       configureBuildTypesForApp(project)
++      // Register root-wide library callbacks once, before libraries are evaluated.
++      // AGP 9 rejects registering finalizeDsl again on an already finalized module.
++      configureBuildConfigFieldsForLibraries(project)
++      configureNamespaceForLibraries(project)
+     }
+ 
+     // Library Only Configuration
+-    configureBuildConfigFieldsForLibraries(project)
+-    configureNamespaceForLibraries(project)
+     project.pluginManager.withPlugin("com.android.library") {
+       configureCodegen(project, extension, rootExtension, isLibrary = true)
+     }
+diff --git a/node_modules/@react-native/gradle-plugin/shared/src/main/kotlin/com/facebook/react/utils/Os.kt b/node_modules/@react-native/gradle-plugin/shared/src/main/kotlin/com/facebook/react/utils/Os.kt
+--- a/node_modules/@react-native/gradle-plugin/shared/src/main/kotlin/com/facebook/react/utils/Os.kt
++++ b/node_modules/@react-native/gradle-plugin/shared/src/main/kotlin/com/facebook/react/utils/Os.kt
+@@ -38,7 +38,7 @@ object Os {
+    */
+   fun File.cliPath(base: File): String =
+       if (isWindows()) {
+-        this.relativeTo(base).path
++        this.relativeToOrSelf(base).path
+       } else {
+         absolutePath
+       }

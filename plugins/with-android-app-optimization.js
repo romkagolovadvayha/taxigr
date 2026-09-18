@@ -2,6 +2,7 @@ const {
   withAppBuildGradle,
   withDangerousMod,
   withGradleProperties,
+  withProjectBuildGradle,
 } = require('expo/config-plugins');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -56,6 +57,13 @@ module.exports = function withAndroidAppOptimization(config) {
   ]);
 
   config = withGradleProperties(config, (gradleConfig) => {
+    // RN 0.86 / Expo 57 use the legacy DSL and external Kotlin plugin. AGP 9
+    // explicitly supports these compatibility switches during migration.
+    upsertGradleProperty(gradleConfig.modResults, 'android.newDsl', 'false');
+    upsertGradleProperty(gradleConfig.modResults, 'android.builtInKotlin', 'false');
+    // Expo autolinking passes directory providers to sourceSets and explicitly
+    // wires generatePackagesList into preBuild, so no task dependency is lost.
+    upsertGradleProperty(gradleConfig.modResults, 'android.sourceset.disallowProvider', 'false');
     upsertGradleProperty(
       gradleConfig.modResults,
       'android.r8.optimizedResourceShrinking',
@@ -64,7 +72,24 @@ module.exports = function withAndroidAppOptimization(config) {
     return gradleConfig;
   });
 
-  return withAppBuildGradle(config, (gradleConfig) => {
+  config = withProjectBuildGradle(config, (gradleConfig) => {
+    const dependency = /classpath\(['"]com\.android\.tools\.build:gradle(?::[^'"]+)?['"]\)/;
+    if (!dependency.test(gradleConfig.modResults.contents)) {
+      throw new Error('Unable to pin Android Gradle Plugin: classpath was not found.');
+    }
+    gradleConfig.modResults.contents = gradleConfig.modResults.contents.replace(
+      dependency, "classpath('com.android.tools.build:gradle:9.0.1')",
+    );
+    return gradleConfig;
+  });
+
+  return withAppBuildGradle(config, async (gradleConfig) => {
+    const edgeToEdgeScript = await fs.readFile(require.resolve('./android/edge-to-edge.gradle'), 'utf8');
+    const start = '// @generated begin taxigr-edge-to-edge';
+    const end = '// @generated end taxigr-edge-to-edge';
+    const previous = new RegExp(`\\n${start}[\\s\\S]*?${end}\\n?`, 'g');
+    gradleConfig.modResults.contents = gradleConfig.modResults.contents.replace(previous, '') +
+      `\n${start}\n${edgeToEdgeScript}\n${end}\n`;
     const { contents } = gradleConfig.modResults;
 
     if (contents.includes(OPTIMIZED_PROGUARD_FILE)) {

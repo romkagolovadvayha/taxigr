@@ -1,0 +1,19 @@
+gradle.beforeProject { project ->
+    if (project.name != 'app') return
+    project.pluginManager.withPlugin('com.facebook.react') {
+        project.tasks.register('testTaxigrWindowsPaths') {
+            doLast {
+                def loader = project.plugins.getPlugin('com.facebook.react').class.classLoader
+                def osClass = loader.loadClass('com.facebook.react.utils.Os')
+                def os = osClass.getField('INSTANCE').get(null)
+                def cliPath = osClass.getMethod('cliPath', File, File)
+                def base = new File('C:/project')
+                def relative = cliPath.invoke(os, new File('C:/project/generated/schema.json'), base)
+                assert relative == new File('generated/schema.json').path
+                def separateDrive = new File('D:/generated/schema.json')
+                assert cliPath.invoke(os, separateDrive, base) == separateDrive.path
+                println('Gradle Windows paths: same-drive and cross-drive cases passed')
+            }
+        }
+    }
+}

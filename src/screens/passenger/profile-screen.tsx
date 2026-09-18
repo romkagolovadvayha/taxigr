@@ -17,7 +17,7 @@ import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { goBackOrReplace } from '@/navigation/back';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { formatRussianPhone } from '@/utils/phone';
-import { detectAvatarMimeType } from '@/utils/avatar';
+import { preparePhoto } from '@/utils/prepare-photo';
 import { useThemeColors } from '@/theme/theme-provider';
 
 function MenuRow({
@@ -94,22 +94,18 @@ export function ProfileScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.65,
-        base64: true,
+        quality: 1,
+        base64: false,
       });
       if (result.canceled) return;
-      const base64 = result.assets[0]?.base64;
-      if (!base64) {
+      const photo = result.assets[0];
+      if (!photo) {
         setError('Не удалось прочитать выбранное изображение');
         return;
       }
-      const mimeType = detectAvatarMimeType(base64);
-      if (!mimeType) {
-        setError('Поддерживаются изображения JPG, PNG и WebP');
-        return;
-      }
       setBusy(true);
-      await uploadAvatar(base64, mimeType);
+      const optimized = await preparePhoto(photo, [{ maxDimension: 512, compress: 0.8 }], 5_000_000);
+      await uploadAvatar(optimized.base64, optimized.mimeType);
       setMessage('Аватар обновлён');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось загрузить аватар');
