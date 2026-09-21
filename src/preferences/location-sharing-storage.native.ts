@@ -1,12 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 
-export const LOCATION_SHARING_STORAGE_KEY = 'taxi_grahovo_share_passenger_location';
+// Old values included default-on sharing and cannot prove explicit consent.
+export const LOCATION_SHARING_STORAGE_KEY = 'taxi_grahovo_share_passenger_location_consent_v2';
 
 export async function readStoredLocationSharing(): Promise<boolean> {
   try {
-    return (await SecureStore.getItemAsync(LOCATION_SHARING_STORAGE_KEY)) !== 'false';
+    return (await SecureStore.getItemAsync(LOCATION_SHARING_STORAGE_KEY)) === 'true';
   } catch {
-    return true;
+    return false;
   }
 }
 

@@ -802,7 +802,7 @@ export function DriverHomeScreen() {
     }
     try {
       if (next) {
-        const permission = await ensureForegroundLocationPermission();
+        const permission = await ensureForegroundLocationPermission('driver');
         if (!permission.granted) {
           setStatusError('Разрешите геолокацию — без неё нельзя выйти на линию');
           return;

@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -20,12 +21,13 @@ type PassengerPreferencesContextValue = {
 const PassengerPreferencesContext = createContext<PassengerPreferencesContextValue | null>(null);
 
 export function PassengerPreferencesProvider({ children }: { children: ReactNode }) {
-  const [shareLocationWithDriver, setShareLocationState] = useState(true);
+  const [shareLocationWithDriver, setShareLocationState] = useState(false);
+  const changedByUser = useRef(false);
 
   useEffect(() => {
     let active = true;
     void readStoredLocationSharing().then((stored) => {
-      if (active) setShareLocationState(stored);
+      if (active && !changedByUser.current) setShareLocationState(stored);
     });
     return () => {
       active = false;
@@ -33,6 +35,7 @@ export function PassengerPreferencesProvider({ children }: { children: ReactNode
   }, []);
 
   const setShareLocationWithDriver = useCallback((enabled: boolean) => {
+    changedByUser.current = true;
     setShareLocationState(enabled);
     void writeStoredLocationSharing(enabled);
   }, []);

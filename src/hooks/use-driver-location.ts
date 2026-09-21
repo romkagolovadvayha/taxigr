@@ -170,7 +170,7 @@ export function useDriverLocation({
     };
 
     void (async () => {
-      const permission = await ensureForegroundLocationPermission();
+      const permission = await ensureForegroundLocationPermission('driver');
       if (cancelled) return;
       if (!permission.granted) {
         setState((current) => ({

@@ -250,7 +250,7 @@ export function AccountDeletionScreen() {
             })}
           >
             <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
-              Политика обработки персональных данных →
+              Политика конфиденциальности →
             </Text>
           </AnimatedPressable>
         </Link>

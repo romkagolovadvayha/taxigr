@@ -31,7 +31,7 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
         <BrandMark compact size={40} />
       </View>
       <View style={{ gap: spacing.x2 }}>
-        <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>{title}</Text>
+        <Text {...webHeadingLevel(1)} accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>{title}</Text>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>Редакция от {updated}</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>{lead}</Text>
       </View>

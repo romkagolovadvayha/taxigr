@@ -1,5 +1,4 @@
 import { router, type Href } from 'expo-router';
-import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform, Text, View } from 'react-native';
 
@@ -20,6 +19,7 @@ import { syncPushRegistration } from '@/notifications/push-registration';
 import { goBackOrReplace } from '@/navigation/back';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
+import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useThemeColors, useAppTheme } from '@/theme/theme-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 
@@ -113,8 +113,10 @@ export function SettingsScreen() {
     }
     setLocationSharingChanging(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await ensureForegroundLocationPermission('sharing');
       setShareLocationWithDriver(permission.granted);
+    } catch {
+      setShareLocationWithDriver(false);
     } finally {
       setLocationSharingChanging(false);
     }
@@ -293,7 +295,7 @@ export function SettingsScreen() {
       >
         <SettingToggle
           title="Показывать водителю, где я"
-          subtitle="Только во время активного заказа"
+          subtitle="Точное местоположение для встречи. Только при открытом приложении и активном заказе"
           value={shareLocationWithDriver}
           disabled={locationSharingChanging}
           onValueChange={(enabled) => void changeLocationSharing(enabled)}
@@ -411,6 +413,9 @@ export function SettingsScreen() {
         устройства.
       </Text>
       <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Аккаунт и данные</Text>
+      <AppButton variant="secondary" onPress={() => router.push('/privacy')}>
+        Политика конфиденциальности
+      </AppButton>
       <View
         style={{
           backgroundColor: colors.surface,

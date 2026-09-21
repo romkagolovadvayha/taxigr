@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -21,6 +22,11 @@ export function PassengerLocationPublisher() {
   const { token, user } = useSession();
   const { currentRide } = useRide();
   const { shareLocationWithDriver } = usePassengerPreferences();
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setAppActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
   const lastSharedOrderRef = useRef<string | null>(null);
   const demoSession = token?.startsWith('demo:') ?? false;
   const orderId = currentRide?.id;
@@ -28,6 +34,7 @@ export function PassengerLocationPublisher() {
   const canShare =
     !!token &&
     !demoSession &&
+    appActive &&
     shareLocationWithDriver &&
     passengerOwnsRide &&
     !!currentRide?.driverId &&

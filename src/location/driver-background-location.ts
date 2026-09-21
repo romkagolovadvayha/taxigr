@@ -1,30 +1,22 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { readSessionToken } from '@/storage/auth-storage';
+import { ensureLocationConsent } from './location-disclosure';
+import { readLocationConsent } from './location-consent-storage';
 
 const DRIVER_LOCATION_TASK = 'taxi-grahovo-driver-location';
 
-function confirmBackgroundLocationDisclosure(): Promise<boolean> {
-  if (Platform.OS !== 'android') return Promise.resolve(true);
-
-  return new Promise((resolve) => {
-    Alert.alert(
-      'Геолокация водителя',
-      '«Такси Грахово» собирает данные о местоположении, чтобы передавать диспетчеру и пассажиру позицию водителя и поддерживать навигацию, даже когда приложение закрыто или не используется. Данные передаются только пока водитель находится на линии или выполняет поездку.',
-      [
-        { text: 'Не сейчас', style: 'cancel', onPress: () => resolve(false) },
-        { text: 'Продолжить', onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
-  });
-}
-
 TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data) return;
+  if (!await readLocationConsent('background')) {
+    if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
+      await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+    }
+    return;
+  }
   const locations = (data as { locations?: Location.LocationObject[] }).locations;
   const latest = locations?.[locations.length - 1];
   if (!latest) return;
@@ -65,19 +57,22 @@ export async function syncDriverBackgroundLocation(
     return true;
   }
 
+  if (!await readLocationConsent('background')) {
+    if (started) await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+    if (!requestPermissions || !await ensureLocationConsent('background')) return false;
+  }
+
   const foreground = await Location.getForegroundPermissionsAsync();
   if (!foreground.granted) return false;
   const currentBackground = await Location.getBackgroundPermissionsAsync();
   if (!currentBackground.granted) {
     if (!requestPermissions) return false;
-    const accepted = await confirmBackgroundLocationDisclosure();
-    if (!accepted) return false;
   }
   const background = currentBackground.granted
     ? currentBackground
     : await Location.requestBackgroundPermissionsAsync();
   if (!background.granted) return false;
-  if (started) return true;
+  if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) return true;
 
   await Location.startLocationUpdatesAsync(DRIVER_LOCATION_TASK, {
     accuracy: Location.Accuracy.Balanced,

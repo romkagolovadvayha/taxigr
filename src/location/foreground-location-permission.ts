@@ -1,11 +1,17 @@
 import * as Location from 'expo-location';
+import { ensureLocationConsent, type LocationPurpose } from './location-disclosure';
 
-let permissionRequest: Promise<Location.LocationPermissionResponse> | null = null;
+const permissionRequests = new Map<LocationPurpose, Promise<Location.LocationPermissionResponse>>();
 
-export function ensureForegroundLocationPermission(): Promise<Location.LocationPermissionResponse> {
-  if (permissionRequest) return permissionRequest;
+export function ensureForegroundLocationPermission(purpose: LocationPurpose = 'pickup'): Promise<Location.LocationPermissionResponse> {
+  const existing = permissionRequests.get(purpose);
+  if (existing) return existing;
 
-  permissionRequest = (async () => {
+  const permissionRequest = (async () => {
+    // OS permission from an older version is not consent to the disclosed use.
+    if (!await ensureLocationConsent(purpose)) {
+      return { status: 'denied', granted: false, canAskAgain: true, expires: 'never' } as Location.LocationPermissionResponse;
+    }
     try {
       const currentPermission = await Location.getForegroundPermissionsAsync();
       if (currentPermission.granted) return currentPermission;
@@ -14,8 +20,9 @@ export function ensureForegroundLocationPermission(): Promise<Location.LocationP
     }
     return Location.requestForegroundPermissionsAsync();
   })().finally(() => {
-    permissionRequest = null;
+    permissionRequests.delete(purpose);
   });
 
+  permissionRequests.set(purpose, permissionRequest);
   return permissionRequest;
 }
