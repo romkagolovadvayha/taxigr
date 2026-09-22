@@ -769,7 +769,7 @@ export function SignInScreen() {
                 fontVariant: ["tabular-nums"],
               }}
             />
-            {!!debugCode && (
+            {__DEV__ && !!debugCode && (
               <Text
                 selectable
                 style={{ ...typography.caption, color: colors.warningText }}

@@ -2,7 +2,7 @@ import type { Map as LibreMap, Marker, MapLibreEvent } from 'maplibre-gl';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { grahovoCenter } from '@/data/demo';
+import { grahovoCenter } from '@/data/service-area';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { driverMarkerPngMarkup } from './driver-marker';

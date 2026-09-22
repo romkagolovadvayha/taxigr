@@ -14,14 +14,8 @@ export const defaultOperatorDetails: OperatorDetails = {
 
 export function presentOperatorDetails(details: OperatorDetails): OperatorDetails {
   return {
-    legalName: details.legalName || 'Реквизиты оператора не заполнены',
-    status: details.status || 'ИП или юридическое лицо',
-    inn: details.inn || 'не указан',
-    registrationNumber: details.registrationNumber || 'не указан',
-    address: details.address || 'не указан',
+    ...details,
     email: details.email || 'support@taxigr.ru',
-    phone: details.phone || 'не указан',
-    taxiRegistryNumber: details.taxiRegistryNumber || 'не указан',
   };
 }
 

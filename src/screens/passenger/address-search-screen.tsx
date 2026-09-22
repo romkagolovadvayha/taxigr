@@ -17,8 +17,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
-import { demoAddresses } from '@/data/demo';
-import { grahovoAddressCatalog } from '@/data/grahovo-address-catalog';
+import { grahovoAddressCatalog, grahovoAddressSuggestions, grahovoSettlement } from '@/data/grahovo-address-catalog';
 import type { DestinationHistoryItem } from '@/domain/address-history';
 import {
   addressSearchScore,
@@ -35,7 +34,7 @@ import {
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
-import { buildStreetSuggestions, toStreetSuggestion } from '@/domain/address-suggestions';
+import { toStreetSuggestion } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address, Coordinates } from '@/domain/models';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
@@ -65,13 +64,7 @@ function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
   });
 }
 
-const localAddressDirectory = uniqueAddressesByLabel([
-  ...demoAddresses,
-  ...grahovoAddressCatalog,
-  // GAR already includes streets; expanding every house here recompiles thousands
-  // of label expressions while Expo Router loads the screen module at startup.
-  ...buildStreetSuggestions(demoAddresses),
-]);
+const localAddressDirectory = uniqueAddressesByLabel(grahovoAddressCatalog);
 
 function searchTokens(value: string): string[] {
   return value
@@ -96,7 +89,6 @@ function collectKnownStreetTokens(addresses: readonly Address[]): Set<string> {
 }
 
 const knownStreetTokens = collectKnownStreetTokens(localAddressDirectory);
-const emptySearchSuggestions = mergeAddresses(buildStreetSuggestions(demoAddresses), demoAddresses);
 
 function relativeDate(value: string): string {
   const date = new Date(value);
@@ -364,7 +356,7 @@ export function AddressSearchScreen() {
 
   const normalizedQuery = query.trim().toLocaleLowerCase('ru');
   const localResults = useMemo(() => {
-    if (!normalizedQuery) return emptySearchSuggestions;
+    if (!normalizedQuery) return grahovoAddressSuggestions;
     return filterRequestedHouse(rankAddressSearchResults(addressDirectory, normalizedQuery), normalizedQuery);
   }, [addressDirectory, normalizedQuery]);
   const matchingHistory = useMemo(
@@ -423,7 +415,7 @@ export function AddressSearchScreen() {
     () =>
       selectedStreet ??
       (queryHasHouseNumber(query) && !hasExactHouseResult ? findBestAddressAnchor(query, manualAnchorDirectory) : null) ??
-      demoAddresses[0]!,
+      grahovoSettlement,
     [hasExactHouseResult, manualAnchorDirectory, query, selectedStreet],
   );
   const manualAddress = hasExactHouseResult ? null : buildManualAddress(query, manualAnchor);
@@ -840,9 +832,9 @@ export function AddressSearchScreen() {
             </View>
           </View>
           <View style={{ gap: spacing.x3 }}>
-            <SectionTitle>Рядом в Грахово</SectionTitle>
+            <SectionTitle>Улицы Грахово</SectionTitle>
             <View style={{ gap: spacing.x2 }}>
-              {mergeAddresses([], demoAddresses)
+              {grahovoAddressSuggestions
                 .filter((address) => !historyByKey.has(addressKey(address)))
                 .map((address) => (
                   <AddressResult

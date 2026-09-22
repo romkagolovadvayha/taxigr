@@ -19,11 +19,47 @@ beforeEach(() => { storage.clear(); vi.stubEnv('EXPO_OS', 'android'); });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('saved session for immediate startup', () => {
+  it.each(['android', 'web'])('discards a legacy demo login and cached profile on %s', async (platform) => {
+    vi.stubEnv('EXPO_OS', platform);
+    if (platform === 'web') {
+      vi.stubGlobal('window', { localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      } });
+    }
+    try {
+      const demoSession = { ...session, token: 'demo:admin' };
+      await writeSessionToken(demoSession.token);
+      await writeStoredSession(demoSession);
+      expect(await readStoredSession(demoSession.token)).toBeNull();
+      expect(await readSessionToken()).toBeNull();
+      expect(storage.size).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it('restores the profile and consent only for its matching token', async () => {
     await writeSessionToken(session.token);
     await writeStoredSession(session);
     expect(await readStoredSession((await readSessionToken())!)).toEqual(session);
     expect(await readStoredSession('another-account')).toBeNull();
+  });
+  it('keeps a real login saved while an old demo session is being rejected', async () => {
+    await writeSessionToken('demo:passenger');
+    let finishRead!: () => void;
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => new Promise<string>(resolve => {
+      finishRead = () => resolve('demo:passenger');
+    }));
+    const restoring = readSessionToken();
+    await Promise.resolve();
+    const signingIn = writeSessionToken(session.token);
+    const snapshot = writeStoredSession(session);
+    finishRead();
+    expect(await restoring).toBeNull();
+    await Promise.all([signingIn, snapshot]);
+    expect(await readSessionToken()).toBe(session.token);
+    expect(await readStoredSession(session.token)).toEqual(session);
   });
   it('supports an existing installation with only a token', async () => {
     await writeSessionToken(session.token);

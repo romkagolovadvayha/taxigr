@@ -18,3 +18,11 @@ export const grahovoAddressCatalog: Address[] = [
 ];
 
 export const grahovoHouseSnapshot = snapshot;
+
+export const grahovoAddressSuggestions = grahovoAddressCatalog
+  .filter(address => address.kind === 'street' && address.label.startsWith('с. Грахово,'))
+  .slice(0, 5);
+
+export const grahovoSettlement = grahovoAddressCatalog.find(
+  address => address.kind === 'settlement' && address.label === 'с. Грахово',
+) ?? null;

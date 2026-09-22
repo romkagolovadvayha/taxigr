@@ -94,7 +94,11 @@ export function DriverApplicationScreen() {
 
   const submit = async () => {
     if (!valid) return;
-    if (!token || token.startsWith('demo:')) {
+    if (!token) {
+      setError('Войдите в аккаунт, чтобы отправить заявку.');
+      return;
+    }
+    if (token.startsWith('demo:')) {
       setSubmitted(true);
       return;
     }

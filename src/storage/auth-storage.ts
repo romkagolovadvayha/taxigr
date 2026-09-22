@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { demoEnabled } from '../auth/demo-mode';
 import type { SessionUser } from '../domain/models';
 
 const TOKEN_KEY = 'taxi_grahovo_session_token';
@@ -14,6 +15,7 @@ function writeInOrder(write: () => Promise<void>): Promise<void> {
 export type StoredSession = { token: string; user: SessionUser; legalConsentRequired?: boolean };
 
 export async function readStoredSession(token: string): Promise<StoredSession | null> {
+  if (token.startsWith('demo:') && !demoEnabled) return null;
   try {
     await pendingWrites;
     const raw = process.env.EXPO_OS === 'web'
@@ -38,11 +40,18 @@ export async function writeStoredSession(session: StoredSession): Promise<void> 
 }
 
 export async function readSessionToken(): Promise<string | null> {
-  await pendingWrites;
-  if (process.env.EXPO_OS === 'web') {
-    return typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
-  }
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  let token: string | null = null;
+  // Reject the old demo login before any concurrent real sign-in can be saved.
+  await writeInOrder(async () => {
+    token = process.env.EXPO_OS === 'web'
+      ? (typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY))
+      : await SecureStore.getItemAsync(TOKEN_KEY);
+    if (token?.startsWith('demo:') && !demoEnabled) {
+      await removeStoredSession();
+      token = null;
+    }
+  });
+  return token;
 }
 
 export async function writeSessionToken(token: string): Promise<void> {
@@ -57,14 +66,16 @@ export async function writeSessionToken(token: string): Promise<void> {
 
 export async function clearSessionToken(): Promise<void> {
   // A slow secure-store write must finish before logout removes its result.
-  await writeInOrder(async () => {
-    if (process.env.EXPO_OS === 'web') {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(TOKEN_KEY);
-        window.localStorage.removeItem(SNAPSHOT_KEY);
-      }
-      return;
+  await writeInOrder(removeStoredSession);
+}
+
+async function removeStoredSession(): Promise<void> {
+  if (process.env.EXPO_OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(SNAPSHOT_KEY);
     }
-    await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(SNAPSHOT_KEY)]);
-  });
+    return;
+  }
+  await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(SNAPSHOT_KEY)]);
 }

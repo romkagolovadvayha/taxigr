@@ -9,8 +9,15 @@ export type LegalSection = {
 export type LegalSections = LegalSection[] | ((operatorDetails: OperatorDetails) => LegalSection[]);
 
 const describeOperator = (operatorDetails: OperatorDetails) =>
-  `${operatorDetails.legalName}, ${operatorDetails.status}, ИНН ${operatorDetails.inn}, ` +
-  `регистрационный номер ${operatorDetails.registrationNumber}, адрес: ${operatorDetails.address}`;
+  [
+    operatorDetails.legalName || 'оператор сервиса «Такси Грахово»',
+    operatorDetails.inn && `ИНН ${operatorDetails.inn}`,
+    operatorDetails.registrationNumber && `регистрационный номер ${operatorDetails.registrationNumber}`,
+    operatorDetails.address && `адрес: ${operatorDetails.address}`,
+  ].filter(Boolean).join(', ');
+
+const describeContacts = (operatorDetails: OperatorDetails) =>
+  [operatorDetails.email, operatorDetails.phone].filter(Boolean).join(', ');
 
 export const termsSections = (operatorDetails: OperatorDetails): LegalSection[] => [
   {
@@ -72,7 +79,7 @@ export const termsSections = (operatorDetails: OperatorDetails): LegalSection[] 
   {
     title: '8. Претензии и споры',
     paragraphs: [
-      `Обращения принимаются по адресу ${operatorDetails.email} и телефону ${operatorDetails.phone}. В обращении следует указать дату поездки, номер заказа, обстоятельства и требование. Ответ предоставляется в срок, установленный законом.`,
+      `Контакты для обращений: ${describeContacts(operatorDetails)}. В обращении следует указать дату поездки, номер заказа, обстоятельства и требование. Ответ предоставляется в срок, установленный законом.`,
       'Применяется право Российской Федерации. Обязательный законом порядок и подсудность для потребителя не могут быть ухудшены настоящим Соглашением.',
     ],
   },
@@ -128,7 +135,7 @@ export const privacySections = (operatorDetails: OperatorDetails): LegalSection[
     paragraphs: [
       'Приложение и сервис: «Такси Грахово» (ru.grahovo.taxi). Разработчик в Google Play: Roman Mescheryakov.',
       `Контакт по вопросам конфиденциальности и удаления данных: ${operatorDetails.email}.`,
-      ...(operatorDetails.legalName && operatorDetails.legalName !== 'Реквизиты оператора не заполнены'
+      ...(operatorDetails.legalName
         ? [`Оператор сервиса: ${operatorDetails.legalName}.`]
         : []),
       ...([
@@ -136,7 +143,7 @@ export const privacySections = (operatorDetails: OperatorDetails): LegalSection[
         ['Регистрационный номер', operatorDetails.registrationNumber],
         ['Адрес', operatorDetails.address],
         ['Телефон', operatorDetails.phone],
-      ] as const).filter(([, value]) => value && value !== 'не указан').map(([label, value]) => `${label}: ${value}.`),
+      ] as const).filter(([, value]) => value).map(([label, value]) => `${label}: ${value}.`),
     ],
   },
   {
@@ -216,7 +223,7 @@ export const personalDataConsentSections = (operatorDetails: OperatorDetails): L
   {
     title: '1. Кому даётся согласие',
     paragraphs: [
-      `Я свободно, своей волей и в своём интересе даю согласие оператору: ${describeOperator(operatorDetails)}. Контакты: ${operatorDetails.email}, ${operatorDetails.phone}.`,
+      `Я свободно, своей волей и в своём интересе даю согласие оператору: ${describeOperator(operatorDetails)}. Контакты: ${describeContacts(operatorDetails)}.`,
     ],
   },
   {

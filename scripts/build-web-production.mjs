@@ -17,9 +17,9 @@ if (!publicUrl) {
 const environment = {
   ...process.env,
   EXPO_NO_DOTENV: '1',
-  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || publicUrl,
-  EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || publicUrl,
-  EXPO_PUBLIC_SITE_URL: process.env.EXPO_PUBLIC_SITE_URL || publicUrl,
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || production.EXPO_PUBLIC_API_URL || publicUrl,
+  EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || production.EXPO_PUBLIC_SOCKET_URL || publicUrl,
+  EXPO_PUBLIC_SITE_URL: process.env.EXPO_PUBLIC_SITE_URL || production.EXPO_PUBLIC_SITE_URL || publicUrl,
   EXPO_PUBLIC_MAP_TILES_URL: process.env.EXPO_PUBLIC_MAP_TILES_URL || production.EXPO_PUBLIC_MAP_TILES_URL || '',
   EXPO_PUBLIC_MAP_GLYPHS_URL: process.env.EXPO_PUBLIC_MAP_GLYPHS_URL || production.EXPO_PUBLIC_MAP_GLYPHS_URL || '',
   EXPO_PUBLIC_DEMO_MODE: 'false',

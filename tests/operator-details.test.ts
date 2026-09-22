@@ -31,7 +31,18 @@ describe('operator details in legal documents', () => {
     expect(areOperatorDetailsReady(details)).toBe(true);
     const incomplete = { ...details, legalName: '', inn: '', taxiRegistryNumber: '' };
     expect(areOperatorDetailsReady(incomplete)).toBe(false);
-    expect(presentOperatorDetails(incomplete).inn).toBe('не указан');
+    expect(presentOperatorDetails(incomplete).inn).toBe('');
     expect(incomplete.inn).toBe('');
+  });
+
+  it('publishes only supplied details without draft labels or invented identifiers', () => {
+    const partial = presentOperatorDetails({ ...details, registrationNumber: '', address: '', phone: '', taxiRegistryNumber: '' });
+    for (const build of [termsSections, privacySections, personalDataConsentSections]) {
+      const document = JSON.stringify(build(partial));
+      expect(document).toContain(details.legalName);
+      expect(document).toContain(details.inn);
+      expect(document).toContain(details.email);
+      expect(document).not.toMatch(/ИНН не указан|не заполнены|регистрационный номер|Регистрационный номер|адрес: |Адрес: |, \./);
+    }
   });
 });

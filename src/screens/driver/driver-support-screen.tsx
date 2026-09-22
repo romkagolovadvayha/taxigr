@@ -15,7 +15,7 @@ export function DriverSupportScreen() {
   const colors = useThemeColors();
   const { operatorDetails } = useOperatorDetails();
   const [message, setMessage] = useState<string | null>(null);
-  const supportPhoneAvailable = operatorDetails.phone !== 'не указан';
+  const supportPhoneAvailable = Boolean(operatorDetails.phone);
 
   const openUrl = async (url: string, failureMessage: string) => {
     try {

@@ -32,7 +32,7 @@ const groups = [
 
 export function LegalHubScreen() {
   const colors = useThemeColors();
-  const { operatorDetails, operatorDetailsReady, isPending } = useOperatorDetails();
+  const { operatorDetails } = useOperatorDetails();
   return (
     <Screen contentStyle={{ maxWidth: 920 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -48,21 +48,6 @@ export function LegalHubScreen() {
           рекомендации по безопасности.
         </Text>
       </View>
-
-      {!isPending && !operatorDetailsReady && (
-        <View
-          accessibilityRole="alert"
-          style={{ padding: spacing.x4, borderRadius: radius.lg, backgroundColor: colors.brandSoft, gap: spacing.x2 }}
-        >
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            Реквизиты оператора требуют заполнения
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            Эта dev-версия не должна публиковаться как коммерческий сервис до заполнения реквизитов и
-            регистрационных сведений службы заказа такси.
-          </Text>
-        </View>
-      )}
 
       {groups.map((group) => (
         <View key={group.title} style={{ gap: spacing.x3 }}>
@@ -138,20 +123,23 @@ export function LegalHubScreen() {
         <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
           Оператор сервиса
         </Text>
-        <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-          {operatorDetails.legalName} · {operatorDetails.status}
-        </Text>
+        {!!operatorDetails.legalName && (
+          <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
+            {operatorDetails.legalName}
+          </Text>
+        )}
+        {([
+          ['ИНН', operatorDetails.inn],
+          ['Регистрационный номер', operatorDetails.registrationNumber],
+          ['Адрес', operatorDetails.address],
+          ['Реестр служб заказа такси', operatorDetails.taxiRegistryNumber],
+        ] as const).filter(([, value]) => value).map(([label, value]) => (
+          <Text key={label} selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+            {label}: {value}
+          </Text>
+        ))}
         <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          ИНН: {operatorDetails.inn} · регистрационный номер: {operatorDetails.registrationNumber}
-        </Text>
-        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          Адрес: {operatorDetails.address}
-        </Text>
-        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          Реестр служб заказа такси: {operatorDetails.taxiRegistryNumber}
-        </Text>
-        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          Поддержка: {operatorDetails.email} · {operatorDetails.phone}
+          Поддержка: {[operatorDetails.email, operatorDetails.phone].filter(Boolean).join(' · ')}
         </Text>
       </View>
     </Screen>

@@ -8,7 +8,6 @@ export default function SafetyRoute() {
       title={legalDocuments.safety.title}
       lead="Практические рекомендации пассажиру и водителю до, во время и после поездки."
       sections={safetySections}
-      showOperatorWarning={false}
     />
   );
 }

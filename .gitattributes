@@ -1,2 +1,6 @@
 *.apk filter=lfs diff=lfs merge=lfs -text
 deploy/*.sh text eol=lf
+*.pdf binary
+*.docx binary
+*.png binary
+*.zip binary

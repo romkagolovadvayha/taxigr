@@ -62,15 +62,15 @@ const demoProfile: DriverProfile = {
   plate: demoDriver.vehicle.plate,
 };
 
-function formFromProfile(profile: DriverProfile): VehicleForm {
+function formFromProfile(profile: DriverProfile | null): VehicleForm {
   return {
-    vehicleMake: profile.make ?? '',
-    vehicleModel: profile.model ?? '',
-    vehicleYear: profile.year ? String(profile.year) : '',
-    vehicleColor: profile.color ?? '',
-    vehicleColorHex: profile.colorHex ?? '#777C84',
-    plate: profile.plate ?? '',
-    hasChildSeat: profile.hasChildSeat,
+    vehicleMake: profile?.make ?? '',
+    vehicleModel: profile?.model ?? '',
+    vehicleYear: profile?.year ? String(profile.year) : '',
+    vehicleColor: profile?.color ?? '',
+    vehicleColorHex: profile?.colorHex ?? '#777C84',
+    plate: profile?.plate ?? '',
+    hasChildSeat: profile?.hasChildSeat ?? false,
   };
 }
 
@@ -81,7 +81,7 @@ export function DriverProfileScreen() {
   const [profile, setProfile] = useState<DriverProfile | null>(demo ? demoProfile : null);
   const loadRequestRef = useRef(0);
   const [requests, setRequests] = useState<VehicleChangeRequest[]>([]);
-  const [form, setForm] = useState<VehicleForm>(() => formFromProfile(demoProfile));
+  const [form, setForm] = useState<VehicleForm>(() => formFromProfile(demo ? demoProfile : null));
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +139,7 @@ export function DriverProfileScreen() {
     return () => subscription.remove();
   }, [load]);
 
-  const activeProfile = profile ?? demoProfile;
+  const activeProfile = profile;
 
   const pendingRequest = useMemo(
     () => requests.find((request) => request.status === 'pending'),
@@ -159,7 +159,7 @@ export function DriverProfileScreen() {
     year <= new Date().getFullYear() + 1;
 
   const submitChange = async () => {
-    if (!valid || pendingRequest) return;
+    if (!valid || pendingRequest || !activeProfile || !token) return;
     setBusy(true);
     try {
       const payload = {
@@ -167,7 +167,7 @@ export function DriverProfileScreen() {
         vehicleYear: year,
         plate: form.plate.toUpperCase(),
       };
-      if (demo || !token) {
+      if (demo) {
         const request: VehicleChangeRequest = {
           id: `demo-change-${Date.now()}`,
           driverId: activeProfile.id,
@@ -244,7 +244,7 @@ export function DriverProfileScreen() {
     </View>
   );
 
-  if (!profile) {
+  if (!activeProfile) {
     return (
       <Screen contentStyle={{ maxWidth: 760, alignItems: 'center', justifyContent: 'center' }}>
         {!!error ? (

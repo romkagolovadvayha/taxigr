@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { grahovoAddressCatalog, grahovoHouseSnapshot } from '../src/data/grahovo-address-catalog';
+import { grahovoAddressCatalog, grahovoAddressSuggestions, grahovoHouseSnapshot, grahovoSettlement } from '../src/data/grahovo-address-catalog';
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
 import { hasApproximateCoordinates, isPickupAddressComplete } from '../src/domain/address-precision';
 import { filterRequestedHouse, rankAddressSearchResults } from '../src/domain/address-search';
 
 describe('district house coordinates', () => {
+  it('uses official local streets for suggestions and a settlement for manual map positioning', () => {
+    expect(grahovoAddressSuggestions).toHaveLength(5);
+    expect(grahovoAddressSuggestions.every(address => address.id.startsWith('gar:') &&
+      address.kind === 'street' && grahovoAddressCatalog.includes(address))).toBe(true);
+    expect(grahovoSettlement).toMatchObject({ kind: 'settlement', label: 'с. Грахово', coordinatePrecision: 'approximate' });
+  });
   it('keeps every GAR object and adds mapped addresses absent from that snapshot', () => {
     const replaced = new Set(grahovoHouseSnapshot.points.flatMap(p => 'garId' in p ? [p.garId] : []));
     const ids = new Set(grahovoAddressCatalog.map(a => a.id));

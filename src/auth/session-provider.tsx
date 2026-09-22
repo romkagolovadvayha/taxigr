@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useEffect, useMemo, useRef, useState
 import { Platform } from 'react-native';
 
 import { ApiError, apiRequest, clearApiCache, setApiCacheSession } from '@/api/client';
+import { demoEnabled } from '@/auth/demo-mode';
 import type { DemoPersona, SessionUser, UserRole } from '@/domain/models';
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
@@ -116,7 +117,6 @@ type SessionContextValue = {
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
-const demoEnabled = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 function demoUser(persona: DemoPersona = 'passenger'): SessionUser {
   const role: UserRole = persona;

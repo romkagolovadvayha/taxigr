@@ -17,12 +17,11 @@ type Props = {
   updated: string;
   lead: string;
   sections: LegalSections;
-  showOperatorWarning?: boolean;
 };
 
-export function LegalScreen({ title, updated, lead, sections, showOperatorWarning = true }: Props) {
+export function LegalScreen({ title, updated, lead, sections }: Props) {
   const colors = useThemeColors();
-  const { operatorDetails, operatorDetailsReady, isPending } = useOperatorDetails();
+  const { operatorDetails } = useOperatorDetails();
   const resolvedSections = typeof sections === 'function' ? sections(operatorDetails) : sections;
   return (
     <Screen contentStyle={{ maxWidth: 860 }}>
@@ -35,25 +34,6 @@ export function LegalScreen({ title, updated, lead, sections, showOperatorWarnin
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>Редакция от {updated}</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>{lead}</Text>
       </View>
-      {showOperatorWarning && !isPending && !operatorDetailsReady && (
-        <View
-          accessibilityRole="alert"
-          style={{
-            gap: spacing.x2,
-            padding: spacing.x4,
-            borderRadius: 18,
-            backgroundColor: colors.brandSoft,
-          }}
-        >
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            Документ ещё не готов к публикации
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            Перед коммерческим запуском заполните юридические реквизиты оператора и номер записи в
-            реестре служб заказа легкового такси.
-          </Text>
-        </View>
-      )}
       {resolvedSections.map((section) => (
         <View key={section.title} style={{ gap: spacing.x2 }}>
           <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{section.title}</Text>

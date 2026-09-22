@@ -8,7 +8,6 @@ export default function PrivacyRoute() {
       title={legalDocuments.privacy.title}
       lead="Политика конфиденциальности приложения «Такси Грахово» (ru.grahovo.taxi). Разработчик в Google Play — Roman Mescheryakov. Здесь описано, какие данные мы собираем, зачем используем, кому передаём и как их удалить."
       sections={privacySections}
-      showOperatorWarning={false}
     />
   );
 }

@@ -3,7 +3,7 @@ import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from 'reac
 import { Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import { grahovoCenter } from '@/data/demo';
+import { grahovoCenter } from '@/data/service-area';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { MapLoadingOverlay } from './map-loading-overlay';

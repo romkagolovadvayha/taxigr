@@ -6,14 +6,12 @@ type Props = {
   title: string;
   lead: string;
   sections: LegalSections;
-  showOperatorWarning?: boolean;
 };
 
 export function LegalDocumentRoute({
   title,
   lead,
   sections,
-  showOperatorWarning,
 }: Props) {
   return (
     <LegalScreen
@@ -21,7 +19,6 @@ export function LegalDocumentRoute({
       updated={LEGAL_UPDATED_AT}
       lead={lead}
       sections={sections}
-      showOperatorWarning={showOperatorWarning}
     />
   );
 }
