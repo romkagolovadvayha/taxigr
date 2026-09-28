@@ -1,0 +1,34 @@
+name: Deploy production
+'on':
+  push:
+    branches:
+    - main
+  workflow_dispatch: null
+concurrency:
+  group: taxigr-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    name: Tests, Expo web build and production deployment
+    runs-on: gitlub-deploy
+    timeout-minutes: 100
+    steps:
+    - name: Build and deploy exact pushed commit
+      shell: bash
+      env:
+        DEPLOY_COMMIT: ${{ forgejo.sha }}
+        DEPLOY_BRANCH: ${{ forgejo.ref_name }}
+        BUILD_SSH_HOST: ${{ vars.BUILD_SSH_HOST }}
+        BUILD_SSH_PRIVATE_KEY: ${{ secrets.BUILD_SSH_PRIVATE_KEY }}
+        BUILD_SSH_KNOWN_HOSTS: ${{ secrets.BUILD_SSH_KNOWN_HOSTS }}
+        ACTION_VARIABLES: ${{ toJSON(vars) }}
+        ACTION_SECRETS: ${{ toJSON(secrets) }}
+      run: "set -euo pipefail\n[[ \"$DEPLOY_COMMIT\" =~ ^[0-9a-f]{40}$ ]]\ntest \"$DEPLOY_BRANCH\" = main\numask 077\ndirectory=$(mktemp -d)\ntrap 'rm -f\
+        \ \"$directory/key\" \"$directory/known_hosts\" \"$directory/settings.json\"; rmdir \"$directory\"' EXIT\nprintf '%s\\n' \"$BUILD_SSH_PRIVATE_KEY\"\
+        \ > \"$directory/key\"\nprintf '%s\\n' \"$BUILD_SSH_KNOWN_HOSTS\" > \"$directory/known_hosts\"\npython3 - <<'PY' > \"$directory/settings.json\"\n\
+        import json,os,sys\nvariables=json.loads(os.environ['ACTION_VARIABLES'])\nsecrets=json.loads(os.environ['ACTION_SECRETS'])\njson.dump({\n 'variables':{k.removeprefix('PRODUCTION_'):v\
+        \ for k,v in variables.items() if k.startswith('PRODUCTION_')},\n 'secrets':{k.removeprefix('PRODUCTION_'):v for k,v in secrets.items() if k.startswith('PRODUCTION_')\
+        \ and not k.startswith('PRODUCTION_SSH_')}\n},sys.stdout)\nPY\nunset ACTION_SECRETS BUILD_SSH_PRIVATE_KEY BUILD_SSH_KNOWN_HOSTS\nssh -T -i \"$directory/key\"\
+        \ -o IdentitiesOnly=yes -o BatchMode=yes \\\n  -o StrictHostKeyChecking=yes -o UserKnownHostsFile=\"$directory/known_hosts\" \\\n  -o ConnectTimeout=20\
+        \ -o ServerAliveInterval=30 -o ServerAliveCountMax=15 \\\n  \"root@$BUILD_SSH_HOST\" \"deploy $DEPLOY_BRANCH $DEPLOY_COMMIT\" < \"$directory/settings.json\"\
+        \n"
