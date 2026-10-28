@@ -2011,31 +2011,28 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     }
   }, 15_000);
 
-  it('confirms arrival with a fresh fix despite stale storage and location throttling', async () => {
+  it.each(['missing', 'stale', 'distant'] as const)('confirms arrival without a GPS gate with %s location data', async (locationState) => {
     await setDriverStatus(driverOneToken, 'online');
     const order = await createOrder(passengerToken);
     expect(order.status).toBe(201);
-    const path = `/v1/driver/orders/${order.data!.id}`;
-    expect((await api(`${path}/accept`, { method: 'POST', token: driverOneToken, body: {} })).status).toBe(200);
-    expect((await api(`${path}/transition`, { method: 'POST', token: driverOneToken, body: { status: 'driver_arriving' } })).status).toBe(200);
-    await api('/v1/driver/location', { method: 'PUT', token: driverOneToken, body: { ...pickup.coordinates, accuracyMeters: 8 } });
-    await connection.execute(`UPDATE driver_locations SET recorded_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 5 MINUTE) WHERE driver_id = ?`, [fixture.driverOneId]);
-    const arrive = (location?: object, token = driverOneToken) => api<RideOrder>(`${path}/transition`, {
-      method: 'POST', token, body: { status: 'driver_waiting', location },
+    const path = '/v1/driver/orders/' + order.data!.id;
+    expect((await api(path + '/accept', { method: 'POST', token: driverOneToken, body: {} })).status).toBe(200);
+    expect((await api(path + '/transition', { method: 'POST', token: driverOneToken, body: { status: 'driver_arriving' } })).status).toBe(200);
+    await connection.execute('DELETE FROM driver_locations WHERE driver_id = ?', [fixture.driverOneId]);
+    if (locationState !== 'missing') {
+      await connection.execute(
+        'INSERT INTO driver_locations (driver_id, latitude, longitude, accuracy_meters, recorded_at) VALUES (?, ?, ?, 8, ?)',
+        [fixture.driverOneId, locationState === 'distant' ? 57 : pickup.coordinates.latitude,
+          pickup.coordinates.longitude, new Date(Date.now() - (locationState === 'stale' ? 600_000 : 0))],
+      );
+    }
+    const arrive = (token: string) => api<RideOrder>(path + '/transition', {
+      method: 'POST', token, body: { status: 'driver_waiting' },
     });
-    expect((await arrive()).error?.code).toBe('DRIVER_LOCATION_STALE');
-    const fix = { ...pickup.coordinates, accuracyMeters: 8, recordedAt: Date.now() };
-    expect((await arrive(fix, driverTwoToken)).status).toBe(404);
-    expect((await arrive({ ...fix, recordedAt: Date.now() - 180_000 })).error?.code).toBe('DRIVER_LOCATION_STALE');
-    expect((await arrive({ ...fix, recordedAt: Date.now() + 180_000 })).error?.code).toBe('DRIVER_LOCATION_STALE');
-    expect((await arrive({ ...fix, latitude: 56.15 })).error?.code).toBe('DRIVER_NOT_AT_PICKUP');
-    expect((await arrive({ ...fix, latitude: 200 })).status).toBe(400);
-    const result = await arrive(fix);
+    expect((await arrive(driverTwoToken)).status).toBe(404);
+    const result = await arrive(driverOneToken);
     expect(result.status, JSON.stringify(result.error)).toBe(200);
     expect(result.data?.status).toBe('driver_waiting');
-    const [rows] = await connection.query<mysql.RowDataPacket[]>("SELECT latitude, TIMESTAMPDIFF(MICROSECOND, '1970-01-01', recorded_at) DIV 1000 AS recordedAtMs FROM driver_locations WHERE driver_id = ?", [fixture.driverOneId]);
-    expect(Number(rows[0]!.latitude)).toBe(fix.latitude);
-    expect(Number(rows[0]!.recordedAtMs)).toBe(fix.recordedAt);
   });
 
   it('runs the full driver lifecycle, location updates and earnings', async () => {
