@@ -5497,10 +5497,14 @@ export async function registerRoutes(
   app.post('/v1/driver/orders/:id/transition', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
-    const { status, paymentReceived } = parse(
+    const { status, paymentReceived, location: arrivalLocation } = parse(
       z.object({
         status: z.enum(['driver_arriving', 'driver_waiting', 'in_progress', 'completed']),
         paymentReceived: z.boolean().optional(),
+        location: pointSchema.extend({
+          accuracyMeters: z.number().min(0).max(10_000).optional(),
+          recordedAt: z.number().int().positive(),
+        }).optional(),
       }),
       request.body,
     );
@@ -5539,6 +5543,24 @@ export async function registerRoutes(
         });
       }
       if (status === 'driver_waiting') {
+        // The fix captured by the arrival button travels with the transition,
+        // bypassing the independent location endpoint's throttle and races.
+        if (arrivalLocation) {
+          const age = Date.now() - arrivalLocation.recordedAt;
+          if (age > 120_000 || age < -30_000) {
+            throw Object.assign(new Error('Геопозиция устарела. Дождитесь сигнала GPS и снова нажмите «Я на месте».'), {
+              statusCode: 409, code: 'DRIVER_LOCATION_STALE',
+            });
+          }
+          await connection.execute(
+            `INSERT INTO driver_locations (driver_id, latitude, longitude, accuracy_meters, recorded_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude),
+               accuracy_meters = VALUES(accuracy_meters), recorded_at = VALUES(recorded_at)`,
+            [driver.id, arrivalLocation.latitude, arrivalLocation.longitude,
+              arrivalLocation.accuracyMeters ?? null, new Date(arrivalLocation.recordedAt)],
+          );
+        }
         const [locationRows] = await connection.query<
           (RowDataPacket & {
             latitude: number;
@@ -5554,7 +5576,7 @@ export async function registerRoutes(
         const location = locationRows[0];
         const recordedAt = location ? new Date(location.recorded_at).getTime() : 0;
         if (!location || !Number.isFinite(recordedAt) || Date.now() - recordedAt > 120_000) {
-          throw Object.assign(new Error('Не удалось подтвердить ваше местоположение у точки подачи'), {
+          throw Object.assign(new Error('Геопозиция не обновилась. Включите GPS, откройте приложение и снова нажмите «Я на месте».'), {
             statusCode: 409,
             code: 'DRIVER_LOCATION_STALE',
           });

@@ -7,6 +7,7 @@ import { grahovoCenter } from '@/data/service-area';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { MapLoadingOverlay } from './map-loading-overlay';
+import { PickupRadar } from './pickup-radar';
 import { configureNativeMapCache } from './map-cache.native';
 import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate } from './map-scene';
 import { taxiMapStyle } from './map-style';
@@ -142,6 +143,11 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
           'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotate': ['get', 'heading'],
           'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'viewport' }} />
       </GeoJSONSource>
+      {props.searching && scene.points.filter(point => point.kind === 'pickup').map(point => (
+        <Marker key={`radar-${point.id}`} id={`radar-${point.id}`} lngLat={point.coordinates} anchor="center">
+          <PickupRadar />
+        </Marker>
+      ))}
       {scene.points.map(point => <Marker key={point.id} id={point.id} lngLat={point.coordinates} anchor="bottom" offset={[0, 8]}>
         <View collapsable={false} pointerEvents="none" style={{ alignItems: 'center' }} accessibilityLabel={point.label}>
           <Text numberOfLines={1} style={{ maxWidth: 200, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,

@@ -183,6 +183,7 @@ export function OrderScreen() {
 
   const map = (
     <TaxiMap
+      searching={currentRide?.status === 'searching'}
       pickup={rideInProgress || routeCompleted ? null : currentRide?.pickup ?? pickup}
       destinations={currentRide?.destinations ?? destinations}
       destination={currentRide?.destination ?? destination}

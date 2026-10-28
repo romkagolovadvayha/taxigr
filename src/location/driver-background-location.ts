@@ -77,9 +77,9 @@ export async function syncDriverBackgroundLocation(
   await Location.startLocationUpdatesAsync(DRIVER_LOCATION_TASK, {
     accuracy: Location.Accuracy.Balanced,
     timeInterval: 10_000,
-    distanceInterval: 25,
+    distanceInterval: 0,
     deferredUpdatesInterval: 10_000,
-    deferredUpdatesDistance: 25,
+    deferredUpdatesDistance: 0,
     activityType: Location.ActivityType.AutomotiveNavigation,
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,

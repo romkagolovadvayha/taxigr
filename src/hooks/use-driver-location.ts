@@ -180,20 +180,20 @@ export function useDriverLocation({
         return;
       }
 
-      const backgroundEnabled = await syncDriverBackgroundLocation(true, false);
-      if (cancelled) return;
-      if (!backgroundEnabled) {
+      // Background setup must never prevent foreground navigation from starting.
+      void syncDriverBackgroundLocation(true, false).catch(() => false).then(backgroundEnabled => {
+        if (cancelled || backgroundEnabled) return;
         backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы заказы и маршрут работали при свёрнутом приложении';
         setState((current) => ({
           ...current,
           error: backgroundWarning,
         }));
-      }
+      });
 
       const lastKnown = await Location.getLastKnownPositionAsync({
         maxAge: 120_000,
         requiredAccuracy: 200,
-      });
+      }).catch(() => null);
       if (cancelled) return;
       if (lastKnown) applyPosition(lastKnown);
 
@@ -205,13 +205,13 @@ export function useDriverLocation({
                   ? Location.Accuracy.High
                   : Location.Accuracy.BestForNavigation,
               timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
-              distanceInterval: 10,
+              distanceInterval: 0,
               mayShowUserSettingsDialog: true,
             }
           : {
               accuracy: Location.Accuracy.Balanced,
               timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
-              distanceInterval: 25,
+              distanceInterval: 0,
               mayShowUserSettingsDialog: true,
             },
         applyPosition,

@@ -54,6 +54,7 @@ import {
 } from '@/domain/search-price-increase';
 import { activeWaitingSeconds } from '@/domain/waiting';
 import { getInstallationId } from '@/storage/device-id';
+import { getDriverArrivalLocation } from '@/location/driver-arrival-location';
 
 const ESTIMATED_ROUTE_RETRY_MS = 31_000;
 
@@ -1110,13 +1111,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
           current.status === 'searching' && status === 'accepted'
             ? `/v1/driver/orders/${current.id}/accept`
             : `/v1/driver/orders/${current.id}/transition`;
+        const location = status === 'driver_waiting' ? await getDriverArrivalLocation() : undefined;
         const ride = await apiRequest<RideOrder>(endpoint, {
           method: 'POST',
           token,
           body: JSON.stringify(
             status === 'accepted'
               ? {}
-              : { status, ...(status === 'completed' ? { paymentReceived: true } : {}) },
+              : { status, location, ...(status === 'completed' ? { paymentReceived: true } : {}) },
           ),
         });
         applyDriverOrder(ride);

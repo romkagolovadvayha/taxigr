@@ -59,7 +59,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     for (const [id, marker] of pointsRef.current) if (!active.has(id)) { marker.remove(); pointsRef.current.delete(id); pointValues.current.delete(id); }
     const updatePoint = (point: RouteMapPoint) => {
       let marker = pointsRef.current.get(point.id);
-      const value = JSON.stringify([point, colors.brand, colors.ink, colors.surface, colors.brandInk]);
+      const searching = Boolean(props.searching && point.kind === 'pickup');
+      const value = JSON.stringify([point, searching, colors.brand, colors.ink, colors.surface, colors.brandInk]);
       if (marker && pointValues.current.get(point.id) === value) return;
       pointValues.current.set(point.id, value);
       if (!marker) {
@@ -71,17 +72,31 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
           fontFamily: 'Manrope, system-ui, sans-serif', fontSize: '14px', fontWeight: '600', lineHeight: '20px',
           boxShadow: '0 2px 8px rgba(0,0,0,.16)' });
         const dot = document.createElement('div');
-        Object.assign(dot.style, { width: '16px', height: '16px', borderRadius: '50%', border: '2px solid white', boxSizing: 'border-box' });
+        Object.assign(dot.style, { position: 'relative', width: '16px', height: '16px', borderRadius: '50%', border: '2px solid white', boxSizing: 'border-box' });
         element.append(label, dot);
         marker = new api.Marker({ element, anchor: 'bottom', offset: [0, 8] }).setLngLat(point.coordinates).addTo(map);
         pointsRef.current.set(point.id, marker);
       }
       const element = marker.getElement();
-      element.setAttribute('aria-label', point.label);
+      element.setAttribute('aria-label', searching ? `${point.label} · Ищем водителя` : point.label);
       const label = element.children[0] as HTMLDivElement, dot = element.children[1] as HTMLDivElement;
       label.textContent = point.label;
       label.style.background = dot.style.background = point.kind === 'pickup' ? colors.brand : point.kind === 'destination' ? colors.ink : colors.surface;
       label.style.color = point.kind === 'destination' ? colors.surface : point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      label.style.zIndex = '1';
+      dot.style.setProperty('--pickup-radar-color', colors.brand);
+      if (searching && !dot.firstChild) {
+        const radar = document.createElement('div');
+        radar.className = 'taxi-pickup-radar';
+        radar.setAttribute('aria-hidden', 'true');
+        for (let index = 0; index < 3; index += 1) {
+          const ring = document.createElement('span');
+          ring.style.animationDelay = `${-index * 800}ms`;
+          ring.style.setProperty('--radar-static-scale', String(0.3 + index / 3));
+          radar.append(ring);
+        }
+        dot.append(radar);
+      } else if (!searching) dot.replaceChildren();
       const currentPosition = marker.getLngLat();
       if (currentPosition.lng !== point.coordinates[0] || currentPosition.lat !== point.coordinates[1]) marker.setLngLat(point.coordinates);
     };
@@ -257,11 +272,17 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
   useEffect(() => { followRef.current = true; followTarget.current = ''; }, [props.followDriver, props.followRequestId]);
   useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.passenger,
-    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, sync]);
+    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, props.searching, sync]);
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
     <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />
     <style>{'[data-taxi-map="maplibre"] .maplibregl-ctrl-bottom-right{bottom:var(--taxi-map-attribution-bottom,4px)}[data-taxi-map="maplibre"] .maplibregl-ctrl-top-right{top:var(--taxi-map-control-top,8px)}'}</style>
+    <style>{`
+      .taxi-pickup-radar{position:absolute;left:50%;top:50%;width:160px;height:160px;transform:translate(-50%,-50%);pointer-events:none}
+      .taxi-pickup-radar span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--pickup-radar-color);background:var(--pickup-radar-color);box-sizing:border-box;animation:taxi-pickup-pulse 2400ms linear infinite}
+      @keyframes taxi-pickup-pulse{from{transform:scale(.15);opacity:.55}to{transform:scale(1);opacity:0}}
+      @media(prefers-reduced-motion:reduce){.taxi-pickup-radar span{animation:none;transform:scale(var(--radar-static-scale));opacity:.08}}
+    `}</style>
     {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} mapVisible={initialized} onRetry={props.retry} insets={props.viewportInsets} />}
   </View>;
 });
