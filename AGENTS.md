@@ -4,6 +4,10 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 ## RuStore publishing preference
 
+- Every RuStore submission must include the current test phone and permanent verification code as plain text in the moderator comment (`moderInfo` in the API, «Комментарий модератору» in the console). A link to instructions alone is not enough. This is a standing user requirement after rejection of 1.0.20 (40).
+- Before each submission run `npm run review:rustore`. It verifies production login and generates `tmp/store-release-<version>/rustore-review.json` and `moderator-comment.txt` from the account constants. Use the generated comment, verify that it is saved in the actual submitted version, and record that verification in the release receipt. Never submit with an empty or stale comment. See `store-listing/rustore-review.md` for the full login instructions.
+- Verified on 2026-09-23: 1.0.21 (41), version ID 2064840966, was sent through the authenticated console; its submitted version detail page showed the full generated test-login comment and «Ожидает модерацию». API draft creation returned `Not found active version` (authentication succeeded), so the console was used to create the version. Evidence: `tmp/store-release-1.0.21/rustore.json`.
+
 The user has already provided RuStore API access. Prefer the API for uploads, submission and status checks. Do not ask for the token again or start with browser uploads when the API can do the operation.
 
 - Existing credentials are in `credentials/rustore/key-id.txt` and `credentials/rustore/private-key.key`. Use them in process to obtain a fresh Public-Token; never print or copy their values into source, logs or messages.

@@ -1,6 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
 import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
@@ -11,7 +10,8 @@ import type {
   RideChatThread,
   RideOrder,
 } from '@/domain/models';
-import { canSendRideChatMessage, upsertRideChatMessage } from '@/domain/ride-chat';
+import { canSendRideChatMessage, mergeRideChatSnapshot, upsertRideChatMessage } from '@/domain/ride-chat';
+import { useForegroundScreen } from './use-foreground-screen';
 
 export type RideChatImageUpload = {
   base64: string;
@@ -21,7 +21,18 @@ export type RideChatImageUpload = {
   fileName?: string;
 };
 
+type ChatSession = {
+  orderId: string;
+  token: string;
+  received: RideChatMessage[];
+  status?: RideOrder['status'];
+  request?: AbortController;
+};
+
 export function useRideChat(orderId: string | undefined) {
+  const visible = useForegroundScreen();
+  const sendInFlight = useRef(false);
+  const session = useRef<ChatSession | null>(null);
   const { token } = useSession();
   const [thread, setThread] = useState<RideChatThread | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,57 +40,62 @@ export function useRideChat(orderId: string | undefined) {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async (signal?: AbortSignal) => {
-    if (!token || token.startsWith('demo:') || !orderId) return;
-    const result = await apiRequest<RideChatThread>(`/v1/orders/${orderId}/messages`, {
-      token,
-      signal,
-    });
-    setThread(result);
-    setError(null);
-  }, [orderId, token]);
-
-  useEffect(() => {
-    if (!token || token.startsWith('demo:') || !orderId) return;
-
+  const reload = useCallback(async () => {
+    const active = session.current;
+    if (!active) return;
+    active.request?.abort();
     const controller = new AbortController();
-    const load = async () => {
-      setLoading(true);
-      try {
-        await reload(controller.signal);
-      } catch (reason) {
-        if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Не удалось загрузить чат');
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-    void load();
-    return () => controller.abort();
-  }, [orderId, reload, token]);
+    active.request = controller;
+    // Only events newer than this snapshot request may override its status.
+    active.status = undefined;
+    const isCurrent = () => session.current === active && active.request === controller && !controller.signal.aborted;
+    setLoading(true);
+    try {
+      const result = await apiRequest<RideChatThread>(`/v1/orders/${active.orderId}/messages`, {
+        token: active.token,
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      if (!isCurrent()) return;
+      setThread((current) => mergeRideChatSnapshot(result, current, active.received, active.status));
+      setError(null);
+    } catch (reason) {
+      if (isCurrent()) setError(reason instanceof Error ? reason.message : 'Не удалось загрузить чат');
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!token || token.startsWith('demo:') || !orderId) return;
+    if (!visible || !token || token.startsWith('demo:') || !orderId) return;
+
+    const active: ChatSession = { orderId, token, received: [] };
+    session.current = active;
+    void reload();
     const socketUrl = getSocketUrl();
-    if (!socketUrl) return;
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket | undefined = socketUrl ? io(socketUrl, {
       path: '/socket.io',
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnectionDelayMax: 8_000,
-    });
-    const handleConnect = () => setConnected(true);
+    }) : undefined;
+    const handleConnect = () => {
+      setConnected(true);
+      // Resync after subscription to cover messages sent before it connected.
+      void reload();
+    };
     const handleDisconnect = () => setConnected(false);
-    const handleReconnect = () => void reload().catch(() => undefined);
     const handleMessage = (message: RideChatMessage) => {
       if (message.orderId !== orderId) return;
-      setThread((current) => current
+      active.received = upsertRideChatMessage(active.received, message);
+      setThread((current) => current?.orderId === orderId
         ? { ...current, messages: upsertRideChatMessage(current.messages, message) }
         : current);
     };
     const handleOrderUpdate = (order: RideOrder) => {
       if (order.id !== orderId) return;
-      setThread((current) => current
+      active.status = order.status;
+      setThread((current) => current?.orderId === orderId
         ? {
             ...current,
             orderStatus: order.status,
@@ -90,44 +106,42 @@ export function useRideChat(orderId: string | undefined) {
         : current);
     };
 
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-    socket.io.on('reconnect', handleReconnect);
-    socket.on('ride-chat:message', handleMessage);
-    socket.on('order:updated', handleOrderUpdate);
+    socket?.on('connect', handleConnect);
+    socket?.on('disconnect', handleDisconnect);
+    socket?.on('ride-chat:message', handleMessage);
+    socket?.on('order:updated', handleOrderUpdate);
 
     return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
-      socket.io.off('reconnect', handleReconnect);
-      socket.off('ride-chat:message', handleMessage);
-      socket.off('order:updated', handleOrderUpdate);
-      socket.disconnect();
+      session.current = null;
+      active.request?.abort();
+      socket?.off('connect', handleConnect);
+      socket?.off('disconnect', handleDisconnect);
+      socket?.off('ride-chat:message', handleMessage);
+      socket?.off('order:updated', handleOrderUpdate);
+      socket?.disconnect();
+      handleDisconnect();
     };
-  }, [orderId, reload, token]);
-
-  useEffect(() => {
-    if (!token || token.startsWith('demo:') || !orderId) return;
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void reload().catch(() => undefined);
-    });
-    return () => subscription.remove();
-  }, [orderId, reload, token]);
+  }, [orderId, reload, token, visible]);
 
   const sendMessage = useCallback(async (
     body: string,
     attachment?: RideChatImageUpload,
   ): Promise<boolean> => {
+    const sendingSession = session.current;
     const normalizedBody = body.trim();
     if (
+      sendInFlight.current ||
       (!normalizedBody && !attachment) ||
       !token ||
       token.startsWith('demo:') ||
       !orderId ||
+      !sendingSession ||
+      sendingSession.orderId !== orderId ||
       !thread?.canSend
     ) {
       return false;
     }
+    sendInFlight.current = true;
     setSending(true);
     setError(null);
     try {
@@ -153,12 +167,15 @@ export function useRideChat(orderId: string | undefined) {
         }
       }
       if (!message) throw new ApiError('Не удалось отправить сообщение', 0, 'NETWORK_ERROR');
+      if (session.current !== sendingSession) return true;
       const sentMessage = message;
-      setThread((current) => current
+      sendingSession.received = upsertRideChatMessage(sendingSession.received, sentMessage);
+      setThread((current) => current?.orderId === orderId
         ? { ...current, messages: upsertRideChatMessage(current.messages, sentMessage) }
         : current);
       return true;
     } catch (reason) {
+      if (session.current !== sendingSession) return false;
       const isAttachmentNetworkError = attachment && reason instanceof ApiError &&
         (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT');
       setError(isAttachmentNetworkError
@@ -168,15 +185,16 @@ export function useRideChat(orderId: string | undefined) {
           : 'Не удалось отправить сообщение или фотографию');
       return false;
     } finally {
+      sendInFlight.current = false;
       setSending(false);
     }
   }, [orderId, thread?.canSend, token]);
 
   return {
-    thread,
+    thread: thread?.orderId === orderId ? thread : null,
     loading,
     sending,
-    connected,
+    connected: visible && connected,
     error: error ?? (token?.startsWith('demo:')
       ? 'Чат доступен после входа в приложение под реальным номером телефона.'
       : null),

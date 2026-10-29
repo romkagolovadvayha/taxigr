@@ -1,11 +1,16 @@
 import type { Address } from './models';
-import { extractHouseNumber, extractQueryHouseNumber } from './address-precision';
+import { extractHouseNumber, extractQueryHouseNumber, normalizeHouseNumber } from './address-precision';
+import { addressWordsMatch, addressQueryVariants, normalizeBotAddress } from './free-text-address';
 
-type SearchableAddress = Pick<Address, 'label' | 'details'>;
+type SearchableAddress = Pick<Address, 'label' | 'details' | 'kind'>;
+
+export function isIntercitySettlement(address: SearchableAddress): boolean {
+  return address.kind === 'settlement' && !/грахово|граховск/iu.test(`${address.label} ${address.details ?? ''}`);
+}
 
 export function filterRequestedHouse<T extends SearchableAddress>(addresses: T[], query: string): T[] {
-  const house = extractQueryHouseNumber(query)?.toLocaleLowerCase('ru');
-  return house ? addresses.filter(address => extractHouseNumber(address)?.toLocaleLowerCase('ru') === house) : addresses;
+  const house = normalizeHouseNumber(extractQueryHouseNumber(normalizeBotAddress(query)));
+  return house ? addresses.filter(address => isIntercitySettlement(address) || normalizeHouseNumber(extractHouseNumber(address)) === house) : addresses;
 }
 
 type SearchIndex = {
@@ -24,6 +29,7 @@ const IGNORED_TOKENS = new Set([
   'пер',
   'переулок',
   'район',
+  'г', 'город', 'п', 'поселок', 'в', 'на', 'до', 'от', 'из', 'хочу', 'поехать', 'ехать', 'мне', 'я', 'такси', 'нужно', 'надо', 'пожалуйста', 'зд', 'здание', 'стр', 'строение',
 ]);
 
 const INFRASTRUCTURE_TOKENS = new Set([
@@ -34,13 +40,12 @@ const INFRASTRUCTURE_TOKENS = new Set([
 ]);
 
 function tokens(value: string): string[] {
-  return value
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+  return normalizeBotAddress(value)
+    .replace(/(?<=[а-я])-(?=[а-я])/gu, ' ')
+    .replace(/[^\p{L}\p{N}/-]+/gu, ' ')
     .trim()
     .split(' ')
-    .filter((token) => token.length > 1 && !IGNORED_TOKENS.has(token));
+    .filter((token) => (token.length > 1 || /^\d$/u.test(token)) && !IGNORED_TOKENS.has(token));
 }
 
 const searchIndexCache = new WeakMap<object, SearchIndex>();
@@ -62,6 +67,8 @@ function searchIndex(address: SearchableAddress): SearchIndex {
 function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): number {
   if (!queryTokens.length) return 0;
   const index = searchIndex(address);
+  if (isIntercitySettlement(address) && index.labelTokens.length && index.labelTokens.every(name =>
+    queryTokens.some(word => word === name || addressWordsMatch(word, name)))) return 100;
   if (
     queryTokens.length === 1 &&
     !INFRASTRUCTURE_TOKENS.has(queryTokens[0]!) &&
@@ -74,6 +81,7 @@ function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): 
   for (const queryToken of queryTokens) {
     if (index.haystackTokens.includes(queryToken)) score += 20;
     else if (index.haystackTokens.some((token) => token.startsWith(queryToken))) score += 5;
+    else if (index.haystackTokens.some((token) => addressWordsMatch(queryToken, token))) score += 3;
     else return 0;
   }
 
@@ -82,7 +90,7 @@ function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): 
 }
 
 export function addressSearchScore(address: SearchableAddress, query: string): number {
-  return scoreAddressTokens(address, tokens(query));
+  return Math.max(...addressQueryVariants(query).map(variant => scoreAddressTokens(address, tokens(variant))));
 }
 
 export function uniqueAddressesByLabel<T extends SearchableAddress>(addresses: readonly T[]): T[] {
@@ -100,14 +108,14 @@ export function rankAddressSearchResults<T extends SearchableAddress>(
   query: string,
   limit = 120,
 ): T[] {
-  const queryTokens = tokens(query);
-  if (!queryTokens.length || limit <= 0) return [];
+  const queryTokens = addressQueryVariants(query).map(tokens);
+  if (!queryTokens.some(part => part.length) || limit <= 0) return [];
 
-  return addresses
+  return filterRequestedHouse([...addresses], query)
     .map((address, position) => ({
       address,
       position,
-      score: scoreAddressTokens(address, queryTokens),
+      score: Math.max(...queryTokens.map(part => scoreAddressTokens(address, part))),
     }))
     .filter((result) => result.score > 0)
     .sort((left, right) => right.score - left.score || left.position - right.position)

@@ -1,8 +1,9 @@
-import mysql, { type Pool, type PoolConnection, type RowDataPacket } from 'mysql2/promise';
+import mysql from 'mysql2';
+import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 
 import { config } from './config';
 
-export const db: Pool = mysql.createPool({
+const pool = mysql.createPool({
   uri: config.MYSQL_URL,
   connectionLimit: 12,
   maxIdle: 8,
@@ -11,6 +12,16 @@ export const db: Pool = mysql.createPool({
   timezone: 'Z',
   decimalNumbers: true,
 });
+
+// mysql2's timezone controls decoding, not MySQL's CURRENT_TIMESTAMP/session.
+// Keep both in UTC so host timezone cannot shift order timers or fare windows.
+pool.on('connection', connection => {
+  connection.query("SET SESSION time_zone = '+00:00'", (error: Error | null) => {
+    if (error) connection.destroy();
+  });
+});
+
+export const db: Pool = pool.promise();
 
 function isRetryableTransactionError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;

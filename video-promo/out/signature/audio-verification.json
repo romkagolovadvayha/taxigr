@@ -1,0 +1,11 @@
+{
+  "comparison": "Final AAC versus the prepared third-take voice + Prizyv reference mix",
+  "correlation": 0.9996281315745654,
+  "offsetMilliseconds": 0.0,
+  "gainDB": 2.348913130926131,
+  "last100msRmsDBFS": -47.051695408915194,
+  "last10msRmsDBFS": -65.5373139523593,
+  "decodedSeconds": 32.0,
+  "matchedRequestedMix": true,
+  "fadeEndsQuietly": true
+}

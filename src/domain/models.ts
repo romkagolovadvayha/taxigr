@@ -253,6 +253,7 @@ export type DriverApplication = {
   vehicleColorHex: string;
   plate: string;
   hasChildSeat: boolean;
+  hasSezPass: boolean;
   status: DriverApplicationStatus;
   moderationComment?: string;
   createdAt: string;
@@ -329,6 +330,7 @@ export type AdminAccountSummary = {
   driverStatus?: 'online' | 'offline' | 'busy' | 'suspended';
   commissionBps?: number | null;
   hasChildSeat?: boolean;
+  hasSezPass?: boolean;
   priorities?: import('./driver-priority').DriverPriorities;
   vehicle?: VehicleDetails;
 };
@@ -411,6 +413,8 @@ export type AdminDriverDetail = {
     status: 'online' | 'offline' | 'busy' | 'suspended';
     commissionBps: number | null;
     hasChildSeat: boolean;
+    hasSezPass: boolean;
+    licenseNumber: string | null;
     priorities: import('./driver-priority').DriverPriorities;
     approvedAt: string;
     vehicle?: VehicleDetails;
@@ -422,4 +426,13 @@ export type AdminDriverDetail = {
   consents: AdminConsent[];
   shifts: { id: number; startedAt: string; endedAt?: string; minutes: number }[];
   vehicles: (VehicleDetails & { id: string; active: boolean; createdAt: string })[];
+};
+
+export type AdminDriverProfileUpdate = {
+  name?: string;
+  phone?: string;
+  licenseNumber?: string | null;
+  hasChildSeat?: boolean;
+  hasSezPass?: boolean;
+  vehicle?: VehicleDetails;
 };

@@ -11,6 +11,7 @@ import {
   calculateCommissionMinor,
   defaultPricingRules,
 } from '@/domain/pricing';
+import { intercitySettlements } from './intercity-settlements';
 
 export { grahovoCenter } from './service-area';
 
@@ -36,13 +37,7 @@ export const demoAddresses: Address[] = [
     houseNumber: '53А',
     coordinates: { latitude: 55.9995786, longitude: 51.8684492 },
   },
-  {
-    id: 'mozhga',
-    label: 'г. Можга, Привокзальная ул., 6',
-    details: 'Железнодорожный вокзал, Удмуртская Республика · точка дома',
-    houseNumber: '6',
-    coordinates: { latitude: 56.445658, longitude: 52.1972249 },
-  },
+  ...intercitySettlements,
   {
     id: 'grahovo-50-let-pobedy-19',
     label: 'ул. 50 лет Победы, 19',
@@ -145,6 +140,7 @@ export const demoApplications: DriverApplication[] = [
     vehicleColorHex: '#B8BDC4',
     plate: 'В456КМ 18',
     hasChildSeat: true,
+    hasSezPass: true,
     status: 'pending',
     createdAt: new Date(Date.now() - 7_200_000).toISOString(),
   },
@@ -161,6 +157,7 @@ export const demoApplications: DriverApplication[] = [
     vehicleColorHex: '#2F6FED',
     plate: 'М777ОР 18',
     hasChildSeat: false,
+    hasSezPass: false,
     status: 'pending',
     createdAt: new Date(Date.now() - 43_200_000).toISOString(),
   },

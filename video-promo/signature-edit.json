@@ -1,0 +1,32 @@
+{
+  "duration": 32,
+  "closingLabel": "Грахово и межгород",
+  "closingAvailability": "24/7",
+  "voice": {
+    "file": "pavel-take-03-original.wav",
+    "source": "Начитка_Гамлет Павел_озвучка для видео ролика промо_297646_81b8b8.wav",
+    "take": 3,
+    "sourceChapterStart": 40.344671,
+    "sourceChapterEnd": 62.229478,
+    "clips": [
+      {"start": 0.36, "end": 3.285, "at": 0.55, "phrase": "Приложение для заказа такси уже доступно в Грахово."},
+      {"start": 3.285, "end": 5.905, "at": 4.5, "phrase": "Укажите адрес и нажмите кнопку «Заказать»."},
+      {"start": 5.905, "end": 9.2, "at": 7.85, "phrase": "Вам придёт оповещение с номером авто и временем подачи."},
+      {"start": 9.2, "end": 11.22, "at": 12, "phrase": "Следите за поездкой в приложении."},
+      {"start": 11.22, "end": 14.385, "at": 16.7, "phrase": "После заказа оцените водителя и оставьте отзыв."},
+      {"start": 14.385, "end": 17.005, "at": 21.55, "phrase": "Заказывайте на сайте TAXIGR.RU."},
+      {"start": 17.005, "end": 19.75, "at": 24.68, "phrase": "Приложение можно скачать в RuStore, Google Play…"},
+      {"start": 19.75, "end": 21.6, "at": 27.8, "phrase": "…или в ботах MAX и ВКонтакте."}
+    ]
+  },
+  "music": {"file": "prizyv-original.mp3", "title": "Призыв", "artist": "Pepeneev Production Music", "start": 0},
+  "scenes": {
+    "hook": {"start": 0, "duration": 4.2, "authoredDuration": 4.5},
+    "order": {"start": 4.2, "duration": 3.3, "authoredDuration": 2.7},
+    "driver": {"start": 7.5, "duration": 4.1, "authoredDuration": 4.4},
+    "trip": {"start": 11.6, "duration": 4.8, "authoredDuration": 8},
+    "review": {"start": 16.4, "duration": 4.8, "authoredDuration": 6.6666666667},
+    "close": {"start": 21.2, "duration": 10.8, "authoredDuration": 5.7333333333}
+  },
+  "previewFrames": [["01-hook", 2.5], ["02-order", 6.5], ["03-driver", 10.1], ["04-map", 13.2], ["05-arrival", 15.5], ["06-rating", 18.5], ["07-thanks", 20.6], ["08-close", 30.2]]
+}

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RideChatMessage } from '../src/domain/models';
+import type { RideChatMessage, RideChatThread } from '../src/domain/models';
 import {
   canSendRideChatMessage,
   formatRideChatTime,
+  mergeRideChatSnapshot,
   upsertRideChatMessage,
 } from '../src/domain/ride-chat';
 import {
@@ -26,6 +27,33 @@ function message(id: string, createdAt: string, body = id): RideChatMessage {
 }
 
 describe('ride chat', () => {
+  const snapshot: RideChatThread = {
+    orderId: 'order-1', orderStatus: 'accepted', viewerRole: 'passenger', canSend: true, messages: [],
+  };
+
+  it('retains socket messages received before the initial HTTP history arrives', () => {
+    const incoming = message('live', '2026-10-30T10:00:00.000Z');
+    expect(mergeRideChatSnapshot(snapshot, null, [incoming]).messages).toEqual([incoming]);
+  });
+
+  it('does not replace newer messages with an older reconnect snapshot or duplicate them', () => {
+    const older = message('older', '2026-10-30T09:59:00.000Z');
+    const newer = message('newer', '2026-10-30T10:00:00.000Z');
+    expect(mergeRideChatSnapshot(
+      { ...snapshot, messages: [older] }, { ...snapshot, messages: [older, newer] }, [newer],
+    ).messages).toEqual([older, newer]);
+  });
+
+  it('never imports another order history when switching chat', () => {
+    const other = { ...message('other', '2026-10-30T10:00:00.000Z'), orderId: 'order-2' };
+    expect(mergeRideChatSnapshot(snapshot, { ...snapshot, orderId: 'order-2', messages: [other] }, [other]).messages).toEqual([]);
+  });
+
+  it('keeps a chat closed when a terminal socket event precedes the HTTP response', () => {
+    expect(mergeRideChatSnapshot(snapshot, null, [], 'completed')).toMatchObject({ canSend: false, orderStatus: 'completed' });
+    expect(mergeRideChatSnapshot({ ...snapshot, viewerRole: 'admin', canSend: false }, null, [], 'accepted').canSend).toBe(false);
+  });
+
   it('allows messages only while assigned participants are travelling', () => {
     expect(canSendRideChatMessage('searching')).toBe(false);
     expect(canSendRideChatMessage('accepted')).toBe(true);

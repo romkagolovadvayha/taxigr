@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
+import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
 import {
   addressSearchScore,
+  filterRequestedHouse,
   rankAddressSearchResults,
   uniqueAddressesByLabel,
 } from '../src/domain/address-search';
@@ -39,6 +41,16 @@ const alnashiRoad: Address = {
 };
 
 describe('address search ranking', () => {
+  it.each(['Грахово гагарина30/2к1', 'Грахово Гагарина 30/2 корпус 1'])(
+    'preserves the building number in %s', query => {
+      expect(rankAddressSearchResults(grahovoAddressCatalog, query).map(a=>a.label)).toEqual(['с. Грахово, ул. Гагарина, 30/2 к. 1']);
+    },
+  );
+  it.each(['советская10а', 'советская10a'])(
+    'accepts Cyrillic and visually identical Latin house letters in %s', query => {
+      expect(rankAddressSearchResults([{...addresses[0]!,label:'с. Грахово, ул. Советская, 10А',houseNumber:'10А'}],query)).toHaveLength(1);
+    },
+  );
   it('keeps the existing scores and deterministic order', () => {
     const legacy = [...addresses]
       .filter((address) => addressSearchScore(address, 'грахово ачинцева') > 0)
@@ -51,7 +63,7 @@ describe('address search ranking', () => {
     expect(rankAddressSearchResults(addresses, 'грахово ачинцева')).toEqual(legacy);
   });
 
-  it('keeps the legacy ranking across the real local directory', () => {
+  it('keeps deterministic relevance and filters the requested house before limiting', () => {
     const directory = uniqueAddressesByLabel([
       ...grahovoDirectoryAddresses,
       ...buildStreetSuggestions(grahovoDirectoryAddresses),
@@ -65,7 +77,7 @@ describe('address search ranking', () => {
       'магазин',
       'дорожная 11',
     ]) {
-      const legacy = [...directory]
+      const legacy = filterRequestedHouse(directory, query)
         .filter((address) => addressSearchScore(address, query) > 0)
         .sort(
           (left, right) =>

@@ -34,6 +34,7 @@ const demoDrivers: AdminAccountSummary[] = [
     driverStatus: 'online',
     commissionBps: 1200,
     hasChildSeat: true,
+    hasSezPass: true,
     vehicle: {
       ...demoDriver.vehicle,
       year: 2021,

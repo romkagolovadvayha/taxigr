@@ -1,3 +1,11 @@
 /out/signature/bundle/
+/out/signature/probe-bundle/
+/out/signature/tail-bundle/
+/out/signature/taxigr-signature-closing-tail.mp4
+/out/pavel-voice/*.wav
+/out/pavel-voice/*.log
+/out/pavel-voice/voice-edit-filter.txt
+/out/pavel-voice/*-transcript.json
+/out/pavel-voice/transcript.json
 /out/signature/*-raw.mp4
 /out/signature/*.log

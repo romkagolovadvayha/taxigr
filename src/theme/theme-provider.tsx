@@ -32,6 +32,7 @@ function applyPlatformTheme(colorScheme: AppColorScheme): void {
 
   if (process.env.EXPO_OS === 'web' && typeof document !== 'undefined') {
     document.documentElement.dataset.appTheme = colorScheme;
+    document.documentElement.dataset.theme = colorScheme;
     document.documentElement.style.colorScheme = colorScheme;
     const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     themeColor?.setAttribute('content', colors.canvas);

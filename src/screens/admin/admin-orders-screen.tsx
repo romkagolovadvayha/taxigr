@@ -22,6 +22,8 @@ export function AdminOrdersScreen() {
   const {
     adminOrders: orders,
     adminOrdersHasMore,
+    adminOrdersLoaded,
+    error: loadError,
     loadAdminOrders,
     loadMoreAdminOrders,
   } = useRide();
@@ -63,6 +65,12 @@ export function AdminOrdersScreen() {
         <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Все заказы</Text>
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>Онлайн-монитор и история поездок</Text>
       </View>
+      {!adminOrdersLoaded && !loadError && <Text style={{ color: colors.inkSecondary }}>Загружаем заказы…</Text>}
+      {!!loadError && <>
+        <Text accessibilityRole="alert" style={{ color: colors.danger }}>{loadError}</Text>
+        <AppButton variant="secondary" onPress={() => void loadAdminOrders()}>Повторить загрузку заказов</AppButton>
+      </>}
+      {adminOrdersLoaded && !loadError && orders.length === 0 && <Text style={{ color: colors.inkSecondary }}>Заказов пока нет</Text>}
       <View
         style={{
           backgroundColor: colors.surface,
@@ -131,7 +139,8 @@ export function AdminOrdersScreen() {
           loading={loadingMore}
           onPress={() => {
             setLoadingMore(true);
-            void loadMoreAdminOrders().finally(() => setLoadingMore(false));
+            setError(null);
+            void loadMoreAdminOrders().catch(reason => setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заказы')).finally(() => setLoadingMore(false));
           }}
         >
           Показать более ранние заказы

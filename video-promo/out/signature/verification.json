@@ -1,7 +1,7 @@
 {
-  "checkedAt": "2026-09-09T16:35:21.989Z",
+  "checkedAt": "2026-10-29T10:56:35.363Z",
   "file": "taxigr-signature-1080x1920-60fps.mp4",
-  "sha256": "76bab900f4428b9d0ceee29ae85ad29fe23b0c9ac6672765174aa0ddb8a4e113",
+  "sha256": "a839e77a62060d59e126a16994f0be3871ed90e38f4016fa0a55fb1e8dd11867",
   "format": {
     "programs": [],
     "stream_groups": [],
@@ -13,7 +13,7 @@
         "height": 1920,
         "pix_fmt": "yuv420p",
         "r_frame_rate": "60/1",
-        "duration": "32.000000",
+        "duration": "31.999991",
         "nb_frames": "1920"
       },
       {
@@ -28,37 +28,164 @@
     ],
     "format": {
       "duration": "32.000000",
-      "size": "6154567"
+      "size": "7044952"
     }
   },
   "loudness": {
-    "integratedLUFS": -16.06,
-    "truePeakDBTP": -3.19,
-    "rangeLU": 5.1
+    "integratedLUFS": -16.04,
+    "truePeakDBTP": -1.9,
+    "rangeLU": 4.7
+  },
+  "edit": {
+    "duration": 32,
+    "closingLabel": "Грахово и межгород",
+    "closingAvailability": "24/7",
+    "voice": {
+      "file": "pavel-take-03-original.wav",
+      "source": "Начитка_Гамлет Павел_озвучка для видео ролика промо_297646_81b8b8.wav",
+      "take": 3,
+      "sourceChapterStart": 40.344671,
+      "sourceChapterEnd": 62.229478,
+      "clips": [
+        {
+          "start": 0.36,
+          "end": 3.285,
+          "at": 0.55,
+          "phrase": "Приложение для заказа такси уже доступно в Грахово."
+        },
+        {
+          "start": 3.285,
+          "end": 5.905,
+          "at": 4.5,
+          "phrase": "Укажите адрес и нажмите кнопку «Заказать»."
+        },
+        {
+          "start": 5.905,
+          "end": 9.2,
+          "at": 7.85,
+          "phrase": "Вам придёт оповещение с номером авто и временем подачи."
+        },
+        {
+          "start": 9.2,
+          "end": 11.22,
+          "at": 12,
+          "phrase": "Следите за поездкой в приложении."
+        },
+        {
+          "start": 11.22,
+          "end": 14.385,
+          "at": 16.7,
+          "phrase": "После заказа оцените водителя и оставьте отзыв."
+        },
+        {
+          "start": 14.385,
+          "end": 17.005,
+          "at": 21.55,
+          "phrase": "Заказывайте на сайте TAXIGR.RU."
+        },
+        {
+          "start": 17.005,
+          "end": 19.75,
+          "at": 24.68,
+          "phrase": "Приложение можно скачать в RuStore, Google Play…"
+        },
+        {
+          "start": 19.75,
+          "end": 21.6,
+          "at": 27.8,
+          "phrase": "…или в ботах MAX и ВКонтакте."
+        }
+      ]
+    },
+    "music": {
+      "file": "prizyv-original.mp3",
+      "title": "Призыв",
+      "artist": "Pepeneev Production Music",
+      "start": 0
+    },
+    "scenes": {
+      "hook": {
+        "start": 0,
+        "duration": 4.2,
+        "authoredDuration": 4.5
+      },
+      "order": {
+        "start": 4.2,
+        "duration": 3.3,
+        "authoredDuration": 2.7
+      },
+      "driver": {
+        "start": 7.5,
+        "duration": 4.1,
+        "authoredDuration": 4.4
+      },
+      "trip": {
+        "start": 11.6,
+        "duration": 4.8,
+        "authoredDuration": 8
+      },
+      "review": {
+        "start": 16.4,
+        "duration": 4.8,
+        "authoredDuration": 6.6666666667
+      },
+      "close": {
+        "start": 21.2,
+        "duration": 10.8,
+        "authoredDuration": 5.7333333333
+      }
+    },
+    "previewFrames": [
+      [
+        "01-hook",
+        2.5
+      ],
+      [
+        "02-order",
+        6.5
+      ],
+      [
+        "03-driver",
+        10.1
+      ],
+      [
+        "04-map",
+        13.2
+      ],
+      [
+        "05-arrival",
+        15.5
+      ],
+      [
+        "06-rating",
+        18.5
+      ],
+      [
+        "07-thanks",
+        20.6
+      ],
+      [
+        "08-close",
+        30.2
+      ]
+    ]
   },
   "checks": {
     "decodedEntireVideo": true,
     "unintendedBlackSections": 0,
     "decodedFrames": 1920,
-    "longestIdenticalRunFrames": 7,
+    "longestIdenticalRunFrames": 9,
     "lowMotionDetectorNotes": [
-      "frame=  446 fps=0.0 q=-0.0 size=N/A time=00:00:07.43 bitrate=N/A speed=14.1x    \rframe=  896 fps=872 q=-0.0 size=N/A time=00:00:14.93 bitrate=N/A speed=14.5x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 18.6",
-      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 19.4",
-      "frame= 1375 fps=889 q=-0.0 size=N/A time=00:00:22.91 bitrate=N/A speed=14.8x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 25.233333",
-      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 26.066667",
-      "frame= 1825 fps=882 q=-0.0 size=N/A time=00:00:30.41 bitrate=N/A speed=14.7x    \r[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_start: 29.633333",
-      "[freezedetect @ 0000022a31b7c800] lavfi.freezedetect.freeze_end: 30.6"
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_start: 5.833333",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_end: 6.666667",
+      "frame=  484 fps=0.0 q=-0.0 size=N/A time=00:00:08.06 bitrate=N/A speed=15.5x    \rframe=  897 fps=869 q=-0.0 size=N/A time=00:00:14.95 bitrate=N/A speed=14.5x    \rframe= 1396 fps=904 q=-0.0 size=N/A time=00:00:23.26 bitrate=N/A speed=15.1x    \r[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_start: 28.266667",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_end: 29.466667",
+      "frame= 1807 fps=872 q=-0.0 size=N/A time=00:00:30.11 bitrate=N/A speed=14.5x    \r[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_start: 29.466667",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_end: 30.366667",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_start: 30.366667",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_end: 31.166667",
+      "[freezedetect @ 000001e4b01bbc40] lavfi.freezedetect.freeze_start: 31.166667"
     ],
-    "sourceAudio": "Existing user-supplied audio, words and speed unchanged",
-    "visualReview": "Eight scene frames, transition frame, full preview playback, and full final-master playback in the in-app browser.",
-    "browserPlayback": {
-      "duration": 32,
-      "currentTime": 32,
-      "ended": true,
-      "width": 1080,
-      "height": 1920,
-      "readyState": 4,
-      "mediaError": null
-    }
+    "sourceAudio": "Only Pavel take 3 and user-supplied Призыв. Voice EQ, gentle compression, short stereo room; phrase pauses; ducked music. No old voice or sound effects."
   }
 }

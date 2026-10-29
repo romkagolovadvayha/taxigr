@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { grahovoCenter } from '@/data/service-area';
+import { useForegroundScreen } from '@/hooks/use-foreground-screen';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { MapLoadingOverlay } from './map-loading-overlay';
@@ -164,5 +165,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const [attempt, setAttempt] = useState(0);
+  const visible = useForegroundScreen();
+  if (!visible) return <View style={{ flex: 1, minHeight: 0 }} />;
   return <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} />;
 });

@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
+import { usePathname } from 'expo-router';
 import { io, type Socket } from 'socket.io-client';
 
 import { ApiError, apiRequest, getSocketUrl, invalidateApiCache } from '@/api/client';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import { useSession } from '@/auth/session-provider';
+import { useAppForeground } from '@/hooks/use-foreground-screen';
 import { useBookingAvailability } from '@/providers/booking-availability-provider';
 import { bookingUnavailableCode } from '@/domain/booking-availability';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
@@ -109,7 +111,7 @@ type RideContextValue = {
   startWaiting: () => Promise<void>;
   stopWaiting: () => Promise<void>;
   releaseDriverRide: (reason: string, orderId?: string) => Promise<boolean>;
-  cancelRide: () => Promise<void>;
+  cancelRide: () => Promise<boolean>;
   rateRide: (score: number) => Promise<void>;
   rateDriverRide: (score: number) => Promise<void>;
   resetRide: () => void;
@@ -221,6 +223,9 @@ function idempotencyKey(): string {
 }
 
 export function RideProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const foreground = useAppForeground();
+  const quoteVisible = foreground && (pathname === '/' || pathname === '/order-confirmation');
   const { token, user, refreshSession, markInitialLegalConsentAccepted } = useSession();
   const { checkBooking, showBookingUnavailable } = useBookingAvailability();
   const demoSession = token?.startsWith('demo:') ?? false;
@@ -259,6 +264,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [chatUnreadCounts, setChatUnreadCounts] = useState<Record<string, number>>({});
   const [latestIncomingChatMessage, setLatestIncomingChatMessage] = useState<RideChatMessage | null>(null);
   // Preserve every transition even when React batches completion and promotion of the next ride.
@@ -290,6 +296,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setQuoteToken(null);
     setQuoteStatus('idle');
   }, []);
+
+  useEffect(() => {
+    if (!quoteVisible && quoteRequestController.current) invalidateQuote();
+  }, [invalidateQuote, quoteVisible]);
 
   const selectPickup = useCallback((address: Address) => {
     invalidateQuote();
@@ -448,9 +458,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverOffer(bootstrap.driverQueue.offer);
       setDestinationHistory(bootstrap.destinationHistory);
       setChatUnreadCounts(bootstrap.chatUnreadCounts);
+      setBootstrapError(null);
     } catch (reason) {
       if (sessionUserIdRef.current !== sessionUserId) return;
-      setError(reason instanceof Error ? reason.message : 'Не удалось обновить заказы');
+      setBootstrapError(reason instanceof Error ? reason.message : 'Не удалось обновить заказы');
     }
   }, [demoSession, token, userId]);
 
@@ -655,6 +666,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setError('Доступ изменён. Перезапустите приложение, чтобы обновить статус.');
       });
     });
+    socket.on('profile:updated', () => {
+      invalidateApiCache(['profile', 'admin']);
+      void refreshSession().catch(() => {
+        setError('Данные профиля изменены. Откройте профиль повторно, чтобы обновить их.');
+      });
+    });
     return () => {
       offerRequestId += 1;
       socket.off('connect', handleReconnect);
@@ -794,6 +811,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       destinations.every(isDestinationAddressComplete);
 
     if (
+      !quoteVisible ||
       !bootstrapReady ||
       !token ||
       currentRide ||
@@ -813,12 +831,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     destinations,
     pickup,
     quoteStatus,
+    quoteVisible,
     requestQuote,
     token,
   ]);
 
   useEffect(() => {
     if (
+      !quoteVisible ||
       demoSession ||
       currentRide ||
       quoteStatus !== 'ready' ||
@@ -830,7 +850,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }, ESTIMATED_ROUTE_RETRY_MS);
 
     return () => clearTimeout(timer);
-  }, [currentRide, demoSession, quoteStatus, requestQuote, routeSummary?.source]);
+  }, [currentRide, demoSession, quoteStatus, quoteVisible, requestQuote, routeSummary?.source]);
 
   useEffect(
     () => () => {
@@ -1313,9 +1333,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [demoSession, driverRide, nextDriverRide, refresh, token, emitRideUpdate]);
 
-  const cancelRide = useCallback(async () => {
+  const cancelInFlight = useRef(false);
+  const cancelRide = useCallback(async (): Promise<boolean> => {
     const current = currentRide;
-    if (!current || ['completed', 'cancelled'].includes(current.status)) return;
+    if (cancelInFlight.current || !current || ['completed', 'cancelled'].includes(current.status)) return false;
     if (demoSession) {
       applyPassengerOrder({
         ...current,
@@ -1323,19 +1344,25 @@ export function RideProvider({ children }: { children: ReactNode }) {
         cancellationCode: 'passenger',
         updatedAt: new Date().toISOString(),
       });
-      return;
+      return true;
     }
-    if (!token) return;
+    if (!token) return false;
+    cancelInFlight.current = true;
     setBusy(true);
+    setError(null);
     try {
       const ride = await apiRequest<RideOrder>(`/v1/orders/${current.id}/cancel`, {
         method: 'POST',
         token,
       });
       applyPassengerOrder(ride);
+      setError(null);
+      return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось отменить заказ');
+      return false;
     } finally {
+      cancelInFlight.current = false;
       setBusy(false);
     }
   }, [applyPassengerOrder, currentRide, demoSession, token]);
@@ -1460,7 +1487,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       bootstrapReady,
       quoteStatus,
       busy,
-      error,
+      error: error ?? bootstrapError,
       chatUnreadCounts,
       latestIncomingChatMessage,
       subscribeRideUpdates,
@@ -1523,6 +1550,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       reorderDestinations,
       requestQuote,
       error,
+      bootstrapError,
       chatUnreadCounts,
       latestIncomingChatMessage,
       subscribeRideUpdates,

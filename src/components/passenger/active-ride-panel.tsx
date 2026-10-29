@@ -24,10 +24,11 @@ import { useScreenClock } from '@/hooks/use-screen-clock';
 type Props = {
   ride: RideOrder;
   pickupEtaMinutes?: number | null;
-  onCancel: () => void;
+  onCancel: () => Promise<boolean>;
   onReset: () => void;
   onRate: (score: number) => Promise<void>;
   busy?: boolean;
+  error?: string | null;
 };
 
 function SearchElapsedBadge({ startedAt }: { startedAt: string }) {
@@ -88,6 +89,7 @@ export function ActiveRidePanel({
   onReset,
   onRate,
   busy = false,
+  error,
 }: Props) {
   const colors = useThemeColors();
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
@@ -231,7 +233,7 @@ export function ActiveRidePanel({
         <AppButton onPress={onReset}>Новая поездка</AppButton>
       ) : driver ? (
         cancellable ? (
-          <AppButton variant="quiet" onPress={() => setCancelConfirmVisible(true)}>
+          <AppButton variant="quiet" loading={busy} onPress={() => setCancelConfirmVisible(true)}>
             Отменить поездку
           </AppButton>
         ) : null
@@ -240,6 +242,7 @@ export function ActiveRidePanel({
           {cancellable && (
             <AppButton
               variant="secondary"
+              loading={busy}
               onPress={() => setCancelConfirmVisible(true)}
               style={{ flex: 1 }}
             >
@@ -252,6 +255,12 @@ export function ActiveRidePanel({
         </View>
       )}
 
+      {!!error && !cancelConfirmVisible && (
+        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+          {error}
+        </Text>
+      )}
+
       <AppModal
         visible={cancelConfirmVisible}
         title="Отменить заказ?"
@@ -260,14 +269,18 @@ export function ActiveRidePanel({
             ? 'Водитель уже назначен. Частые отмены могут временно ограничить создание новых заказов.'
             : 'Поиск водителя будет остановлен. Частые отмены могут временно ограничить создание новых заказов.'
         }
-        onClose={() => setCancelConfirmVisible(false)}
+        onClose={() => { if (!busy) setCancelConfirmVisible(false); }}
       >
+        {!!error && (
+          <Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
+            {error}
+          </Text>
+        )}
         <AppButton
           variant="danger"
           loading={busy}
-          onPress={() => {
-            setCancelConfirmVisible(false);
-            onCancel();
+          onPress={async () => {
+            if (await onCancel()) setCancelConfirmVisible(false);
           }}
         >
           Да, отменить заказ

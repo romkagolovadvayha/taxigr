@@ -24,6 +24,7 @@ import { AnimatedPressable } from "@/components/ui/animated-pressable";
 import { AppIcon } from "@/components/ui/app-icon";
 import type { DemoPersona } from "@/domain/models";
 import { useAuthViewport } from "@/hooks/use-auth-viewport";
+import { useForegroundScreen } from "@/hooks/use-foreground-screen";
 import {
   currentInitialLegalAcceptance,
   legalDocuments,
@@ -54,6 +55,7 @@ const consentLinkWebProps =
     : {};
 
 export function SignInScreen() {
+  const visible = useForegroundScreen();
   const colors = useThemeColors();
   const { compact, tight, keyboardOpen } = useAuthViewport();
   const {
@@ -123,7 +125,7 @@ export function SignInScreen() {
   }, [cooldown]);
 
   useEffect(() => {
-    if (!maxChallenge) return;
+    if (!visible || !maxChallenge) return;
     const check = async () => {
       if (checkingMax.current) return;
       checkingMax.current = true;
@@ -145,10 +147,10 @@ export function SignInScreen() {
       clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [checkMaxPhoneAuth, maxChallenge]);
+  }, [checkMaxPhoneAuth, maxChallenge, visible]);
 
   useEffect(() => {
-    if (!telegramChallenge) return;
+    if (!visible || !telegramChallenge) return;
     const check = async () => {
       if (checkingTelegram.current) return;
       checkingTelegram.current = true;
@@ -170,10 +172,10 @@ export function SignInScreen() {
       clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [checkTelegramPhoneAuth, telegramChallenge]);
+  }, [checkTelegramPhoneAuth, telegramChallenge, visible]);
 
   useEffect(() => {
-    if (!vkChallenge) return;
+    if (!visible || !vkChallenge) return;
     const check = async () => {
       if (checkingVk.current) return;
       checkingVk.current = true;
@@ -195,7 +197,7 @@ export function SignInScreen() {
       clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [checkVkPhoneAuth, vkChallenge]);
+  }, [checkVkPhoneAuth, vkChallenge, visible]);
 
   const acceptance = legalAccepted ? currentInitialLegalAcceptance() : null;
   const phone = russianPhoneE164(phoneDigits);

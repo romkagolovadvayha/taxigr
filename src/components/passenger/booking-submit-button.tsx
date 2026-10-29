@@ -4,7 +4,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { formatMoney } from '@/utils/format';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
-import { useBookingAvailability } from '@/providers/booking-availability-provider';
+import { useBookingAvailability, useBookingAvailabilityPolling } from '@/providers/booking-availability-provider';
 
 type Props = {
   priceMinor: number;
@@ -16,6 +16,7 @@ type Props = {
   label?: string;
   loadingLabel?: string;
   accessibilityLabel?: string;
+  checkAvailability?: boolean;
   onPress: () => void;
 };
 
@@ -29,11 +30,13 @@ export function BookingSubmitButton({
   label = 'Заказать такси',
   loadingLabel = 'Рассчитываем…',
   accessibilityLabel,
+  checkAvailability = true,
   onPress,
 }: Props) {
   const colors = useThemeColors();
+  useBookingAvailabilityPolling();
   const { enabled, checking, checkBooking } = useBookingAvailability();
-  if (enabled !== true) {
+  if (enabled !== true && !loading) {
     disabled = false;
     loading = false;
     estimateAvailable = false;
@@ -58,7 +61,10 @@ export function BookingSubmitButton({
       aria-disabled={unavailable}
       aria-busy={loading}
       disabled={unavailable}
-      onPress={() => { void checkBooking().then((allowed) => { if (allowed) onPress(); }); }}
+      onPress={() => {
+        if (!checkAvailability) { onPress(); return; }
+        void checkBooking().then((allowed) => { if (allowed) onPress(); });
+      }}
       style={({ pressed }) => ({
         minHeight: 56,
         alignItems: 'center',

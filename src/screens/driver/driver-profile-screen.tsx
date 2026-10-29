@@ -28,6 +28,8 @@ type DriverProfile = {
   status: string;
   rating: number;
   hasChildSeat: boolean;
+  hasSezPass: boolean;
+  licenseNumber: string | null;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -54,6 +56,8 @@ const demoProfile: DriverProfile = {
   status: 'online',
   rating: demoDriver.rating,
   hasChildSeat: true,
+  hasSezPass: true,
+  licenseNumber: '18 22 123456',
   make: demoDriver.vehicle.make,
   model: demoDriver.vehicle.model,
   year: 2021,
@@ -150,7 +154,17 @@ export function DriverProfileScreen() {
     [requests],
   );
   const year = Number(form.vehicleYear);
+  const changed = !!activeProfile && (
+    form.vehicleMake.trim() !== activeProfile.make ||
+    form.vehicleModel.trim() !== activeProfile.model ||
+    year !== activeProfile.year ||
+    form.vehicleColor !== activeProfile.color ||
+    form.vehicleColorHex !== (activeProfile.colorHex ?? '#777C84') ||
+    form.plate.trim().toUpperCase() !== activeProfile.plate?.trim().toUpperCase() ||
+    form.hasChildSeat !== activeProfile.hasChildSeat
+  );
   const valid =
+    changed && Number.isInteger(year) &&
     form.vehicleMake.trim().length >= 2 &&
     form.vehicleModel.trim().length >= 1 &&
     form.vehicleColor.trim().length >= 2 &&
@@ -327,6 +341,8 @@ export function DriverProfileScreen() {
           label={activeProfile.hasChildSeat ? 'Детское кресло подтверждено' : 'Детский тариф недоступен'}
           tone={activeProfile.hasChildSeat ? 'info' : 'neutral'}
         />
+        <StatusChip label={activeProfile.hasSezPass ? 'Есть пропуск в ОЭЗ' : 'Пропуска в ОЭЗ нет'}
+          tone={activeProfile.hasSezPass ? 'info' : 'neutral'} />
         {!pendingRequest && (
           <AppButton
             variant={editing ? 'quiet' : 'secondary'}
@@ -352,7 +368,7 @@ export function DriverProfileScreen() {
             <View style={{ flex: 1, minWidth: 180, gap: spacing.x1, opacity: 0.72 }}>
               <Text selectable style={{ ...typography.micro, color: colors.warningText }}>СЕЙЧАС</Text>
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-                {pendingRequest.currentVehicle.make} {pendingRequest.currentVehicle.model}
+                {pendingRequest.currentVehicle.make} {pendingRequest.currentVehicle.model} · {pendingRequest.currentVehicle.year}
               </Text>
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
                 {pendingRequest.currentVehicle.color} · {pendingRequest.currentVehicle.plate}
@@ -367,7 +383,7 @@ export function DriverProfileScreen() {
                 ПОСЛЕ ОДОБРЕНИЯ
               </Text>
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-                {pendingRequest.proposedVehicle.make} {pendingRequest.proposedVehicle.model}
+                {pendingRequest.proposedVehicle.make} {pendingRequest.proposedVehicle.model} · {pendingRequest.proposedVehicle.year}
               </Text>
               <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
                 {pendingRequest.proposedVehicle.color} · {pendingRequest.proposedVehicle.plate}

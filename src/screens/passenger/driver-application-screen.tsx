@@ -54,6 +54,7 @@ export function DriverApplicationScreen() {
     plate: '',
   });
   const [childSeat, setChildSeat] = useState(false);
+  const [hasSezPass, setHasSezPass] = useState(false);
   const [driverTermsAccepted, setDriverTermsAccepted] = useState(false);
   const [driverDataAccepted, setDriverDataAccepted] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -111,6 +112,7 @@ export function DriverApplicationScreen() {
           ...values,
           vehicleYear: year,
           hasChildSeat: childSeat,
+          hasSezPass,
           legalAcceptance: currentDriverLegalAcceptance(),
         }),
       });
@@ -144,6 +146,7 @@ export function DriverApplicationScreen() {
           <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>Стать водителем</Text>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Проверка обычно занимает до одного рабочего дня</Text>
         </View>
+
       </View>
       <View style={{ gap: spacing.x3 }}>
         {fields.map(({ key, label, keyboard }) => (
@@ -204,6 +207,16 @@ export function DriverApplicationScreen() {
             onValueChange={setChildSeat}
             trackColor={{ true: colors.brand }}
           />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x4,
+          minHeight: 68, paddingHorizontal: spacing.x4, borderRadius: radius.md,
+          backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <View style={{ flex: 1 }}>
+            <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Есть пропуск в ОЭЗ</Text>
+            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Действующий пропуск на территорию особой экономической зоны</Text>
+          </View>
+          <AccessibleSwitch value={hasSezPass} onValueChange={setHasSezPass}
+            accessibilityLabel="Есть пропуск в ОЭЗ" trackColor={{ true: colors.brand }} />
         </View>
       </View>
       <View style={{ gap: spacing.x4 }}>

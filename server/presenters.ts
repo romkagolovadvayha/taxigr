@@ -249,7 +249,11 @@ export function presentOrder(row: OrderRow): RideOrder {
     paymentConfirmedAt: row.payment_confirmed_at
       ? new Date(row.payment_confirmed_at).toISOString()
       : undefined,
-    comment: row.comment ?? undefined,
+    // Published clients predate manualPriceSet and only display the comment.
+    // Keep the fare workflow available without requiring an app update.
+    comment: row.pricing_mode === 'driver' && !row.manual_price_set
+      ? ['Цена не рассчитана — согласуйте стоимость с водителем. Водителю: укажите сумму на taxigr.ru или в привязанном боте сообщением «Цена 350» (свою сумму).', row.comment].filter(Boolean).join('\n')
+      : row.comment ?? undefined,
     cancellationCode: row.cancellation_code ?? undefined,
     cancellationReason: row.cancellation_reason ?? undefined,
     createdAt: new Date(row.created_at).toISOString(),

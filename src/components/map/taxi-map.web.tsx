@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { View } from 'react-native';
 
 import { grahovoCenter } from '@/data/service-area';
+import { useForegroundScreen } from '@/hooks/use-foreground-screen';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
 import { driverMarkerPngMarkup } from './driver-marker';
@@ -289,5 +290,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const [attempt, setAttempt] = useState(0);
+  const visible = useForegroundScreen();
+  if (!visible) return <View style={{ flex: 1, minHeight: 0 }} />;
   return <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} />;
 });

@@ -86,7 +86,8 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
       !['127.0.0.1', 'localhost'].includes(new URL(apiUrl).hostname)) {
       throw new Error('Concurrency tests require an isolated local taxi_qa_* or taxi_test_* database');
     }
-    connection = await mysql.createConnection(databaseUrl);
+    connection = await mysql.createConnection({ uri: databaseUrl, timezone: 'Z' });
+    await connection.query("SET SESSION time_zone = '+00:00'");
     const [settings] = await connection.query<RowDataPacket[]>('SELECT enabled FROM booking_settings WHERE id = 1');
     originalBookingEnabled = Number(settings[0]?.enabled ?? 0);
     await connection.execute('UPDATE booking_settings SET enabled = 1 WHERE id = 1');

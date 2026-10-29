@@ -84,11 +84,6 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   if (currentRide) {
     return (
       <View style={{ gap: spacing.x3 }}>
-        {!!error && (
-          <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
-            {error}
-          </Text>
-        )}
         <ActiveRidePanel
           ride={currentRide}
           pickupEtaMinutes={pickupEtaMinutes}
@@ -96,6 +91,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
           onReset={resetRide}
           onRate={rateRide}
           busy={busy}
+          error={error}
         />
       </View>
     );

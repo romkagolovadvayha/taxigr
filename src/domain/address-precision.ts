@@ -8,10 +8,22 @@ type AddressLike = {
   coordinatePrecision?: 'approximate' | 'precise';
 };
 
-const HOUSE_NUMBER = String.raw`\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?`;
+const HOUSE_NUMBER = String.raw`\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?(?:\s+(?:к(?:орп(?:ус)?)?\.?|стр(?:оение)?\.?)\s*\d+[а-яa-z]?)?`;
 const ROAD_CODE = /^\d{1,3}[рк]-\d+$/iu;
 const TRAILING_HOUSE = new RegExp(String.raw`(?:,\s*|\s+)(${HOUSE_NUMBER})\s*$`, 'iu');
 const EXPLICIT_HOUSE = new RegExp(String.raw`\b(?:дом|д\.)\s*(${HOUSE_NUMBER})(?:\b|$)`, 'iu');
+
+const normalizedHouses = new Map<string, string>();
+export function normalizeHouseNumber(value: string | null | undefined): string {
+  if (!value) return '';
+  const existing = normalizedHouses.get(value);
+  if (existing !== undefined) return existing;
+  const normalized = value.toLocaleLowerCase('ru').replace(/корп(?:ус)?\.?/gu, 'к')
+    .replace(/строение/gu, 'стр').replace(/[.\s]/gu, '');
+  if (normalizedHouses.size >= 1_000) normalizedHouses.clear();
+  normalizedHouses.set(value, normalized);
+  return normalized;
+}
 
 export function extractHouseNumber(address: AddressLike): string | null {
   const structured = address.houseNumber?.trim();

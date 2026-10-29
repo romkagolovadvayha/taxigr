@@ -171,6 +171,7 @@ import {
 import { getTelegramProfilePhotoUrl } from './telegram-bot';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
 import { createMessengerBookingHandler } from './messenger-booking';
+import { adminDriverProfileSchema, updateAdminDriverProfile } from './driver-profile-edit';
 import { ridePriceLabel } from '../src/domain/ride-price';
 import {
   exchangeVkAuthorizationCode,
@@ -491,6 +492,7 @@ const applicationSchema = vehicleDetailsSchema.extend({
   applicantName: z.string().trim().min(2).max(160),
   phone: z.string().trim().min(10).max(32),
   licenseNumber: z.string().trim().min(4).max(64),
+  hasSezPass: z.boolean().default(false),
   legalAcceptance: driverLegalAcceptanceSchema,
 });
 
@@ -4868,6 +4870,8 @@ export async function registerRoutes(
         status: string;
         rating: number;
         hasChildSeat: number;
+        hasSezPass: number;
+        licenseNumber: string | null;
         make: string | null;
         model: string | null;
         year: number | null;
@@ -4877,7 +4881,8 @@ export async function registerRoutes(
       }
     >(
       `SELECT d.id, d.user_id AS userId, u.name, u.phone, d.status, d.rating,
-        d.has_child_seat AS hasChildSeat, v.make, v.model, v.year, v.color,
+        d.has_child_seat AS hasChildSeat, d.has_sez_pass AS hasSezPass, d.license_number AS licenseNumber,
+        v.make, v.model, v.year, v.color,
         v.color_hex AS colorHex, v.plate
        FROM drivers d JOIN users u ON u.id = d.user_id
        LEFT JOIN vehicles v ON v.driver_id = d.id AND v.active = TRUE
@@ -4885,7 +4890,7 @@ export async function registerRoutes(
       [session.id],
     );
     if (!row) throw Object.assign(new Error('Профиль водителя не найден'), { statusCode: 404 });
-    return { data: { ...row, hasChildSeat: Boolean(row.hasChildSeat) } };
+    return { data: { ...row, hasChildSeat: Boolean(row.hasChildSeat), hasSezPass: Boolean(row.hasSezPass) } };
   });
 
   app.get('/v1/driver/vehicle-change-requests/me', async (request) => {
@@ -5817,8 +5822,8 @@ export async function registerRoutes(
       await connection.execute(
         `INSERT INTO driver_applications (
           id, user_id, applicant_name, phone, license_number, vehicle_make, vehicle_model,
-          vehicle_year, vehicle_color, vehicle_color_hex, plate, has_child_seat, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+          vehicle_year, vehicle_color, vehicle_color_hex, plate, has_child_seat, has_sez_pass, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
         [
           id,
           session.id,
@@ -5832,6 +5837,7 @@ export async function registerRoutes(
           input.vehicleColorHex.toUpperCase(),
           input.plate.toUpperCase(),
           input.hasChildSeat,
+          input.hasSezPass,
         ],
       );
       await recordDriverConsents(connection, session.id, input.legalAcceptance, {
@@ -5857,6 +5863,7 @@ export async function registerRoutes(
         ['Цвет', input.vehicleColor],
         ['Госномер', input.plate.toUpperCase()],
         ['Детское кресло', input.hasChildSeat ? 'есть' : 'нет'],
+        ['Пропуск в ОЭЗ', input.hasSezPass ? 'есть' : 'нет'],
       ],
     });
     notifyMessengers(
@@ -5883,12 +5890,12 @@ export async function registerRoutes(
         license_number AS licenseNumber, vehicle_make AS vehicleMake,
         vehicle_model AS vehicleModel, vehicle_year AS vehicleYear,
         vehicle_color AS vehicleColor, vehicle_color_hex AS vehicleColorHex,
-        plate, has_child_seat AS hasChildSeat,
+        plate, has_child_seat AS hasChildSeat, has_sez_pass AS hasSezPass,
         status, moderation_comment AS moderationComment, created_at AS createdAt
        FROM driver_applications WHERE user_id = ? ORDER BY created_at DESC`,
       [session.id],
     );
-    return { data: rows };
+    return { data: rows.map(row => ({ ...row, hasChildSeat: Boolean(row.hasChildSeat), hasSezPass: Boolean(row.hasSezPass) })) };
   });
 
   app.get('/v1/admin/places', async (request) => {
@@ -6078,12 +6085,12 @@ export async function registerRoutes(
         license_number AS licenseNumber, vehicle_make AS vehicleMake,
         vehicle_model AS vehicleModel, vehicle_year AS vehicleYear,
         vehicle_color AS vehicleColor, vehicle_color_hex AS vehicleColorHex,
-        plate, has_child_seat AS hasChildSeat,
+        plate, has_child_seat AS hasChildSeat, has_sez_pass AS hasSezPass,
         status, moderation_comment AS moderationComment, created_at AS createdAt
        FROM driver_applications
        ORDER BY FIELD(status, "pending", "draft", "approved", "rejected"), created_at DESC`,
     );
-    return { data: rows };
+    return { data: rows.map(row => ({ ...row, hasChildSeat: Boolean(row.hasChildSeat), hasSezPass: Boolean(row.hasSezPass) })) };
   });
 
   app.post('/v1/admin/applications/:id/moderate', async (request) => {
@@ -6104,6 +6111,8 @@ export async function registerRoutes(
           vehicle_color_hex: string;
           plate: string;
           has_child_seat: number;
+          has_sez_pass: number;
+          license_number: string;
           status: string;
         })[]
       >('SELECT * FROM driver_applications WHERE id = ? FOR UPDATE', [id]);
@@ -6129,10 +6138,11 @@ export async function registerRoutes(
         }
         const driverId = randomUUID();
         await connection.execute(
-          `INSERT INTO drivers (id, user_id, status, has_child_seat)
-           VALUES (?, ?, 'online', ?)
-           ON DUPLICATE KEY UPDATE has_child_seat = VALUES(has_child_seat)`,
-          [driverId, application.user_id, application.has_child_seat],
+          `INSERT INTO drivers (id, user_id, status, has_child_seat, has_sez_pass, license_number)
+           VALUES (?, ?, 'online', ?, ?, ?)
+           ON DUPLICATE KEY UPDATE has_child_seat = VALUES(has_child_seat),
+             has_sez_pass = VALUES(has_sez_pass), license_number = VALUES(license_number)`,
+          [driverId, application.user_id, application.has_child_seat, application.has_sez_pass, application.license_number],
         );
         const [drivers] = await connection.query<(RowDataPacket & { id: string; status: string })[]>(
           'SELECT id, status FROM drivers WHERE user_id = ?',
@@ -6331,7 +6341,7 @@ export async function registerRoutes(
     const [rows] = await db.query<RowDataPacket[]>(
       `SELECT d.id, d.user_id AS userId, d.status, d.rating,
         d.rating_count AS ratingCount, d.commission_bps AS commissionBps,
-        d.has_child_seat AS hasChildSeat, u.name, u.phone, u.avatar_url AS avatarUrl,
+        d.has_child_seat AS hasChildSeat, d.has_sez_pass AS hasSezPass, u.name, u.phone, u.avatar_url AS avatarUrl,
         u.avatar_mime AS avatarMime, u.updated_at AS updatedAt,
         u.blocked_at AS blockedAt, u.block_reason AS blockReason,
         v.make, v.model, v.year, v.color, v.color_hex AS colorHex, v.plate,
@@ -6369,6 +6379,7 @@ export async function registerRoutes(
         rating: Number(row.rating ?? 5),
         ratingCount: Number(row.ratingCount ?? 0),
         hasChildSeat: Boolean(row.hasChildSeat),
+        hasSezPass: Boolean(row.hasSezPass),
         priorities: {
           grahovo: Boolean(row.priorityGrahovo),
           district: Boolean(row.priorityDistrict),
@@ -6401,6 +6412,8 @@ export async function registerRoutes(
         status: 'online' | 'offline' | 'busy' | 'suspended';
         commission_bps: number | null;
         has_child_seat: number;
+        has_sez_pass: number;
+        license_number: string | null;
         priority_grahovo: number;
         priority_district: number;
         priority_intercity: number;
@@ -6413,7 +6426,7 @@ export async function registerRoutes(
         plate: string | null;
       }
     >(
-      `SELECT d.id, d.user_id, d.status, d.commission_bps, d.has_child_seat,
+      `SELECT d.id, d.user_id, d.status, d.commission_bps, d.has_child_seat, d.has_sez_pass, d.license_number,
         EXISTS(SELECT 1 FROM driver_priority_assignments p
           WHERE p.driver_id = d.id AND p.scope = 'grahovo') AS priority_grahovo,
         EXISTS(SELECT 1 FROM driver_priority_assignments p
@@ -6463,6 +6476,8 @@ export async function registerRoutes(
           status: driver.status,
           commissionBps: driver.commission_bps,
           hasChildSeat: Boolean(driver.has_child_seat),
+          hasSezPass: Boolean(driver.has_sez_pass),
+          licenseNumber: driver.license_number,
           priorities: {
             grahovo: Boolean(driver.priority_grahovo),
             district: Boolean(driver.priority_district),
@@ -6503,6 +6518,21 @@ export async function registerRoutes(
         })),
       },
     };
+  });
+
+  app.patch('/v1/admin/drivers/:id/profile', async (request) => {
+    const session = await auth(request, 'admin');
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const input = parse(adminDriverProfileSchema, request.body);
+    const changed = await updateAdminDriverProfile(id, input, session.id, request.ip);
+    publish('admins', 'driver:updated', { id });
+    publish(`user:${changed.userId}`, 'profile:updated', { id: changed.userId });
+    notifyMessengers(notifyDriversInMessengers([id], {
+      icon: 'ℹ️', title: 'Данные водителя обновлены',
+      body: 'Администратор изменил данные вашего профиля. Проверьте их в кабинете водителя.',
+      action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
+    }), 'driver.profile-updated');
+    return { data: changed };
   });
 
   app.patch('/v1/admin/drivers/:id', async (request) => {

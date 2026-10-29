@@ -248,6 +248,9 @@ export function AdminAccountsList({ kind, title, subtitle, items, loading, error
                         .join(' · ') || 'не назначен'}
                     </Text>
                   )}
+                    {kind === 'drivers' && item.hasSezPass && (
+                      <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Есть пропуск в ОЭЗ</Text>
+                    )}
                   {!!item.blockReason && (
                     <Text numberOfLines={1} style={{ ...typography.caption, color: colors.dangerText }}>
                       {item.blockReason}

@@ -71,8 +71,8 @@ export const ThreeMap: React.FC<{f:number}> = ({f}) => {
     c.position.set(8,17,18); c.lookAt(0,0,0); c.updateProjectionMatrix(); c.updateMatrixWorld(); return c;
   },[width,height]);
   const rotation=interpolate(f,[0,240],[-.16,.12],clamp);
-  const progress=f<105?interpolate(f,[0,105],[.7,0],clamp):interpolate(f,[143,230],[0,.95],clamp);
-  const location=f<143?curve.getPoint(0):curve.getPoint(progress);
+  const progress=interpolate(f,[16,230],[0,1],clamp);
+  const location=curve.getPoint(progress);
   const project=(point:THREE.Vector3) => {
     const screen=point.clone().applyAxisAngle(new THREE.Vector3(0,1,0),rotation).project(camera);
     return {left:(screen.x+1)*width/2,top:(1-screen.y)*height/2};

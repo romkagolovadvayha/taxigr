@@ -15,6 +15,36 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it.each(['Можга', 'в можгу', 'я хочу в можгу', 'Можга Придорожная 10'])('returns a city centre without streets for %s', async query => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses(query);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({label:'г. Можга',kind:'settlement',coordinates:{latitude:56.4490364,longitude:52.2185947}});
+    expect(results[0]?.houseNumber).toBeUndefined(); expect(fetch).not.toHaveBeenCalled();
+  });
+  it('resolves an outside road to the actual settlement centre, not the road coordinates', async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      return new Response(JSON.stringify(url.searchParams.get('featureType') === 'settlement'
+        ? [{place_id:'test-centre',name:'Тестовый',lat:'55.7946485',lon:'49.1115022',type:'city',address:{city:'Тестовый',state:'Татарстан'}}]
+        : [{place_id:'test-road',name:'улица Баумана',lat:'55.788',lon:'49.122',type:'road',address:{city:'Тестовый',road:'улица Баумана',state:'Татарстан'}}]));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses('Тестовый Баумана');
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({label:'г. Тестовый',kind:'settlement',coordinates:{latitude:55.7946485,longitude:49.1115022}});
+    expect(fetch.mock.calls.some(([input]) => new URL(String(input)).searchParams.get('featureType') === 'settlement')).toBe(true);
+  }, 15_000);
+  it('keeps numbered streets distinct even when the house number matches', async () => {
+    const results = await searchAddresses('Верхняя Игра 1 я Заречная 6');
+    expect(results.map(a=>a.label)).toEqual(['с. Верхняя Игра, ул. 1-я Заречная, 6']);
+  });
+  it.each(['Благодатное ул Благодатновская дом1', 'Благодатное Благодатновской 1'])(
+    'finds an unmapped house with conversational formatting: %s', async query => {
+      const results = await searchAddresses(query);
+      expect(results.map(a=>a.label)).toEqual(['д. Благодатное, ул. Благодатновская, 1']);
+    },
+  );
   it('finds imported house coordinates immediately without upstream requests', async () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     const results = await searchAddresses('Грахово Колпакова 8');
@@ -59,7 +89,7 @@ describe('local address directory', () => {
   it('prefers an exact outside settlement over roads that contain its name', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input));
-      const payload = url.searchParams.get('q') === 'Алнаши'
+      const payload = url.searchParams.get('q')?.toLowerCase() === 'алнаши'
         ? [
             {
               place_id: 122,

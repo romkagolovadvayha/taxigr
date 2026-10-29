@@ -78,7 +78,7 @@ export const AppButton = forwardRef<View, Props>(function AppButton(
       {...pressableProps}
       ref={ref}
       accessibilityRole={accessibilityRole}
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? (typeof children === 'string' ? children : undefined)}
       aria-disabled={disabled || loading}
       aria-busy={loading}
       disabled={disabled || loading}

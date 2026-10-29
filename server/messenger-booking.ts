@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
-import { resolveBotAddress, splitBotRoute, unresolvedBotAddress } from './bot-address';
+import { resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
 import { db, firstRow, withTransaction } from './db';
 import type { MessengerIdentityInput } from './messenger-identity';
 import { findOrCreatePhoneUser, findUserWithRoles, linkMessengerIdentity } from './repositories';
@@ -23,7 +23,10 @@ type Reply = { text: string; buttons?: { label: string; data: string }[]; reques
 export type BookingDraft = {
   id: string;
   flowVersion?: 2;
-  stage: 'idle' | 'pickup' | 'destination' | 'confirm' | 'done';
+  stage: 'idle' | 'pickup' | 'destination' | 'choose' | 'confirm' | 'done';
+  choice?: { field: 'pickup' | 'destination'; candidates: Address[] };
+  selectedPickup?: Address;
+  selectedDestination?: Address;
   pickupRaw?: string;
   destinationRaw?: string;
   pickup?: Address;
@@ -115,6 +118,18 @@ function review(draft: BookingDraft): Reply {
       { label: 'Изменить адреса', data: `b:restart:${draft.id}` },
       ...draftButtons(draft),
     ],
+  };
+}
+
+function addressChoice(draft: BookingDraft): Reply {
+  const choice = draft.choice!;
+  return {
+    text: `Нашлось несколько похожих адресов. ${choice.field === 'pickup' ? 'Откуда вас забрать?' : 'Куда поедем?'}\n` +
+      choice.candidates.map((address, index) => `${index + 1}. ${address.label}`).join('\n') +
+      '\nВыберите кнопку или напишите адрес точнее, указав населённый пункт.',
+    buttons: [...choice.candidates.map((address, index) => ({
+      label: `${index + 1}. ${address.label}`.slice(0, 40), data: `b:pick:${draft.id}:${index}`,
+    })), ...draftButtons(draft)],
   };
 }
 
@@ -214,13 +229,31 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       let draft = rows[0] && new Date(rows[0].expires_at).getTime() > Date.now() ? readJson<BookingDraft>(rows[0].draft_json) : freshDraft();
       // Old drafts could start from an arbitrary message without an explicit booking request.
       if (draft.flowVersion !== 2) draft = freshDraft();
-      const quote = async () => {
+      const quote = async (): Promise<Reply> => {
         draft.id = randomUUID();
-        const [pickup, destination] = await Promise.all([
-          resolveBotAddress(draft.pickupRaw!, true), resolveBotAddress(draft.destinationRaw!, false),
+        draft.quoteToken = undefined;
+        draft.quotedAt = undefined;
+        draft.priceMinor = undefined;
+        draft.originalPriceMinor = undefined;
+        const [pickupResult, destinationResult] = await Promise.all([
+          resolveBotAddressOptions(draft.pickupRaw!, true, draft.selectedPickup),
+          resolveBotAddressOptions(draft.destinationRaw!, false, draft.selectedDestination),
         ]);
-        draft.pickup = pickup ?? unresolvedBotAddress(draft.pickupRaw!);
-        draft.destination = destination ?? unresolvedBotAddress(draft.destinationRaw!);
+        const pickup = pickupResult.address, destination = destinationResult.address;
+        // Preserve an already resolved side while clarifying the other one.
+        if (pickup) draft.selectedPickup = pickup;
+        if (destination) draft.selectedDestination = destination;
+        for (const field of ['pickup', 'destination'] as const) {
+          const result = field === 'pickup' ? pickupResult : destinationResult;
+          if (result.candidates.length > 1) {
+            draft.stage = 'choose';
+            draft.choice = { field, candidates: result.candidates };
+            return addressChoice(draft);
+          }
+        }
+        draft.choice = undefined;
+        draft.pickup = pickup ?? unresolvedBotAddress(pickupResult.recognized?.label ?? draft.pickupRaw!);
+        draft.destination = destination ?? unresolvedBotAddress(destinationResult.recognized?.label ?? draft.destinationRaw!);
         draft.priceMinor = undefined;
         draft.originalPriceMinor = undefined;
         if (pickup && destination) {
@@ -248,6 +281,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         }
         draft.quotedAt = Date.now();
         draft.stage = 'confirm';
+        return review(draft);
       };
       const process = async (): Promise<Reply> => {
         const action = text.match(/^b:(confirm|restart|cancel):(.+)$/u);
@@ -285,8 +319,8 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         }
         if (draft.stage === 'confirm' && (action?.[1] === 'confirm' || /^(?:вызвать(?: такси)?|вызвать без цены|да|подтверждаю)$/iu.test(text))) {
           if (!draft.quotedAt || Date.now() - draft.quotedAt > 240_000) {
-            await quote();
-            return { ...review(draft), text: 'Расчёт обновлён. Подтвердите актуальные условия.\n\n' + review(draft).text };
+            const updated = await quote();
+            return { ...updated, text: 'Расчёт обновлён.\n\n' + updated.text };
           }
           const order = await call<RideOrder>('/v1/orders', {
             pickup: draft.pickup, destination: draft.destination, quoteToken: draft.quoteToken,
@@ -305,13 +339,25 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           draft = freshDraft();
           return welcome();
         }
-        if (text.startsWith('b:')) return welcome('Эта кнопка устарела. Начните оформление заново.');
+        const pick = text.match(/^b:pick:([^:]+):(\d+)$/u);
+        if (pick && draft.stage === 'choose' && draft.choice && pick[1] === draft.id) {
+          const selected = draft.choice.candidates[Number(pick[2])];
+          if (!selected) return addressChoice(draft);
+          if (draft.choice.field === 'pickup') draft.selectedPickup = selected;
+          else draft.selectedDestination = selected;
+          return quote();
+        }
+        if (text.startsWith('b:')) return draft.stage === 'choose' && draft.choice
+          ? addressChoice(draft) : welcome('Эта кнопка устарела. Начните оформление заново.');
         const pair = splitBotRoute(text);
         if (pair?.some(part => part.length < 2 || part.length > 255) || (!pair && (text.length < 2 || text.length > 255))) {
           return { text: 'Напишите каждый адрес длиной от 2 до 255 символов.' };
         }
         if (pair) {
           draft = { ...freshDraft(), pickupRaw: pair[0], destinationRaw: pair[1] };
+        } else if (draft.stage === 'choose' && draft.choice) {
+          if (draft.choice.field === 'pickup') { draft.pickupRaw = text; draft.selectedPickup = undefined; }
+          else { draft.destinationRaw = text; draft.selectedDestination = undefined; }
         } else if (draft.stage === 'pickup') {
           draft = { ...freshDraft(), stage: 'destination', pickupRaw: text };
           return { text: `Место подачи: ${text}\nКуда поедем? Напишите адрес или название места.`, buttons: draftButtons(draft) };
@@ -320,8 +366,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         } else {
           return { ...review(draft), text: 'Для исправления нажмите «Изменить адреса».\n\n' + review(draft).text };
         }
-        await quote();
-        return review(draft);
+        return quote();
       };
       const response = await process().catch(error => ({ text: error instanceof Error ? error.message : 'Не удалось оформить заказ. Попробуйте ещё раз.' }));
       await connection.execute(`UPDATE messenger_booking_drafts SET draft_json = ?, expires_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 30 MINUTE)

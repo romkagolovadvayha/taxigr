@@ -18,6 +18,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { grahovoAddressCatalog, grahovoAddressSuggestions, grahovoSettlement } from '@/data/grahovo-address-catalog';
+import { intercitySettlements } from '@/data/intercity-settlements';
 import type { DestinationHistoryItem } from '@/domain/address-history';
 import {
   addressSearchScore,
@@ -34,10 +35,12 @@ import {
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
+import { addressSuggestionKey, mergeAddressSuggestions, selectUnambiguousAddress } from '@/domain/address-suggestions-selection';
 import { toStreetSuggestion } from '@/domain/address-suggestions';
 import { buildManualAddress, findBestAddressAnchor } from '@/domain/manual-address';
 import type { Address, Coordinates } from '@/domain/models';
 import { getPlaceOpenStatus } from '@/domain/place-directory';
+import { isGrahovoDistrictAddress } from '@/domain/pricing';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRideAddresses } from '@/state/ride-provider';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
@@ -47,7 +50,7 @@ import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 function addressKey(address: Address): string {
-  return `${address.placeId ?? address.label.toLocaleLowerCase('ru')}:${address.houseNumber?.toLocaleLowerCase('ru') ?? 'place'}:${address.coordinates.latitude.toFixed(5)}:${address.coordinates.longitude.toFixed(5)}`;
+  return addressSuggestionKey(address);
 }
 
 function matchesAddress(address: Address, normalizedQuery: string): boolean {
@@ -55,16 +58,15 @@ function matchesAddress(address: Address, normalizedQuery: string): boolean {
 }
 
 function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
-  const seen = new Set<string>();
-  return [...primary, ...secondary].filter((address) => {
-    const key = addressKey(address);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return mergeAddressSuggestions(primary, secondary);
 }
 
-const localAddressDirectory = uniqueAddressesByLabel(grahovoAddressCatalog);
+const localAddressDirectory = uniqueAddressesByLabel([...grahovoAddressCatalog, ...intercitySettlements]);
+
+function searchableAddress(address: Address): Address | null {
+  if (address.kind === 'settlement' || isGrahovoDistrictAddress(address)) return address;
+  return intercitySettlements.find(city => addressSearchScore(city, address.label) > 0) ?? null;
+}
 
 function searchTokens(value: string): string[] {
   return value
@@ -340,8 +342,12 @@ export function AddressSearchScreen() {
     setDestination,
     setDestinationAt,
     addDestination,
-    destinationHistory,
+    destinationHistory: storedDestinationHistory,
   } = useRideAddresses();
+  const destinationHistory = useMemo(() => storedDestinationHistory.flatMap(item => {
+    const address = searchableAddress(item.address);
+    return address ? [{ ...item, address }] : [];
+  }), [storedDestinationHistory]);
 
   useFocusEffect(
     useCallback(() => {
@@ -376,7 +382,7 @@ export function AddressSearchScreen() {
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
   const overlaidResults = overlayRememberedAddresses(
     mergeAddresses(localResults, canSearchRemote && edited ? remoteResults : []), rememberedAddresses,
-  );
+  ).flatMap(address => { const searchable = searchableAddress(address); return searchable ? [searchable] : []; });
   const baseResults = filterRequestedHouse(normalizedQuery ? rankAddressSearchResults(overlaidResults, normalizedQuery) : overlaidResults, query);
   const queryTokens = searchTokens(query);
   const queryMatchesKnownStreetName = queryTokens.some((token) => knownStreetTokens.has(token));
@@ -430,18 +436,29 @@ export function AddressSearchScreen() {
     ? pointMapCenter.coordinates
     : pendingAddress?.coordinates;
 
+  const applyAddress = useCallback((address: Address) => {
+    if (field === 'pickup') setPickup(address);
+    else if (append === '1') addDestination(address);
+    else {
+      const index = destinationIndex?.trim() ? Number(destinationIndex) : NaN;
+      if (Number.isInteger(index) && index >= 0) setDestinationAt(index, address);
+      else setDestination(address);
+    }
+    goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
+  }, [field, append, destinationIndex, setPickup, addDestination, setDestinationAt, setDestination]);
+
   useEffect(() => {
     if (!pendingAddress) return;
     let active = true;
     const controller = new AbortController();
-    // The map is already visible. Refinement may improve its initial point,
-    // but must never move it after the passenger pans or picks a point.
+    // A verified house needs no second confirmation. Respect a point the
+    // passenger has already picked/panned to while the lookup was running.
     let houseResolved = false;
     void resolveHouseAddress(pendingAddress, { token, signal: controller.signal }).then(address => {
       if (!active || pointInteraction.current || !address) return;
       houseResolved = true;
-      setPointMapCenter({ address: pendingAddress, coordinates: address.coordinates });
-      setSelectedPoint(address.coordinates);
+      setPendingAddress(null);
+      applyAddress(address);
     }).finally(() => { if (active) setResolvingHouse(false); });
     void (pendingStreet
       ? resolveStreetCenter(pendingStreet, {
@@ -458,9 +475,9 @@ export function AddressSearchScreen() {
       active = false;
       controller.abort();
     };
-  }, [pendingAddress, pendingStreet, token]);
+  }, [pendingAddress, pendingStreet, token, applyAddress]);
 
-  const runRemoteSearch = useCallback(() => {
+  const runRemoteSearch = useCallback((selectAfterSearch = false) => {
     const normalized = query.trim();
     if (normalized.length < 2 || !token) return;
     lastSearchQuery.current = `${token}:${normalized}`;
@@ -473,12 +490,18 @@ export function AddressSearchScreen() {
     const endpoint = demoSession ? '/v1/addresses/preview' : '/v1/addresses/search';
     void apiRequest<Address[]>(
       `${endpoint}?query=${encodeURIComponent(normalized)}`,
-      { token: demoSession ? undefined : token, signal: controller.signal, timeoutMs: 5_000 },
+      { token: demoSession ? undefined : token, signal: controller.signal, timeoutMs: 25_000 },
     )
       .then((items) => {
         if (requestId !== searchRequestId.current) return;
         setRemoteResults(items);
         setSearchError(items.length ? null : 'Точного совпадения нет');
+        if (selectAfterSearch) {
+          const candidates = overlayRememberedAddresses(mergeAddresses(localResults, items), rememberedAddresses)
+            .flatMap(address => { const candidate = searchableAddress(address); return candidate ? [candidate] : []; });
+          const selected = selectUnambiguousAddress(normalized, candidates, field === 'pickup');
+          if (selected) applyAddress(selected);
+        }
       })
       .catch((reason: unknown) => {
         if (requestId !== searchRequestId.current) return;
@@ -492,7 +515,16 @@ export function AddressSearchScreen() {
           searchAbortController.current = null;
         }
       });
-  }, [demoSession, query, token]);
+  }, [applyAddress, demoSession, field, localResults, query, rememberedAddresses, token]);
+
+  const submitSearch = () => {
+    const selected = selectUnambiguousAddress(query, results, field === 'pickup');
+    if (selected) {
+      searchRequestId.current += 1;
+      searchAbortController.current?.abort();
+      applyAddress(selected);
+    } else runRemoteSearch(true);
+  };
 
   useEffect(() => {
     if (!canSearchRemote || !edited || !isFocused || pendingAddress) return;
@@ -555,16 +587,7 @@ export function AddressSearchScreen() {
       });
       return;
     }
-    if (field === 'pickup') {
-      setPickup(address);
-    } else if (append === '1') {
-      addDestination(address);
-    } else {
-      const index = destinationIndex?.trim() ? Number(destinationIndex) : NaN;
-      if (Number.isInteger(index) && index >= 0) setDestinationAt(index, address);
-      else setDestination(address);
-    }
-    goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
+    applyAddress(address);
   };
 
   const saveSelectedPoint = async () => {
@@ -703,7 +726,7 @@ export function AddressSearchScreen() {
             outlineWidth: 0,
           }}
           returnKeyType="search"
-          onSubmitEditing={runRemoteSearch}
+          onSubmitEditing={submitSearch}
           accessibilityLabel="Поиск адреса или места"
         />
         {searching ? (
@@ -713,7 +736,7 @@ export function AddressSearchScreen() {
             accessibilityRole="button"
             accessibilityLabel="Найти адрес"
             disabled={!canSearchRemote}
-            onPress={runRemoteSearch}
+            onPress={submitSearch}
             hitSlop={8}
             style={({ pressed }) => ({
               width: 40,

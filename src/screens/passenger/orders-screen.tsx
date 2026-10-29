@@ -32,6 +32,7 @@ export function OrdersScreen() {
     error,
   } = useRide();
   const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
     void loadPassengerOrders();
@@ -60,9 +61,9 @@ export function OrdersScreen() {
           </View>
         )}
         {passengerOrdersLoaded && !!error && (
-          <Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
+          <View style={{ gap: spacing.x3 }}><Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
             {error}
-          </Text>
+          </Text><AppButton variant="secondary" onPress={() => void loadPassengerOrders()}>Повторить загрузку поездок</AppButton></View>
         )}
         {passengerOrdersLoaded && !error && orders.length === 0 && (
           <View
@@ -149,12 +150,14 @@ export function OrdersScreen() {
             loading={loadingMore}
             onPress={() => {
               setLoadingMore(true);
-              void loadMorePassengerOrders().finally(() => setLoadingMore(false));
+              setPageError(null);
+              void loadMorePassengerOrders().catch(reason => setPageError(reason instanceof Error ? reason.message : 'Не удалось загрузить поездки')).finally(() => setLoadingMore(false));
             }}
           >
             Показать более ранние поездки
           </AppButton>
         )}
+        {!!pageError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pageError}</Text>}
       </View>
     </Screen></PassengerWorkspace>
   );

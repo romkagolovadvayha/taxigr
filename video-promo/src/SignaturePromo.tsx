@@ -1,4 +1,5 @@
 import {ThreeMap, ThreeMagnifier} from './ThreeMap';
+import edit from '../signature-edit.json';
 import React, {useEffect, useState} from 'react';
 import {Audio} from '@remotion/media';
 import {AbsoluteFill, Img, Sequence, continueRender, delayRender, Easing, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
@@ -10,7 +11,7 @@ const ease = Easing.bezier(.16,1,.3,1);
 const lerp = (f:number, a:number, b:number, x:number, y:number) => interpolate(f,[a,b],[x,y],{...clamp,easing:ease});
 const linear = (f:number, a:number, b:number, x=0, y=1) => interpolate(f,[a,b],[x,y],clamp);
 const pop = (f:number, delay=0) => spring({frame:f-delay,fps:30,config:{damping:19,stiffness:155,mass:.85}});
-const useTime = () => {const f=useCurrentFrame();const {fps}=useVideoConfig();return f*30/fps;};
+const useTime = (scene?:keyof typeof edit.scenes) => {const f=useCurrentFrame();const {fps}=useVideoConfig();const timing=scene?edit.scenes[scene]:null;return f*30/fps*(timing?timing.authoredDuration/timing.duration:1);};
 const reveal = (f:number,delay=0,distance=60):React.CSSProperties => ({opacity:linear(f,delay,delay+12),transform:`translateY(${lerp(f,delay,delay+24,distance,0)}px)`});
 
 const Brand:React.FC<{dark?:boolean;label?:string}> = ({dark=false,label='ТАКСИ ГРАХОВО'}) => <div style={{position:'absolute',left:84,top:132,display:'flex',alignItems:'center',gap:20,color:dark?P.cream:P.ink,zIndex:4}}>
@@ -44,7 +45,7 @@ const Phone:React.FC<{f:number;children?:React.ReactNode;style?:React.CSSPropert
 </div>;
 
 const Hook:React.FC = () => {
-  const f=useTime();
+  const f=useTime('hook');
   return <AbsoluteFill style={{background:P.night,overflow:'hidden',perspective:1700}}>
     <div style={{position:'absolute',width:1200,height:1200,left:80,top:540,background:'radial-gradient(ellipse,#6A55272D,transparent 66%)'}}/>
     <RouteRibbon f={f} dark opacity={.58}/><Brand dark/>
@@ -59,7 +60,7 @@ const Hook:React.FC = () => {
 const Address:React.FC<{f:number;delay:number;label:string;value:string;destination?:boolean}> = ({f,delay,label,value,destination}) => <div style={{display:'flex',alignItems:'center',gap:26,height:144,...reveal(f,delay,24)}}><div style={{width:22,height:22,borderRadius:destination?7:30,border:destination?'none':`6px solid ${P.yellow}`,background:destination?P.yellow:'transparent',flexShrink:0}}/><div style={{minWidth:0}}><div style={{fontSize:25,color:P.muted,marginBottom:5}}>{label}</div><div style={{fontSize:37,fontWeight:750,letterSpacing:-1,whiteSpace:'nowrap'}}>{value}</div></div><span style={{marginLeft:'auto',fontSize:44,color:'#A19C8F'}}>›</span></div>;
 
 const Order:React.FC = () => {
-  const f=useTime();const pressed=interpolate(f,[60,65,71],[1,.95,1],clamp);
+  const f=useTime('order');const pressed=interpolate(f,[60,65,71],[1,.95,1],clamp);
   return <AbsoluteFill style={{background:P.cream,overflow:'hidden',perspective:1600}}>
     <Brand/><Title f={f} lines={['Два адреса.','И можно ехать.']} size={102} top={270}/>
     <div style={{position:'absolute',right:-330,top:980,width:1100,height:1100,borderRadius:1100,border:'100px solid #EFE2B1',transform:`translateX(${lerp(f,0,80,130,-20)}px)`}}/>
@@ -75,10 +76,11 @@ const Order:React.FC = () => {
 
 const Plate:React.FC<{width?:number}> = ({width=435}) => <div style={{width,height:width*.245,border:'3px solid #252A28',borderRadius:12,background:'#FEFEFC',display:'flex',color:'#222B2B',boxShadow:'inset 0 0 0 3px white',fontFamily:FONT,overflow:'hidden',flexShrink:0}}><div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',fontSize:width*.104,fontWeight:800,letterSpacing:2,whiteSpace:'nowrap'}}>А<span style={{fontSize:width*.134}}>123</span>АА</div><div style={{width:'23%',borderLeft:'3px solid #252A28',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}><strong style={{fontSize:width*.105,lineHeight:1.06}}>18</strong><div style={{display:'flex',gap:6,alignItems:'center',marginTop:4,fontSize:width*.025}}>RUS<span style={{display:'block',width:width*.068,height:width*.043,border:'1px solid #AAA',background:'linear-gradient(#fff 0 33%,#285ABC 33% 66%,#DC494C 66%)'}}/></div></div></div>;
 
-const Lens:React.FC<{f:number}> = ({f}) => <div style={{position:'absolute',left:580,top:1260,width:440,height:500,opacity:linear(f,45,58),scale:pop(f,45),zIndex:8}}><ThreeMagnifier f={f}/></div>;
+// Keep the WebGL canvas measurable from its first frame; scale(0) prevents R3F initialization.
+const Lens:React.FC<{f:number}> = ({f}) => <div style={{position:'absolute',left:580,top:1260,width:440,height:500,opacity:linear(f,19,29),scale:lerp(f,19,39,.85,1),zIndex:8}}><ThreeMagnifier f={f}/></div>;
 
 const Driver:React.FC = () => {
-  const f=useTime();
+  const f=useTime('driver');
   return <AbsoluteFill style={{background:P.yellow,overflow:'hidden'}}>
     <div style={{position:'absolute',width:1350,height:1350,borderRadius:1400,border:'2px solid #FFF7D455',left:-200,top:580,transform:`scale(${1+f*.0007})`}}/><div style={{position:'absolute',width:1000,height:1000,borderRadius:1000,background:'radial-gradient(#FFECA0,transparent 68%)',left:50,top:590}}/>
     <Brand/><Title f={f} top={265} size={80} lines={['Вы видите водителя:','кто к вам едет','и когда приедет.']}/>
@@ -94,20 +96,20 @@ const Driver:React.FC = () => {
 };
 
 const Trip:React.FC = () => {
-  const f=useTime();const stage=f<105?0:f<143?1:2;const messages=['Машина едет к вам','Водитель приехал','Вы в пути'];
+  const f=useTime('trip');const arrived=f>=230;
   return <AbsoluteFill style={{background:P.cream,overflow:'hidden',perspective:1650}}>
     <ThreeMap f={f}/>
     <div style={{position:'absolute',inset:'0 0 auto',height:620,background:'linear-gradient(#F7F4EB 8%,#F7F4EBF2 68%,#F7F4EB00)'}}/>
     <Brand/><Title f={f} lines={['Всё на карте.','До самой точки.']} size={100}/>
 
-    <div style={{position:'absolute',left:84,top:605,width:190,height:150,borderRadius:34,background:P.ink,color:P.cream,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',boxShadow:'0 25px 50px #181D2130',...reveal(f,24,50)}}>{stage===0?<><strong style={{fontSize:68,lineHeight:1}}>{Math.max(1,4-Math.floor(f/29))}</strong><span style={{fontSize:23,marginTop:5}}>мин до вас</span></>:<span style={{color:P.yellow}}><Check size={70}/></span>}</div>
-    <div style={{position:'absolute',left:100,right:100,top:1640,background:P.ink,color:P.cream,borderRadius:38,padding:'31px 35px',display:'flex',alignItems:'center',gap:24,boxShadow:'0 25px 55px #0002',...reveal(f,32,80)}}><div style={{width:64,height:64,borderRadius:22,background:P.yellow,color:P.ink,display:'grid',placeItems:'center'}}>{stage===2?<Arrow size={39}/>:<Pin size={30}/>}</div><div><div style={{fontSize:37,fontWeight:800,letterSpacing:-1}}>{messages[stage]}</div><div style={{fontSize:25,color:'#BEBEAF',marginTop:5}}>{stage===2?'К месту назначения':'Дмитрий · белый седан'}</div></div></div>
+    <div style={{position:'absolute',left:84,top:605,width:190,height:150,borderRadius:34,background:P.ink,color:P.cream,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',boxShadow:'0 25px 50px #181D2130',...reveal(f,24,50)}}>{!arrived?<><strong style={{fontSize:68,lineHeight:1}}>{Math.max(1,3-Math.floor(f/80))}</strong><span style={{fontSize:23,marginTop:5}}>мин в пути</span></>:<span style={{color:P.yellow}}><Check size={70}/></span>}</div>
+    <div style={{position:'absolute',left:100,right:100,top:1640,background:P.ink,color:P.cream,borderRadius:38,padding:'31px 35px',display:'flex',alignItems:'center',gap:24,boxShadow:'0 25px 55px #0002',...reveal(f,32,80)}}><div style={{width:64,height:64,borderRadius:22,background:P.yellow,color:P.ink,display:'grid',placeItems:'center'}}>{arrived?<Check size={39}/>:<Arrow size={39}/>}</div><div><div style={{fontSize:37,fontWeight:800,letterSpacing:-1}}>{arrived?'Вы приехали':'Вы в пути'}</div><div style={{fontSize:25,color:'#BEBEAF',marginTop:5}}>{arrived?'Место назначения':'К месту назначения'}</div></div></div>
     <div style={{position:'absolute',left:100,top:1830,fontSize:24,color:P.muted,background:P.cream,padding:'9px 18px',borderRadius:18}}>Пример поездки</div>
   </AbsoluteFill>;
 };
 
 const Review:React.FC = () => {
-  const f=useTime();const submitted=f>=119;const text='Спасибо за поездку!';
+  const f=useTime('review');const submitted=f>=119;const text='Спасибо за поездку!';
   const dismiss=lerp(f,128,153,0,1);
   return <AbsoluteFill style={{background:P.night,overflow:'hidden',perspective:1800}}>
     <div style={{position:'absolute',left:-210,top:510,width:1400,height:1400,background:'radial-gradient(ellipse,#66551B45,transparent 65%)'}}/>
@@ -123,22 +125,31 @@ const Review:React.FC = () => {
 };
 
 const Close:React.FC = () => {
-  const f=useTime();
+  const f=useTime('close');const orbit=f*Math.PI/30;
   return <AbsoluteFill style={{background:P.cream,overflow:'hidden',perspective:1700}}>
     <RouteRibbon f={f} opacity={.33}/>
-    <div style={{position:'absolute',left:80,right:80,top:160,fontSize:26,fontWeight:800,letterSpacing:3,textAlign:'center',color:P.muted,...reveal(f,4,20)}}>ГРАХОВО И РАЙОН</div>
-    <div style={{position:'absolute',left:392,top:380,width:296,height:296,borderRadius:72,background:'#BA9029',boxShadow:'14px 24px 0 #C69A2C,28px 48px 75px #6F561C24',transform:`translateY(${lerp(f,0,27,150,0)+Math.sin(f/25)*5}px) rotateX(${lerp(f,0,70,20,6)}deg) rotateY(${lerp(f,0,80,-24,8)}deg) rotateZ(${lerp(f,0,80,-10,1)}deg) scale(${pop(f,1)})`}}><Img src={staticFile('signature/logo.svg')} style={{width:'100%',height:'100%'}}/></div>
-    <div style={{position:'absolute',left:70,right:70,top:940,textAlign:'center',color:P.ink,fontSize:112,fontWeight:800,letterSpacing:-4,...reveal(f,30,45)}}>TAXIGR.RU</div>
+    <div style={{position:'absolute',left:80,right:80,top:145,fontSize:58,fontWeight:800,letterSpacing:-1.8,textAlign:'center',color:P.ink,...reveal(f,4,20)}}>{edit.closingLabel}</div>
+    <div style={{position:'absolute',left:390,top:250,width:300,height:180,display:'grid',placeItems:'center',background:'radial-gradient(ellipse,#F6C94520,transparent 70%)',...reveal(f,6,16)}}>
+      <svg width="300" height="180" viewBox="0 0 300 180" style={{position:'absolute',inset:0}}>
+        <ellipse cx="150" cy="90" rx="140" ry="75" fill="none" stroke="#D8CDAF" strokeWidth="3"/>
+        <ellipse cx="150" cy="90" rx="140" ry="75" fill="none" stroke={P.yellow} strokeWidth="6" pathLength="100" strokeDasharray="19 81" strokeDashoffset={-orbit/(2*Math.PI)*100} strokeLinecap="round"/>
+        <circle cx={150+140*Math.cos(orbit)} cy={90+75*Math.sin(orbit)} r="8" fill={P.ink}/>
+        <circle cx={150-140*Math.cos(orbit)} cy={90-75*Math.sin(orbit)} r="5" fill={P.yellow}/>
+      </svg>
+      <span style={{fontSize:74,fontWeight:800,letterSpacing:-3,lineHeight:1}}>24/7</span>
+    </div>
+    <div style={{position:'absolute',left:392,top:510,width:296,height:296,borderRadius:72,background:'#BA9029',boxShadow:'14px 24px 0 #C69A2C,28px 48px 75px #6F561C24',transform:`translateY(${lerp(f,0,27,150,0)+Math.sin(f/25)*5}px) rotateX(${lerp(f,0,70,20,6)}deg) rotateY(${lerp(f,0,80,-24,8)}deg) rotateZ(${lerp(f,0,80,-10,1)}deg) scale(${pop(f,1)})`}}><Img src={staticFile('signature/logo.svg')} style={{width:'100%',height:'100%'}}/></div>
+    <div style={{position:'absolute',left:70,right:70,top:940,textAlign:'center',color:P.ink,fontSize:112,fontWeight:800,letterSpacing:-4,...reveal(f,25,45)}}>TAXIGR.RU</div>
     <div style={{position:'absolute',left:100,right:100,top:1130,textAlign:'center',fontSize:32,color:'#766F5C',...reveal(f,43,25)}}>Закажите на сайте или в приложении</div>
-    <div style={{position:'absolute',left:100,right:100,top:1250,display:'flex',alignItems:'center',justifyContent:'center',gap:34,...reveal(f,51,25)}}>
+    <div style={{position:'absolute',left:100,right:100,top:1250,display:'flex',alignItems:'center',justifyContent:'center',gap:34,...reveal(f,55,25)}}>
       <Img src={staticFile('store/rustore-ru.svg')} style={{width:383,height:138,objectFit:'contain'}}/>
       <div style={{width:469,height:138,position:'relative',overflow:'hidden',borderRadius:12}}><Img src={staticFile('store/google-play-ru.png')} style={{position:'absolute',width:469,height:182,left:0,top:-22}}/></div>
     </div>
-    <div style={{position:'absolute',left:100,right:100,top:1460,textAlign:'center',fontSize:28,color:P.muted,...reveal(f,60,18)}}>Доступно в VK, MAX и Telegram</div>
+    <div style={{position:'absolute',left:100,right:100,top:1460,textAlign:'center',fontSize:28,color:P.muted,...reveal(f,102,18)}}>Доступно в VK, MAX и Telegram</div>
+    <div style={{position:'absolute',left:100,right:100,top:1545,textAlign:'center',fontSize:27,color:P.muted,...reveal(f,112,18)}}>Или по телефону +7 (995) 645-96-07</div>
   </AbsoluteFill>;
 };
 
-const CUTS=[4.5,7.2,11.6,19.6,26.2666666667];
 const RibbonCut:React.FC = () => {const f=useTime();return <AbsoluteFill style={{pointerEvents:'none',overflow:'hidden'}}><div style={{position:'absolute',left:interpolate(f,[0,10,20],[1800,-660,-3250],{...clamp,easing:Easing.inOut(Easing.cubic)}),top:-360,width:2400,height:2640,background:P.yellow,transform:'rotate(-15deg)',boxShadow:'-35px 0 80px #2B240E33'}}><div style={{position:'absolute',inset:'0 auto 0 70px',width:3,background:'#FFF4BC66'}}/></div></AbsoluteFill>;};
 
 export const TaxiGrahovoSignature:React.FC<{voiceover?:boolean}> = ({voiceover=true}) => {
@@ -147,14 +158,18 @@ export const TaxiGrahovoSignature:React.FC<{voiceover?:boolean}> = ({voiceover=t
   const frames=(seconds:number)=>Math.round(seconds*fps);
   return <AbsoluteFill style={{fontFamily:FONT,color:P.ink,background:P.night}}>
     <style>{`@font-face{font-family:TaxiManrope;src:url('${staticFile('signature/Manrope.ttf')}') format('truetype');font-weight:200 800;font-style:normal}*{box-sizing:border-box}`}</style>
-    <Sequence premountFor={fps} from={0} durationInFrames={frames(4.5)} name="01 · Свои дороги"><Hook/></Sequence>
-    <Sequence premountFor={fps} from={frames(4.5)} durationInFrames={frames(2.7)} name="02 · Один заказ"><Order/></Sequence>
-    <Sequence premountFor={fps} from={frames(7.2)} durationInFrames={frames(4.4)} name="03 · Машина и лупа"><Driver/></Sequence>
-    <Sequence premountFor={fps} from={frames(11.6)} durationInFrames={frames(8)} name="04 · Объёмная карта"><Trip/></Sequence>
-    <Sequence premountFor={fps} from={frames(19.6)} durationInFrames={frames(26.2666666667)-frames(19.6)} name="05 · Спасибо за поездку"><Review/></Sequence>
-    <Sequence premountFor={fps} from={frames(26.2666666667)} durationInFrames={frames(32)-frames(26.2666666667)} name="06 · Свое такси"><Close/></Sequence>
-    {CUTS.map((seconds,i)=><Sequence key={seconds} from={frames(seconds)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name={`Переход ${i+1}`}><RibbonCut/></Sequence>)}
-    {voiceover?<Audio src={staticFile('audio/user/taxi-grahovo-voice.mp3')} volume={.93}/>:null}
-    <Audio src={staticFile('signature/sound-design.wav')} volume={1}/>
+    <Sequence premountFor={fps} from={frames(edit.scenes.hook.start)} durationInFrames={frames(edit.scenes.hook.duration)} name="01 · Закажи в одно касание"><Hook/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.order.start)} durationInFrames={frames(edit.scenes.order.duration)} name="02 · Два адреса"><Order/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.driver.start)} durationInFrames={frames(edit.scenes.driver.duration)} name="03 · Водитель и машина"><Driver/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.trip.start)} durationInFrames={frames(edit.scenes.trip.duration)} name="04 · Объёмная карта"><Trip/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.review.start)} durationInFrames={frames(edit.scenes.review.duration)} name="05 · Спасибо за поездку"><Review/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.close.start)} durationInFrames={frames(edit.scenes.close.duration)} name="06 · Сайт и приложения"><Close/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.order.start)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name="Переход · заказ"><RibbonCut/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.driver.start)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name="Переход · водитель"><RibbonCut/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.trip.start)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name="Переход · карта"><RibbonCut/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.review.start)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name="Переход · отзыв"><RibbonCut/></Sequence>
+    <Sequence premountFor={fps} from={frames(edit.scenes.close.start)-Math.round(fps/3)} durationInFrames={Math.round(fps*2/3)} name="Переход · финал"><RibbonCut/></Sequence>
+    {voiceover?<Audio premountFor={fps} name="Павел · дубль 3 · обработанный голос" src={staticFile('audio/user/pavel-take-03-cinematic.wav')}/>:null}
+    <Audio premountFor={fps} name="Призыв · музыка под голосом" src={staticFile('audio/user/prizyv-ducked.wav')}/>
   </AbsoluteFill>;
 };

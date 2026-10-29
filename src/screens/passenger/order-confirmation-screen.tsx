@@ -267,6 +267,7 @@ export function OrderConfirmationScreen() {
             )}
 
             <BookingSubmitButton
+              checkAvailability={false}
               priceMinor={selected.priceMinor}
               etaMinutes={selected.etaMinutes}
               label="Подтвердить"

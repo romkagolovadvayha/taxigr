@@ -605,7 +605,7 @@ function DriverOrderCard({
           <AppModal
             visible={completionConfirmVisible}
             title="Оплата получена?"
-            description={`Подтвердите получение ${paymentLabel.toLowerCase()} на сумму ${ridePriceLabel(currentRide)}. После этого поездка будет завершена.`}
+            description={`Подтвердите получение оплаты: ${ridePriceLabel(currentRide)}. Способ оплаты: ${paymentLabel.toLowerCase()}. После этого поездка будет завершена.`}
             onClose={() => setCompletionConfirmVisible(false)}
           >
             <AppButton
@@ -725,6 +725,8 @@ export function DriverHomeScreen() {
   const demo = token?.startsWith('demo:') ?? false;
   const [online, setOnline] = useState<boolean | null>(demo ? true : null);
   const statusRequestRef = useRef(0);
+  const statusChangeInFlight = useRef(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
   const [mapFollowRequestId, setMapFollowRequestId] = useState(0);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -758,6 +760,7 @@ export function DriverHomeScreen() {
     : location.heading;
 
   const loadStatus = useCallback(async () => {
+    if (statusChangeInFlight.current) return;
     const requestId = ++statusRequestRef.current;
     if (demo) {
       setOnline(true);
@@ -800,10 +803,14 @@ export function DriverHomeScreen() {
   }, [loadStatus]);
 
   const changeOnline = async (next: boolean) => {
+    if (statusChangeInFlight.current) return;
     if (!token || token.startsWith('demo:')) {
       setOnline(next);
       return;
     }
+    statusChangeInFlight.current = true;
+    statusRequestRef.current += 1;
+    setChangingStatus(true);
     try {
       if (next) {
         const permission = await ensureForegroundLocationPermission('driver');
@@ -813,18 +820,21 @@ export function DriverHomeScreen() {
         }
         await syncDriverBackgroundLocation(true);
       }
-      setOnline(next);
       await apiRequest('/v1/driver/status', {
         method: 'POST',
         token,
         body: JSON.stringify({ status: next ? 'online' : 'offline' }),
       });
-      if (next) await refresh();
+      setOnline(next);
+      if (next) void refresh().catch(() => undefined);
       setStatusError(null);
     } catch (reason) {
       setOnline(!next);
       if (next) void syncDriverBackgroundLocation(false).catch(() => undefined);
       setStatusError(reason instanceof Error ? reason.message : 'Не удалось изменить статус');
+    } finally {
+      statusChangeInFlight.current = false;
+      setChangingStatus(false);
     }
   };
 
@@ -883,7 +893,7 @@ export function DriverHomeScreen() {
             {activeTrip ? 'Маршрут и действия по заказу' : online === null ? 'Проверяем статус…' : online ? 'На линии · ждём заказы рядом' : 'Вы не на линии'}
           </Text>
         </View>
-        {!activeTrip && <AccessibleSwitch value={online === true} disabled={online === null}
+        {!activeTrip && <AccessibleSwitch value={online === true} disabled={online === null || changingStatus}
           accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'} onValueChange={(next) => void changeOnline(next)} trackColor={{ true: colors.brand }} />}
         {!activeTrip && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
           label={mapVisible ? 'Скрыть карту заказа' : 'Показать карту заказа'} onPress={() => setMapVisible((value) => !value)} />}

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 
 import mysql, { type Connection } from 'mysql2/promise';
 import { io, type Socket } from 'socket.io-client';
@@ -239,8 +240,31 @@ async function cleanup(): Promise<void> {
 }
 
 describe.skipIf(!runIntegration)('live API role and order flows', () => {
+  it('can retry the driver profile migration without overwriting edited driver data', async () => {
+    const [before] = await connection.query<mysql.RowDataPacket[]>(
+      'SELECT has_sez_pass, license_number FROM drivers WHERE id = ?', [fixture.driverOneId],
+    );
+    const retryConnection = await mysql.createConnection({ uri: mysqlUrl, multipleStatements: true });
+    try {
+      await connection.execute('UPDATE drivers SET has_sez_pass = TRUE, license_number = ? WHERE id = ?',
+        ['ADMIN-EDITED-1234', fixture.driverOneId]);
+      const migration = await readFile(new URL('../server/migrations/052_driver_profile_details.sql', import.meta.url), 'utf8');
+      await retryConnection.query(migration);
+      await retryConnection.query(migration);
+      const [after] = await connection.query<mysql.RowDataPacket[]>(
+        'SELECT has_sez_pass, license_number FROM drivers WHERE id = ?', [fixture.driverOneId],
+      );
+      expect(after[0]).toMatchObject({ has_sez_pass: 1, license_number: 'ADMIN-EDITED-1234' });
+    } finally {
+      await connection.execute('UPDATE drivers SET has_sez_pass = ?, license_number = ? WHERE id = ?',
+        [before[0]!.has_sez_pass, before[0]!.license_number, fixture.driverOneId]);
+      await retryConnection.end();
+    }
+  });
+
   beforeAll(async () => {
-    connection = await mysql.createConnection(mysqlUrl);
+    connection = await mysql.createConnection({ uri: mysqlUrl, timezone: 'Z' });
+    await connection.query("SET SESSION time_zone = '+00:00'");
     await cleanup();
     await connection.execute(
       `INSERT INTO users
@@ -386,6 +410,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(created.data).toMatchObject({ pricingMode: 'driver', manualPriceSet: false, priceMinor: 0,
       pickup: { label: body.pickup.label, coordinatePrecision: 'approximate' } });
     expect(created.data?.routeCoordinates).toBeUndefined();
+    expect(created.data?.comment).toContain('Цена не рассчитана');
+    expect(created.data?.comment).toContain('Цена 350');
     const id = created.data!.id;
     expect((await api<RideOrder>('/v1/orders', { method: 'POST', token: passengerToken, body })).data?.id).toBe(id);
     expect((await api(`/v1/driver/orders/${id}/accept`, { method: 'POST', token: driverOneToken, body: {} })).status).toBe(200);
@@ -401,6 +427,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect((await api(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 0 } })).status).toBe(400);
     const fare = await api<RideOrder>(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 35000 } });
     expect(fare.data).toMatchObject({ manualPriceSet: true, priceMinor: 35000, basePriceMinor: 35000 });
+    expect(fare.data?.comment).toBeUndefined();
     const completed = await api<RideOrder>(`/v1/driver/orders/${id}/transition`, { method: 'POST', token: driverOneToken,
       body: { status: 'completed', paymentReceived: true } });
     expect(completed.data).toMatchObject({ status: 'completed', priceMinor: 35000 });
@@ -1126,6 +1153,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       },
     });
 
+    expect(verified.status, JSON.stringify(verified.error)).toBe(200);
+
     const [attemptRows] = await connection.query<mysql.RowDataPacket[]>(
       `SELECT action, outcome, ip_address, installation_fingerprint
        FROM auth_attempt_events
@@ -1335,6 +1364,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     const replay = await createOrder(passengerToken, 'economy', key);
     expect(first.status).toBe(201);
     expect(replay.status).toBe(200);
+    // API timestamps must stay UTC even when the database host uses local time.
+    expect(Math.abs(Date.now() - new Date(first.data!.createdAt).getTime())).toBeLessThan(10_000);
     expect(replay.data?.id).toBe(first.data?.id);
     const secondActive = await createOrder(passengerToken);
     expect(secondActive.status).toBe(409);
@@ -2476,6 +2507,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         vehicleColorHex: '#2F6FED',
         plate: `К${fixture.applicantId.slice(0, 6).toUpperCase()}`,
         hasChildSeat: true,
+        hasSezPass: true,
         legalAcceptance: currentDriverLegalAcceptance(),
       },
     });
@@ -2495,19 +2527,20 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         vehicleColorHex: '#2F6FED',
         plate: `К${fixture.applicantId.slice(0, 6).toUpperCase()}`,
         hasChildSeat: true,
+        hasSezPass: true,
         legalAcceptance: currentDriverLegalAcceptance(),
       },
     });
     expect(duplicate.status).toBe(409);
     expect(duplicate.error?.code).toBe('PENDING_APPLICATION_EXISTS');
-    const own = await api<{ id: string }[]>('/v1/driver-applications/me', {
+    const own = await api<{ id: string; hasSezPass: boolean }[]>('/v1/driver-applications/me', {
       token: applicantToken,
     });
-    expect(own.data?.some((item) => item.id === application.data!.id)).toBe(true);
-    const adminList = await api<{ id: string }[]>('/v1/admin/applications', {
+    expect(own.data?.find((item) => item.id === application.data!.id)?.hasSezPass).toBe(true);
+    const adminList = await api<{ id: string; hasSezPass: boolean }[]>('/v1/admin/applications', {
       token: adminToken,
     });
-    expect(adminList.data?.some((item) => item.id === application.data!.id)).toBe(true);
+    expect(adminList.data?.find((item) => item.id === application.data!.id)?.hasSezPass).toBe(true);
 
     const moderated = await api(`/v1/admin/applications/${application.data!.id}/moderate`, {
       method: 'POST',
@@ -2526,7 +2559,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     ).toBe(409);
 
     const [drivers] = await connection.query<mysql.RowDataPacket[]>(
-      `SELECT d.id, d.status, d.has_child_seat, v.plate
+      `SELECT d.id, d.status, d.has_child_seat, d.has_sez_pass, d.license_number, v.plate
        FROM drivers d JOIN vehicles v ON v.driver_id = d.id AND v.active = TRUE
        WHERE d.user_id = ?`,
       [fixture.applicantId],
@@ -2534,6 +2567,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(drivers).toHaveLength(1);
     expect(drivers[0]?.status).toBe('online');
     expect(Boolean(drivers[0]?.has_child_seat)).toBe(true);
+    expect(Boolean(drivers[0]?.has_sez_pass)).toBe(true);
+    expect(drivers[0]?.license_number).toBe('18 22 654321');
     const [openShifts] = await connection.query<mysql.RowDataPacket[]>(
       'SELECT id FROM driver_shifts WHERE driver_id = ? AND ended_at IS NULL',
       [drivers[0]!.id],
@@ -2550,9 +2585,10 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
     expect(refreshed.status).toBe(200);
     expect(refreshed.data?.user.roles).toContain('driver');
-    expect(
-      (await api('/v1/driver/profile', { token: refreshed.data!.token })).status,
-    ).toBe(200);
+    const profile = await api<{hasSezPass:boolean;licenseNumber:string}>('/v1/driver/profile', {token:refreshed.data!.token});
+    expect(profile.data).toMatchObject({hasSezPass:true,licenseNumber:'18 22 654321'});
+    const detail = await api<AdminDriverDetail>(`/v1/admin/drivers/${drivers[0]!.id}`, {token:adminToken});
+    expect(detail.data?.driver.hasSezPass).toBe(true);
   });
 
   it('configures independent driver priorities and notification delays by zone', async () => {
@@ -2629,6 +2665,98 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       token: adminToken,
       body: { priorities: { grahovo: false, district: false, intercity: false } },
     });
+  });
+
+  it('accepts applications from older clients without a SEZ field and defaults it to false', async () => {
+    const created = await api<{id:string}>('/v1/driver-applications',{method:'POST',token:outsiderToken,body:{
+      applicantName:'Кандидат без пропуска',phone:'+79000000002',licenseNumber:'18 22 888888',
+      vehicleMake:'Lada',vehicleModel:'Granta',vehicleYear:2020,vehicleColor:'Белый',vehicleColorHex:'#F7F7F2',
+      plate:`О${fixture.outsiderId.slice(0,6).toUpperCase()}`,hasChildSeat:false,legalAcceptance:currentDriverLegalAcceptance(),
+    }});
+    expect(created.status).toBe(201);
+    const own = await api<{id:string;hasSezPass:boolean}[]>('/v1/driver-applications/me',{token:outsiderToken});
+    expect(own.data?.find(row=>row.id===created.data!.id)?.hasSezPass).toBe(false);
+    expect((await api(`/v1/admin/applications/${created.data!.id}/moderate`,{method:'POST',token:adminToken,body:{decision:'rejected',comment:'Проверка совместимости'}})).status).toBe(200);
+  });
+
+  it('lets an admin edit driver data atomically and preserves vehicle history', async () => {
+    const path = `/v1/admin/drivers/${fixture.driverOneId}`;
+    const before = (await api<AdminDriverDetail>(path, {token:adminToken})).data!;
+    const oldVehicle = before.vehicles.find(vehicle => vehicle.active)!;
+    const nextVehicle = {...before.driver.vehicle!, model:'Niva',year:2024,color:'Зелёный',colorHex:'#2f7d4a',plate:`Р${randomUUID().slice(0,6).toUpperCase()}`};
+    const edited = await api(`${path}/profile`, {method:'PATCH',token:adminToken,body:{
+      name:'Исправленное ФИО водителя', phone:'8 (900) 000-00-08',licenseNumber:'18 33 778899',
+      hasChildSeat:true,hasSezPass:true,vehicle:nextVehicle,
+    }});
+    expect(edited.status,JSON.stringify(edited.error)).toBe(200);
+    const after = (await api<AdminDriverDetail>(path,{token:adminToken})).data!;
+    expect(after.user).toMatchObject({name:'Исправленное ФИО водителя',phone:'+79000000008'});
+    expect(after.driver).toMatchObject({hasSezPass:true,hasChildSeat:true,licenseNumber:'18 33 778899',vehicle:{...nextVehicle,colorHex:'#2F7D4A'}});
+    expect(after.driver.commissionBps).toBe(before.driver.commissionBps);
+    expect(after.driver.priorities).toEqual(before.driver.priorities);
+    expect(after.vehicles.find(v=>v.id===oldVehicle.id)).toMatchObject({...oldVehicle,active:false});
+    expect(after.vehicles.filter(v=>v.active)).toHaveLength(1);
+    const own = await api<{name:string;phone:string;hasSezPass:boolean;licenseNumber:string}>('/v1/driver/profile',{token:driverOneToken});
+    expect(own.data).toMatchObject({name:'Исправленное ФИО водителя',phone:'+79000000008',hasSezPass:true,licenseNumber:'18 33 778899'});
+    const list = await api<{id:string;hasSezPass:boolean}[]>('/v1/admin/drivers',{token:adminToken});
+    expect(list.data?.find(d=>d.id===fixture.driverOneId)?.hasSezPass).toBe(true);
+    const [users] = await connection.query<mysql.RowDataPacket[]>('SELECT phone_verified_at FROM users WHERE id = ?',[fixture.driverUserOneId]);
+    expect(users[0]?.phone_verified_at).toBeNull();
+    const [audit] = await connection.query<mysql.RowDataPacket[]>("SELECT before_json, after_json FROM audit_logs WHERE entity_id = ? AND action = 'driver.profile.update' ORDER BY id DESC LIMIT 1",[fixture.driverOneId]);
+    expect(JSON.parse(audit[0]!.after_json).hasSezPass).toBe(true);
+    expect(JSON.parse(audit[0]!.before_json).vehicle.id).toBe(oldVehicle.id);
+    expect((await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{hasSezPass:false}})).status).toBe(200);
+    const disabled = (await api<AdminDriverDetail>(path,{token:adminToken})).data!;
+    expect(disabled.driver.hasSezPass).toBe(false);
+    expect(disabled.user.name).toBe(after.user.name);
+    expect(disabled.driver.licenseNumber).toBe(after.driver.licenseNumber);
+    expect(disabled.vehicles.filter(v=>v.active).map(v=>v.id)).toEqual(after.vehicles.filter(v=>v.active).map(v=>v.id));
+  });
+
+  it('restricts driver profile edits to admins and validates all supplied fields', async () => {
+    const path = `/v1/admin/drivers/${fixture.driverOneId}/profile`;
+    for (const token of [passengerToken,driverOneToken,driverTwoToken]) {
+      expect((await api(path,{method:'PATCH',token,body:{hasSezPass:true}})).status).toBe(403);
+    }
+    expect((await api(path,{method:'PATCH',body:{hasSezPass:true}})).status).toBe(401);
+    for (const body of [{},{name:''},{phone:'123'},{licenseNumber:'1'},{hasSezPass:'true'},{hasChildSeat:1},{roles:['admin']},{vehicle:{year:1800}}]) {
+      expect((await api(path,{method:'PATCH',token:adminToken,body})).status,JSON.stringify(body)).toBe(400);
+    }
+    expect((await api(`/v1/admin/drivers/${randomUUID()}/profile`,{method:'PATCH',token:adminToken,body:{hasSezPass:true}})).status).toBe(404);
+  });
+
+  it('rolls back all driver edits when a phone or plate is already in use', async () => {
+    const path = `/v1/admin/drivers/${fixture.driverOneId}`;
+    const before = (await api<AdminDriverDetail>(path,{token:adminToken})).data!;
+    const other = (await api<AdminDriverDetail>(`/v1/admin/drivers/${fixture.driverTwoId}`,{token:adminToken})).data!;
+    const phone = await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{name:'Не должно сохраниться',phone:'+79000000001',hasSezPass:true}});
+    expect(phone.status).toBe(409); expect(phone.error?.code).toBe('PHONE_ALREADY_EXISTS');
+    const plate = await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{name:'Не должно сохраниться',hasSezPass:true,vehicle:{...before.driver.vehicle!,plate:other.driver.vehicle!.plate}}});
+    expect(plate.status).toBe(409); expect(plate.error?.code).toBe('PLATE_ALREADY_EXISTS');
+    const after = (await api<AdminDriverDetail>(path,{token:adminToken})).data!;
+    expect(after.user.name).toBe(before.user.name);expect(after.driver).toEqual(before.driver);
+    expect(after.vehicles).toEqual(before.vehicles);
+  });
+
+  it('prevents vehicle edits during a ride or while its change request is pending', async () => {
+    const path = `/v1/admin/drivers/${fixture.driverOneId}`;
+    const before = (await api<AdminDriverDetail>(path,{token:adminToken})).data!;
+    const vehicle = {...before.driver.vehicle!,model:'Vesta Test'};
+    await setDriverStatus(driverOneToken,'online');
+    const order = await createOrder(passengerToken); expect(order.status).toBe(201);
+    expect((await api(`/v1/driver/orders/${order.data!.id}/accept`,{method:'POST',token:driverOneToken})).status).toBe(200);
+    const busy = await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{vehicle}});
+    expect(busy.error?.code).toBe('ACTIVE_RIDE_IN_PROGRESS');
+    expect((await api(`/v1/orders/${order.data!.id}/cancel`,{method:'POST',token:passengerToken})).status).toBe(200);
+    const pending = await api<{id:string}>('/v1/driver/vehicle-change-requests',{method:'POST',token:driverOneToken,body:{
+      vehicleMake:vehicle.make,vehicleModel:vehicle.model,vehicleYear:vehicle.year,vehicleColor:vehicle.color,
+      vehicleColorHex:vehicle.colorHex,plate:vehicle.plate,hasChildSeat:before.driver.hasChildSeat,
+    }});
+    expect(pending.status).toBe(201);
+    const blocked = await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{vehicle}});
+    expect(blocked.error?.code).toBe('PENDING_VEHICLE_CHANGE_EXISTS');
+    expect((await api(`${path}/profile`,{method:'PATCH',token:adminToken,body:{hasSezPass:true}})).status).toBe(200);
+    expect((await api(`/v1/admin/vehicle-change-requests/${pending.data!.id}/moderate`,{method:'POST',token:adminToken,body:{decision:'rejected',comment:'Проверка редактирования завершена'}})).status).toBe(200);
   });
 
   it('updates tariffs, metrics, driver suspension and audit records', async () => {

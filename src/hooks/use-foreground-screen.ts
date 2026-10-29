@@ -9,8 +9,12 @@ const subscribe = (onChange: () => void) => {
 const getSnapshot = () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive';
 const getServerSnapshot = () => true;
 
+export function useAppForeground(): boolean {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
 export function useForegroundScreen(): boolean {
   const focused = useIsFocused();
-  const foreground = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const foreground = useAppForeground();
   return focused && foreground;
 }

@@ -7,6 +7,7 @@ import { Text, TextInput, View } from 'react-native';
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { AdminActivityChart } from '@/components/admin/admin-activity-chart';
+import { AdminDriverProfileEditor } from '@/components/admin/admin-driver-profile-editor';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
@@ -150,6 +151,8 @@ function demoDetail(kind: Props['kind']): Detail {
       status: 'online',
       commissionBps: 1200,
       hasChildSeat: true,
+      hasSezPass: true,
+      licenseNumber: '18 22 123456',
       priorities: defaultDriverPriorities,
       approvedAt: profile.createdAt,
       vehicle: { ...demoDriver.vehicle, year: 2021 },
@@ -210,6 +213,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
   const [detail, setDetail] = useState<Detail>();
   const [section, setSection] = useState<Section>('overview');
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
+  const [dialogVisible, setDialogVisible] = useState(false);
   const [blockReason, setBlockReason] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [selectedRating, setSelectedRating] = useState<AdminRating>();
@@ -286,10 +290,15 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
   };
 
   const resetDialog = () => {
-    setDialogAction(null);
+    // Keep the content stable during the modal's closing animation.
+    setDialogVisible(false);
+  };
+
+  const openDialog = (action: DialogAction) => {
+    setDialogAction(action);
     setBlockReason('');
     setDeleteConfirmation('');
-    setSelectedRating(undefined);
+    setDialogVisible(true);
   };
 
   const closeDialog = () => {
@@ -557,7 +566,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
               fullWidth={!isDesktop}
               variant={blocked ? 'primary' : 'danger'}
               icon={<AppIcon name={blocked ? 'check' : 'ban'} color={blocked ? colors.brandInk : colors.dangerInk} />}
-              onPress={() => setDialogAction(blocked ? 'unblock' : 'block')}
+              onPress={() => openDialog(blocked ? 'unblock' : 'block')}
             >
               {blocked ? 'Вернуть доступ' : 'Заблокировать'}
             </AppButton>
@@ -699,9 +708,24 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                       ['Автомобиль', detail.driver.vehicle ? `${detail.driver.vehicle.make} ${detail.driver.vehicle.model}, ${detail.driver.vehicle.year}` : undefined],
                       ['Цвет и госномер', detail.driver.vehicle ? `${detail.driver.vehicle.color}, ${detail.driver.vehicle.plate}` : undefined],
                       ['Детский тариф', detail.driver.hasChildSeat ? 'Доступен' : 'Недоступен'],
+                      ['Пропуск в ОЭЗ', detail.driver.hasSezPass ? 'Есть' : 'Нет'],
+                      ['Водительское удостоверение', detail.driver.licenseNumber ?? undefined],
                       ['Время на линии', formatDuration(detail.stats.onlineMinutes ?? 0)],
                     ]}
                   />
+                  <AdminDriverProfileEditor detail={detail} disabled={busy} token={token} demo={demo}
+                    onSaved={async (input) => {
+                      if (!demo) { await load(); return; }
+                      setDetail(current => current?.kind === 'driver' ? {
+                        ...current,
+                        user: {...current.user, name: input.name ?? current.user.name, phone: input.phone ?? current.user.phone},
+                        driver: {...current.driver,
+                          hasSezPass: input.hasSezPass ?? current.driver.hasSezPass,
+                          hasChildSeat: input.hasChildSeat ?? current.driver.hasChildSeat,
+                          licenseNumber: input.licenseNumber === undefined ? current.driver.licenseNumber : input.licenseNumber,
+                          vehicle: input.vehicle ?? current.driver.vehicle},
+                      } : current);
+                    }} />
                   <View style={{ gap: spacing.x2 }}>
                     <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
                       Приоритет получения заказов
@@ -894,7 +918,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                     icon={<AppIcon name="trash" color={colors.dangerInk} />}
                     onPress={() => {
                       setSelectedRating(rating);
-                      setDialogAction('delete-rating');
+                      openDialog('delete-rating');
                     }}
                   >
                     Удалить оценку
@@ -1032,7 +1056,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
       </Screen>
 
       <AppModal
-        visible={dialogAction !== null}
+        visible={dialogVisible}
         title={
           dialogAction === 'block'
             ? `Заблокировать ${profileLabel}`

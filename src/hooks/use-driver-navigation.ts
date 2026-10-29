@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
+import { useForegroundScreen } from './use-foreground-screen';
 
 import { apiRequest } from '@/api/client';
 import { getDemoRoadRoute } from '@/api/demo-routing';
@@ -45,6 +46,7 @@ export function useDriverNavigation({
   origin: Coordinates | null;
   token: string | null;
 }): DriverNavigationState {
+  const visible = useForegroundScreen();
   const demo = token?.startsWith('demo:') ?? false;
   const rideId = ride?.id ?? null;
   const rideStatus = ride?.status ?? null;
@@ -75,13 +77,14 @@ export function useDriverNavigation({
   const routeKeyRef = useRef(routeKey);
 
   useEffect(() => {
-    if (!routeKey) return;
+    if (!visible || !routeKey) return;
     return onlineManager.subscribe((online) => {
       if (online) setRetryKey((value) => value + 1);
     });
-  }, [routeKey]);
+  }, [routeKey, visible]);
 
   useEffect(() => {
+    if (!visible) return;
     const requestOrigin = originRef.current;
     if (!rideId || !requestOrigin || !targetsKey || !targetKind || !positionBucket || !token) {
       const timer = setTimeout(() => {
@@ -151,7 +154,7 @@ export function useDriverNavigation({
       if (resetTimer) clearTimeout(resetTimer);
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [demo, positionBucket, retryKey, rideId, routeKey, targetsKey, targetKind, token]);
+  }, [demo, positionBucket, retryKey, rideId, routeKey, targetsKey, targetKind, token, visible]);
 
   return {
     active: Boolean(rideId && origin && targetKind),

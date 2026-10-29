@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookingDraft, BookingMessage } from '../server/messenger-booking';
-const mocks=vi.hoisted(()=>({firstRow:vi.fn(),execute:vi.fn(),query:vi.fn(),user:vi.fn(),send:vi.fn(),resolve:vi.fn(),inject:vi.fn(),signQuote:vi.fn(),link:vi.fn(),phone:vi.fn()}));
+const mocks=vi.hoisted(()=>({firstRow:vi.fn(),execute:vi.fn(),query:vi.fn(),user:vi.fn(),send:vi.fn(),resolve:vi.fn(),options:vi.fn(),inject:vi.fn(),signQuote:vi.fn(),link:vi.fn(),phone:vi.fn()}));
 vi.mock('../server/db',()=>({db:{execute:mocks.execute},firstRow:mocks.firstRow,withTransaction:(fn:(c:unknown)=>unknown)=>fn({query:mocks.query,execute:mocks.execute})}));
 vi.mock('../server/repositories',()=>({findUserWithRoles:mocks.user,findOrCreatePhoneUser:mocks.phone,linkMessengerIdentity:mocks.link}));
 vi.mock('../server/security',()=>({signSession:async()=> 'test-session',signOrderQuote:mocks.signQuote}));
-vi.mock('../server/bot-address',async original=>({...await original<typeof import('../server/bot-address')>(),resolveBotAddress:mocks.resolve}));
+vi.mock('../server/bot-address',async original=>({...await original<typeof import('../server/bot-address')>(),resolveBotAddress:mocks.resolve,resolveBotAddressOptions:mocks.options}));
 vi.mock('../server/address-directory',()=>({getAddressDirectory:vi.fn()}));
 vi.mock('../server/geocoding',()=>({searchAddresses:vi.fn()}));
 vi.mock('../server/places',()=>({listPlaces:vi.fn(),placeToAddress:vi.fn()}));
@@ -33,6 +33,7 @@ beforeEach(()=>{
     sql.includes('SELECT id, status FROM orders')?active:null);
   mocks.user.mockResolvedValue({id:'user',roles:['passenger'],phone:'+79000000000'});
   mocks.resolve.mockResolvedValue(null); mocks.signQuote.mockResolvedValue('signed-manual-quote');
+  mocks.options.mockImplementation(async(raw, pickup, selected) => ({ address: selected ?? await mocks.resolve(raw, pickup), candidates: [] }));
   mocks.query.mockImplementation(async(sql:string,params:unknown[])=>sql.includes('SELECT draft_json')?
     [[{draft_json:JSON.stringify(draft),expires_at:expiresAt}]]:
     [[...(events.has(String(params[2]))?[{response_json:events.get(String(params[2]))}]:[])]]);
@@ -48,6 +49,55 @@ beforeEach(()=>{
 });
 
 describe('taxi booking in messenger conversations',()=>{
+  it.each(['telegram', 'vk', 'max'] as const)('lets a driver with an older app set the negotiated fare through %s', async provider => {
+    mocks.user.mockResolvedValue({id:'user',roles:['passenger','driver'],phone:'+79000000000'});
+    mocks.firstRow.mockImplementation(async(sql:string) => sql.includes('user_messenger_accounts')
+      ? {user_id:'user',chat_id:'42'} : sql.includes('SELECT o.id FROM orders') ? {id:orderId} : null);
+    mocks.inject.mockResolvedValue({statusCode:200,json:()=>({data:{id:orderId,priceMinor:35050,manualPriceSet:true}})});
+    await handle({...message('Цена 350,50'),provider});
+    expect(mocks.inject).toHaveBeenCalledWith(expect.objectContaining({
+      url:`/v1/driver/orders/${orderId}/fare`,payload:{priceMinor:35050},
+    }));
+    expect(mocks.send.mock.calls.at(-1)?.[1]?.text ?? mocks.send.mock.calls.at(-1)?.[1]?.message)
+      .toContain('Стоимость сохранена');
+    expect(mocks.options).not.toHaveBeenCalled();
+    expect(draft.stage).toBe('idle');
+  });
+  it('does not submit a fare when a driver has no assigned unpriced order', async () => {
+    mocks.user.mockResolvedValue({id:'user',roles:['passenger','driver'],phone:'+79000000000'});
+    await handle(message('Цена 350'));
+    expect(mocks.inject).not.toHaveBeenCalled();
+    expect(replyText()).toContain('нет текущего заказа');
+  });
+  it.each(['telegram', 'vk', 'max'] as const)('offers and accepts ambiguous addresses in %s without ordering automatically', async provider => {
+    const candidates = ['с. Грахово, ул. Советская, 10', 'д. Каменное, ул. Советская, 10'].map((label, i) => ({
+      id: String(i), label, houseNumber: '10', coordinates: { latitude: 56.05 + i * 0.1, longitude: 51.96 },
+    }));
+    const send = (text: string, eventId = text) => handle({ ...message(text, eventId), provider });
+    mocks.options.mockImplementation(async(raw, pickup, selected) => selected ? {address:selected,candidates:[]} :
+      pickup ? {address:null,candidates} : {address:{...candidates[0],id:'dest'},candidates:[]});
+    mocks.inject.mockResolvedValue({statusCode:200,json:()=>({data:{quoteToken:'fixed',tariffs:[{code:'economy',priceMinor:20000}]}})});
+    await send('b:start'); await send('советкая10 → больница');
+    expect(draft.stage).toBe('choose'); expect(mocks.inject).not.toHaveBeenCalled();
+    const reply = JSON.stringify(mocks.send.mock.calls.at(-1)?.[1]);
+    expect(reply).toContain('Каменное'); expect(reply).toContain(`b:pick:${draft.id}:1`);
+    await send('b:pick:stale:1', 'stale'); expect(draft.stage).toBe('choose');
+    await send(`b:pick:${draft.id}:99`, 'invalid'); expect(draft.stage).toBe('choose');
+    await send(`b:pick:${draft.id}:1`, 'selected');
+    expect(draft.stage).toBe('confirm'); expect(draft.pickup?.label).toContain('Каменное');
+    expect(mocks.inject).toHaveBeenCalledTimes(1);
+    expect(mocks.inject.mock.calls[0]?.[0].url).toBe('/v1/quotes');
+    await send(`b:pick:${draft.id}:1`, 'replayed'); expect(mocks.inject).toHaveBeenCalledTimes(1);
+  });
+  it('accepts a more specific address instead of requiring a choice button', async () => {
+    const candidates = ['Грахово', 'Каменное'].map((v, i) => ({id:String(i),label:`${v} Советская 10`,houseNumber:'10',coordinates:{latitude:56+i*0.1,longitude:52}}));
+    mocks.options.mockImplementation(async(raw, pickup, selected) => selected ? {address:selected,candidates:[]} :
+      pickup && !raw.includes('Грахово') ? {address:null,candidates} : {address:candidates[0],candidates:[]});
+    mocks.inject.mockResolvedValue({statusCode:200,json:()=>({data:{quoteToken:'fixed',tariffs:[{code:'economy',priceMinor:20000}]}})});
+    await start(); await handle(message('советская10 → больница')); expect(draft.stage).toBe('choose');
+    await handle(message('Грахово Советская 10')); expect(draft.stage).toBe('confirm');
+    expect(draft.pickupRaw).toBe('Грахово Советская 10');
+  });
   it('asks pickup and destination, then offers an honest unpriced order',async()=>{
     await handle(message('/start')); expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
     await start(); expect(replyText()).toContain('откуда вас забрать');

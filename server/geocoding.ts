@@ -3,9 +3,12 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getAddressDirectory } from './address-directory';
 import { getRememberedAddresses } from './remembered-addresses';
 import { overlayRememberedAddresses } from '../src/domain/remembered-address';
-import { hasApproximateCoordinates } from '../src/domain/address-precision';
+import { hasApproximateCoordinates, extractQueryHouseNumber, normalizeHouseNumber } from '../src/domain/address-precision';
 import { addressSearchScore } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
+import { normalizeBotAddress, addressQueryVariants } from '../src/domain/free-text-address';
+import { intercitySettlements } from '../src/data/intercity-settlements';
+import { isGrahovoDistrictAddress } from '../src/domain/pricing';
 import type { AddressKind } from '../src/domain/models';
 import { config } from './config';
 import { db } from './db';
@@ -54,13 +57,7 @@ const localAddresses: GeocodedAddress[] = [
     houseNumber: '53А',
     coordinates: { latitude: 55.9995786, longitude: 51.8684492 },
   },
-  {
-    id: 'mozhga-station',
-    label: 'г. Можга, Привокзальная ул., 6',
-    details: 'Железнодорожный вокзал, Удмуртская Республика · точка дома',
-    houseNumber: '6',
-    coordinates: { latitude: 56.445658, longitude: 52.1972249 },
-  },
+  ...intercitySettlements,
 ];
 
 const memoryCache = new Map<string, MemoryEntry>();
@@ -157,6 +154,8 @@ export function prioritizeGrahovoDistrict(addresses: GeocodedAddress[]): Geocode
 
 function trailingHouseNumber(value: string): { houseNumber: string; streetPart: string } | null {
   const normalized = value.trim().replace(/\s+/g, ' ');
+  const fullHouse = extractQueryHouseNumber(normalized);
+  if (fullHouse) return { houseNumber: fullHouse, streetPart: normalized.slice(0, -fullHouse.length).replace(/[,\s]+$/g, '') };
   const match = normalized.match(
     /(?:^|[,\s])(?:д(?:ом)?\.?\s*)?(\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?)\s*$/iu,
   );
@@ -169,7 +168,7 @@ function trailingHouseNumber(value: string): { houseNumber: string; streetPart: 
 
 function containsHouseNumber(address: GeocodedAddress, houseNumber: string): boolean {
   if (address.houseNumber) {
-    return normalizeForSearch(address.houseNumber) === normalizeForSearch(houseNumber);
+    return normalizeHouseNumber(address.houseNumber) === normalizeHouseNumber(houseNumber);
   }
   const tokens = `${address.label} ${address.details ?? ''}`.match(
     /\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?/giu,
@@ -184,29 +183,11 @@ export function filterExactHouseResults(
   const parsed = trailingHouseNumber(query);
   if (!parsed) return addresses;
 
-  const ignoredStreetTokens = new Set([
-    'с',
-    'село',
-    'д',
-    'деревня',
-    'ул',
-    'улица',
-    'грахово',
-    'граховский',
-    'район',
-    'удмуртия',
-    'удмуртская',
-    'республика',
-    'россия',
-  ]);
-  const streetTokens = normalizeForSearch(parsed.streetPart)
-    .split(' ')
-    .filter((token) => token.length > 1 && !ignoredStreetTokens.has(token));
 
   return addresses.filter((address) => {
+    if (address.kind === 'settlement' && !isGrahovoDistrictAddress(address)) return true;
     if (!containsHouseNumber(address, parsed.houseNumber)) return false;
-    const haystack = normalizeForSearch(`${address.label} ${address.details ?? ''}`);
-    return streetTokens.every((token) => haystack.includes(token));
+    return addressSearchScore(address, query) > 0;
   });
 }
 
@@ -391,7 +372,9 @@ function fromNominatim(item: {
       : road
         ? 'street'
         : undefined;
-  const label = road && houseNumber ? `${road}, ${houseNumber}` : item.name?.trim() || displayLabel;
+  const name = item.name?.trim() || displayLabel;
+  const label = kind === 'settlement' && nominatimType === 'city' && !/^(?:г\.|город)\s/iu.test(name ?? '')
+    ? `г. ${name}` : road && houseNumber ? `${road}, ${houseNumber}` : name;
   const structuredDetails = [
     item.address?.village ?? item.address?.town ?? item.address?.city,
     item.address?.municipality,
@@ -409,7 +392,7 @@ function fromNominatim(item: {
   };
 }
 
-async function requestNominatimOnce(query: string): Promise<GeocodedAddress[]> {
+async function requestNominatimOnce(query: string, settlementsOnly = false): Promise<GeocodedAddress[]> {
   const baseUrl = config.NOMINATIM_BASE_URL.replace(/\/$/, '');
   const coordinates = coordinateQuery(query);
   const params = new URLSearchParams({
@@ -430,14 +413,33 @@ async function requestNominatimOnce(query: string): Promise<GeocodedAddress[]> {
     params.set('addressdetails', '1');
     params.set('viewbox', '50.3,57.1,53.8,55.2');
     params.set('bounded', '0');
+    if (settlementsOnly) params.set('featureType', 'settlement');
   }
   const response = await limitedFetch(`${baseUrl}/${endpoint}?${params}`);
   if (!response.ok) throw new Error(`Nominatim returned ${response.status}`);
   const payload = (await response.json()) as unknown;
   const items = Array.isArray(payload) ? payload : [payload];
-  return items
+  const mapped = items
     .map((item) => fromNominatim(item as Parameters<typeof fromNominatim>[0]))
     .filter((item): item is GeocodedAddress => item != null);
+  if (settlementsOnly) return mapped.filter(item => item.kind === 'settlement');
+  const withinDistrict = (item: GeocodedAddress) => isGrahovoDistrictAddress({ ...item, label: '' });
+  // Outside the service district, return the actual locality centre. Never
+  // rename a road/building point to a city: that would produce a wrong route.
+  const result = mapped.filter(item => item.kind === 'settlement' || withinDistrict(item));
+  const names = new Set<string>();
+  for (const item of items as Parameters<typeof fromNominatim>[0][]) {
+    const address = fromNominatim(item);
+    if (!address || withinDistrict(address) || address.kind === 'settlement') continue;
+    const locality = item.address?.city ?? item.address?.town ?? item.address?.village;
+    if (locality && !result.some(entry => entry.kind === 'settlement' && normalizeNamedPlace(entry.label) === normalizeNamedPlace(locality))) names.add(locality);
+  }
+  for (const name of [...names].slice(0, 3)) {
+    const known = intercitySettlements.filter(item => normalizeNamedPlace(item.label) === normalizeNamedPlace(name));
+    const found = known.length ? known : await requestNominatimOnce(name, true).catch(() => []);
+    result.push(...found.filter(item => normalizeNamedPlace(item.label) === normalizeNamedPlace(name)));
+  }
+  return result;
 }
 
 function deduplicateAddresses(addresses: GeocodedAddress[]): GeocodedAddress[] {
@@ -486,17 +488,22 @@ async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
 }
 
 export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false): Promise<GeocodedAddress[]> {
+  const variants = addressQueryVariants(query).map(normalizeBotAddress);
+  const knownCity = intercitySettlements.filter(address => addressSearchScore(address, query) > 0);
+  query = coordinateQuery(query) ? query : normalizeBotAddress(query);
+  if (knownCity.length) return knownCity;
   // Street anchors in GAR are approximate. Point selection needs an actual
   // street from OSM when available, bypassing the local-address shortcut.
-  const local = streetOnly ? [] : localMatches(query, overlayRememberedAddresses(
+  const directory = streetOnly ? [] : overlayRememberedAddresses(
     [...localAddresses, ...await getAddressDirectory()], await getRememberedAddresses(),
-  ));
-  if (local.length && hasStrongLocalMatch(query, local) &&
+  );
+  const local = deduplicateAddresses(variants.flatMap(variant => localMatches(variant, directory)));
+  if (local.length && variants.some(variant => hasStrongLocalMatch(variant, local)) &&
       (!resolveHouse || local.some(address => address.houseNumber && !hasApproximateCoordinates(address)))) {
     return prioritizeGrahovoDistrict(local);
   }
 
-  const key = `${streetOnly ? 'street-v2' : resolveHouse ? 'house-v1' : 'v12'}:${normalize(query)}`;
+  const key = `${streetOnly ? 'street-v3' : resolveHouse ? 'house-v2' : 'v14'}:${normalize(query)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) {
     return mergeLocalAndExternalResults(query, resolveHouse && memory.value.length ? [] : local, memory.value);
