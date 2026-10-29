@@ -8,21 +8,22 @@ type Props = {
   valueMinor: number;
   compact?: boolean;
   color?: string;
+  pending?: boolean;
 };
 
-export function MoneyValue({ valueMinor, compact = false, color: customColor }: Props) {
+export function MoneyValue({ valueMinor, compact = false, color: customColor, pending = false }: Props) {
   const colors = useThemeColors();
   const color = customColor ?? colors.ink;
   return (
     <Text
       selectable
       style={{
-        ...(compact ? typography.bodyStrong : typography.money),
+        ...(compact || pending ? typography.bodyStrong : typography.money),
         color,
         fontVariant: ['tabular-nums'],
       }}
     >
-      {formatMoney(valueMinor)}
+      {pending ? 'Стоимость определит водитель' : formatMoney(valueMinor)}
     </Text>
   );
 }

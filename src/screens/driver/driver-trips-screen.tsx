@@ -1,3 +1,4 @@
+import { isRidePricePending } from '@/domain/ride-price';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -223,7 +224,7 @@ export function DriverTripsScreen() {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: spacing.x1 }}>
-                  <MoneyValue valueMinor={order.priceMinor} compact />
+                  <MoneyValue pending={isRidePricePending(order)} valueMinor={order.priceMinor} compact />
                   {order.status === 'completed' && (
                     <Text selectable style={{ ...typography.micro, color: colors.successText }}>
                       вам {formatMoney(order.priceMinor - order.serviceCommissionMinor)}

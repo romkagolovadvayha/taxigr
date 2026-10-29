@@ -48,7 +48,7 @@ export function useDriverNavigation({
   const demo = token?.startsWith('demo:') ?? false;
   const rideId = ride?.id ?? null;
   const rideStatus = ride?.status ?? null;
-  const targetKind = rideStatus ? driverRouteTarget(rideStatus) : null;
+  const targetKind = rideStatus && ride?.pricingMode !== 'driver' ? driverRouteTarget(rideStatus) : null;
   const nextDestinationIndex = ride?.nextDestinationIndex ?? 0;
   const targetSource =
     ride && targetKind

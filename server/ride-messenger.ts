@@ -1,4 +1,5 @@
 import type { RideOrder } from '../src/domain/models';
+import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
 import { formatMoney } from './admin-telegram';
@@ -88,7 +89,7 @@ export function passengerRideButtons(ride: RideOrder): MessengerButton[][] {
   if (ride.status === 'searching') {
     return [
       [
-        callback(ride, 'increase', `💰 +${formatMoney(ride.searchPriceIncreaseStepMinor ?? 3_000)}`, 'positive'),
+        ...(ride.pricingMode === 'driver' ? [] : [callback(ride, 'increase', `💰 +${formatMoney(ride.searchPriceIncreaseStepMinor ?? 3_000)}`, 'positive')]),
         callback(ride, 'refresh', '🔄 Обновить'),
       ],
       [callback(ride, 'cancel', '✖️ Отменить заказ', 'negative')],
@@ -250,7 +251,7 @@ export function passengerRideNotification(
     ['👤 Водитель', activeDriver ? ride.driver?.name : null],
     ['📞 Телефон', activeDriver ? ride.driver?.phone : null],
     ['🚘 Машина', activeDriver ? vehicle(ride) : null],
-    [ride.status === 'completed' ? '💳 Итого' : '💳 Цена', formatMoney(ride.priceMinor)],
+    [ride.status === 'completed' ? '💳 Итого' : '💳 Цена', ridePriceLabel(ride)],
     ['⏱ Ожидание', ride.waitingPriceMinor ? formatMoney(ride.waitingPriceMinor) : null],
   ];
   return {
@@ -296,7 +297,8 @@ export function driverRideNotification(
   const details: PersonalMessengerNotification['details'] = [
     ['👤 Пассажир', assigned ? ride.passenger?.name : null],
     ['📞 Телефон', assigned ? ride.passenger?.phone : null],
-    ['💳 Стоимость', formatMoney(ride.priceMinor)],
+    ['💳 Стоимость', ridePriceLabel(ride)],
+    ['Уточнение', isRidePricePending(ride) ? 'Согласуйте стоимость с пассажиром, затем отправьте «Цена 350» (свою сумму в рублях).' : null],
     ['🧾 Комиссия', ride.status === 'completed'
       ? formatMoney(ride.serviceCommissionMinor)
       : null],
@@ -315,6 +317,6 @@ export function driverRideNotification(
       : formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: driverRideButtons(ride),
-    locations: driverTargetLocation(ride),
+    locations: ride.pricingMode === 'driver' ? [] : driverTargetLocation(ride),
   };
 }

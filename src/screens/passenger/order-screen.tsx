@@ -161,7 +161,7 @@ export function OrderScreen() {
   const driverIsFinishingPreviousRide = currentRide?.driverQueuePosition === 2;
   const livePickupEtaMinutes = estimatePickupEtaMinutes({
     driver: driverIsFinishingPreviousRide ? null : trackedDriver.coordinates,
-    pickup: currentRide?.pickup.coordinates,
+    pickup: currentRide?.pricingMode === 'driver' ? undefined : currentRide?.pickup.coordinates,
     status: currentRide?.status,
   });
   const rideInProgress = currentRide?.status === 'in_progress';
@@ -187,7 +187,7 @@ export function OrderScreen() {
       pickup={rideInProgress || routeCompleted ? null : currentRide?.pickup ?? pickup}
       destinations={currentRide?.destinations ?? destinations}
       destination={currentRide?.destination ?? destination}
-      routeCoordinates={currentRide?.routeCoordinates ?? routeCoordinates}
+      routeCoordinates={currentRide ? currentRide.routeCoordinates : routeCoordinates}
       pickupEtaMinutes={
         currentRide
           ? livePickupEtaMinutes != null && livePickupEtaMinutes > 0

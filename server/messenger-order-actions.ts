@@ -22,12 +22,14 @@ import {
   type RideMessengerAction,
 } from './ride-messenger';
 import { signSession } from './security';
+import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 
 export type MessengerOrderActionRequest = {
   provider: 'max' | 'telegram' | 'vk';
   externalUserId: string;
   chatId?: string;
   sourceMessageId?: string;
+  eventId?: string;
   data: unknown;
 };
 
@@ -195,7 +197,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         icon: '⚠️',
         title: 'Отменить заказ?',
         body: 'После отмены поиск или поездка будут остановлены.',
-        details: [['💳 Стоимость', formatMoney(ride.priceMinor)]],
+        details: [['💳 Стоимость', ridePriceLabel(ride)]],
         buttons: [
           [{
             type: 'callback',
@@ -251,6 +253,9 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
     }
 
     if (parsed.action === 'complete') {
+      if (isRidePricePending(ride)) return {
+        text: 'Сначала согласуйте сумму с пассажиром и отправьте «Цена 350» (вашу сумму в рублях).', alert: true,
+      };
       if (audience !== 'driver' || ride.status !== 'in_progress') {
         await refreshCurrentStatus().catch(() => undefined);
         return { text: 'Завершить эту поездку сейчас нельзя.', alert: true };
@@ -262,7 +267,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         icon: '🏁',
         title: 'Оплата получена?',
         body: 'Подтвердите, что пассажир доставлен в место назначения и оплата получена.',
-        details: [['💳 Итого', formatMoney(ride.priceMinor)]],
+        details: [['💳 Итого', ridePriceLabel(ride)]],
         buttons: [
           [{
             type: 'callback',

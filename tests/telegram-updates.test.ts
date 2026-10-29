@@ -139,6 +139,7 @@ describe("Telegram update processing", () => {
     await processTelegramUpdate(update, onAction);
 
     expect(onAction).toHaveBeenCalledWith({
+      eventId: "callback-1",
       provider: "telegram",
       externalUserId: "42",
       chatId: "42",

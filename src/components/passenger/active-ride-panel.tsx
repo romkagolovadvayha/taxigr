@@ -1,3 +1,4 @@
+import { ridePriceLabel } from '@/domain/ride-price';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -16,7 +17,6 @@ import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
 import { rideStatusLabel } from '@/domain/ride-state';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
-import { formatMoney } from '@/utils/format';
 import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
 import { useThemeColors } from '@/theme/theme-provider';
 import { useScreenClock } from '@/hooks/use-screen-clock';
@@ -211,7 +211,7 @@ export function ActiveRidePanel({
 
       {driver && !terminal && <AppButton variant="quiet" compact onPress={openDetails}
         accessibilityLabel="Открыть детали поездки" icon={<AppIcon name="orders" size={16} color={colors.inkSecondary} />}>
-        {`Детали поездки · ${formatMoney(ride.priceMinor)}`}
+        {`Детали поездки · ${ridePriceLabel(ride)}`}
       </AppButton>}
 
       <WaitingBreakdown ride={ride} compact />

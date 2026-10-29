@@ -1,3 +1,4 @@
+import { isRidePricePending, ridePriceLabel } from '@/domain/ride-price';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -103,11 +104,11 @@ export function OrderDetailScreen() {
           ? 'Перевод водителю'
           : 'Наличные',
     ],
-    ['Расстояние', `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
-    ['В пути', formatDuration(Math.round(order.durationSeconds / 60))],
+    ['Расстояние', order.pricingMode === 'driver' ? 'Уточнит водитель' : `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
+    ['В пути', order.pricingMode === 'driver' ? 'Уточнит водитель' : formatDuration(Math.round(order.durationSeconds / 60))],
     [
       'Стоимость маршрута',
-      formatMoney(order.basePriceMinor ?? order.priceMinor),
+      isRidePricePending(order) ? ridePriceLabel(order) : formatMoney(order.basePriceMinor ?? order.priceMinor),
     ],
     ...((order.searchPriceIncreaseMinor ?? 0) > 0
       ? [['Повышение цены', `+ ${formatMoney(order.searchPriceIncreaseMinor ?? 0)}`]]
@@ -120,7 +121,7 @@ export function OrderDetailScreen() {
           ],
         ]
       : []),
-    ['Итого', formatMoney(order.priceMinor)],
+    ['Итого', ridePriceLabel(order)],
     ['Создан', formatDateTime(order.createdAt)],
   ];
 
@@ -136,7 +137,7 @@ export function OrderDetailScreen() {
             № {order.id}
           </Text>
         </View>
-        <MoneyValue valueMinor={order.priceMinor} />
+        <MoneyValue pending={isRidePricePending(order)} valueMinor={order.priceMinor} />
       </View>
       <WaitingBreakdown ride={order} />
       {!!error && (

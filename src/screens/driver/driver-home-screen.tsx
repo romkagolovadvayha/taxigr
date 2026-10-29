@@ -1,3 +1,4 @@
+import { isRidePricePending, ridePriceLabel } from '@/domain/ride-price';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
@@ -6,6 +7,7 @@ import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ShiftSummary } from '@/components/driver/shift-summary';
+import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
@@ -37,7 +39,6 @@ import { syncDriverBackgroundLocation } from '@/location/driver-background-locat
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
-import { formatMoney } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
 import { UserAvatar } from '@/components/user-avatar';
 
@@ -148,10 +149,10 @@ function DriverOrderCard({
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {(currentRide.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км · около{' '}
-            {Math.max(1, Math.round(currentRide.durationSeconds / 60))} мин
+            {currentRide.pricingMode === 'driver' ? 'Маршрут уточнит водитель' :
+              `${(currentRide.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км · около ${Math.max(1, Math.round(currentRide.durationSeconds / 60))} мин`}
           </Text>
-          <MoneyValue valueMinor={currentRide.priceMinor} />
+          <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} />
         </View>
         {!!currentRide.comment && (
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -192,7 +193,7 @@ function DriverOrderCard({
   const hasIntermediateStop = nextDestinationIndex < rideDestinations.length - 1;
   const routePointLabels = [routeAddresses.pickup, ...routeAddresses.destinations];
   const routeMetricLabel =
-    remainingDistanceMeters != null
+    currentRide.pricingMode === 'driver' ? 'Уточните маршрут у пассажира' : remainingDistanceMeters != null
       ? `${formatNavigationDistance(remainingDistanceMeters)}${
           remainingDurationSeconds != null
             ? remainingDurationSeconds === 0 ? ' · на месте' : ` · ${Math.max(1, Math.round(remainingDurationSeconds / 60))} мин`
@@ -232,8 +233,11 @@ function DriverOrderCard({
           label={rideStatusLabel[currentRide.status]}
           tone={currentRide.status === 'completed' ? 'success' : 'info'}
         />
-        <MoneyValue valueMinor={currentRide.priceMinor} compact />
+        <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} compact />
       </View>
+      {currentRide.pricingMode === 'driver' && currentRide.driverQueuePosition !== 2 &&
+        ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(currentRide.status) ?
+        <DriverFareEditor key={currentRide.id} ride={currentRide}/> : null}
       <View
         style={{
           gap: spacing.x2,
@@ -443,7 +447,7 @@ function DriverOrderCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
             <StatusChip label="Следующий заказ принят" tone="warning" />
-            <MoneyValue valueMinor={nextDriverRide.priceMinor} compact />
+            <MoneyValue pending={isRidePricePending(nextDriverRide)} valueMinor={nextDriverRide.priceMinor} compact />
           </View>
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {nextDriverRide.pickup.label}
@@ -505,7 +509,7 @@ function DriverOrderCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
             <StatusChip label="Можно взять следующим" tone="warning" />
-            <MoneyValue valueMinor={driverOffer.priceMinor} compact />
+            <MoneyValue pending={isRidePricePending(driverOffer)} valueMinor={driverOffer.priceMinor} compact />
           </View>
           <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
             {driverOffer.pickup.label}
@@ -594,14 +598,14 @@ function DriverOrderCard({
             compact
             loading={busy}
             disabled={busy}
-            onPress={() => hasIntermediateStop ? void completeDriverStop() : setCompletionConfirmVisible(true)}
+            onPress={() => hasIntermediateStop ? void completeDriverStop() : !isRidePricePending(currentRide) && setCompletionConfirmVisible(true)}
           >
-            {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : 'Завершить поездку'}
+            {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : isRidePricePending(currentRide) ? 'Сначала укажите стоимость выше' : 'Завершить поездку'}
           </AppButton>
           <AppModal
             visible={completionConfirmVisible}
             title="Оплата получена?"
-            description={`Подтвердите получение ${paymentLabel.toLowerCase()} на сумму ${formatMoney(currentRide.priceMinor)}. После этого поездка будет завершена.`}
+            description={`Подтвердите получение ${paymentLabel.toLowerCase()} на сумму ${ridePriceLabel(currentRide)}. После этого поездка будет завершена.`}
             onClose={() => setCompletionConfirmVisible(false)}
           >
             <AppButton

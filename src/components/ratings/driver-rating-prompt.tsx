@@ -1,3 +1,4 @@
+import { ridePriceLabel } from '@/domain/ride-price';
 import { ScrollView, Text } from 'react-native';
 
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
@@ -5,7 +6,6 @@ import { AppModal } from '@/components/ui/app-modal';
 import { useRide } from '@/state/ride-provider';
 import { useThemeColors } from '@/theme/theme-provider';
 import { spacing, typography } from '@/theme/tokens';
-import { formatMoney } from '@/utils/format';
 
 export function DriverRatingPrompt() {
   const colors = useThemeColors();
@@ -26,7 +26,7 @@ export function DriverRatingPrompt() {
     <AppModal
       visible={!busy}
       title="Поездка завершена"
-      description={`Получено ${formatMoney(ride.priceMinor)} · ${payment}`}
+      description={`Получено ${ridePriceLabel(ride)} · ${payment}`}
       onClose={dismissDriverRating}
     >
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.x3 }}>

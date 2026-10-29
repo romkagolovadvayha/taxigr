@@ -168,13 +168,15 @@ import {
 } from './social-avatar';
 import { getTelegramProfilePhotoUrl } from './telegram-bot';
 import { processTelegramUpdate, telegramUpdateSchema } from './telegram-updates';
+import { createMessengerBookingHandler } from './messenger-booking';
+import { ridePriceLabel } from '../src/domain/ride-price';
 import {
   exchangeVkAuthorizationCode,
   vkAuthorizationUrl,
   vkCallbackHtml,
   vkCommunityMessageUrl,
 } from './vk-auth';
-import { answerVkMessageEvent, isVkMessagesAllowed, sendVkMessage } from './vk-bot';
+import { answerVkMessageEvent, isVkMessagesAllowed } from './vk-bot';
 import {
   verifyVkMiniAppLaunchParams,
   verifyVkMiniAppPhone,
@@ -274,6 +276,11 @@ const quoteSchema = z.object({
   destinations: z.array(destinationAddressSchema).min(1).max(5).optional(),
 });
 const createOrderSchema = quoteSchema.extend({
+  // Completeness is checked after verifying the server-issued quote. Only a
+  // signed bot quote can authorize a textual address without a map position.
+  pickup: addressSchema,
+  destination: addressSchema,
+  destinations: z.array(addressSchema).min(1).max(5).optional(),
   tariff: tariffSchema,
   quoteToken: z.string().min(32).max(32_000),
   paymentMethod: z.enum(['cash', 'transfer']).default('cash'),
@@ -345,6 +352,7 @@ const vkCallbackUpdateSchema = z.object({
   secret: z.string().optional(),
   object: z.object({
     message: z.object({
+      id: z.union([z.string(), z.number()]).optional(),
       from_id: z.union([z.string(), z.number()]),
       peer_id: z.union([z.string(), z.number()]),
       text: z.string().optional(),
@@ -375,10 +383,19 @@ const maxUpdateSchema = z.object({
     }).passthrough(),
   }).passthrough().optional(),
   message: z.object({
-    sender: z.object({ user_id: z.union([z.string(), z.number()]) }).passthrough().optional(),
+    recipient: z.object({
+      chat_id: z.union([z.string(), z.number()]).nullable(),
+      chat_type: z.string(),
+    }).passthrough().optional(),
+    sender: z.object({
+      user_id: z.union([z.string(), z.number()]),
+      first_name: z.string().nullish(), last_name: z.string().nullish(),
+      name: z.string().nullish(), username: z.string().nullish(),
+    }).passthrough().optional(),
     body: z.object({
+      text: z.string().nullable().optional(),
       mid: z.string().optional(),
-      attachments: z.array(z.unknown()).optional(),
+      attachments: z.array(z.unknown()).nullable().optional(),
     }).passthrough().nullable().optional(),
   }).passthrough().optional(),
 }).passthrough();
@@ -1630,7 +1647,19 @@ export async function registerRoutes(
       'order.queue-promoted.driver',
     );
   };
-  const handleMessengerOrderAction = createMessengerOrderActionHandler(app);
+  const handleBookingMessage = createMessengerBookingHandler(app);
+  const handleRideAction = createMessengerOrderActionHandler(app);
+  const handleMessengerOrderAction = async (input: MessengerOrderActionRequest): Promise<MessengerOrderActionResult> => {
+    if (typeof input.data === 'string' && input.data.startsWith('b:')) {
+      if (!input.chatId) return { text: 'Откройте личный чат с ботом.', alert: true };
+      await handleBookingMessage({
+        provider: input.provider, externalUserId: input.externalUserId, chatId: input.chatId,
+        eventId: `action:${input.eventId ?? input.data}`, text: input.data,
+      });
+      return { text: 'Готово' };
+    }
+    return handleRideAction(input);
+  };
   const expireStaleSearchingOrders = async (): Promise<number> => {
     const expired = await withTransaction(async (connection) => {
       const [rows] = await connection.query<OrderRow[]>(
@@ -2218,6 +2247,7 @@ export async function registerRoutes(
         const message = update.object.message;
         const userId = String(message.from_id);
         const peerId = String(message.peer_id);
+        if (peerId !== userId || Number(userId) <= 0) return reply.type('text/plain').send('ok');
         const [result] = await db.execute<import('mysql2/promise').ResultSetHeader>(
           `UPDATE user_messenger_accounts
            SET chat_id = ?, active = TRUE, bot_contact_available = TRUE,
@@ -2225,15 +2255,11 @@ export async function registerRoutes(
            WHERE provider = 'vk' AND external_user_id = ?`,
           [peerId, userId],
         );
-        if (result.affectedRows > 0) {
-          await sendVkMessage(peerId, {
-            message: 'VK подключён к «Такси Грахово». Здесь будут приходить статусы поездок и доступные действия.',
-          });
-        } else {
-          await sendVkMessage(peerId, {
-            message: 'Чтобы подключить уведомления, войдите через VK в приложении «Такси Грахово»: https://taxigr.ru/sign-in',
-          });
-        }
+        void result;
+        if (message.id != null) await handleBookingMessage({
+          provider: 'vk', externalUserId: userId, chatId: peerId,
+          eventId: `message:${message.id}`, text: message.text,
+        });
       }
 
       if (
@@ -2256,6 +2282,7 @@ export async function registerRoutes(
       ) {
         const userId = String(update.object.user_id);
         const peerId = String(update.object.peer_id);
+        if (peerId !== userId || Number(userId) <= 0) return reply.type('text/plain').send('ok');
         const data = typeof update.object.payload === 'string'
           ? update.object.payload
           : update.object.payload && typeof update.object.payload === 'object'
@@ -2265,6 +2292,7 @@ export async function registerRoutes(
         try {
           actionResult = await handleMessengerOrderAction({
             provider: 'vk',
+            eventId: update.object.event_id,
             externalUserId: userId,
             chatId: peerId,
             sourceMessageId: update.object.conversation_message_id == null
@@ -2301,12 +2329,14 @@ export async function registerRoutes(
       }
 
       const update = parse(maxUpdateSchema, request.body);
-      if (update.update_type === 'message_callback' && update.callback) {
+      if (update.update_type === 'message_callback' && update.callback && update.message?.recipient?.chat_type === 'dialog') {
         let result: MessengerOrderActionResult;
         try {
           result = await handleMessengerOrderAction({
             provider: 'max',
+            eventId: update.callback.callback_id,
             externalUserId: String(update.callback.user.user_id),
+            chatId: String(update.message.recipient.chat_id ?? update.callback.user.user_id),
             sourceMessageId: update.message?.body?.mid,
             data: update.callback.payload,
           });
@@ -2344,7 +2374,13 @@ export async function registerRoutes(
         }
       }
 
-      if (update.update_type === 'message_created' && update.message?.sender?.user_id != null) {
+      if (update.update_type === 'bot_started' && !update.payload && update.user?.user_id != null && update.chat_id != null) {
+        await handleBookingMessage({ provider: 'max', externalUserId: String(update.user.user_id),
+          chatId: String(update.chat_id), eventId: `start:${Date.now()}`, text: '/start',
+          displayName: update.user.name, username: update.user.username });
+      }
+
+      if (update.update_type === 'message_created' && update.message?.sender?.user_id != null && update.message.recipient?.chat_type === 'dialog') {
         const userId = String(update.message.sender.user_id);
         const attachments = update.message.body?.attachments ?? [];
         const contact = attachments.find((attachment) => {
@@ -2378,7 +2414,19 @@ export async function registerRoutes(
               [verifiedPhone, matches ? null : 'PHONE_MISMATCH', matches, challenge.id],
             );
             await sendMaxConfirmation(userId, matches);
+            return { success: true };
           }
+          if (verifiedPhone && update.message.body?.mid) await handleBookingMessage({
+            provider: 'max', externalUserId: userId, chatId: String(update.message.recipient.chat_id ?? userId),
+            eventId: `message:${update.message.body.mid}`, verifiedPhone,
+            firstName: update.message.sender.first_name, lastName: update.message.sender.last_name,
+            displayName: update.message.sender.name, username: update.message.sender.username,
+          });
+        } else if (!contact && update.message.body?.mid) {
+          await handleBookingMessage({
+            provider: 'max', externalUserId: userId, chatId: String(update.message.recipient.chat_id ?? userId),
+            eventId: `message:${update.message.body.mid}`, text: update.message.body.text ?? undefined,
+          });
         }
       }
 
@@ -2601,6 +2649,7 @@ export async function registerRoutes(
       await processTelegramUpdate(
         parse(telegramUpdateSchema, request.body),
         handleMessengerOrderAction,
+        handleBookingMessage,
       );
 
       void reply.header('Cache-Control', 'no-store');
@@ -3625,7 +3674,10 @@ export async function registerRoutes(
         code: 'QUOTE_EXPIRED_OR_INVALID',
       });
     }
-    const submitted = await resolveTrustedAddresses(input);
+    const manualPricing = quote.pricingMode === 'driver';
+    const submitted = manualPricing
+      ? { pickup: input.pickup, destinations: input.destinations ?? [input.destination] }
+      : await resolveTrustedAddresses(parse(quoteSchema, input));
     if (
       !addressesMatch(submitted.pickup, quote.pickup) ||
       submitted.destinations.length !== quote.destinations.length ||
@@ -3638,10 +3690,12 @@ export async function registerRoutes(
         code: 'QUOTE_ADDRESS_MISMATCH',
       });
     }
-    const { tripRoute: route } = await getMultiStopRouteMetrics(quote.pickup, quote.destinations);
+    const route = manualPricing
+      ? { distanceMeters: 0, durationSeconds: 0, coordinates: [], source: 'estimate' as const }
+      : (await getMultiStopRouteMetrics(quote.pickup, quote.destinations)).tripRoute;
     const { pricingDistanceMeters, pricingScope } = quote;
     const price = quote.prices[input.tariff];
-    if (!Number.isSafeInteger(price) || price <= 0) {
+    if (!Number.isSafeInteger(price) || (manualPricing ? price !== 0 : price <= 0)) {
       throw Object.assign(new Error('В расчёте отсутствует выбранный тариф'), {
         statusCode: 409,
         code: 'QUOTE_TARIFF_MISMATCH',
@@ -3796,14 +3850,15 @@ export async function registerRoutes(
           commission,
           rules.serviceCommissionBps,
           rules.waitingFreeMinutes,
-          rules.waitingPerMinuteMinor,
+          manualPricing ? 0 : rules.waitingPerMinuteMinor,
           rules.searchPriceIncreaseIntervalMinutes,
-          rules.searchPriceIncreaseStepMinor,
+          manualPricing ? 0 : rules.searchPriceIncreaseStepMinor,
           input.paymentMethod,
           input.comment ?? null,
           input.idempotencyKey,
         ],
       );
+      if (manualPricing) await connection.execute("UPDATE orders SET pricing_mode = 'driver' WHERE id = ?", [orderId]);
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, to_status, payload)
          VALUES (?, ?, 'order.created', 'searching', ?)`,
@@ -3846,7 +3901,7 @@ export async function registerRoutes(
             result.order.destinations ?? [result.order.destination],
           )],
           ['Тариф', tariffLabels[result.order.tariff]],
-          ['Стоимость', formatMoney(result.order.priceMinor)],
+          ['Стоимость', ridePriceLabel(result.order)],
           ['Оплата', paymentMethodLabels[result.order.paymentMethod]],
           ['Комментарий', result.order.comment],
         ],
@@ -4265,6 +4320,7 @@ export async function registerRoutes(
           code: 'PRICE_INCREASE_FORBIDDEN',
         });
       }
+      if (row.pricing_mode === 'driver') throw Object.assign(new Error('Стоимость этого заказа определяет водитель'), { statusCode: 409 });
       if (row.status !== 'searching' || row.driver_id) {
         throw Object.assign(new Error('Водитель уже найден или поиск завершён'), {
           statusCode: 409,
@@ -5003,6 +5059,9 @@ export async function registerRoutes(
         });
       }
       const targetKind = driverRouteTarget(order.status);
+      if (order.pricing_mode === 'driver') throw Object.assign(new Error('Адрес со слов пассажира. Уточните маршрут по телефону.'), {
+        statusCode: 409, code: 'ROUTE_UNRESOLVED',
+      });
       if (!targetKind) {
         throw Object.assign(new Error('Навигация доступна только для активного заказа'), {
           statusCode: 409,
@@ -5494,6 +5553,38 @@ export async function registerRoutes(
     return { data: order };
   });
 
+  app.post('/v1/driver/orders/:id/fare', async (request) => {
+    const session = await auth(request, 'driver');
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const { priceMinor } = parse(z.object({ priceMinor: z.number().int().min(100).max(10_000_000) }), request.body);
+    await withTransaction(async connection => {
+      const driver = await getDriver(session.id, connection, true);
+      const [rows] = await connection.query<OrderRow[]>('SELECT * FROM orders WHERE id = ? FOR UPDATE', [id]);
+      const row = rows[0];
+      if (!driver || !row || row.driver_id !== driver.id || row.active_driver_id !== driver.id) {
+        throw Object.assign(new Error('Текущий заказ водителя не найден'), { statusCode: 404 });
+      }
+      if (row.pricing_mode !== 'driver' || !['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(row.status)) {
+        throw Object.assign(new Error('Стоимость этого заказа нельзя менять'), { statusCode: 409 });
+      }
+      const commission = calculateCommissionMinor(priceMinor, Number(row.commission_bps));
+      await connection.execute(`UPDATE orders SET base_price_minor = ?, price_minor = ?, commission_minor = ?, manual_price_set = TRUE WHERE id = ?`,
+        [priceMinor, priceMinor, commission, id]);
+      await connection.execute(`INSERT INTO order_events (order_id, actor_user_id, event_type, payload) VALUES (?, ?, 'order.driver_fare', ?)`,
+        [id, session.id, JSON.stringify({ priceMinor })]);
+    });
+    const updated = await getOrder(id);
+    if (!updated) throw new Error('Order disappeared');
+    const order = presentOrder(updated);
+    publish(`user:${order.passengerId}`, 'order:updated', order);
+    publish(`driver:${order.driverId}`, 'order:updated', order);
+    publish('admins', 'order:updated', order);
+    notifyMessengers(notifyUsersInMessengers([order.passengerId], passengerRideNotification(order, {
+      title: 'Водитель указал стоимость', body: `Стоимость поездки: ${ridePriceLabel(order)}. Если сумма не согласована, свяжитесь с водителем.`,
+    })), 'order.driver-fare');
+    return { data: order };
+  });
+
   app.post('/v1/driver/orders/:id/transition', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
@@ -5530,6 +5621,11 @@ export async function registerRoutes(
         throw Object.assign(new Error('Подтвердите получение оплаты перед завершением поездки'), {
           statusCode: 409,
           code: 'PAYMENT_CONFIRMATION_REQUIRED',
+        });
+      }
+      if (status === 'completed' && row.pricing_mode === 'driver' && !row.manual_price_set) {
+        throw Object.assign(new Error('Сначала укажите согласованную стоимость: в приложении или сообщением «Цена 350» в боте'), {
+          statusCode: 409, code: 'DRIVER_FARE_REQUIRED',
         });
       }
       if (status === 'completed' && Number(row.next_destination_index ?? 0) <

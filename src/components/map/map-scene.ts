@@ -6,6 +6,7 @@ import type { Coordinates } from '../../domain/models';
 import { lngLat, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 import type { MapViewportInsets, TaxiMapProps } from './types';
 import { fitRouteLocation } from './route-viewport';
+import { hasApproximateCoordinates } from '../../domain/address-precision';
 
 export { lngLat, mapBearing, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 
@@ -22,7 +23,7 @@ export function taxiMapScene(props: TaxiMapProps) {
   const points: RouteMapPoint[] = [];
   const pickup = props.routeTarget === 'pickup' ? original[original.length - 1] ?? props.pickup?.coordinates
     : original[0] ?? props.pickup?.coordinates;
-  if (props.pickup && validMapCoordinate(pickup)) points.push({
+  if (props.pickup && !hasApproximateCoordinates(props.pickup) && validMapCoordinate(pickup)) points.push({
     id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup),
     label: props.pickupEtaMinutes ? `Старт · ${props.pickupEtaMinutes} мин` : 'Старт',
   });
@@ -31,7 +32,7 @@ export function taxiMapScene(props: TaxiMapProps) {
     const final = index === destinations.length - 1;
     // A route to pickup must never move destination pins onto the pickup point.
     const coordinates = final && props.routeTarget !== 'pickup' ? original[original.length - 1] ?? destination.coordinates : destination.coordinates;
-    if (validMapCoordinate(coordinates)) points.push({
+    if (!hasApproximateCoordinates(destination) && validMapCoordinate(coordinates)) points.push({
       id: `destination-${index}`, kind: final ? 'destination' : 'stop', coordinates: lngLat(coordinates),
       label: routeDestinationMapLabel(index, destinations.length, final ? props.destinationArrivalLabel : undefined),
     });

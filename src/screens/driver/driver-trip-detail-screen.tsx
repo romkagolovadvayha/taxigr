@@ -1,3 +1,4 @@
+import { isRidePricePending, ridePriceLabel } from '@/domain/ride-price';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -75,11 +76,11 @@ export function DriverTripDetailScreen() {
   const netMinor = order.priceMinor - order.serviceCommissionMinor;
   const rows = [
     ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
-    ['Расстояние', `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
-    ['В пути', formatDuration(Math.max(1, Math.round(order.durationSeconds / 60)))],
-    ['Получено от пассажира', formatMoney(order.priceMinor)],
-    ['Комиссия сервиса', `− ${formatMoney(order.serviceCommissionMinor)}`],
-    ['Остаётся водителю', formatMoney(netMinor)],
+    ['Расстояние', order.pricingMode === 'driver' ? 'Уточните у пассажира' : `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
+    ['В пути', order.pricingMode === 'driver' ? 'По фактическому маршруту' : formatDuration(Math.max(1, Math.round(order.durationSeconds / 60)))],
+    ['Получено от пассажира', ridePriceLabel(order)],
+    ['Комиссия сервиса', isRidePricePending(order) ? 'После указания стоимости' : `− ${formatMoney(order.serviceCommissionMinor)}`],
+    ['Остаётся водителю', isRidePricePending(order) ? 'После указания стоимости' : formatMoney(netMinor)],
     ['Создан', formatDateTime(order.createdAt)],
   ];
 

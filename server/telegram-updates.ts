@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { db, firstRow } from './db';
 import { matchesMessengerPhone } from './messenger-auth-phone';
+import type { BookingMessage } from './messenger-booking';
 import {
   answerTelegramCallback,
   extractOwnTelegramPhone,
@@ -35,6 +36,7 @@ export const telegramUpdateSchema = z.object({
     }).passthrough().optional(),
   }).passthrough().optional(),
   message: z.object({
+    message_id: z.union([z.string(), z.number()]).optional(),
     text: z.string().optional(),
     from: z.object({
       id: z.union([z.string(), z.number()]),
@@ -58,6 +60,7 @@ export type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
 export async function processTelegramUpdate(
   update: TelegramUpdate,
   onAction?: TelegramActionHandler,
+  onBooking?: (message: BookingMessage) => Promise<void>,
 ): Promise<void> {
   const callback = update.callback_query;
   if (callback) {
@@ -70,6 +73,7 @@ export async function processTelegramUpdate(
       try {
         result = await onAction({
           provider: 'telegram',
+          eventId: callback.id,
           externalUserId: String(callback.from.id),
           chatId: String(chat.id),
           sourceMessageId: callback.message?.message_id != null
@@ -119,9 +123,19 @@ export async function processTelegramUpdate(
       [payload, userId],
     );
     if (challenge) await requestTelegramContact(chatId);
+    return;
   }
 
-  if (!message.contact) return;
+  const booking = (verifiedPhone?: string | null) => onBooking?.({
+    provider: 'telegram', externalUserId: userId, chatId,
+    eventId: `message:${message.message_id ?? ''}`,
+    text: message.text, verifiedPhone,
+    username: message.from?.username, firstName: message.from?.first_name, lastName: message.from?.last_name,
+  });
+  if (!message.contact) {
+    if (message.message_id != null) await booking();
+    return;
+  }
   const verifiedPhone = extractOwnTelegramPhone(message.contact, userId);
   if (!verifiedPhone) return;
 
@@ -134,7 +148,10 @@ export async function processTelegramUpdate(
      ORDER BY created_at DESC LIMIT 1`,
     [userId],
   );
-  if (!challenge) return;
+  if (!challenge) {
+    if (message.message_id != null) await booking(verifiedPhone);
+    return;
+  }
 
   const matches = matchesMessengerPhone(verifiedPhone, challenge.expected_phone);
   await db.execute(

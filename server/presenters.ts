@@ -20,6 +20,8 @@ export type OrderRow = RowDataPacket & {
   tariff: TariffCode;
   status: RideStatus;
   pricing_scope: PricingScope;
+  pricing_mode?: 'fixed' | 'driver';
+  manual_price_set?: number;
   priority_release_at: Date | string | null;
   priority_released_at: Date | string | null;
   pickup_label: string;
@@ -84,6 +86,8 @@ export type OrderRow = RowDataPacket & {
 };
 
 export type OrderSummaryRow = RowDataPacket & {
+  pricing_mode?: 'fixed' | 'driver';
+  manual_price_set?: number;
   id: string;
   passenger_id: string;
   tariff: TariffCode;
@@ -149,8 +153,10 @@ function address(
 ): Address {
   const normalizedDetails = details ?? undefined;
   const houseNumber = extractHouseNumber({ label, details: normalizedDetails }) ?? undefined;
+  const unresolved = id.startsWith('manual:') || /Точка не определена/u.test(normalizedDetails ?? '');
   return {
-    id,
+    id: unresolved && !id.startsWith('manual:') ? `manual:${id}` : id,
+    ...(unresolved ? { coordinatePrecision: 'approximate' as const } : {}),
     label,
     details: normalizedDetails,
     houseNumber,
@@ -216,6 +222,8 @@ export function presentOrder(row: OrderRow): RideOrder {
     tariff: row.tariff,
     status: row.status,
     pricingScope: row.pricing_scope,
+    pricingMode: row.pricing_mode ?? 'fixed',
+    manualPriceSet: Boolean(row.manual_price_set),
     basePriceMinor: row.base_price_minor,
     searchPriceIncreaseMinor: row.search_price_increase_minor,
     searchPriceIncreaseIntervalMinutes: row.search_price_increase_interval_minutes,
@@ -318,6 +326,8 @@ function presentUserAvatarUrl(
 
 export function presentOrderSummary(row: OrderSummaryRow): RideOrderSummary {
   return {
+    pricingMode: row.pricing_mode ?? 'fixed',
+    manualPriceSet: Boolean(row.manual_price_set),
     id: row.id,
     passengerId: row.passenger_id,
     pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
@@ -406,7 +416,7 @@ export const orderSummarySelect = `
   SELECT o.id, o.passenger_id, o.tariff, o.status,
     o.pickup_label, o.pickup_details, o.pickup_lat, o.pickup_lon,
     o.destination_label, o.destination_details, o.destination_lat, o.destination_lon,
-    o.price_minor, o.created_at, o.updated_at
+    o.price_minor, o.pricing_mode, o.manual_price_set, o.created_at, o.updated_at
   FROM orders o
 `;
 

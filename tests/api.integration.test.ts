@@ -20,7 +20,8 @@ import {
   legalDocuments,
   type InitialLegalAcceptance,
 } from '../src/legal/documents';
-import { signSession } from '../server/security';
+import { signOrderQuote, signSession } from '../server/security';
+import { unresolvedBotAddress } from '../server/bot-address';
 import { buildAuthIdentity, consumeAuthRateLimits } from '../server/auth-abuse';
 import { confirmAddressPoint } from '../src/domain/route-stops';
 
@@ -142,6 +143,23 @@ async function setDriverStatus(token: string, status: 'online' | 'offline') {
     token,
     body: { status },
   });
+}
+
+async function manualBookingBody() {
+  const pickup = unresolvedBotAddress('у дома тёти Нины');
+  const destination = unresolvedBotAddress('до дальнего моста');
+  return {
+    pickup, destination, tariff: 'economy', paymentMethod: 'cash',
+    idempotencyKey: `manual-${randomUUID()}`, deviceId: `manual-${randomUUID()}`,
+    legalAcceptance: currentInitialLegalAcceptance(),
+    quoteToken: await signOrderQuote({
+      passengerId: fixture.passengerId, pricingMode: 'driver', pickup, destination,
+      destinations: [destination], pricingScope: 'grahovo',
+      route: { distanceMeters: 0, durationSeconds: 0, source: 'estimate' },
+      pricingDistanceMeters: 0, driverApproachDistanceMeters: 0,
+      prices: { economy: 0, child: 0 }, pricedAt: new Date().toISOString(),
+    }),
+  };
 }
 
 function socketEvent<T = unknown>(socket: Socket, event: string): Promise<T> {
@@ -358,6 +376,46 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     }
     await cleanup();
     await connection.end();
+  });
+
+  it('manual bot booking persists raw addresses, requires the assigned driver fare, then completes', async () => {
+    expect((await setDriverStatus(driverOneToken, 'online')).status).toBe(200);
+    const body = await manualBookingBody();
+    const created = await api<RideOrder>('/v1/orders', { method: 'POST', token: passengerToken, body });
+    expect(created.status, JSON.stringify(created.error)).toBe(201);
+    expect(created.data).toMatchObject({ pricingMode: 'driver', manualPriceSet: false, priceMinor: 0,
+      pickup: { label: body.pickup.label, coordinatePrecision: 'approximate' } });
+    expect(created.data?.routeCoordinates).toBeUndefined();
+    const id = created.data!.id;
+    expect((await api<RideOrder>('/v1/orders', { method: 'POST', token: passengerToken, body })).data?.id).toBe(id);
+    expect((await api(`/v1/driver/orders/${id}/accept`, { method: 'POST', token: driverOneToken, body: {} })).status).toBe(200);
+    expect((await api(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverTwoToken, body: { priceMinor: 35000 } })).status).toBe(404);
+    expect((await api(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: passengerToken, body: { priceMinor: 35000 } })).status).toBe(403);
+    expect((await api(`/v1/driver/orders/${id}/route`, { method: 'POST', token: driverOneToken, body: pickup.coordinates })).error?.code).toBe('ROUTE_UNRESOLVED');
+    for (const status of ['driver_arriving', 'driver_waiting', 'in_progress']) {
+      const changed = await api(`/v1/driver/orders/${id}/transition`, { method: 'POST', token: driverOneToken, body: { status } });
+      expect(changed.status, JSON.stringify(changed.error)).toBe(200);
+    }
+    expect((await api(`/v1/driver/orders/${id}/transition`, { method: 'POST', token: driverOneToken,
+      body: { status: 'completed', paymentReceived: true } })).error?.code).toBe('DRIVER_FARE_REQUIRED');
+    expect((await api(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 0 } })).status).toBe(400);
+    const fare = await api<RideOrder>(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 35000 } });
+    expect(fare.data).toMatchObject({ manualPriceSet: true, priceMinor: 35000, basePriceMinor: 35000 });
+    const completed = await api<RideOrder>(`/v1/driver/orders/${id}/transition`, { method: 'POST', token: driverOneToken,
+      body: { status: 'completed', paymentReceived: true } });
+    expect(completed.data).toMatchObject({ status: 'completed', priceMinor: 35000 });
+    expect((await api(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 40000 } })).status).toBe(404);
+  }, 20_000);
+
+  it('manual bot booking still enforces availability and signed passenger identity', async () => {
+    const body = await manualBookingBody();
+    expect((await api('/v1/orders', { method: 'POST', token: outsiderToken, body })).error?.code).toBe('QUOTE_EXPIRED_OR_INVALID');
+    try {
+      await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: false } });
+      expect((await api('/v1/orders', { method: 'POST', token: passengerToken, body })).error?.code).toBe('BOOKING_DISABLED');
+    } finally {
+      await api('/v1/admin/booking-settings', { method: 'PUT', token: adminToken, body: { enabled: true } });
+    }
   });
 
   it('blocks new bookings while disabled, then allows them when re-enabled and preserves active orders', async () => {

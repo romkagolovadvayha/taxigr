@@ -9,7 +9,7 @@ await fs.mkdir(out,{recursive:true});
 const mode=process.argv[2]||'frames';
 const serveUrl=await bundle({entryPoint:path.join(root,'src/index.ts'),outDir:path.join(out,'bundle'),publicDir:path.join(root,'public')});
 console.log('Bundle ready');
-const browser=await openBrowser('chrome',{logLevel:'error'});
+const browser=await openBrowser('chrome',{logLevel:'error',browserExecutable:process.env.REMOTION_BROWSER_EXECUTABLE,chromiumOptions:{gl:'swangle'}});
 try{
   const composition=await selectComposition({serveUrl,id:'TaxiGrahovoSignature',puppeteerInstance:browser,logLevel:'error'});
   if(mode==='frames'){

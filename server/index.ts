@@ -9,6 +9,7 @@ import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
 import { closeGatewayDispatcher } from './gateway-proxy';
+import { pruneMessengerBookingData } from './messenger-booking';
 import { registerRoutes } from './routes';
 import { verifySession } from './security';
 
@@ -129,7 +130,7 @@ const routeHandlers = await registerRoutes(app, (room, event, payload) => {
 });
 
 const authAbusePruneTimer = setInterval(() => {
-  void pruneAuthAbuseData().catch((error) => {
+  void pruneAuthAbuseData().then(pruneMessengerBookingData).catch((error) => {
     app.log.error(error, 'auth abuse data pruning failed');
     reportCritical({
       source: 'server-process',
@@ -139,7 +140,7 @@ const authAbusePruneTimer = setInterval(() => {
   });
 }, 24 * 60 * 60 * 1_000);
 (authAbusePruneTimer as unknown as { unref?: () => void }).unref?.();
-void pruneAuthAbuseData().catch((error) => {
+void pruneAuthAbuseData().then(pruneMessengerBookingData).catch((error) => {
   app.log.error(error, 'initial auth abuse data pruning failed');
   reportCritical({
     source: 'server-process',

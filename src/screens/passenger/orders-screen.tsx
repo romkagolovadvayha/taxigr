@@ -1,3 +1,4 @@
+import { isRidePricePending } from '@/domain/ride-price';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -128,7 +129,7 @@ export function OrdersScreen() {
                   </Text>
                 </View>
               </View>
-              <MoneyValue valueMinor={order.priceMinor} compact />
+              <MoneyValue pending={isRidePricePending(order)} valueMinor={order.priceMinor} compact />
             </View>
             <StatusChip
               label={rideStatusLabel[order.status]}

@@ -1,3 +1,4 @@
+import { isRidePricePending, ridePriceLabel } from '@/domain/ride-price';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
@@ -152,9 +153,9 @@ export function AdminOrderDetailScreen({ id }: Props) {
     ['Тариф', tariffLabels[order.tariff]],
     ['Зона расчёта', pricingScopeLabel[order.pricingScope ?? 'intercity']],
     ['Оплата', paymentLabels[order.paymentMethod]],
-    ['Расстояние', `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
-    ['Расчётное время', formatDuration(Math.round(order.durationSeconds / 60))],
-    ['Стоимость маршрута', formatMoney(order.basePriceMinor ?? order.priceMinor)],
+    ['Расстояние', order.pricingMode === 'driver' ? 'Уточняет водитель' : `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
+    ['Расчётное время', order.pricingMode === 'driver' ? 'Уточняет водитель' : formatDuration(Math.round(order.durationSeconds / 60))],
+    ['Стоимость маршрута', isRidePricePending(order) ? ridePriceLabel(order) : formatMoney(order.basePriceMinor ?? order.priceMinor)],
     ...((order.searchPriceIncreaseMinor ?? 0) > 0
       ? [['Повышение цены', `+ ${formatMoney(order.searchPriceIncreaseMinor ?? 0)}`] as [string, string]]
       : []),
@@ -164,8 +165,8 @@ export function AdminOrderDetailScreen({ id }: Props) {
           `+ ${formatMoney(order.waitingPriceMinor ?? 0)}`,
         ] as [string, string]]
       : []),
-    ['Комиссия сервиса', formatMoney(order.serviceCommissionMinor)],
-    ['Итого', formatMoney(order.priceMinor)],
+    ['Комиссия сервиса', isRidePricePending(order) ? 'После указания стоимости' : formatMoney(order.serviceCommissionMinor)],
+    ['Итого', ridePriceLabel(order)],
     ['Создан', formatDateTime(order.createdAt)],
     ['Обновлён', formatDateTime(order.updatedAt)],
   ];
@@ -186,7 +187,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
           label={rideStatusLabel[order.status]}
           tone={order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'danger' : 'info'}
         />
-        <MoneyValue valueMinor={order.priceMinor} />
+        <MoneyValue pending={isRidePricePending(order)} valueMinor={order.priceMinor} />
       </View>
 
       {!!error && (

@@ -1,3 +1,4 @@
+import { isRidePricePending } from '@/domain/ride-price';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
@@ -97,7 +98,7 @@ export function AdminOrdersScreen() {
               </Text>
             </View>
             <StatusChip label={rideStatusLabel[order.status]} tone={order.status === 'completed' ? 'success' : 'info'} />
-            <MoneyValue valueMinor={order.priceMinor} compact />
+            <MoneyValue pending={isRidePricePending(order)} valueMinor={order.priceMinor} compact />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
               <AppButton
                 variant="secondary"

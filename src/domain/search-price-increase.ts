@@ -46,10 +46,11 @@ export function searchPriceIncreaseOfferSlot(
     | 'searchPriceIncreaseIntervalMinutes'
     | 'searchPriceIncreaseLastSlot'
     | 'status'
+    | 'pricingMode'
   >,
   now = Date.now(),
 ): number | null {
-  if (ride.status !== 'searching' || ride.driverId) return null;
+  if (ride.status !== 'searching' || ride.driverId || ride.pricingMode === 'driver') return null;
   const slot = searchPriceIncreaseSlotAt(
     ride.createdAt,
     now,
@@ -66,6 +67,7 @@ export function canOfferSearchPriceIncrease(
     | 'searchPriceIncreaseIntervalMinutes'
     | 'searchPriceIncreaseLastSlot'
     | 'status'
+    | 'pricingMode'
   >,
   now = Date.now(),
 ): boolean {

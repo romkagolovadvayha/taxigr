@@ -116,6 +116,8 @@ export type RideOrder = {
   tariff: TariffCode;
   status: RideStatus;
   pricingScope?: import('./pricing').PricingScope;
+  pricingMode?: 'fixed' | 'driver';
+  manualPriceSet?: boolean;
   basePriceMinor?: number;
   searchPriceIncreaseMinor?: number;
   searchPriceIncreaseIntervalMinutes?: number;
@@ -153,6 +155,8 @@ export type RideOrderSummary = Pick<
   | 'tariff'
   | 'status'
   | 'priceMinor'
+  | 'pricingMode'
+  | 'manualPriceSet'
   | 'createdAt'
   | 'updatedAt'
 >;

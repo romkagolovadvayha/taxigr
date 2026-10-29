@@ -83,6 +83,8 @@ describe('order summary payload', () => {
     const summary = presentOrderSummary(row);
 
     expect(summary).toEqual({
+      pricingMode: 'fixed',
+      manualPriceSet: false,
       id: row.id,
       passengerId: row.passenger_id,
       pickup: expect.objectContaining({ label: row.pickup_label }),

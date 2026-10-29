@@ -1,3 +1,4 @@
+import { ridePriceLabel } from '@/domain/ride-price';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -82,7 +83,7 @@ export function AdminDashboardScreen() {
             <Text selectable numberOfLines={1} style={{ ...typography.body, color: colors.ink, flex: 1 }}>
               {formatRouteLabel(order.pickup, order.destination)}
             </Text>
-            <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{formatMoney(order.priceMinor)}</Text>
+            <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>{ridePriceLabel(order)}</Text>
           </View>
         ))}
       </SurfaceCard>

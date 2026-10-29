@@ -1,3 +1,4 @@
+import { ridePriceLabel } from '@/domain/ride-price';
 import { router } from 'expo-router';
 import { Host, Switch } from '@expo/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -797,7 +798,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
               <View
                 key={order.id}
                 accessible
-                accessibilityLabel={`${rideStatusLabel[order.status]}, ${order.pickup.label}, ${order.destination.label}, ${formatMoney(order.priceMinor)}`}
+                accessibilityLabel={`${rideStatusLabel[order.status]}, ${order.pickup.label}, ${order.destination.label}, ${ridePriceLabel(order)}`}
                 style={{
                   minHeight: spacing.x12 * 2,
                   flexDirection: 'row',
@@ -824,7 +825,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                   tone={order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'danger' : 'info'}
                 />
                 <Text style={{ ...typography.bodyStrong, color: colors.ink, fontVariant: ['tabular-nums'] }}>
-                  {formatMoney(order.priceMinor)}
+                  {ridePriceLabel(order)}
                 </Text>
                 <AppButton
                   fullWidth={false}
