@@ -191,6 +191,49 @@ describe('messenger order actions', () => {
     }));
   });
 
+  it.each(['telegram', 'vk', 'max'] as const)('cancels through the protected API in %s and handles repeated confirmation', async provider => {
+    mocks.firstRow.mockResolvedValue({ user_id: 'passenger-user', chat_id: 'chat' });
+    mocks.findUserWithRoles.mockResolvedValue({ id: 'passenger-user', roles: ['passenger'] });
+    let current = order();
+    const inject = vi.fn().mockImplementation(async ({ method }: { method: string }) => {
+      if (method === 'POST') current = order({ status: 'cancelled' });
+      return response(current);
+    });
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+    const request = { provider, externalUserId: '42', chatId: 'chat', sourceMessageId: 'confirm-message', data: `r:cancel-ok:${orderId}` };
+
+    expect(await handle(request)).toEqual({ text: 'Заказ отменён.' });
+    expect(inject).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'POST', url: `/v1/orders/${orderId}/cancel`, headers: { authorization: 'Bearer internal-session' },
+    }));
+    expect(mocks.refreshMessengerAccountOrderMessages).toHaveBeenCalledWith(
+      provider, '42', expect.objectContaining({ orderId, audience: 'passenger', title: expect.stringContaining('отмен') }), 'confirm-message',
+    );
+    expect(await handle(request)).toEqual({ text: 'Заказ уже отменён.' });
+    expect(inject.mock.calls.filter(([request]) => request.method === 'POST')).toHaveLength(1);
+  });
+
+  it('rejects a confirmation if the trip started after the cancellation prompt', async () => {
+    mocks.firstRow.mockResolvedValue({ user_id: 'passenger-user', chat_id: 'chat' });
+    mocks.findUserWithRoles.mockResolvedValue({ id: 'passenger-user', roles: ['passenger'] });
+    const inject = vi.fn().mockResolvedValue(response(order({ status: 'in_progress' })));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+    expect(await handle({ provider: 'telegram', externalUserId: '42', chatId: 'chat', data: `r:cancel-ok:${orderId}` }))
+      .toEqual({ text: 'Заказ уже нельзя отменить.', alert: true });
+    expect(inject).toHaveBeenCalledOnce();
+    expect(inject).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('does not cancel another passenger order', async () => {
+    mocks.firstRow.mockResolvedValue({ user_id: 'someone-else', chat_id: 'chat' });
+    mocks.findUserWithRoles.mockResolvedValue({ id: 'someone-else', roles: ['passenger'] });
+    const inject = vi.fn().mockResolvedValue(response(order()));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+    expect(await handle({ provider: 'telegram', externalUserId: '42', chatId: 'chat', data: `r:cancel-ok:${orderId}` }))
+      .toEqual({ text: 'Этот заказ вам недоступен.', alert: true });
+    expect(inject).toHaveBeenCalledOnce();
+  });
+
   it('refreshes existing buttons instead of sending another card after rating', async () => {
     const completed = order({ status: 'completed', ratings: {} });
     const rated = order({ status: 'completed', ratings: { byPassenger: 5 } });

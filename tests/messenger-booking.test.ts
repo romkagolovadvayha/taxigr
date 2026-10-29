@@ -11,35 +11,46 @@ vi.mock('../server/places',()=>({listPlaces:vi.fn(),placeToAddress:vi.fn()}));
 vi.mock('../server/telegram-bot',()=>({sendTelegramMessage:mocks.send}));
 vi.mock('../server/max-bot',()=>({sendMaxMessage:mocks.send}));
 vi.mock('../server/vk-bot',()=>({sendVkMessage:mocks.send,vkInlineKeyboard:(rows:unknown)=>rows}));
+vi.mock('../server/messenger-notifications',()=>({appUrl:(path:string)=>`https://taxigr.ru${path}`}));
 import { createMessengerBookingHandler } from '../server/messenger-booking';
 import type { FastifyInstance } from 'fastify';
 
-const initial=():BookingDraft=>({id:'test-draft',stage:'pickup'});
+const initial=():BookingDraft=>({id:'test-draft',flowVersion:2,stage:'idle'});
+const orderId='123e4567-e89b-12d3-a456-426614174000';
 let draft:BookingDraft;
+let active:{id:string;status:string}|null;
+let expiresAt:Date;
 const events=new Map<string,unknown>();
 const message=(text:string,eventId=text):BookingMessage=>({provider:'telegram',externalUserId:'42',chatId:'42',eventId,text});
 const handle=createMessengerBookingHandler({inject:mocks.inject} as unknown as FastifyInstance);
 const replyText=()=>mocks.send.mock.calls.at(-1)?.[1]?.text as string;
+const replyButtons=()=>mocks.send.mock.calls.at(-1)?.[1]?.reply_markup?.inline_keyboard?.flat() ?? [];
+const start=()=>handle(message('b:start'));
 
 beforeEach(()=>{
-  vi.resetAllMocks(); events.clear(); draft=initial();
-  mocks.firstRow.mockImplementation(async(sql:string)=>sql.includes('user_messenger_accounts')?{user_id:'user',chat_id:'42'}:null);
+  vi.resetAllMocks(); events.clear(); draft=initial(); active=null; expiresAt=new Date(Date.now()+1800000);
+  mocks.firstRow.mockImplementation(async(sql:string)=>sql.includes('user_messenger_accounts')?{user_id:'user',chat_id:'42'}:
+    sql.includes('SELECT id, status FROM orders')?active:null);
   mocks.user.mockResolvedValue({id:'user',roles:['passenger'],phone:'+79000000000'});
   mocks.resolve.mockResolvedValue(null); mocks.signQuote.mockResolvedValue('signed-manual-quote');
   mocks.query.mockImplementation(async(sql:string,params:unknown[])=>sql.includes('SELECT draft_json')?
-    [[{draft_json:JSON.stringify(draft),expires_at:new Date(Date.now()+1800000)}]]:
+    [[{draft_json:JSON.stringify(draft),expires_at:expiresAt}]]:
     [[...(events.has(String(params[2]))?[{response_json:events.get(String(params[2]))}]:[])]]);
   mocks.execute.mockImplementation(async(sql:string,params:unknown[])=>{
     if(sql.startsWith('UPDATE messenger_booking_drafts'))draft=JSON.parse(String(params[0]));
     if(sql.startsWith('INSERT INTO messenger_booking_events'))events.set(String(params[2]),JSON.parse(String(params[3])));
     return [{affectedRows:1}];
   });
-  mocks.inject.mockResolvedValue({statusCode:201,json:()=>({data:{id:'created-order'}})});
+  mocks.inject.mockImplementation(async()=>{
+    active={id:orderId,status:'searching'};
+    return {statusCode:201,json:()=>({data:active})};
+  });
 });
 
 describe('taxi booking in messenger conversations',()=>{
   it('asks pickup and destination, then offers an honest unpriced order',async()=>{
-    await handle(message('/start')); expect(replyText()).toContain('Откуда');
+    await handle(message('/start')); expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    await start(); expect(replyText()).toContain('откуда вас забрать');
     await handle(message('у старого клуба')); expect(replyText()).toContain('Куда');
     await handle(message('до зелёного дома'));
     expect(replyText()).toContain('Стоимость определит водитель');
@@ -52,8 +63,26 @@ describe('taxi booking in messenger conversations',()=>{
       legalAcceptance:expect.objectContaining({termsAccepted:true}),
     })}));
     expect(replyText()).toContain('Такси вызвано');
+    expect(replyButtons()).toContainEqual({text:'Отменить заказ',callback_data:`r:cancel:${orderId}`});
+  });
+  it.each(['ММ','привет','у клуба → у дома'])('does not treat the initial %s as an address',async text=>{
+    await handle(message(text));
+    expect(draft.stage).toBe('idle');expect(draft.pickupRaw).toBeUndefined();
+    expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    expect(mocks.resolve).not.toHaveBeenCalled();expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('resets legacy implicit drafts instead of reusing a random pickup',async()=>{
+    draft={id:'old',stage:'destination',pickupRaw:'ММ'};
+    await handle(message('привет'));
+    expect(draft.stage).toBe('idle');expect(draft.pickupRaw).toBeUndefined();
+  });
+  it('returns to the menu after a draft expires',async()=>{
+    draft={...initial(),stage:'destination',pickupRaw:'клуб'};expiresAt=new Date(Date.now()-1);
+    await handle(message('дом'));
+    expect(draft.stage).toBe('idle');expect(mocks.resolve).not.toHaveBeenCalled();
   });
   it('replays duplicate deliveries without advancing the conversation or creating a second order',async()=>{
+    await start();
     await handle(message('у клуба','m1'));await handle(message('у клуба','m1'));
     expect(draft.stage).toBe('destination');
     await handle(message('больница','m2'));
@@ -62,6 +91,7 @@ describe('taxi booking in messenger conversations',()=>{
     expect(mocks.inject).toHaveBeenCalledTimes(1);
   });
   it('shows the actual tariff and requires confirmation',async()=>{
+    await start();
     mocks.resolve.mockImplementation(async(raw:string)=>({id:raw,label:raw,houseNumber:'10',coordinates:{latitude:56,longitude:52}}));
     mocks.inject.mockResolvedValueOnce({statusCode:200,json:()=>({data:{quoteToken:'signed-fixed',tariffs:[{code:'economy',priceMinor:25000}]}})});
     await handle(message('Советская 10 → Ачинцева 5'));
@@ -69,6 +99,7 @@ describe('taxi booking in messenger conversations',()=>{
     expect(mocks.inject).toHaveBeenCalledTimes(1);expect(mocks.signQuote).not.toHaveBeenCalled();
   });
   it('refreshes an expired quote and rejects the older card after refresh',async()=>{
+    await start();
     await handle(message('у клуба → у дома'));
     draft.quotedAt=Date.now()-300000;
     const stale=`b:confirm:${draft.id}`;
@@ -77,6 +108,7 @@ describe('taxi booking in messenger conversations',()=>{
     await handle(message(stale,'c2'));expect(replyText()).toContain('устарела');expect(mocks.inject).not.toHaveBeenCalled();
   });
   it('keeps the draft on failed order creation and retries with the same idempotency key',async()=>{
+    await start();
     await handle(message('у клуба → у дома'));const confirm=`b:confirm:${draft.id}`;
     mocks.inject.mockResolvedValueOnce({statusCode:503,json:()=>({error:{message:'Попробуйте позже'}})});
     await handle(message(confirm,'c1'));expect(draft.stage).toBe('confirm');
@@ -85,6 +117,7 @@ describe('taxi booking in messenger conversations',()=>{
     expect(draft.stage).toBe('done');
   });
   it('does not bypass a service restriction through manual pricing',async()=>{
+    await start();
     mocks.resolve.mockResolvedValue({id:'precise',label:'Советская 10',coordinates:{latitude:56,longitude:52}});
     mocks.inject.mockResolvedValue({statusCode:403,json:()=>({error:{code:'BOOKING_DISABLED',message:'Заказы отключены'}})});
     await handle(message('Советская 10 → Ачинцева 5'));
@@ -92,11 +125,12 @@ describe('taxi booking in messenger conversations',()=>{
   });
   it('does not authenticate a typed phone number',async()=>{
     mocks.firstRow.mockResolvedValue(null);await handle(message('+79990000000'));
-    expect(mocks.phone).not.toHaveBeenCalled();expect(mocks.send.mock.calls[0]![1].reply_markup.keyboard[0][0].request_contact).toBe(true);
+    expect(mocks.phone).not.toHaveBeenCalled();expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    await start();expect(mocks.send.mock.calls.at(-1)![1].reply_markup.keyboard[0][0].request_contact).toBe(true);
   });
   it('requests an own contact when an existing messenger account has no phone',async()=>{
     mocks.user.mockResolvedValue({id:'user',roles:['passenger']});
-    await handle(message('такси'));
+    await start();
     expect(mocks.send.mock.calls.at(-1)![1].reply_markup.keyboard[0][0].request_contact).toBe(true);
     expect(mocks.inject).not.toHaveBeenCalled();
   });
@@ -112,7 +146,51 @@ describe('taxi booking in messenger conversations',()=>{
     expect(replyText()).toContain('недоступен');expect(mocks.inject).not.toHaveBeenCalled();
   });
   it.each(['vk','max'] as const)('uses the same route flow in %s',async provider=>{
+    await handle({...message('ММ'),provider});expect(draft.stage).toBe('idle');
+    const menu=mocks.send.mock.calls.at(-1)![1];
+    expect(JSON.stringify(menu)).toContain('b:start');
+    await handle({...message('b:start'),provider});expect(draft.stage).toBe('pickup');
     await handle({...message('клуб → дом'),provider});expect(draft.stage).toBe('confirm');
     const reply=mocks.send.mock.calls.at(-1)![1];expect(reply.text??reply.message).toContain('Стоимость определит водитель');
+  });
+  it.each(['Отмена','отменить заказ','/cancel'])('asks to cancel the actual order for %s',async text=>{
+    active={id:orderId,status:'searching'};
+    await handle(message(text));
+    expect(replyText()).toContain('Отменить заказ?');
+    expect(replyButtons()).toContainEqual({text:'Да, отменить',callback_data:`r:cancel-ok:${orderId}`});
+    expect(mocks.inject).not.toHaveBeenCalled();
+    expect(active.status).toBe('searching');
+  });
+  it('lets the last draft cancellation button cancel the created order with confirmation',async()=>{
+    await start();await handle(message('клуб → дом'));const id=draft.id;
+    await handle(message(`b:confirm:${id}`));await handle(message(`b:cancel:${id}`));
+    expect(replyButtons()).toContainEqual({text:'Да, отменить',callback_data:`r:cancel-ok:${orderId}`});
+    expect(draft.orderId).toBe(orderId);expect(mocks.inject).toHaveBeenCalledTimes(1);
+  });
+  it.each(['ММ','b:start','/start'])('shows active order controls instead of starting over for %s',async text=>{
+    active={id:orderId,status:'accepted'};
+    await handle(message(text));
+    expect(replyButtons()).toContainEqual({text:'Отменить заказ',callback_data:`r:cancel:${orderId}`});
+    expect(draft.stage).toBe('idle');expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+  it('does not offer cancellation once the ride has started',async()=>{
+    active={id:orderId,status:'in_progress'};await handle(message('Отмена'));
+    expect(replyText()).toContain('Поездка уже началась');
+    expect(JSON.stringify(replyButtons())).not.toContain('cancel');expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('cancels an unfinished draft and requires a new explicit start',async()=>{
+    await start();await handle(message('у клуба'));await handle(message('отмена'));
+    expect(replyText()).toContain('Оформление отменено');expect(draft.pickupRaw).toBeUndefined();
+    await handle(message('ММ'));expect(draft.stage).toBe('idle');expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('starts a new order after the previous order has been cancelled',async()=>{
+    await start();await handle(message('клуб → дом'));await handle(message(`b:confirm:${draft.id}`));
+    active=null;
+    await handle(message('b:start','start-again'));expect(draft.stage).toBe('pickup');expect(draft.orderId).toBeUndefined();
+  });
+  it('asks pickup after a verified contact instead of interpreting the contact as an address',async()=>{
+    await handle({...message('Контакт'),verifiedPhone:'+79000000000'});
+    expect(draft.stage).toBe('pickup');expect(draft.pickupRaw).toBeUndefined();
+    expect(replyText()).toContain('откуда вас забрать');
   });
 });

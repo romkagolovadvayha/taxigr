@@ -11,6 +11,7 @@ import { signOrderQuote, signSession } from './security';
 import { sendTelegramMessage } from './telegram-bot';
 import { sendMaxMessage } from './max-bot';
 import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
+import { rideMessengerActionData } from './ride-messenger';
 
 export type BookingMessage = MessengerIdentityInput & {
   eventId: string;
@@ -21,7 +22,8 @@ export type BookingMessage = MessengerIdentityInput & {
 type Reply = { text: string; buttons?: { label: string; data: string }[]; requestContact?: boolean };
 export type BookingDraft = {
   id: string;
-  stage: 'pickup' | 'destination' | 'confirm' | 'done';
+  flowVersion?: 2;
+  stage: 'idle' | 'pickup' | 'destination' | 'confirm' | 'done';
   pickupRaw?: string;
   destinationRaw?: string;
   pickup?: Address;
@@ -31,7 +33,24 @@ export type BookingDraft = {
   quotedAt?: number;
   orderId?: string;
 };
-const freshDraft = (): BookingDraft => ({ id: randomUUID(), stage: 'pickup' });
+const freshDraft = (): BookingDraft => ({ id: randomUUID(), flowVersion: 2, stage: 'idle' });
+const welcome = (text = 'Заказ такси доступен прямо в чате. Нажмите кнопку ниже, чтобы начать.'): Reply => ({
+  text, buttons: [{ label: 'Заказать такси', data: 'b:start' }],
+});
+const draftButtons = (draft: BookingDraft): NonNullable<Reply['buttons']> => [
+  { label: 'Отменить оформление', data: `b:cancel:${draft.id}` },
+];
+type ActiveOrder = Pick<RideOrder, 'id' | 'status'>;
+const canCancel = (order: ActiveOrder) => ['searching', 'accepted', 'driver_arriving', 'driver_waiting'].includes(order.status);
+function activeOrderReply(order: ActiveOrder, text = 'У вас уже есть активный заказ.'): Reply {
+  return {
+    text: `${text}\nСтатус заказа: https://taxigr.ru/orders/${order.id}`,
+    buttons: [
+      { label: 'Обновить статус', data: rideMessengerActionData(order.id, 'refresh') },
+      ...(canCancel(order) ? [{ label: 'Отменить заказ', data: rideMessengerActionData(order.id, 'cancel') }] : []),
+    ],
+  };
+}
 const readJson = <T>(value: unknown): T => typeof value === 'string' ? JSON.parse(value) as T : value as T;
 
 export async function pruneMessengerBookingData(): Promise<void> {
@@ -92,7 +111,7 @@ function review(draft: BookingDraft): Reply {
     buttons: [
       { label: draft.priceMinor == null ? 'Вызвать без цены' : `Вызвать за ${draft.priceMinor / 100} ₽`, data: `b:confirm:${draft.id}` },
       { label: 'Изменить адреса', data: `b:restart:${draft.id}` },
-      { label: 'Отменить', data: `b:cancel:${draft.id}` },
+      ...draftButtons(draft),
     ],
   };
 }
@@ -100,6 +119,8 @@ function review(draft: BookingDraft): Reply {
 export function createMessengerBookingHandler(app: FastifyInstance) {
   const processMessage = async (message: BookingMessage): Promise<void> => {
     if (!message.eventId || message.eventId.length > 128) return;
+    const text = message.text?.trim() ?? '';
+    const startRequested = text === 'b:start' || /^(?:заказать(?: такси)?|начать)$/iu.test(text);
     let account = await firstRow<RowDataPacket & { user_id: string; chat_id: string }>(
       `SELECT user_id, chat_id FROM user_messenger_accounts
        WHERE provider = ? AND external_user_id = ? AND active = TRUE LIMIT 1`,
@@ -116,10 +137,14 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       );
     }
     if (!account) {
+      if (!startRequested && !message.verifiedPhone) {
+        await sendBookingReply(message, welcome());
+        return;
+      }
       await sendBookingReply(message, message.provider === 'vk' ? {
         text: 'Для первого заказа подтвердите номер, войдя через VK: https://taxigr.ru/sign-in . Затем вернитесь сюда и напишите «Такси». Следующие заказы можно оформлять прямо в чате.',
       } : {
-        text: 'Закажите такси прямо здесь. Сначала поделитесь своим номером кнопкой ниже — водитель сможет связаться с вами. Затем напишите адреса. Обработка данных: https://taxigr.ru/privacy',
+        text: 'Сначала поделитесь своим номером кнопкой ниже — водитель сможет связаться с вами. Затем я спрошу, откуда вас забрать. Обработка данных: https://taxigr.ru/privacy',
         requestContact: true,
       });
       return;
@@ -144,6 +169,10 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       user.phone = message.verifiedPhone;
     }
     if (!user.phone) {
+      if (!startRequested) {
+        await sendBookingReply(message, welcome());
+        return;
+      }
       await sendBookingReply(message, message.provider === 'vk'
         ? { text: 'Подтвердите номер в своём профиле: https://taxigr.ru/sign-in . Затем напишите здесь «Такси».' }
         : { text: 'Поделитесь своим номером кнопкой ниже, чтобы водитель мог связаться с вами.', requestContact: true });
@@ -164,7 +193,6 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       );
       return body.data;
     };
-    const text = message.text?.trim() ?? '';
     if (text.length > 520) {
       await sendBookingReply(message, { text: 'Сократите сообщение: каждый адрес — до 255 символов.' });
       return;
@@ -182,6 +210,8 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         [message.provider, message.externalUserId, message.eventId]);
       if (events[0]) return readJson<Reply>(events[0].response_json);
       let draft = rows[0] && new Date(rows[0].expires_at).getTime() > Date.now() ? readJson<BookingDraft>(rows[0].draft_json) : freshDraft();
+      // Old drafts could start from an arbitrary message without an explicit booking request.
+      if (draft.flowVersion !== 2) draft = freshDraft();
       const quote = async () => {
         draft.id = randomUUID();
         const [pickup, destination] = await Promise.all([
@@ -217,11 +247,6 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       };
       const process = async (): Promise<Reply> => {
         const action = text.match(/^b:(confirm|restart|cancel):(.+)$/u);
-        if (action && action[2] !== draft.id) return { text: 'Эта кнопка устарела. Напишите «Такси», чтобы оформить новый заказ.' };
-        if (/^(?:\/cancel|отменить|отмена)$/iu.test(text) || action?.[1] === 'cancel') {
-          draft = freshDraft();
-          return { text: 'Черновик удалён. Напишите «Такси», когда будете готовы. Уже вызванное такси отменяется кнопкой в карточке поездки.' };
-        }
         // Drivers can set the negotiated amount from any of the three bots.
         const fare = text.match(/^цена\s+(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:₽|руб(?:лей)?)?$/iu);
         if (fare && user.roles.includes('driver')) {
@@ -232,8 +257,27 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           await call(`/v1/driver/orders/${order.id}/fare`, { priceMinor: Math.round(Number(fare[1]!.replace(',', '.')) * 100) });
           return { text: 'Стоимость сохранена и передана пассажиру.' };
         }
+        const active = await firstRow<RowDataPacket & ActiveOrder>(`SELECT id, status FROM orders WHERE passenger_id = ?
+          AND status IN ('searching','accepted','driver_arriving','driver_waiting','in_progress') LIMIT 1`, [user.id]);
+        const cancelRequested = /^(?:\/cancel|отменить(?:\s+(?:заказ|такси|поездку))?|отмена(?:\s+заказа)?)$/iu.test(text) ||
+          (action?.[1] === 'cancel' && action[2] === draft.id);
+        if (active) {
+          if (cancelRequested && canCancel(active)) return {
+            text: 'Отменить заказ? После подтверждения поиск или подача такси будут остановлены.',
+            buttons: [
+              { label: 'Да, отменить', data: rideMessengerActionData(active.id, 'cancel-confirm') },
+              { label: 'Не отменять', data: rideMessengerActionData(active.id, 'refresh') },
+            ],
+          };
+          return activeOrderReply(active, cancelRequested ? 'Поездка уже началась, отменить её в боте нельзя.' : undefined);
+        }
+        if (action && action[2] !== draft.id) return welcome('Эта кнопка устарела. Нажмите «Заказать такси», чтобы начать заново.');
+        if (cancelRequested) {
+          draft = freshDraft();
+          return welcome('Оформление отменено. Активного заказа нет.');
+        }
         if (draft.stage === 'done' && (action?.[1] === 'confirm' || /^(?:вызвать|да|подтверждаю)$/iu.test(text))) {
-          return { text: `Заказ уже создан: https://taxigr.ru/orders/${draft.orderId}` };
+          return welcome(`Этот заказ уже закрыт: https://taxigr.ru/orders/${draft.orderId}`);
         }
         if (draft.stage === 'confirm' && (action?.[1] === 'confirm' || /^(?:вызвать(?: такси)?|вызвать без цены|да|подтверждаю)$/iu.test(text))) {
           if (!draft.quotedAt || Date.now() - draft.quotedAt > 240_000) {
@@ -247,25 +291,26 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
             comment: `Из ${message.provider}. Со слов пассажира: ${draft.pickupRaw} → ${draft.destinationRaw}`.slice(0, 500),
           });
           draft.stage = 'done'; draft.orderId = order.id;
-          return { text: `Такси вызвано. Ищем водителя.\n${draft.priceMinor == null ? 'Стоимость определит водитель и согласует с вами.\n' : ''}Статус заказа: https://taxigr.ru/orders/${order.id}` };
+          return activeOrderReply(order, `Такси вызвано. Ищем водителя.${draft.priceMinor == null ? '\nСтоимость определит водитель и согласует с вами.' : ''}`);
         }
-        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси|заказать|начать|изменить адреса)$/iu.test(text) || action?.[1] === 'restart' || !text) {
+        if (startRequested || message.verifiedPhone || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
+          draft = { ...freshDraft(), stage: 'pickup' };
+          return { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
+        }
+        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text || draft.stage === 'idle' || draft.stage === 'done') {
           draft = freshDraft();
-          return { text: 'Откуда вас забрать? Напишите адрес или название места. Можно сразу маршрут: «Советская 10 → больница». Для исправления напишите «Изменить адреса».' };
+          return welcome();
         }
-        if (action) return { text: 'Сначала укажите адреса поездки.' };
-        const active = await firstRow<RowDataPacket & { id: string }>(`SELECT id FROM orders WHERE passenger_id = ?
-          AND status IN ('searching','accepted','driver_arriving','driver_waiting','in_progress') LIMIT 1`, [user.id]);
-        if (active) return { text: `У вас уже есть активная поездка: https://taxigr.ru/orders/${active.id}` };
+        if (text.startsWith('b:')) return welcome('Эта кнопка устарела. Начните оформление заново.');
         const pair = splitBotRoute(text);
         if (pair?.some(part => part.length < 2 || part.length > 255) || (!pair && (text.length < 2 || text.length > 255))) {
           return { text: 'Напишите каждый адрес длиной от 2 до 255 символов.' };
         }
         if (pair) {
           draft = { ...freshDraft(), pickupRaw: pair[0], destinationRaw: pair[1] };
-        } else if (draft.stage === 'pickup' || draft.stage === 'done') {
+        } else if (draft.stage === 'pickup') {
           draft = { ...freshDraft(), stage: 'destination', pickupRaw: text };
-          return { text: `Место подачи: ${text}\nКуда поедем? Напишите адрес или название места.` };
+          return { text: `Место подачи: ${text}\nКуда поедем? Напишите адрес или название места.`, buttons: draftButtons(draft) };
         } else if (draft.stage === 'destination') {
           draft.destinationRaw = text;
         } else {

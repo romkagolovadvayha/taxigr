@@ -179,8 +179,12 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
       };
     }
 
-    if (parsed.action === 'cancel') {
+    if (parsed.action === 'cancel' || parsed.action === 'cancel-confirm') {
       if (audience !== 'passenger') return { text: 'Отменить заказ может пассажир.', alert: true };
+      if (ride.status === 'cancelled') {
+        await refreshCurrentStatus().catch(() => undefined);
+        return { text: 'Заказ уже отменён.' };
+      }
       if (!['searching', 'accepted', 'driver_arriving', 'driver_waiting'].includes(ride.status)) {
         await refreshCurrentStatus().catch(() => undefined);
         return {
@@ -190,6 +194,8 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
           alert: true,
         };
       }
+    }
+    if (parsed.action === 'cancel') {
       await notifyMessengerAccount(request.provider, request.externalUserId, {
         orderId: ride.id,
         audience,
