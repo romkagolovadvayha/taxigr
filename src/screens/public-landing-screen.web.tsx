@@ -5,6 +5,8 @@ import { useBookingAvailability } from '@/providers/booking-availability-provide
 
 import "./public-landing.css";
 
+const bookingPhone = { label: '+7 (995) 645-96-07', href: 'tel:+79956459607' };
+
 const steps = [
   {
     title: "Скажите, куда едем",
@@ -244,9 +246,15 @@ export function PublicLandingScreen() {
           <a href="#tariffs">Тарифы</a>
           <a href="#drivers">Водителям</a>
         </nav>
-        <Link href="/sign-in" className="lp-header-login">
-          Войти <Arrow diagonal />
-        </Link>
+        <div className="lp-header-actions">
+          <a className="lp-header-contact" href={bookingPhone.href}>
+            <span>Заказ по телефону</span>
+            <strong>{bookingPhone.label}</strong>
+          </a>
+          <Link href="/sign-in" className="lp-header-login">
+            Войти <Arrow diagonal />
+          </Link>
+        </div>
       </header>
 
       <main id="main">
@@ -277,6 +285,10 @@ export function PublicLandingScreen() {
                 Как это работает
               </a>
             </div>
+            <a className="lp-booking-phone" href={bookingPhone.href}>
+              <span>Или закажите такси по телефону</span>
+              <strong>{bookingPhone.label}</strong>
+            </a>
             <div className="lp-hero-proof">
               <span className="lp-proof-icon">
                 <Icon kind="check" />
@@ -605,6 +617,15 @@ export function PublicLandingScreen() {
           <div className="lp-faq-list">
             <details>
               <summary>
+                Можно заказать такси по телефону?<span>+</span>
+              </summary>
+              <p>
+                Да. Позвоните по номеру <a href={bookingPhone.href}>{bookingPhone.label}</a>{' '}
+                и сообщите, откуда вас забрать и куда поедете. Устанавливать приложение или регистрироваться для звонка не нужно.
+              </p>
+            </details>
+            <details>
+              <summary>
                 Нужно устанавливать приложение?<span>+</span>
               </summary>
               <p>
@@ -651,7 +672,10 @@ export function PublicLandingScreen() {
           <Link href="/sign-in" onPress={requestBooking} className="lp-button lp-primary">
             Заказать такси <Arrow />
           </Link>
-          <p>Ваш следующий маршрут начинается здесь.</p>
+          <a className="lp-booking-phone lp-booking-phone-final" href={bookingPhone.href}>
+            <span>Заказ по телефону</span>
+            <strong>{bookingPhone.label}</strong>
+          </a>
         </section>
       </main>
 
@@ -668,6 +692,7 @@ export function PublicLandingScreen() {
           </button>
         </div>
         <div className="lp-footer-links">
+          <a href={bookingPhone.href}>Заказ такси: {bookingPhone.label}</a>
           <Link href="/legal">Правовые документы</Link>
           <Link href="/privacy">Персональные данные</Link>
           <Link href="/terms">Условия сервиса</Link>
