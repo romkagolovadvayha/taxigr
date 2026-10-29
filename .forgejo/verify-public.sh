@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
-npm run check:store-review -- "https://${API_DOMAIN}"
+npm run review:rustore
+# Keep the verified release receipt usable when the developer's network cannot
+# reach production directly. Never put the test login or session in CI logs.
+node <<'NODE'
+const fs = require('node:fs');
+const { createHash } = require('node:crypto');
+const { version } = require('./app.json').expo;
+const review = JSON.parse(fs.readFileSync(`tmp/store-release-${version}/rustore-review.json`, 'utf8'));
+const { versionCode, apiOrigin, verifiedAt, checks } = review;
+console.log('STORE_REVIEW_VERIFIED ' + JSON.stringify({
+  version, versionCode, apiOrigin, verifiedAt, checks,
+  moderInfoSha256: createHash('sha256').update(review.moderInfo).digest('hex'),
+}));
+NODE
 set -euo pipefail
 curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
 vk_page="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk")"
