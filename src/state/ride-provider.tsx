@@ -971,6 +971,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return ride;
       } catch (reason) {
         if (reason instanceof ApiError && reason.code === bookingUnavailableCode) showBookingUnavailable();
+        if (reason instanceof ApiError && reason.code === 'PROMOTION_QUOTE_CHANGED') await requestQuote();
         const uncertainFailure =
           reason instanceof ApiError &&
           (reason.code === 'TIMEOUT' || reason.code === 'NETWORK_ERROR' || reason.status >= 500);
@@ -1016,6 +1017,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       pickup,
       quoteStatus,
       quoteToken,
+      requestQuote,
       routeCoordinates,
       routeSummary,
       selectedTariff,

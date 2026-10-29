@@ -18,6 +18,18 @@
   line-height: 1.55;
   color-scheme: light;
 }
+.lp-downloads { margin-top: 24px; }
+.lp-downloads-label { display: block; margin-bottom: 10px; font-size: 13px; color: var(--lp-muted); }
+.lp-store-links { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.lp-store-link { display: block; height: 48px; position: relative; flex-shrink: 0; border-radius: 8px; }
+.lp-store-link:hover { opacity: .85; }
+.lp-store-link:focus-visible { outline: 3px solid var(--lp-accent-ink); outline-offset: 4px; }
+.lp-store-rustore { width: 133px; }
+.lp-store-rustore img { display: block; width: 133px; height: 48px; }
+.lp-store-google { width: 163px; overflow: hidden; }
+.lp-store-google img { display: block; position: absolute; width: 163px; height: 63px; top: -7.5px; max-width: none; }
+.lp .lp-vk-app-link { display: inline-block; margin-top: 12px; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.lp-final .lp-store-links { justify-content: center; }
 .lp * {
   box-sizing: border-box;
 }

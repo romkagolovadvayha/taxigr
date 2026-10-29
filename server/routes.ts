@@ -2,6 +2,8 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
+import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor } from '../src/domain/first-order-discount';
+import { firstLocalOrderEligible } from './first-order-discount';
 
 import {
   calculateCommissionMinor,
@@ -3544,14 +3546,15 @@ export async function registerRoutes(
     const input = parse(quoteSchema, request.body);
     const { pickup, destination, destinations } = await resolveTrustedAddresses(input);
     const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
-    const [pricedRoute, rules, etaMinutes] = await Promise.all([
+    const [pricedRoute, rules, etaMinutes, discountEligible] = await Promise.all([
       getMultiStopPricedRouteMetrics(pickup, destinations),
       pricingRules(),
       estimateTariffEtaMinutes(pickup),
+      firstLocalOrderEligible(session.id, pricingScope),
     ]);
     const { tripRoute: route, segments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
     const pricedAt = new Date();
-    const prices = multiStopPrices(
+    const originalPrices = multiStopPrices(
       pickup,
       destinations,
       segments.map((segment) => segment.route.distanceMeters),
@@ -3560,6 +3563,10 @@ export async function registerRoutes(
       rules,
       pricedAt,
     );
+    const prices = discountEligible
+      ? { economy: firstOrderPriceMinor(originalPrices.economy), child: firstOrderPriceMinor(originalPrices.child) }
+      : originalPrices;
+    const promotion = discountEligible ? { code: firstLocalOrderPromotion, originalPrices } : undefined;
     const tariffs = quoteTariffs(
       pricingDistanceMeters,
       rules,
@@ -3569,7 +3576,10 @@ export async function registerRoutes(
       etaMinutes,
       prices,
       destinations.length,
-    );
+    ).map((tariff) => ({
+      ...tariff,
+      ...(discountEligible ? { originalPriceMinor: originalPrices[tariff.code], discountPercent: firstLocalOrderDiscountPercent } : {}),
+    }));
     const quoteToken = await signOrderQuote({
       passengerId: session.id,
       pickup,
@@ -3587,6 +3597,7 @@ export async function registerRoutes(
         economy: prices.economy,
         child: prices.child,
       },
+      promotion,
       pricedAt: pricedAt.toISOString(),
     });
     return {
@@ -3801,6 +3812,14 @@ export async function registerRoutes(
           code: 'ACTIVE_ORDER_EXISTS',
         });
       }
+      const discountEligible = !manualPricing && await firstLocalOrderEligible(session.id, pricingScope, connection);
+      if (Boolean(quote.promotion) !== discountEligible || (quote.promotion &&
+          (quote.promotion.code !== firstLocalOrderPromotion ||
+           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff]) !== price))) {
+        throw Object.assign(new Error('Условия скидки изменились. Обновите расчёт и подтвердите новую стоимость'), {
+          statusCode: 409, code: 'PROMOTION_QUOTE_CHANGED',
+        });
+      }
       if (!(await hasCurrentInitialConsents(connection, session.id))) {
         if (!input.legalAcceptance) {
           throw Object.assign(new Error('Примите условия сервиса перед первым заказом'), {
@@ -3850,15 +3869,19 @@ export async function registerRoutes(
           commission,
           rules.serviceCommissionBps,
           rules.waitingFreeMinutes,
-          manualPricing ? 0 : rules.waitingPerMinuteMinor,
+          manualPricing ? 0 : discountEligible ? firstOrderPriceMinor(rules.waitingPerMinuteMinor) : rules.waitingPerMinuteMinor,
           rules.searchPriceIncreaseIntervalMinutes,
-          manualPricing ? 0 : rules.searchPriceIncreaseStepMinor,
+          manualPricing ? 0 : discountEligible ? firstOrderPriceMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
           input.paymentMethod,
           input.comment ?? null,
           input.idempotencyKey,
         ],
       );
       if (manualPricing) await connection.execute("UPDATE orders SET pricing_mode = 'driver' WHERE id = ?", [orderId]);
+      if (quote.promotion) await connection.execute(
+        'UPDATE orders SET promotion_code = ?, original_price_minor = ?, promotion_phone_fingerprint = ? WHERE id = ?',
+        [quote.promotion.code, quote.promotion.originalPrices[input.tariff], phoneLockKey, orderId],
+      );
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, to_status, payload)
          VALUES (?, ?, 'order.created', 'searching', ?)`,
@@ -3870,6 +3893,7 @@ export async function registerRoutes(
             pricingDistanceMeters,
             driverApproachDistanceMeters: quote.driverApproachDistanceMeters,
             quotePricedAt: quote.pricedAt,
+            promotion: quote.promotion,
           }),
         ],
       );

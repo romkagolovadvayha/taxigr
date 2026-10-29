@@ -26,6 +26,10 @@ export type OrderQuoteClaims = {
   pricingDistanceMeters: number;
   driverApproachDistanceMeters: number;
   prices: Record<TariffCode, number>;
+  promotion?: {
+    code: 'first-local-order-50';
+    originalPrices: Record<TariffCode, number>;
+  };
   pricedAt: string;
 };
 

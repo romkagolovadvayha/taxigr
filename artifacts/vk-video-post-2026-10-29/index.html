@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Такси Грахово — черновик поста VK</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f3ef;color:#24241f;font:16px/1.6 system-ui,sans-serif}main{max-width:1040px;margin:40px auto;padding:24px}header{margin-bottom:24px}h1{font-size:28px;margin:0}small{color:#777}article{display:grid;grid-template-columns:320px 1fr;gap:40px;padding:32px;border:1px solid #e6e3d9;background:white;border-radius:24px}video{width:100%;border-radius:16px;background:#181818}#post{white-space:pre-wrap;margin:0 0 24px}button,.download{display:inline-block;background:#f6c945;color:#24241f;border:0;border-radius:12px;padding:12px 18px;font:600 14px system-ui;cursor:pointer;text-decoration:none}.download{background:#f3f2ec;margin-left:8px}#status{min-height:24px;font-size:13px;color:#666}a{color:#1666bc}@media(max-width:720px){main{margin:8px auto;padding:16px}article{grid-template-columns:1fr;padding:20px;gap:24px}video{max-height:440px}h1{font-size:24px}.download{margin:8px 0 0}}
+</style>
+<main><header><small>ЧЕРНОВИК ДЛЯ VK · 29 ОКТЯБРЯ 2026</small><h1>Заказ такси уже доступен</h1><small>Видео и текст готовы для публикации и репостов.</small></header>
+<article><video controls playsinline preload="metadata" src="taxi-grahovo-final.mp4"></video><div><p id="post">🚕 Заказ такси уже доступен!
+
+По Грахово, району и межгороду — 24/7.
+🎁 Скидка 50% на первый заказ по Грахово и району. На межгород акция не действует.
+
+Укажите, откуда вас забрать и куда поедете, — и подтвердите заказ.
+
+Заказать:
+• В приложении VK: https://vk.com/app54638428
+• На сайте: https://taxigr.ru
+• По телефону: +7 (995) 645-96-07
+
+Также доступны приложение для Android и боты VK, MAX и Telegram. Ссылки на скачивание — на сайте.</p>
+<button id="copy">Скопировать текст</button><a class="download" href="taxi-grahovo-final.mp4" download>Скачать видео</a><p id="status" aria-live="polite"></p></div></article></main>
+<script>document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('post').innerText);document.getElementById('status').textContent='Текст скопирован'}catch{document.getElementById('status').textContent='Откройте post.txt и скопируйте текст'}};</script>
+</html>

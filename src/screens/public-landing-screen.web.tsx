@@ -7,6 +7,23 @@ import "./public-landing.css";
 
 const bookingPhone = { label: '+7 (995) 645-96-07', href: 'tel:+79956459607' };
 
+function StoreDownloads() {
+  return (
+    <div className="lp-downloads">
+      <span className="lp-downloads-label">Скачайте приложение для Android</span>
+      <div className="lp-store-links">
+        <a className="lp-store-link lp-store-rustore" href="https://www.rustore.ru/catalog/app/ru.grahovo.taxi" target="_blank" rel="noopener noreferrer" aria-label="Скачать Такси Грахово в RuStore">
+          <img src="/store/rustore-ru.svg" alt="Скачать в RuStore" width="133" height="48" />
+        </a>
+        <a className="lp-store-link lp-store-google" href="https://play.google.com/store/apps/details?id=ru.grahovo.taxi" target="_blank" rel="noopener noreferrer" aria-label="Скачать Такси Грахово в Google Play">
+          <img src="/store/google-play-ru.png" alt="Скачать в Google Play" width="163" height="63" />
+        </a>
+      </div>
+      <a className="lp-vk-app-link" href="https://vk.com/app54638428" target="_blank" rel="noopener noreferrer">Или закажите в приложении VK ↗</a>
+    </div>
+  );
+}
+
 const steps = [
   {
     title: "Скажите, куда едем",
@@ -289,6 +306,7 @@ export function PublicLandingScreen() {
               <span>Или закажите такси по телефону</span>
               <strong>{bookingPhone.label}</strong>
             </a>
+            <StoreDownloads />
             <div className="lp-hero-proof">
               <span className="lp-proof-icon">
                 <Icon kind="check" />
@@ -676,6 +694,7 @@ export function PublicLandingScreen() {
             <span>Заказ по телефону</span>
             <strong>{bookingPhone.label}</strong>
           </a>
+          <StoreDownloads />
         </section>
       </main>
 

@@ -3,7 +3,8 @@ import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { RideChatMessage, RideOrder } from '../src/domain/models';
+import type { RideChatMessage, RideOrder, Tariff } from '../src/domain/models';
+import { confirmAddressPoint } from '../src/domain/route-stops';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
 import { signSession } from '../server/security';
 
@@ -136,6 +137,60 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(new Set(responses.map((response) => response.data?.id)).size).toBe(1);
     const [rows] = await connection.query<RowDataPacket[]>('SELECT COUNT(*) AS total FROM orders WHERE passenger_id=?', [actor.id]);
     expect(Number(rows[0]!.total)).toBe(1);
+  }, 30_000);
+
+  it('applies the local discount once, keeps it after cancellation and rejects a spent quote', async () => {
+    const actor = passengers[0]!;
+    const quoteResult = await api<{ quoteToken: string; tariffs: Tariff[] }>('/v1/quotes', actor, { pickup, destination });
+    expect(quoteResult.status).toBe(200);
+    for (const tariff of quoteResult.data!.tariffs) {
+      expect(tariff.discountPercent).toBe(50);
+      expect(tariff.priceMinor).toBe(Math.floor(tariff.originalPriceMinor! / 2));
+    }
+    const first = await submit(actor, quoteResult.data!.quoteToken);
+    expect(first.status, JSON.stringify(first.error)).toBe(201);
+    expect(first.data!.promotionCode).toBe('first-local-order-50');
+    expect(first.data!.priceMinor).toBe(quoteResult.data!.tariffs[0]!.priceMinor);
+    expect((await cancel(actor, first.data!)).status).toBe(200);
+    const second = await create(actor);
+    expect(second.promotionCode).toBe('first-local-order-50');
+    const stale = await quote(actor);
+    await connection.execute("UPDATE orders SET status='completed' WHERE id=?", [second.id]);
+    const rejected = await submit(actor, stale);
+    expect(rejected.status).toBe(409);
+    expect(rejected.error?.code).toBe('PROMOTION_QUOTE_CHANGED');
+    const next = await create(actor);
+    expect(next.promotionCode).toBeUndefined();
+    expect(next.priceMinor).toBe(second.originalPriceMinor);
+    // Even after changing the original profile's phone, that phone cannot claim again.
+    const replacement = passengers[1]!;
+    const [users] = await connection.query<RowDataPacket[]>('SELECT id, phone FROM users WHERE id IN (?, ?)', [actor.id, replacement.id]);
+    const originalPhone = users.find(user => user.id === actor.id)!.phone;
+    const replacementPhone = users.find(user => user.id === replacement.id)!.phone;
+    try {
+      await connection.execute('UPDATE users SET phone=NULL WHERE id=?', [actor.id]);
+      await connection.execute('UPDATE users SET phone=? WHERE id=?', [originalPhone, replacement.id]);
+      const samePhone = await api<{ tariffs: Tariff[] }>('/v1/quotes', replacement, { pickup, destination });
+      expect(samePhone.status).toBe(200);
+      expect(samePhone.data!.tariffs[0]!.discountPercent).toBeUndefined();
+    } finally {
+      await connection.execute('UPDATE users SET phone=? WHERE id=?', [replacementPhone, replacement.id]);
+      await connection.execute('UPDATE users SET phone=? WHERE id=?', [originalPhone, actor.id]);
+    }
+  }, 30_000);
+
+  it('discounts district routes but excludes intercity, including an intermediate intercity stop', async () => {
+    const actor = passengers[0]!;
+    const district = confirmAddressPoint({ id: 'qa-district-promo', label: 'д. Лолошур-Возжи', kind: 'settlement', details: 'Граховский район', coordinates: { latitude: 55.998771, longitude: 51.7719962 } }, { latitude: 55.998771, longitude: 51.7719962 });
+    const intercity = confirmAddressPoint({ id: 'qa-intercity-promo', label: 'Можга', kind: 'settlement', coordinates: { latitude: 56.4439, longitude: 52.2274 } }, { latitude: 56.4439, longitude: 52.2274 });
+    for (const [destinations, scope, discount] of [
+      [[district], 'district', 50], [[intercity], 'intercity', undefined], [[intercity, destination], 'intercity', undefined],
+    ] as const) {
+      const result = await api<{ pricingScope: string; tariffs: Tariff[] }>('/v1/quotes', actor, { pickup, destination: destinations.at(-1), destinations });
+      expect(result.status, JSON.stringify(result.error)).toBe(200);
+      expect(result.data!.pricingScope).toBe(scope);
+      expect(result.data!.tariffs[0]!.discountPercent).toBe(discount);
+    }
   }, 30_000);
 
   it('allows only one active order when one passenger submits 16 different requests', async () => {

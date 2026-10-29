@@ -30,6 +30,7 @@ export type BookingDraft = {
   destination?: Address;
   quoteToken?: string;
   priceMinor?: number;
+  originalPriceMinor?: number;
   quotedAt?: number;
   orderId?: string;
 };
@@ -104,6 +105,7 @@ function review(draft: BookingDraft): Reply {
     text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
       (draft.priceMinor == null ? 'Адрес не удалось определить точно. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
+      (draft.originalPriceMinor === undefined ? '' : `\nСкидка 50% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽.`) +
       '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
       [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
@@ -220,12 +222,14 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.pickup = pickup ?? unresolvedBotAddress(draft.pickupRaw!);
         draft.destination = destination ?? unresolvedBotAddress(draft.destinationRaw!);
         draft.priceMinor = undefined;
+        draft.originalPriceMinor = undefined;
         if (pickup && destination) {
           try {
             const result = await call<{ quoteToken: string; tariffs: Tariff[] }>('/v1/quotes', { pickup, destination });
             const economy = result.tariffs.find(tariff => tariff.code === 'economy');
             if (economy && economy.priceMinor > 0) {
               draft.priceMinor = economy.priceMinor;
+              draft.originalPriceMinor = economy.originalPriceMinor;
               draft.quoteToken = result.quoteToken;
             }
           } catch (error) {

@@ -868,7 +868,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(quote.data?.tariffs[1]?.priceMinor).toBeGreaterThan(
       quote.data?.tariffs[0]?.priceMinor ?? 0,
     );
-    expect(quote.data?.tariffs[0]?.priceMinor).toBe(15_000);
+    expect(quote.data?.tariffs[0]?.priceMinor).toBe(7_500);
 
     const secondLocalDestination = {
       id: 'integration-second-local-destination',
@@ -1375,8 +1375,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(confirmed.status).toBe(200);
-    expect(confirmed.data?.searchPriceIncreaseMinor).toBe(3_000);
-    expect(confirmed.data?.priceMinor).toBe(originalPrice + 3_000);
+    expect(confirmed.data?.searchPriceIncreaseMinor).toBe(1_500);
+    expect(confirmed.data?.priceMinor).toBe(originalPrice + 1_500);
     expect(confirmed.data?.createdAt).toBe(beforeIncrease.data?.createdAt);
 
     const repeated = await api<RideOrder>(
@@ -1384,7 +1384,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(repeated.status).toBe(200);
-    expect(repeated.data?.priceMinor).toBe(originalPrice + 3_000);
+    expect(repeated.data?.priceMinor).toBe(originalPrice + 1_500);
 
     await connection.execute(
       'UPDATE orders SET created_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 8 MINUTE) WHERE id = ?',
@@ -1395,8 +1395,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(secondInterval.status).toBe(200);
-    expect(secondInterval.data?.searchPriceIncreaseMinor).toBe(6_000);
-    expect(secondInterval.data?.priceMinor).toBe(originalPrice + 6_000);
+    expect(secondInterval.data?.searchPriceIncreaseMinor).toBe(3_000);
+    expect(secondInterval.data?.priceMinor).toBe(originalPrice + 3_000);
     expect(secondInterval.data?.searchPriceIncreaseLastSlot).toBe(2);
   });
 
@@ -2178,9 +2178,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         expect(waitingStopped.status).toBe(200);
         expect(waitingStopped.data?.waitingStartedAt).toBeUndefined();
         expect(waitingStopped.data?.waitingSeconds).toBeGreaterThanOrEqual(270);
-        expect(waitingStopped.data?.waitingPriceMinor).toBe(800);
+        expect(waitingStopped.data?.waitingPriceMinor).toBe(400);
         expect(waitingStopped.data?.priceMinor).toBe(
-          (waitingStopped.data?.basePriceMinor ?? 0) + 800,
+          (waitingStopped.data?.basePriceMinor ?? 0) + 400,
         );
       }
       if (status === 'in_progress') {

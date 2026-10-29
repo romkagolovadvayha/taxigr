@@ -38,6 +38,8 @@ export type OrderRow = RowDataPacket & {
   duration_seconds: number;
   route_geometry: unknown;
   base_price_minor: number;
+  promotion_code?: 'first-local-order-50' | null;
+  original_price_minor?: number | null;
   search_price_increase_minor: number;
   search_price_increase_interval_minutes: number;
   search_price_increase_step_minor: number;
@@ -225,6 +227,8 @@ export function presentOrder(row: OrderRow): RideOrder {
     pricingMode: row.pricing_mode ?? 'fixed',
     manualPriceSet: Boolean(row.manual_price_set),
     basePriceMinor: row.base_price_minor,
+    promotionCode: row.promotion_code ?? undefined,
+    originalPriceMinor: row.original_price_minor ?? undefined,
     searchPriceIncreaseMinor: row.search_price_increase_minor,
     searchPriceIncreaseIntervalMinutes: row.search_price_increase_interval_minutes,
     searchPriceIncreaseStepMinor: row.search_price_increase_step_minor,

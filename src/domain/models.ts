@@ -83,6 +83,8 @@ export type Tariff = {
   childSeatIncluded: boolean;
   etaMinutes: number;
   priceMinor: number;
+  originalPriceMinor?: number;
+  discountPercent?: number;
 };
 
 export type RouteSummary = {
@@ -119,6 +121,8 @@ export type RideOrder = {
   pricingMode?: 'fixed' | 'driver';
   manualPriceSet?: boolean;
   basePriceMinor?: number;
+  promotionCode?: 'first-local-order-50';
+  originalPriceMinor?: number;
   searchPriceIncreaseMinor?: number;
   searchPriceIncreaseIntervalMinutes?: number;
   searchPriceIncreaseStepMinor?: number;

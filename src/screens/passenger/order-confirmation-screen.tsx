@@ -207,6 +207,11 @@ export function OrderConfirmationScreen() {
                 loading={quotePending}
                 estimateAvailable={routeReady}
               />
+              {!quotePending && routeReady && selected.discountPercent === 50 && (
+                <Text selectable style={{ ...typography.caption, color: colors.ink }}>
+                  Скидка 50% на первый заказ по Грахово и району уже учтена: {selected.originalPriceMinor! / 100} ₽ → {selected.priceMinor / 100} ₽. На межгород акция не действует.
+                </Text>
+              )}
               {selectedTariff === 'child' && (
                 <View
                   style={{

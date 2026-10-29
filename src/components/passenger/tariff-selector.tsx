@@ -66,6 +66,12 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
               : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}
+        {!loading && estimateAvailable && tariff.discountPercent === 50 && (
+          <Text selectable style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>Первый заказ −50%</Text>
+        )}
+        {!compact && !loading && estimateAvailable && tariff.originalPriceMinor !== undefined && (
+          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textDecorationLine: 'line-through' }}>{tariff.originalPriceMinor / 100} ₽</Text>
+        )}
         {!compact && (loading ? <SkeletonBlock width={56} height={22} /> : estimateAvailable ? <MoneyValue valueMinor={tariff.priceMinor} compact /> : null)}
       </View>
     </AnimatedPressable>
