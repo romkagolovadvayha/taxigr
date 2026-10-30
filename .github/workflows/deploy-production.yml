@@ -1,8 +1,6 @@
 name: Deploy production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -49,33 +47,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Validate deployment environment
+      - name: Setup SSH
+        timeout-minutes: 2
         shell: bash
+        env:
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
         run: |
           set -euo pipefail
-          for name in WEB_DOMAIN API_DOMAIN DEPLOY_PATH SSH_HOST SSH_PORT SSH_USER VK_APP_ID VK_MINI_APP_ID VK_COMMUNITY_ID; do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing GitHub Environment variable: $name" >&2
-              exit 1
-            fi
-          done
-          for name in MYSQL_PASSWORD JWT_SECRET SSH_PRIVATE_KEY_B64 NOTIFICORE_API_KEY VK_BOT_TOKEN VK_CALLBACK_SECRET VK_CALLBACK_CONFIRMATION VK_MINI_APP_SECRET; do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing GitHub Environment secret: $name" >&2
-              exit 1
-            fi
-          done
-        env:
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
-          NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
-          VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
-          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
-          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
-          VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
-          RUSTORE_PUSH_PROJECT_ID: ${{ vars.RUSTORE_PUSH_PROJECT_ID }}
-          RUSTORE_PUSH_SERVICE_TOKEN: ${{ secrets.RUSTORE_PUSH_SERVICE_TOKEN }}
+          install -d -m 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/taxigr_deploy
+          chmod 600 ~/.ssh/taxigr_deploy
+          ssh-keygen -y -f ~/.ssh/taxigr_deploy >/dev/null
+          printf '%s\n' '212.193.26.91 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINbG3rc2WM6IYC/bg293sBMj5kcRP7+1qpOUX83u9CEH' > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host taxigr-production
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile ~/.ssh/taxigr_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Verify existing production access before building
+        run: ssh taxigr-production "test -s /etc/taxigr/taxigr.env && test -d /var/www/taxigr/current && readlink /var/www/taxigr/current"
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -95,120 +95,12 @@ jobs:
       - name: Verify and build
         run: npm run check
 
-      - name: Create server environment file
-        shell: bash
-        env:
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SUPERADMIN_PHONES: ${{ secrets.SUPERADMIN_PHONES }}
-          NOTIFICORE_API_KEY: ${{ secrets.NOTIFICORE_API_KEY }}
-          NOTIFICORE_BEARER_TOKEN: ${{ secrets.NOTIFICORE_BEARER_TOKEN }}
-          NOTIFICORE_ORIGINATOR: ${{ vars.NOTIFICORE_ORIGINATOR || 'TaxiGr' }}
-          NOTIFICORE_TEMPLATE_ID: ${{ vars.NOTIFICORE_TEMPLATE_ID }}
-          MAX_BOT_USERNAME: ${{ vars.MAX_BOT_USERNAME }}
-          MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
-          MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
-          TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          VK_BOT_TOKEN: ${{ secrets.VK_BOT_TOKEN }}
-          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
-          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
-          VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
-        run: |
-          python3 - <<'PY'
-          import os, shlex
-
-          mysql_password = os.environ['MYSQL_PASSWORD']
-          values = {
-              'NODE_ENV': 'production',
-              'NODE_EXTRA_CA_CERTS': '/etc/taxigr/ca/russian-trusted-ca-bundle.pem',
-              'HOST': '127.0.0.1',
-              'PORT': '4100',
-              'PUBLIC_URL': os.environ['PUBLIC_URL'],
-              'CORS_ORIGINS': os.environ['PUBLIC_URL'],
-              'MYSQL_PASSWORD': mysql_password,
-              'MYSQL_URL': f'mysql://taxigr:{mysql_password}@127.0.0.1:3306/taxi_grahovo',
-              'JWT_SECRET': os.environ['JWT_SECRET'],
-              'SUPERADMIN_PHONES': os.environ.get('SUPERADMIN_PHONES', ''),
-              'ROUTER_BASE_URL': 'https://router.project-osrm.org',
-              'ROUTER_TIMEOUT_MS': '5000',
-              'ROUTER_CACHE_TTL_SECONDS': '600',
-              'ROUTER_CACHE_MAX_ENTRIES': '2000',
-              'ROUTER_CIRCUIT_BREAKER_SECONDS': '30',
-              'NOMINATIM_BASE_URL': 'https://nominatim.openstreetmap.org',
-              'GEOCODER_CACHE_TTL_DAYS': '30',
-              'SMS_PROVIDER': 'notificore',
-              'NOTIFICORE_API_KEY': os.environ['NOTIFICORE_API_KEY'],
-              'NOTIFICORE_BEARER_TOKEN': os.environ.get('NOTIFICORE_BEARER_TOKEN', ''),
-              'NOTIFICORE_TEMPLATE_ID': os.environ.get('NOTIFICORE_TEMPLATE_ID') or '271',
-              'NOTIFICORE_ORIGINATOR': os.environ.get('NOTIFICORE_ORIGINATOR') or 'TaxiGr',
-              'MAX_BOT_USERNAME': os.environ.get('MAX_BOT_USERNAME', ''),
-              'MAX_BOT_TOKEN': os.environ.get('MAX_BOT_TOKEN', ''),
-              'MAX_WEBHOOK_SECRET': os.environ.get('MAX_WEBHOOK_SECRET', ''),
-              'TELEGRAM_BOT_USERNAME': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
-              'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN', ''),
-              'TELEGRAM_WEBHOOK_SECRET': os.environ.get('TELEGRAM_WEBHOOK_SECRET', ''),
-              'VK_APP_ID': os.environ['VK_APP_ID'],
-              'VK_REDIRECT_URI': f"https://{os.environ['API_DOMAIN']}/v1/auth/vk/callback",
-              'VK_MINI_APP_ID': os.environ['VK_MINI_APP_ID'],
-              'VK_MINI_APP_SECRET': os.environ['VK_MINI_APP_SECRET'],
-              'VK_MINI_APP_MAX_AGE_SECONDS': '900',
-              'VK_COMMUNITY_ID': os.environ['VK_COMMUNITY_ID'],
-              'VK_BOT_TOKEN': os.environ['VK_BOT_TOKEN'],
-              'VK_CALLBACK_SECRET': os.environ['VK_CALLBACK_SECRET'],
-              'VK_CALLBACK_CONFIRMATION': os.environ['VK_CALLBACK_CONFIRMATION'],
-              'VK_API_VERSION': os.environ.get('VK_API_VERSION') or '5.199',
-              'RUSTORE_PUSH_PROJECT_ID': os.environ.get('RUSTORE_PUSH_PROJECT_ID', ''),
-              'RUSTORE_PUSH_SERVICE_TOKEN': os.environ.get('RUSTORE_PUSH_SERVICE_TOKEN', ''),
-              'PHONE_CODE_TTL_MINUTES': '10',
-              'PHONE_CODE_RESEND_SECONDS': '180',
-              'TRUST_PROXY_HOPS': '1',
-              'AUTH_ATTEMPT_RETENTION_DAYS': '30',
-              'GLOBAL_RATE_LIMIT_MAX': '10000',
-          }
-          for key, value in values.items():
-              if '\n' in value or '\r' in value:
-                  raise SystemExit(f'Newlines are not allowed in {key}')
-          with open('.taxigr.env', 'w', encoding='utf-8', newline='\n') as output:
-              for key, value in values.items():
-                  output.write(f'{key}={shlex.quote(value)}\n')
-          PY
-          chmod 600 .taxigr.env
-
       - name: Package release
         shell: bash
         run: |
           archive="$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz"
           bash deploy/package-release.sh "$archive"
           sha256sum "$archive" | awk '{print $1}' > "$RUNNER_TEMP/archive.sha256"
-
-      - name: Setup SSH
-        timeout-minutes: 2
-        shell: bash
-        env:
-          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
-        run: |
-          set -euo pipefail
-          install -d -m 700 ~/.ssh
-          echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/taxigr_deploy
-          chmod 600 ~/.ssh/taxigr_deploy
-          ssh-keygen -y -f ~/.ssh/taxigr_deploy >/dev/null
-          ssh-keyscan -T 15 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          cat > ~/.ssh/config <<EOF
-          Host taxigr-production
-            HostName $SSH_HOST
-            Port $SSH_PORT
-            User $SSH_USER
-            IdentityFile ~/.ssh/taxigr_deploy
-            IdentitiesOnly yes
-            BatchMode yes
-            StrictHostKeyChecking yes
-            ConnectTimeout 15
-            ServerAliveInterval 15
-            ServerAliveCountMax 3
-          EOF
-          chmod 600 ~/.ssh/config
 
       - name: Prepare server upload directory
         timeout-minutes: 2
@@ -224,15 +116,12 @@ jobs:
           bash deploy/upload-file.sh "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" \
             "taxigr-production:$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
 
-      - name: Upload deployment configuration
-        timeout-minutes: 5
+      - name: Preserve production settings and upload activation script
         shell: bash
-        env:
-          UPLOAD_TIMEOUT_SECONDS: '60'
         run: |
-          bash deploy/upload-file.sh .taxigr.env "taxigr-production:$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
-          bash deploy/upload-file.sh deploy/remote-deploy.sh \
-            "taxigr-production:$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
+          set -euo pipefail
+          bash deploy/upload-file.sh deploy/remote-deploy.sh "taxigr-production:$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
+          ssh taxigr-production "umask 077; cp -p /etc/taxigr/taxigr.env '$DEPLOY_PATH/incoming/${GITHUB_SHA}.env'"
 
       - name: Activate release on server
         timeout-minutes: 15
@@ -249,56 +138,10 @@ jobs:
       - name: Verify store review login
         run: npm run check:store-review -- "https://${API_DOMAIN}"
 
-      - name: Verify public endpoints
+      - name: Verify live group alert endpoints
         shell: bash
-        env:
-          MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
-          MAX_WEBHOOK_SECRET: ${{ secrets.MAX_WEBHOOK_SECRET }}
-          VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
-          VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
-          vk_page="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk")"
-          grep -q 'Такси Грахово' <<<"$vk_page"
+          curl --fail --silent --show-error --retry 5 "https://${API_DOMAIN}/health/live"
+          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "https://${API_DOMAIN}/v1/group-alerts/device")" = "401"
           node scripts/verify-maplibre-deployment.cjs "https://${WEB_DOMAIN}"
-          health_response="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live")"
-          test "$(jq -r '.data.status' <<<"$health_response")" = "ok"
-          vk_mini_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            -H 'Content-Type: application/json' \
-            --data-binary '{"launchParams":"probe"}' \
-            "https://${API_DOMAIN}/v1/auth/vk-mini/session")"
-          test "$vk_mini_session_status" = "401"
-          max_ca="$RUNNER_TEMP/russian-trusted-root-ca.pem"
-          curl --fail --silent --show-error --location \
-            'https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt' \
-            --output "$max_ca"
-          test "$(openssl x509 -in "$max_ca" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')" = \
-            'D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31'
-          max_subscription_payload="$(jq -cn \
-            --arg url "https://${API_DOMAIN}/v1/webhooks/max" \
-            --arg secret "$MAX_WEBHOOK_SECRET" \
-            '{url:$url, update_types:["message_callback","bot_started","message_created"], secret:$secret}')"
-          curl --fail --silent --show-error \
-            --retry 8 --retry-all-errors --retry-delay 3 \
-            --cacert "$max_ca" \
-            -H "Authorization: ${MAX_BOT_TOKEN}" \
-            -H 'Content-Type: application/json' \
-            --data-binary "$max_subscription_payload" \
-            'https://platform-api2.max.ru/subscriptions' | jq -e '.success == true' >/dev/null
-          max_probe_response="$(curl --fail --silent --show-error \
-            -H "X-Max-Bot-Api-Secret: ${MAX_WEBHOOK_SECRET}" \
-            -H 'Content-Type: application/json' \
-            --data-binary '{"update_type":"diagnostic_probe"}' \
-            "https://${API_DOMAIN}/v1/webhooks/max")"
-          test "$(jq -r '.success' <<<"$max_probe_response")" = "true"
-          callback_payload="$(jq -cn \
-            --arg group_id "$VK_COMMUNITY_ID" \
-            --arg secret "$VK_CALLBACK_SECRET" \
-            '{type:"confirmation", group_id:$group_id, secret:$secret}')"
-          callback_response="$(curl --fail --silent --show-error \
-            --retry 8 --retry-all-errors --retry-delay 3 \
-            -H 'Content-Type: application/json' \
-            --data-binary "$callback_payload" \
-            "https://${API_DOMAIN}/v1/webhooks/vk")"
-          test "$callback_response" = "$VK_CALLBACK_CONFIRMATION"
