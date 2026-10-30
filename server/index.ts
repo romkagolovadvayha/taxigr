@@ -13,6 +13,7 @@ import { closeGatewayDispatcher } from './gateway-proxy';
 import { pruneMessengerBookingData } from './messenger-booking';
 import { registerRoutes } from './routes';
 import { verifySession } from './security';
+import { registerSocketLifecycle } from './socket-lifecycle';
 
 const app = Fastify({
   logger: {
@@ -95,6 +96,7 @@ const io = new SocketServer(app.server, {
   cors: { origin: config.corsOrigins },
   transports: ['websocket', 'polling'],
 });
+registerSocketLifecycle(app, io);
 
 io.use(async (socket, next) => {
   try {
@@ -254,7 +256,6 @@ app.addHook('onClose', async () => {
   clearInterval(staleOrderTimer);
   clearInterval(priorityReleaseTimer);
   await closeGatewayDispatcher();
-  io.close();
   await db.end();
 });
 
