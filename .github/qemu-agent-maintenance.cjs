@@ -7,7 +7,9 @@ function state(){return cmd('systemctl',['show','qemu-guest-agent','-p','LoadSta
 function required(file,args,timeout){const result=cmd(file,args,timeout);out.actions.push({command:file+' '+args.join(' '),...result});if(!result.ok)throw Error('Command failed: '+file+' '+args.join(' '));return result;}
 async function run(){
  out.before={package:cmd('dpkg-query',['-W','-f=${Status} ${Version}','qemu-guest-agent']),state:state(),bootId:fs.readFileSync('/proc/sys/kernel/random/boot_id','utf8').trim()};
- if(!out.before.package.ok||!out.before.package.text.startsWith('install ok installed')){
+ out.before.webServices=cmd('systemctl',['show','taxigr-api','nginx','mysql','-p','Id','-p','ActiveState','-p','MainPID','-p','ActiveEnterTimestamp']);
+ out.before.unit=cmd('systemctl',['cat','qemu-guest-agent']);
+ if(!out.before.package.ok||!/^(?:install|hold) ok installed/.test(out.before.package.text)){
   required('apt-get',['update','-o','Acquire::Retries=1','-o','Acquire::http::Timeout=20','-o','Acquire::https::Timeout=20'],180000);
   required('apt-get',['install','-y','--no-install-recommends','-o','DPkg::Lock::Timeout=60','qemu-guest-agent'],180000);
  }
@@ -28,7 +30,7 @@ async function run(){
  out.after.udevRules=[];
  for(const root of ['/usr/lib/udev/rules.d','/lib/udev/rules.d'])if(fs.existsSync(root))for(const name of fs.readdirSync(root)){if(!/qemu|virtio/.test(name))continue;const text=fs.readFileSync(root+'/'+name,'utf8');if(text.includes('org.qemu.guest_agent.0'))out.after.udevRules.push({path:root+'/'+name,text});}
  out.after.services=cmd('systemctl',['show','taxigr-api','nginx','mysql','-p','Id','-p','ActiveState','-p','MainPID','-p','ActiveEnterTimestamp']);
- out.after.agentJournal=cmd('journalctl',['-u','qemu-guest-agent','--since',out.startedAt,'--no-pager','-n','15']);
+ out.after.agentJournal=cmd('journalctl',['-u','qemu-guest-agent','--since',out.startedAt.replace('T',' ').replace(/\.\d+Z$/,' UTC'),'--no-pager','-n','15']);
  const r=await fetch('http://127.0.0.1:4100/health/ready',{signal:AbortSignal.timeout(10000)});out.after.apiReady=r.status;await r.body?.cancel();
  if(!out.after.state.text.includes('ActiveState=active')||!out.after.openAgentChannel||r.status!==200)throw Error('Post-install verification failed');
  out.finishedAt=new Date().toISOString();
