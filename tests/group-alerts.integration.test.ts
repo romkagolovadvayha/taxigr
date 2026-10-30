@@ -94,8 +94,19 @@ describe.skipIf(process.env.RUN_GROUP_ALERT_INTEGRATION !== '1')('group alerts w
     await db.execute('UPDATE group_alert_devices SET pairing_expires_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 MINUTE) WHERE id = ?', [created.id]);
     expect((await app.inject({ method: 'POST', url: '/v1/group-alerts/pair', payload: { code: created.code } })).statusCode).toBe(401);
   });
+  it('pins a collector to the original group ID and rejects substitution after pairing', async () => {
+    const bind = (boundGroups: unknown[]) => app.inject({ method: 'POST', url: '/v1/group-alerts/groups/bind',
+      headers: { authorization: `Bearer ${deviceToken}` }, payload: { groups: boundGroups } });
+    expect((await bind([{ provider: 'max', title: 'Кто таксует?', id: 'unrelated' }])).statusCode).toBe(403);
+    expect((await bind([{ ...groups[0], id: 'watched@g.us' }])).statusCode).toBe(200);
+    expect((await bind([{ ...groups[0], id: 'replacement@g.us' }])).statusCode).toBe(403);
+    expect((await ingest(event({ groupId: 'replacement@g.us' }))).statusCode).toBe(403);
+    expect((await ingest(event({ groupId: 'watched@g.us', groupTitle: 'Группа переименована' }))).statusCode).toBe(200);
+    send.mockClear(); await deliverGroupAlerts();
+    for (const [provider, externalId] of send.mock.calls) expect(externalId).toBe(owner + provider);
+  });
   it('revokes pending delivery and ingress when admin rights or device access are removed', async () => {
-    expect((await ingest(event())).statusCode).toBe(200);
+    expect((await ingest(event({ groupId: 'watched@g.us' }))).statusCode).toBe(200);
     await db.execute("DELETE FROM user_roles WHERE user_id = ? AND role = 'admin'", [owner]);
     expect((await ingest(event())).statusCode).toBe(401);
     send.mockClear(); await deliverGroupAlerts(); expect(send).not.toHaveBeenCalled();

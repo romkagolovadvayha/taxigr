@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Linking, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
@@ -16,8 +16,8 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
   const query = useQuery({ queryKey: ['admin-group-alerts', token], enabled: !!token && !demo,
     queryFn: ({ signal }) => apiRequest<State>('/v1/admin/group-alerts/devices', { token: token!, signal, cache: 'no-store' }),
   });
-  const [maxGroups, setMaxGroups] = useState('');
-  const [whatsappGroups, setWhatsappGroups] = useState('');
+  const [maxGroups, setMaxGroups] = useState('Такси 🚖 Грахово');
+  const [whatsappGroups, setWhatsappGroups] = useState('Грахово такси');
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
       (provider === 'max' ? maxGroups : whatsappGroups).split('\n').map(title => title.trim()).filter(Boolean).map(title => ({ provider, title })));
     if (!groups.length) throw new Error('Укажите хотя бы одну группу');
     const result = await apiRequest<{ code: string; expiresAt: string }>('/v1/admin/group-alerts/devices', {
-      method: 'POST', token: token!, body: JSON.stringify({ name: 'Android для групп', groups }),
+      method: 'POST', token: token!, body: JSON.stringify({ name: 'Заявки из групп', groups }),
     });
     setPairing(result);
   });
@@ -41,12 +41,10 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
   return <SurfaceCard>
     <Text style={{ ...typography.sectionTitle, color: colors.ink }}>Сообщения из групп</Text>
     <Text style={{ ...typography.body, color: colors.inkSecondary }}>
-      Android передаёт запросы такси из выбранных групп. Уведомления приходят только вам в боты, включённые в вашем профиле.
+      Подключение через ваши аккаунты передаёт новые сообщения со словом «кто» и просьбы вызвать такси из выбранных групп. Уведомления приходят только вам в боты, включённые в вашем профиле.
     </Text>
     {demo ? <Text>Подключение доступно после входа администратора.</Text> : query.data ? <>
-      <AppButton variant="secondary" onPress={() => void Linking.openURL('https://taxigr.ru/tools/taxigr-groups-0.1.0.apk')
-        .catch(() => setError('Не удалось открыть скачивание APK'))}>Скачать APK для Android</AppButton>
-      <Text style={{ color: colors.inkSecondary }}>Нужен Android 9 или новее. После установки разрешите приложению доступ к уведомлениям.</Text>
+      <Text style={{ color: colors.inkSecondary }}>Подтвердите вход в WhatsApp и MAX в окне «Заявки из групп» на компьютере, затем введите там код подключения.</Text>
       <Text style={{ color: colors.inkSecondary }}>Ваши боты: {query.data.channels.map(channel => channelLabels[channel] ?? channel).join(', ') || 'не подключены'}</Text>
       <Text style={{ color: colors.ink }}>Группы MAX — каждое название с новой строки</Text>
       <TextInput accessibilityLabel="Названия групп MAX" value={maxGroups} onChangeText={setMaxGroups} multiline
@@ -54,13 +52,13 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
       <Text style={{ color: colors.ink }}>Группы WhatsApp — каждое название с новой строки</Text>
       <TextInput accessibilityLabel="Названия групп WhatsApp" value={whatsappGroups} onChangeText={setWhatsappGroups} multiline
         maxLength={3000} editable={!busy} style={inputStyle} />
-      <Text style={{ color: colors.inkSecondary }}>Укажите названия точно как в уведомлениях телефона. Выбирайте группы с различающимися названиями.</Text>
-      <AppButton loading={busy} disabled={!query.data.channels.length} onPress={() => void create()}>Получить код для Android</AppButton>
+      <Text style={{ color: colors.inkSecondary }}>Укажите названия точно как в списке чатов. После подключения группы закрепляются по их ID.</Text>
+      <AppButton loading={busy} disabled={!query.data.channels.length} onPress={() => void create()}>Получить код подключения</AppButton>
       {pairing && <View style={{ gap: spacing.x1 }}>
         <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>{pairing.code}</Text>
-        <Text style={{ color: colors.inkSecondary }}>Введите код в приложении «Группы такси» до {new Date(pairing.expiresAt).toLocaleTimeString('ru-RU')}.</Text>
+        <Text style={{ color: colors.inkSecondary }}>Введите код в окне «Заявки из групп» до {new Date(pairing.expiresAt).toLocaleTimeString('ru-RU')}.</Text>
       </View>}
-      {!query.data.devices.length && <Text style={{ color: colors.inkSecondary }}>Android ещё не подключён.</Text>}
+      {!query.data.devices.length && <Text style={{ color: colors.inkSecondary }}>Источник сообщений ещё не подключён.</Text>}
       {query.data.devices.map(device => <View key={device.id} style={{ gap: spacing.x1 }}>
         <Text style={{ color: colors.ink }}>{device.name}: {device.revokedAt ? 'отключён' : device.paired ? 'подключён' : 'ожидает ввода кода'}</Text>
         {!!device.lastSeenAt && <Text style={{ color: colors.inkSecondary }}>Последнее сообщение: {new Date(device.lastSeenAt).toLocaleString('ru-RU')}</Text>}

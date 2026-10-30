@@ -15,14 +15,16 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   if (!result.success) throw fail(400, 'Проверьте заполненные данные');
   return result.data;
 }
-const groupsSchema = z.array(z.object({ provider: z.enum(['max', 'whatsapp']), title: z.string().trim().min(1).max(200) })).min(1).max(30);
+const groupsSchema = z.array(z.object({ provider: z.enum(['max', 'whatsapp']), title: z.string().trim().min(1).max(200), id: z.string().trim().min(1).max(200).optional() })).min(1).max(30);
 export const groupEventSchema = z.object({
   eventId: z.string().regex(/^[a-f0-9]{64}$/u), provider: z.enum(['max', 'whatsapp']),
   groupTitle: z.string().trim().min(1).max(200), senderName: z.string().trim().max(200).optional(),
+  groupId: z.string().trim().min(1).max(200).optional(),
   text: z.string().trim().min(1).max(2000), sentAt: z.number().int().positive(),
   // NotificationListener provides Person.uri. Display name and text are never identities.
   senderUri: z.string().max(200).optional(),
-}).strict();
+  senderId: z.string().regex(/^[1-9]\d{0,19}$/u).optional(),
+}).strict().refine(value => !value.senderId || value.provider === 'max');
 type Device = RowDataPacket & { id: string; owner_id: string; groups_json: WatchedGroup[] | string };
 const parseGroups = (value: Device['groups_json']): WatchedGroup[] => groupsSchema.parse(typeof value === 'string' ? JSON.parse(value) : value);
 
@@ -44,7 +46,15 @@ async function deviceFor(request: FastifyRequest): Promise<Device> {
   return device;
 }
 
-export async function matchGroupAuthor(connection: PoolConnection, uri?: string): Promise<string | null> {
+export async function matchGroupAuthor(connection: PoolConnection, uri?: string, provider?: string, senderId?: string): Promise<string | null> {
+  if (provider === 'max' && senderId) {
+    const [rows] = await connection.query<(RowDataPacket & { id: string })[]>(
+      `SELECT DISTINCT u.id FROM users u JOIN user_messenger_accounts a ON a.user_id = u.id
+       WHERE a.provider = 'max' AND a.external_user_id = ? AND a.active = TRUE
+       AND u.phone_verified_at IS NOT NULL AND u.deleted_at IS NULL LIMIT 2`, [senderId]);
+    // Never fall back to a different identity when MAX provided an account ID.
+    return rows.length === 1 ? rows[0]!.id : null;
+  }
   const phone = senderPhone(uri);
   // Notification keys are opaque. MAX account IDs must not be guessed from them.
   if (!phone) return null;
@@ -101,10 +111,29 @@ export function registerGroupAlertRoutes(app: FastifyInstance): void {
     const device = await deviceFor(request);
     return { data: { groups: parseGroups(device.groups_json) } };
   });
+  app.post('/v1/group-alerts/groups/bind', async request => {
+    const device = await deviceFor(request);
+    const input = parse(z.object({ groups: groupsSchema }).strict(), request.body);
+    return withTransaction(async connection => {
+      const [rows] = await connection.query<Device[]>('SELECT groups_json FROM group_alert_devices WHERE id = ? AND revoked_at IS NULL FOR UPDATE', [device.id]);
+      if (!rows[0]) throw fail(401, 'Устройство отключено');
+      const existing = parseGroups(rows[0].groups_json);
+      if (input.groups.length !== existing.length || input.groups.some(group => !group.id)) throw fail(400, 'Укажите ID каждой выбранной группы');
+      const remaining = [...input.groups];
+      const bound = existing.map(group => {
+        const index = remaining.findIndex(candidate => groupAllowed([group], candidate.provider, candidate.title, candidate.id));
+        if (index < 0) throw fail(403, 'Группа не подключена или её ID уже закреплён');
+        const [match] = remaining.splice(index, 1);
+        return { ...group, id: match!.id };
+      });
+      await connection.execute('UPDATE group_alert_devices SET groups_json = ? WHERE id = ?', [JSON.stringify(bound), device.id]);
+      return { data: { groups: bound } };
+    });
+  });
   app.post('/v1/group-alerts/events', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async request => {
     const device = await deviceFor(request);
     const input = parse(groupEventSchema, request.body);
-    if (!groupAllowed(parseGroups(device.groups_json), input.provider, input.groupTitle)) throw fail(403, 'Группа не подключена');
+    if (!groupAllowed(parseGroups(device.groups_json), input.provider, input.groupTitle, input.groupId)) throw fail(403, 'Группа не подключена');
     const age = Date.now() - input.sentAt;
     if (age < -60_000 || age > 3_600_000 || !isTaxiRequest(input.text)) return { data: { accepted: false } };
     await withTransaction(async connection => {
@@ -113,7 +142,7 @@ export function registerGroupAlertRoutes(app: FastifyInstance): void {
       if (!locked.length) throw fail(401, 'Устройство отключено');
       const [existing] = await connection.query<RowDataPacket[]>('SELECT id FROM group_alert_events WHERE device_id = ? AND event_key = ?', [device.id, input.eventId]);
       if (existing.length) return;
-      const matched = await matchGroupAuthor(connection, input.senderUri);
+      const matched = await matchGroupAuthor(connection, input.senderUri, input.provider, input.senderId);
       const id = randomUUID();
       await connection.execute(`INSERT INTO group_alert_events
         (id, device_id, event_key, provider, group_title, sender_name, message_text, message_at, matched_user_id)
