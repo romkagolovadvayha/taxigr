@@ -1,4 +1,4 @@
-name: Single SMS delivery check
+name: Read-only infrastructure comparison
 on:
   workflow_dispatch:
 permissions:
@@ -41,8 +41,8 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Check one SMS to owner and provider receipt
+      - name: Read current production resource and availability metrics
         shell: bash
         run: |
           set -euo pipefail
-          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/sms-delivery-check.cjs
+          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/infra-readonly-check.cjs
