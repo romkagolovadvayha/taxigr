@@ -1,4 +1,4 @@
-name: Read-only booking diagnostics
+name: Single SMS delivery check
 on:
   workflow_dispatch:
 permissions:
@@ -6,7 +6,7 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     environment: production
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
@@ -41,8 +41,8 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Read logs and database in a read-only transaction
+      - name: Check one SMS to owner and provider receipt
         shell: bash
         run: |
           set -euo pipefail
-          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/booking-readonly-audit.cjs
+          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/sms-delivery-check.cjs
