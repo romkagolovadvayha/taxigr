@@ -1,4 +1,4 @@
-name: Read-only infrastructure comparison
+name: Install or repair QEMU guest agent
 on:
   workflow_dispatch:
 permissions:
@@ -6,7 +6,7 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     environment: production
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
@@ -41,8 +41,8 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Read current production resource and availability metrics
+      - name: Install missing guest agent and verify application health
         shell: bash
         run: |
           set -euo pipefail
-          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/infra-readonly-check.cjs
+          ssh taxigr-production "node -" < .github/qemu-agent-maintenance.cjs
