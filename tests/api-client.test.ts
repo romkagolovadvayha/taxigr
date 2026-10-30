@@ -1,9 +1,100 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.resetModules();
+});
+
+describe('startup recovery after a short API outage', () => {
+  const success = () => ({ ok: true, status: 200, json: async () => ({ data: { ready: true } }) });
+  const unavailable = () => ({ ok: false, status: 502, json: async () => ({}) });
+
+  it('shares a bootstrap retry after a failed CORS preflight', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(success());
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    const first = apiRequest('/v1/bootstrap', { token: 'same-session' });
+    const second = apiRequest('/v1/bootstrap', { token: 'same-session' });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await first).toEqual({ ready: true });
+    expect(await second).toEqual({ ready: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('recovers the session after a restarting upstream returns 502', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockResolvedValueOnce(unavailable()).mockResolvedValue(success());
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    const result = apiRequest('/v1/auth/refresh', { method: 'POST', token: 'session' });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await result).toEqual({ ready: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes a fresh request after a timeout instead of retaining the aborted signal', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')));
+    })).mockResolvedValue(success());
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    const result = apiRequest('/v1/bootstrap', { timeoutMs: 200 });
+    await vi.advanceTimersByTimeAsync(1_200);
+    expect(await result).toEqual({ ready: true });
+    expect(fetchMock.mock.calls[0]![1].signal).not.toBe(fetchMock.mock.calls[1]![1].signal);
+  });
+
+  it('stops after two retries and returns the real error', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockResolvedValue(unavailable());
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    const result = expect(apiRequest('/v1/bootstrap')).rejects.toMatchObject({ status: 502 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('cancels the retry when the caller leaves or cancels the request', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Offline'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    const controller = new AbortController();
+    const result = expect(apiRequest('/v1/bootstrap', { signal: controller.signal })).rejects.toMatchObject({ code: 'REQUEST_ABORTED' });
+    await vi.advanceTimersByTimeAsync(100);
+    controller.abort();
+    await result;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([401, 403, 429])('does not retry an HTTP %s rejection', async status => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockResolvedValue({ ...unavailable(), status });
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    await expect(apiRequest('/v1/bootstrap')).rejects.toMatchObject({ status });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never duplicates an order mutation after a network failure', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Network failed after sending'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiRequest } = await import('../src/api/client');
+    await expect(apiRequest('/v1/orders', { method: 'POST', body: '{}' })).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('API client request bodies', () => {

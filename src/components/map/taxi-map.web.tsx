@@ -10,6 +10,7 @@ import { driverMarkerPngMarkup } from './driver-marker';
 import { MapLoadingOverlay } from './map-loading-overlay';
 import { loadMapLibre } from './maplibre-loader.web';
 import { watchBaseMapReady } from './map-readiness.web';
+import { watchMapRecovery } from './map-recovery.web';
 import { createRouteLayerSync } from './route-layer-sync';
 import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
 import { taxiMapStyle } from './map-style';
@@ -19,7 +20,7 @@ import { useMapScene } from './use-map-scene';
 type MapApi = typeof import('maplibre-gl');
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry: () => void }) {
+const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry: () => void; recover: () => void }) {
   // Imperative map updates must follow each committed route/position change.
   'use no memo';
   const colors = useThemeColors();
@@ -51,6 +52,10 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!error) return;
+    return watchMapRecovery(() => latest.current.props.recover());
+  }, [error]);
   const sync = useCallback(() => {
     const { props, scene, colors } = latest.current;
     const map = mapRef.current, api = apiRef.current, host = container.current;
@@ -290,7 +295,20 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
 export const TaxiMap = memo(function TaxiMap(props: TaxiMapProps) {
   const [attempt, setAttempt] = useState(0);
+  const recoveryUsed = useRef(false);
+  const retry = useCallback(() => {
+    recoveryUsed.current = false;
+    setAttempt(value => value + 1);
+  }, []);
+  const recover = useCallback(() => {
+    if (recoveryUsed.current) return;
+    recoveryUsed.current = true;
+    setAttempt(value => value + 1);
+  }, []);
   const visible = useForegroundScreen();
   if (!visible) return <View style={{ flex: 1, minHeight: 0 }} />;
-  return <ActiveTaxiMap key={attempt} {...props} retry={() => setAttempt(value => value + 1)} />;
+  return <ActiveTaxiMap key={attempt} {...props} retry={retry} recover={recover} onMapReady={() => {
+    recoveryUsed.current = false;
+    props.onMapReady?.();
+  }} />;
 });

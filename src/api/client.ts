@@ -94,6 +94,43 @@ async function requestFromNetwork<T>(
   path: string,
   options: RequestInit & { token?: string; timeoutMs?: number } = {},
 ): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  // These startup requests only read state or sign an equivalent session token.
+  // A failed CORS preflight during an API restart must not strand the page.
+  const recoverStartup = (method === 'GET' && path === '/v1/bootstrap') ||
+    (method === 'POST' && path === '/v1/auth/refresh');
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await requestOnce<T>(path, options);
+    } catch (error) {
+      const transient = error instanceof ApiError &&
+        (['NETWORK_ERROR', 'TIMEOUT'].includes(error.code ?? '') || [502, 503, 504].includes(error.status));
+      if (!recoverStartup || !transient || attempt >= 2 || options.signal?.aborted) throw error;
+      await waitForStartupRetry((attempt + 1) * 1_000, options.signal);
+    }
+  }
+}
+
+function waitForStartupRetry(delay: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(new ApiError('Запрос отменён', 0, 'REQUEST_ABORTED'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, delay);
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+}
+
+async function requestOnce<T>(
+  path: string,
+  options: RequestInit & { token?: string; timeoutMs?: number } = {},
+): Promise<T> {
   const {
     token,
     timeoutMs = 12_000,
