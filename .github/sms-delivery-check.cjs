@@ -26,18 +26,27 @@ async function run(){
  out.recipientLast4=digits(owner.phone).slice(-4);
  require(require.resolve('tsx/cjs',{paths:[process.cwd()+'/server']}));
  const sms=require(process.cwd()+'/server/sms.ts');
- if(fs.existsSync(lock)){out.prior=JSON.parse(fs.readFileSync(lock,'utf8'));out.skippedDuplicate=true;return;}
+ let retryAuth=false;
+ if(fs.existsSync(lock)){
+  const prior=JSON.parse(fs.readFileSync(lock,'utf8'));
+  retryAuth=!prior.retryOfFailedAuth && prior.finishedAt && !prior.error && !prior.balance && prior.send?.accepted===false && prior.send?.error==='This operation was aborted' && prior.providerRequests?.length===0;
+  if(!retryAuth){out.prior=prior;out.skippedDuplicate=true;return;}
+  out.retryOfFailedAuth=true;
+ }
  globalThis.fetch=async(url,init)=>{
   const path=new URL(String(url)).pathname;
+  const entry={path,at:new Date().toISOString()};out.providerRequests.push(entry);
   if(path==='/api/2fa/authentications/otp')bearer=new Headers(init?.headers).get('Authorization');
-  const response=await originalFetch(url,init);
+  let response;
+  try{response=await originalFetch(url,init);}catch(e){entry.error=clean(e.message);entry.elapsedMs=Date.now()-Date.parse(entry.at);throw e;}
+  entry.httpStatus=response.status;entry.elapsedMs=Date.now()-Date.parse(entry.at);
   if(path==='/api/2fa/authentications/otp'){
    const body=await response.clone().json().catch(()=>({}));
-   out.providerRequests.push({at:new Date().toISOString(),httpStatus:response.status,status:body.data?.status,error:response.ok?undefined:clean(body.errors?.[0]?.message||body.message||body.error),errorCode:body.errors?.[0]?.code});
+   Object.assign(entry,{status:body.data?.status,error:response.ok?undefined:clean(body.errors?.[0]?.message||body.message||body.error),errorCode:body.errors?.[0]?.code});
   }
   return response;
  };
- fs.writeFileSync(lock,JSON.stringify({startedAt:out.startedAt,state:'send-attempted'}),{flag:'wx',mode:0o600});
+ fs.writeFileSync(lock,JSON.stringify({startedAt:out.startedAt,retryOfFailedAuth:retryAuth,state:'send-attempted'}),{flag:retryAuth?'w':'wx',mode:0o600});
  try{
   const result=await sms.sendPhoneVerificationCode(owner.phone,'','127.0.0.1');
   out.send={accepted:true,at:new Date().toISOString(),...result};
