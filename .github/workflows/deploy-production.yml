@@ -1,52 +1,19 @@
 name: Deploy production
-
 on:
   workflow_dispatch:
-
-concurrency:
-  group: taxigr-production
-  cancel-in-progress: false
-
 permissions:
   contents: read
-
 jobs:
-  deploy:
+  setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     environment: production
     env:
-      WEB_DOMAIN: ${{ vars.WEB_DOMAIN }}
-      API_DOMAIN: ${{ vars.API_DOMAIN }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       SSH_HOST: ${{ vars.SSH_HOST }}
       SSH_PORT: ${{ vars.SSH_PORT }}
       SSH_USER: ${{ vars.SSH_USER }}
-      PUBLIC_URL: https://${{ vars.WEB_DOMAIN }}
-      EXPO_PUBLIC_API_URL: https://${{ vars.API_DOMAIN }}
-      EXPO_PUBLIC_SOCKET_URL: https://${{ vars.API_DOMAIN }}
-      EXPO_PUBLIC_SITE_URL: https://${{ vars.WEB_DOMAIN }}
-      EXPO_PUBLIC_DEMO_MODE: "false"
-      EXPO_PUBLIC_VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
-      EXPO_PUBLIC_MAP_TILES_URL: ${{ vars.EXPO_PUBLIC_MAP_TILES_URL }}
-      EXPO_PUBLIC_MAP_GLYPHS_URL: ${{ vars.EXPO_PUBLIC_MAP_GLYPHS_URL }}
-      EXPO_PUBLIC_OPERATOR_LEGAL_NAME: ${{ vars.EXPO_PUBLIC_OPERATOR_LEGAL_NAME }}
-      EXPO_PUBLIC_OPERATOR_STATUS: ${{ vars.EXPO_PUBLIC_OPERATOR_STATUS }}
-      EXPO_PUBLIC_OPERATOR_INN: ${{ vars.EXPO_PUBLIC_OPERATOR_INN }}
-      EXPO_PUBLIC_OPERATOR_REGISTRATION_NUMBER: ${{ vars.EXPO_PUBLIC_OPERATOR_REGISTRATION_NUMBER }}
-      EXPO_PUBLIC_OPERATOR_ADDRESS: ${{ vars.EXPO_PUBLIC_OPERATOR_ADDRESS }}
-      EXPO_PUBLIC_OPERATOR_EMAIL: ${{ vars.EXPO_PUBLIC_OPERATOR_EMAIL }}
-      EXPO_PUBLIC_OPERATOR_PHONE: ${{ vars.EXPO_PUBLIC_OPERATOR_PHONE }}
-      EXPO_PUBLIC_TAXI_REGISTRY_NUMBER: ${{ vars.EXPO_PUBLIC_TAXI_REGISTRY_NUMBER }}
-      VK_APP_ID: ${{ vars.VK_APP_ID }}
-      VK_MINI_APP_ID: ${{ vars.VK_MINI_APP_ID }}
-      VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
-      VK_API_VERSION: ${{ vars.VK_API_VERSION || '5.199' }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
+      - uses: actions/checkout@v7
       - name: Setup SSH
         timeout-minutes: 2
         shell: bash
@@ -74,74 +41,20 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Verify existing production access before building
-        run: ssh taxigr-production "test -s /etc/taxigr/taxigr.env && test -d /var/www/taxigr/current && readlink /var/www/taxigr/current"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify API service survives database maintenance
-        run: sudo python3 deploy/check-service-dependency.py
-
-      - name: Verify release packaging and transfer recovery
-        run: python3 deploy/test-release-tools.py
-
-      - name: Verify and build
-        run: npm run check
-
-      - name: Package release
-        shell: bash
-        run: |
-          archive="$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz"
-          bash deploy/package-release.sh "$archive"
-          sha256sum "$archive" | awk '{print $1}' > "$RUNNER_TEMP/archive.sha256"
-
-      - name: Prepare server upload directory
-        timeout-minutes: 2
-        shell: bash
+      - name: Upload one-time collector setup
+        run: scp .github/group-bridge-bootstrap.cjs "taxigr-production:/var/www/taxigr/incoming/group-setup-${GITHUB_SHA}.cjs"
+      - name: Verify owner and provision collector
+        env:
+          GROUP_ALERT_SETUP_JSON: ${{ secrets.GROUP_ALERT_SETUP_JSON }}
         run: |
           set -euo pipefail
-          ssh taxigr-production "install -d -m 0755 '$DEPLOY_PATH/incoming'"
-
-      - name: Upload release archive
-        timeout-minutes: 8
-        shell: bash
-        run: |
-          bash deploy/upload-file.sh "$RUNNER_TEMP/taxigr-${GITHUB_SHA}.tar.gz" \
-            "taxigr-production:$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
-
-      - name: Preserve production settings and upload activation script
-        shell: bash
+          printf '%s' "$GROUP_ALERT_SETUP_JSON" | ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node /var/www/taxigr/incoming/group-setup-${GITHUB_SHA}.cjs setup"
+      - name: Verify test alert reaches only administrator bots
+        env:
+          GROUP_ALERT_SETUP_JSON: ${{ secrets.GROUP_ALERT_SETUP_JSON }}
         run: |
           set -euo pipefail
-          bash deploy/upload-file.sh deploy/remote-deploy.sh "taxigr-production:$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
-          ssh taxigr-production "umask 077; cp -p /etc/taxigr/taxigr.env '$DEPLOY_PATH/incoming/${GITHUB_SHA}.env'"
-
-      - name: Activate release on server
-        timeout-minutes: 15
-        shell: bash
-        run: |
-          set -euo pipefail
-          remote_archive="$DEPLOY_PATH/incoming/${GITHUB_SHA}.tar.gz"
-          remote_env="$DEPLOY_PATH/incoming/${GITHUB_SHA}.env"
-          remote_script="$DEPLOY_PATH/incoming/remote-deploy-${GITHUB_SHA}.sh"
-          archive_sha256="$(cat "$RUNNER_TEMP/archive.sha256")"
-          ssh taxigr-production \
-            "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_ID='$GITHUB_SHA' ARCHIVE='$remote_archive' ENV_UPLOAD='$remote_env' ARCHIVE_SHA256='$archive_sha256' bash '$remote_script'"
-
-      - name: Verify store review login
-        run: npm run check:store-review -- "https://${API_DOMAIN}"
-
-      - name: Verify live group alert endpoints
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --retry 5 "https://${API_DOMAIN}/health/live"
-          test "$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "https://${API_DOMAIN}/v1/group-alerts/device")" = "401"
-          node scripts/verify-maplibre-deployment.cjs "https://${WEB_DOMAIN}"
+          printf '%s' "$GROUP_ALERT_SETUP_JSON" | ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node /var/www/taxigr/incoming/group-setup-${GITHUB_SHA}.cjs verify"
+      - name: Remove one-time server helper
+        if: always()
+        run: ssh taxigr-production "rm -f /var/www/taxigr/incoming/group-setup-${GITHUB_SHA}.cjs"
