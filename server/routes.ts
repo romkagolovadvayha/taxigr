@@ -2,6 +2,7 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
+import { registerGroupAlertRoutes } from './group-alerts';
 import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 
@@ -1565,6 +1566,7 @@ export async function registerRoutes(
   realtime: RealtimeControls,
 ): Promise<RegisteredRouteHandlers> {
   registerAppReleaseRoutes(app);
+  registerGroupAlertRoutes(app);
   const lastDriverLocationAcceptedAt = new Map<string, number>();
   const lastPassengerLocationAcceptedAt = new Map<string, number>();
   const notifyAdmins = (action: AdminTelegramAction): void => {

@@ -1,4 +1,6 @@
 *.apk filter=lfs diff=lfs merge=lfs -text
+public/tools/taxigr-groups-*.apk -filter -diff -merge -text
+companion-android/gradlew text eol=lf
 deploy/*.sh text eol=lf
 *.pdf binary
 *.docx binary

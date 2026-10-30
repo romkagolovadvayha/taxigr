@@ -8,6 +8,7 @@ import { pruneAuthAbuseData } from './auth-abuse';
 import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
+import { deliverGroupAlerts } from './group-alerts';
 import { closeGatewayDispatcher } from './gateway-proxy';
 import { pruneMessengerBookingData } from './messenger-booking';
 import { registerRoutes } from './routes';
@@ -129,6 +130,15 @@ const routeHandlers = await registerRoutes(app, (room, event, payload) => {
   },
 });
 
+let groupAlertDelivery: Promise<void> | undefined;
+const groupAlertTimer = setInterval(() => {
+  if (groupAlertDelivery) return;
+  groupAlertDelivery = deliverGroupAlerts().catch(() => {
+    app.log.warn('Group alert delivery will retry');
+  }).finally(() => { groupAlertDelivery = undefined; });
+}, 10_000);
+groupAlertTimer.unref();
+
 const authAbusePruneTimer = setInterval(() => {
   void pruneAuthAbuseData().then(pruneMessengerBookingData).catch((error) => {
     app.log.error(error, 'auth abuse data pruning failed');
@@ -239,6 +249,8 @@ app.setErrorHandler((error, request, reply) => {
 
 app.addHook('onClose', async () => {
   clearInterval(authAbusePruneTimer);
+  clearInterval(groupAlertTimer);
+  await groupAlertDelivery;
   clearInterval(staleOrderTimer);
   clearInterval(priorityReleaseTimer);
   await closeGatewayDispatcher();

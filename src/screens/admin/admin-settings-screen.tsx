@@ -6,6 +6,7 @@ import { useSession } from '@/auth/session-provider';
 import { GatewaySettingsCard } from '@/components/admin/gateway-settings-card';
 import { OperatorSettingsCard } from '@/components/admin/operator-settings-card';
 import { BookingSettingsCard } from '@/components/admin/booking-settings-card';
+import { GroupAlertsCard } from '@/components/admin/group-alerts-card';
 import { AppButton } from '@/components/ui/app-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { SurfaceCard } from '@/components/ui/surface-card';
@@ -159,6 +160,7 @@ export function AdminSettingsScreen() {
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
       <BookingSettingsCard key={`booking:${token}`} token={token} demo={demo} />
+      <GroupAlertsCard key={`group-alerts:${token}`} token={token} demo={demo} />
       <OperatorSettingsCard key={token} token={token} demo={demo} />
       <GatewaySettingsCard token={token} demo={demo} />
       <SurfaceCard>
