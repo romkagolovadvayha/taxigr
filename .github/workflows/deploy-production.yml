@@ -1,4 +1,4 @@
-name: Install or repair QEMU guest agent
+name: Read-only MAX booking diagnostics
 on:
   workflow_dispatch:
 permissions:
@@ -6,7 +6,7 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     environment: production
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
@@ -41,8 +41,8 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Install missing guest agent and verify application health
+      - name: Inspect MAX booking address failures
         shell: bash
         run: |
           set -euo pipefail
-          ssh taxigr-production "node -" < .github/qemu-agent-maintenance.cjs
+          ssh taxigr-production "cd /var/www/taxigr/current && set -a && . /etc/taxigr/taxigr.env && set +a && node -" < .github/max-booking-readonly.cjs
