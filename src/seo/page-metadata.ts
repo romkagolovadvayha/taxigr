@@ -214,6 +214,11 @@ export const PAGE_METADATA = {
       'Настройка тарифов, стоимости поездок и комиссии сервиса.',
     indexable: false,
   },
+  '/admin/broadcasts': {
+    title: 'Рассылки — Панель Такси Грахово',
+    description: 'Рассылки ВК, тестовые сообщения администраторам и история отправок.',
+    indexable: false,
+  },
   '/+not-found': {
     title: 'Страница не найдена — Такси Грахово',
     description:

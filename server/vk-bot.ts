@@ -5,7 +5,14 @@ type VkApiResponse<T = unknown> = {
   error?: { error_msg?: string; error_code?: number };
 };
 
-async function callVkApi<T>(method: string, params: Record<string, string>): Promise<T> {
+export class VkApiError extends Error {
+  constructor(public readonly vkCode: number, message: string) {
+    super(message);
+    this.name = 'VkApiError';
+  }
+}
+
+export async function callVkApi<T>(method: string, params: Record<string, string>, token = config.VK_BOT_TOKEN): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -14,14 +21,14 @@ async function callVkApi<T>(method: string, params: Record<string, string>): Pro
       headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         ...params,
-        access_token: config.VK_BOT_TOKEN,
+        access_token: token,
         v: config.VK_API_VERSION,
       }),
       signal: controller.signal,
     });
     const payload = await response.json().catch(() => ({})) as VkApiResponse<T>;
     if (!response.ok || payload.error || payload.response === undefined) {
-      throw new Error(payload.error?.error_msg ?? `VK API HTTP ${response.status}`);
+      throw new VkApiError(payload.error?.error_code ?? response.status, payload.error?.error_msg ?? `VK API HTTP ${response.status}`);
     }
     return payload.response;
   } finally {

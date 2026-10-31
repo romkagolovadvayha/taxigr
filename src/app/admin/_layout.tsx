@@ -14,6 +14,7 @@ const items: NavItem[] = [
   { href: '/admin/drivers', label: 'Водители', icon: 'car' },
   { href: '/admin/orders', label: 'Заказы', icon: 'orders' },
   { href: '/admin/places', label: 'Места', icon: 'location' },
+  { href: '/admin/broadcasts', label: 'Рассылки', icon: 'send' },
   { href: '/admin/settings', label: 'Настройки', icon: 'settings' },
 ];
 

@@ -4,6 +4,7 @@ import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
 import { registerGroupAlertRoutes } from './group-alerts';
 import { registerMiniAppRoutes } from './mini-app-routes';
+import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
 import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 
@@ -1577,6 +1578,7 @@ export async function registerRoutes(
   registerAppReleaseRoutes(app);
   registerGroupAlertRoutes(app);
   registerMiniAppRoutes(app);
+  registerVkBroadcastRoutes(app);
   const lastDriverLocationAcceptedAt = new Map<string, number>();
   const lastPassengerLocationAcceptedAt = new Map<string, number>();
   const notifyAdmins = (action: AdminTelegramAction): void => {
@@ -2283,6 +2285,7 @@ export async function registerRoutes(
         (update.type === 'message_allow' || update.type === 'message_deny') &&
         update.object?.user_id != null
       ) {
+        await recordVkBroadcastPermission(String(update.object.user_id), update.type === 'message_allow');
         await db.execute(
           `UPDATE user_messenger_accounts
            SET active = TRUE, bot_contact_available = ?, updated_at = UTC_TIMESTAMP(3)

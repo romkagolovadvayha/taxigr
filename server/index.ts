@@ -9,6 +9,7 @@ import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
 import { deliverGroupAlerts } from './group-alerts';
+import { processVkBroadcasts } from './vk-broadcast-worker';
 import { closeGatewayDispatcher } from './gateway-proxy';
 import { pruneMessengerBookingData } from './messenger-booking';
 import { registerRoutes } from './routes';
@@ -30,6 +31,7 @@ const app = Fastify({
       'req.body.webhookSecret',
       'req.body.initData',
       'req.body.contact',
+      'req.body.image.base64',
     ],
   },
   trustProxy: config.trustProxy,
@@ -251,7 +253,17 @@ app.setErrorHandler((error, request, reply) => {
   });
 });
 
+let broadcastWork: Promise<void> | undefined;
+const broadcastTimer = setInterval(() => {
+  if (broadcastWork) return;
+  broadcastWork = processVkBroadcasts().catch(() => app.log.warn('VK broadcast worker failed'))
+    .finally(() => { broadcastWork = undefined; });
+}, 2_000);
+broadcastTimer.unref();
+
 app.addHook('onClose', async () => {
+  clearInterval(broadcastTimer);
+  await broadcastWork;
   clearInterval(authAbusePruneTimer);
   clearInterval(groupAlertTimer);
   await groupAlertDelivery;
