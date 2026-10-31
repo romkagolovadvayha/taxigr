@@ -17,6 +17,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppUpdatePromptHost } from '@/components/updates/app-update-prompt';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { AppProviders } from '@/providers/app-providers';
+import { MiniAppNavigation } from '@/mini-apps/mini-app-navigation';
 import { AppHead } from '@/seo/app-head';
 import { BlockedAccountScreen } from '@/screens/blocked-account-screen';
 import { useThemeColors, AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
@@ -164,6 +165,7 @@ function RootNavigator() {
 
   return (
     <ThemeProvider value={navigationTheme}>
+      <MiniAppNavigation />
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
         key={user?.id ?? 'signed-out'}
@@ -180,6 +182,8 @@ function RootNavigator() {
         <Stack.Screen name="driver-data-consent" />
         <Stack.Screen name="safety" />
         <Stack.Screen name="vk" />
+        <Stack.Screen name="max" />
+        <Stack.Screen name="telegram" />
         <Stack.Screen name="auth-return" />
         <Stack.Screen name="navigate" />
         <Stack.Protected guard={!user}>

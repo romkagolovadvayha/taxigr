@@ -7,7 +7,7 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: async (key: string, value: string) => { storage.set(key, value); },
   deleteItemAsync: async (key: string) => { storage.delete(key); },
 }));
-vi.mock('../server/config', () => ({config: {PUBLIC_URL: 'https://taxigr.ru', MAX_BOT_TOKEN: 'test-max', TELEGRAM_BOT_TOKEN: 'test-telegram'}}));
+vi.mock('../server/config', () => ({config: {PUBLIC_URL: 'https://taxigr.ru', MAX_BOT_TOKEN: 'test-max', MAX_BOT_USERNAME: 'taxi_test_bot', TELEGRAM_BOT_TOKEN: 'test-telegram'}}));
 vi.mock('undici', () => ({fetch: fetchTelegram}));
 vi.mock('../server/gateway-proxy', () => ({telegramDispatcher: async () => undefined}));
 
@@ -122,5 +122,17 @@ describe('returning from messenger verification', () => {
     expect(html).toContain('Заказать такси</a>');
     expect(html).toContain(url.replace(/&/gu, '&amp;'));
     expect(vkCallbackHtml(false, url)).not.toContain('Заказать такси</a>');
+  });
+
+  it.each(['max', 'telegram'] as const)('opens the %s mini app after browser phone confirmation', async provider => {
+    const fetchMock = provider === 'telegram' ? fetchTelegram : vi.fn();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, result: {}, message: { body: { mid: '1' } } })));
+    if (provider === 'max') vi.stubGlobal('fetch', fetchMock);
+    await (provider === 'max' ? sendMaxConfirmation : sendTelegramConfirmation)('42', true, messengerAuthReturnUrl(provider, id, 'web'));
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.text).toBe('Номер успешно подтверждён');
+    if (provider === 'max') expect(body.attachments[0].payload.buttons[0][0]).toMatchObject({ type: 'open_app', web_app: 'taxi_test_bot' });
+    else expect(body.reply_markup.inline_keyboard[0][0].web_app.url).toBe('https://taxigr.ru/telegram');
+    expect(JSON.stringify(body)).not.toContain('/auth-return');
   });
 });

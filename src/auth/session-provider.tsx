@@ -12,6 +12,11 @@ import { clearSessionToken, readSessionToken, readStoredSession, writeSessionTok
 import { getInstallationId } from '@/storage/device-id';
 import { savePendingMessengerLogin, clearPendingMessengerLogin, type MessengerAuthExchange } from '@/storage/messenger-login-storage';
 import { createVkMiniAppSessionHandoff } from '@/vk-mini-app/session-handoff';
+import { getEmbeddedAppProvider, getMiniAppProvider, type MiniAppProvider } from '@/mini-apps/runtime';
+import { getVkMiniAppLaunchParams } from '@/vk-mini-app/bridge';
+import type { MiniAppContact } from '@/mini-apps/bridge';
+
+type MiniAppAuthInput = { initData: string; contact?: MiniAppContact; contactRequestId?: string };
 
 type PhoneAuthStartResult = {
   phone: string;
@@ -96,6 +101,7 @@ type SessionContextValue = {
   ) => Promise<VkAuthChallenge>;
   checkVkPhoneAuth: (challenge: MessengerAuthExchange) => Promise<VkAuthStatus['status']>;
   signInWithVkMiniApp: (input: VkMiniAppAuthInput) => Promise<void>;
+  signInWithMiniApp: (provider: MiniAppProvider, input: MiniAppAuthInput) => Promise<'verified' | 'phone_required'>;
   consumeVkMiniAppSessionHandoff: (launchParams: string) => boolean;
   verifyVkMiniAppSession: (launchParams: string) => Promise<boolean>;
   resetSessionForEmbeddedAuth: () => Promise<void>;
@@ -173,8 +179,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const restore = useCallback(async () => {
     const revision = sessionRevision.current;
     try {
+      // Always verify the current messenger account before restoring any data.
+      if (getMiniAppProvider()) return;
       const stored = await readSessionToken();
       if (!stored || revision !== sessionRevision.current) return;
+      if (getEmbeddedAppProvider() === 'vk') {
+        const launchParams = getVkMiniAppLaunchParams();
+        const verified = launchParams && await apiRequest<{ verified: boolean }>('/v1/auth/vk-mini/session', {
+          method: 'POST', token: stored, body: JSON.stringify({ launchParams }),
+        });
+        if (!verified || !verified.verified) { await clearSessionToken(); return; }
+      }
       setLoading(true);
       if (stored.startsWith('demo:') && demoEnabled) {
         const storedPersona = stored.slice(5);
@@ -437,6 +452,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const signInWithMiniApp = useCallback(async (provider: MiniAppProvider, input: MiniAppAuthInput) => {
+    const result = await apiRequest<{ status: 'phone_required' } | {
+      status: 'verified'; token: string; user: SessionUser; legalConsentRequired: boolean;
+    }>(`/v1/auth/mini-app/${provider}`, { method: 'POST', body: JSON.stringify(input) });
+    if (result.status === 'verified') await applySession(result);
+    return result.status;
+  }, [applySession]);
+
   const signInWithVkMiniApp = useCallback(async (input: VkMiniAppAuthInput) => {
     setAuthenticating(true);
     setAuthError(null);
@@ -661,6 +684,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       startVkPhoneAuth,
       checkVkPhoneAuth,
       signInWithVkMiniApp,
+      signInWithMiniApp,
       consumeVkMiniAppSessionHandoff,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,
@@ -682,6 +706,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkTelegramPhoneAuth,
       checkVkPhoneAuth,
       signInWithVkMiniApp,
+      signInWithMiniApp,
       consumeVkMiniAppSessionHandoff,
       verifyVkMiniAppSession,
       resetSessionForEmbeddedAuth,

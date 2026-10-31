@@ -210,6 +210,10 @@ fi
 
 echo 'Registering Telegram webhook'
 ./server/node_modules/.bin/tsx server/scripts/register-telegram-webhook.ts
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+  echo 'Configuring and verifying Telegram mini-app menu'
+  ./server/node_modules/.bin/tsx server/scripts/configure-telegram-mini-app.ts
+fi
 
 rm -f "$ARCHIVE" "$ENV_UPLOAD"
 

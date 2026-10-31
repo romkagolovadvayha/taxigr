@@ -1,6 +1,7 @@
 import bridge from '@vkontakte/vk-bridge';
 
 import { extractSignedVkPhone } from '@/vk-mini-app/phone';
+import { rememberMiniAppLaunch, restoredMiniAppLaunch } from '@/mini-apps/runtime';
 
 export type VkMiniAppProfileIdentity = {
   launchParams: string;
@@ -37,7 +38,12 @@ export function getVkMiniAppLaunchParams(): string {
   for (const [key, value] of current.entries()) {
     if (key === 'sign' || key.startsWith('vk_')) launch.append(key, value);
   }
-  return launch.toString();
+  if (launch.has('sign')) {
+    const raw = launch.toString();
+    rememberMiniAppLaunch('vk', raw);
+    return raw;
+  }
+  return restoredMiniAppLaunch() ?? '';
 }
 
 export async function initializeVkMiniApp(): Promise<void> {

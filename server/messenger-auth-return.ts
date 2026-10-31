@@ -4,6 +4,14 @@ export function legacyMessengerReturnUrl(): string {
   return new URL('/return-to-taxi.html', config.PUBLIC_URL).href;
 }
 
+export function isWebMessengerReturn(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const target = new URL(url);
+    return target.origin === new URL(config.PUBLIC_URL).origin && target.pathname === '/auth-return' && target.searchParams.get('target') === 'web';
+  } catch { return false; }
+}
+
 // This link carries navigation context only. The exchange secret stays on the
 // device that started login, never in bot messages, browser history or referrers.
 export function messengerAuthReturnUrl(

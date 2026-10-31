@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
   requestTelegramContact: vi.fn(),
   sendTelegramConfirmation: vi.fn(),
   telegramStartPayload: vi.fn(),
+  recordTelegramMiniAppContact: vi.fn().mockResolvedValue(false),
 }));
+
+vi.mock('../server/mini-app-phone', () => ({ recordTelegramMiniAppContact: mocks.recordTelegramMiniAppContact }));
 
 vi.mock("../server/db", () => ({
   db: { execute: mocks.execute },
@@ -29,7 +32,22 @@ vi.mock("../server/telegram-bot", () => ({
 }));
 
 describe("Telegram update processing", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mocks.recordTelegramMiniAppContact.mockResolvedValue(false); });
+
+  it('delivers an owned contact to the pending mini app without a second login message', async () => {
+    mocks.telegramStartPayload.mockReturnValue(null);
+    mocks.extractOwnTelegramPhone.mockReturnValue('+79990000000');
+    mocks.recordTelegramMiniAppContact.mockResolvedValue(true);
+    const booking = vi.fn();
+    await processTelegramUpdate(telegramUpdateSchema.parse({ message: {
+      message_id: 10, from: { id: 42 }, chat: { id: 42, type: 'private' },
+      contact: { phone_number: '+79990000000', user_id: 42 },
+    } }), undefined, booking);
+    expect(mocks.recordTelegramMiniAppContact).toHaveBeenCalledWith('42', '42', '+79990000000');
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.sendTelegramConfirmation).not.toHaveBeenCalled();
+    expect(booking).not.toHaveBeenCalled();
+  });
 
   it("links a valid /start payload and requests the contact", async () => {
     mocks.telegramStartPayload.mockReturnValue("payload-token");

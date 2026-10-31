@@ -18,6 +18,14 @@ set -euo pipefail
 curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/" >/dev/null
 vk_page="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${WEB_DOMAIN}/vk")"
 grep -q 'Такси Грахово' <<<"$vk_page"
+for provider in max telegram; do
+  mini_page="$(curl --fail --silent --show-error --retry 3 "https://${WEB_DOMAIN}/${provider}")"
+  grep -q 'Такси Грахово' <<<"$mini_page"
+  mini_auth_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    -H 'Content-Type: application/json' --data-binary '{"initData":"unsigned-deployment-probe"}' \
+    "https://${API_DOMAIN}/v1/auth/mini-app/${provider}")"
+  test "$mini_auth_status" = "401"
+done
 node scripts/verify-maplibre-deployment.cjs "https://${WEB_DOMAIN}"
 health_response="$(curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 "https://${API_DOMAIN}/health/live")"
 test "$(jq -r '.data.status' <<<"$health_response")" = "ok"

@@ -2,7 +2,7 @@ import { fetch as undiciFetch } from 'undici';
 
 import { config } from './config';
 import { telegramDispatcher } from './gateway-proxy';
-import { legacyMessengerReturnUrl } from './messenger-auth-return';
+import { isWebMessengerReturn, legacyMessengerReturnUrl } from './messenger-auth-return';
 import { normalizeRussianPhone } from './phone-verification';
 
 type TelegramApiResponse<T = unknown> = {
@@ -175,7 +175,9 @@ export async function sendTelegramConfirmation(
       ? 'Номер успешно подтверждён'
       : 'Номер Telegram не совпадает с номером, указанным в приложении. Вернитесь в приложение и проверьте номер.',
     reply_markup: success
-      ? { inline_keyboard: [[{ text: '🚕 Заказать такси', url: returnUrl ?? legacyMessengerReturnUrl() }]] }
+      ? { inline_keyboard: [[{ text: '🚕 Заказать такси', ...(isWebMessengerReturn(returnUrl)
+        ? { web_app: { url: new URL('/telegram', config.PUBLIC_URL).href } }
+        : { url: returnUrl ?? legacyMessengerReturnUrl() }) }]] }
       : { remove_keyboard: true },
     disable_web_page_preview: true,
   });

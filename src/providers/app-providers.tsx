@@ -16,6 +16,7 @@ import { PassengerPreferencesProvider } from '@/preferences/passenger-preference
 import { RideProvider, useRideBootstrapReady } from '@/state/ride-provider';
 import { AppUpdateProvider } from '@/updates/app-update-provider';
 import { BookingAvailabilityProvider } from '@/providers/booking-availability-provider';
+import { MiniAppBoundary } from '@/mini-apps/mini-app-boundary';
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
@@ -61,6 +62,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AppUpdateProvider>
         <SessionProvider>
+          <MiniAppBoundary>
           <CriticalErrorMonitor />
           <LocationPermissionRegistrar />
           <VkCommunityPromptHost />
@@ -71,6 +73,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
               </BookingAvailabilityProvider>
             </FeedbackPreferencesProvider>
           </PassengerPreferencesProvider>
+          </MiniAppBoundary>
         </SessionProvider>
       </AppUpdateProvider>
     </QueryClientProvider>

@@ -125,7 +125,7 @@ describe('taxi booking in messenger conversations',()=>{
     expect(draft.pickupRaw).toBe('Грахово Советская 10');
   });
   it('asks pickup and destination, then offers an honest unpriced order',async()=>{
-    await handle(message('/start')); expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    await handle(message('/start')); expect(replyButtons()).toContainEqual({text:'Заказать сообщениями',callback_data:'b:start'});
     await start(); expect(replyText()).toContain('откуда вас забрать');
     await handle(message('у старого клуба')); expect(replyText()).toContain('Куда');
     await handle(message('до зелёного дома'));
@@ -144,7 +144,7 @@ describe('taxi booking in messenger conversations',()=>{
   it.each(['ММ','привет','у клуба → у дома'])('does not treat the initial %s as an address',async text=>{
     await handle(message(text));
     expect(draft.stage).toBe('idle');expect(draft.pickupRaw).toBeUndefined();
-    expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    expect(replyButtons()).toContainEqual({text:'Заказать сообщениями',callback_data:'b:start'});
     expect(mocks.resolve).not.toHaveBeenCalled();expect(mocks.inject).not.toHaveBeenCalled();
   });
   it('resets legacy implicit drafts instead of reusing a random pickup',async()=>{
@@ -201,7 +201,7 @@ describe('taxi booking in messenger conversations',()=>{
   });
   it('does not authenticate a typed phone number',async()=>{
     mocks.firstRow.mockResolvedValue(null);await handle(message('+79990000000'));
-    expect(mocks.phone).not.toHaveBeenCalled();expect(replyButtons()).toContainEqual({text:'Заказать такси',callback_data:'b:start'});
+    expect(mocks.phone).not.toHaveBeenCalled();expect(replyButtons()).toContainEqual({text:'Заказать сообщениями',callback_data:'b:start'});
     await start();expect(mocks.send.mock.calls.at(-1)![1].reply_markup.keyboard[0][0].request_contact).toBe(true);
   });
   it('requests an own contact when an existing messenger account has no phone',async()=>{

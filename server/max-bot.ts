@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { config } from './config';
-import { legacyMessengerReturnUrl } from './messenger-auth-return';
+import { isWebMessengerReturn, legacyMessengerReturnUrl } from './messenger-auth-return';
 import { normalizeRussianPhone } from './phone-verification';
 
 type MaxContactPayload = {
@@ -243,7 +243,9 @@ export async function sendMaxConfirmation(userId: string, success: boolean, retu
       ? 'Номер успешно подтверждён'
       : 'Номер MAX не совпадает с номером, указанным в приложении. Вернитесь в приложение и проверьте номер.',
     ...(success ? { attachments: [{ type: 'inline_keyboard', payload: {
-      buttons: [[{ type: 'link', text: '🚕 Заказать такси', url: returnUrl ?? legacyMessengerReturnUrl() }]],
+      buttons: [[isWebMessengerReturn(returnUrl)
+        ? { type: 'open_app', text: '🚕 Заказать такси', web_app: config.MAX_BOT_USERNAME }
+        : { type: 'link', text: '🚕 Заказать такси', url: returnUrl ?? legacyMessengerReturnUrl() }]],
     } }] } : {}),
   });
 }

@@ -226,7 +226,7 @@ function idempotencyKey(): string {
 export function RideProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const foreground = useAppForeground();
-  const quoteVisible = foreground && (pathname === '/' || pathname === '/order-confirmation');
+  const quoteVisible = foreground && ['/', '/vk', '/max', '/telegram', '/order-confirmation'].includes(pathname);
   const { token, user, refreshSession, markInitialLegalConsentAccepted } = useSession();
   const { checkBooking, showBookingUnavailable } = useBookingAvailability();
   const demoSession = token?.startsWith('demo:') ?? false;

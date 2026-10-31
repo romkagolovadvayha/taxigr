@@ -5,6 +5,7 @@ import { db, firstRow } from './db';
 import { matchesMessengerPhone } from './messenger-auth-phone';
 import { messengerAuthReturnUrl } from './messenger-auth-return';
 import type { BookingMessage } from './messenger-booking';
+import { recordTelegramMiniAppContact } from './mini-app-phone';
 import {
   answerTelegramCallback,
   extractOwnTelegramPhone,
@@ -139,6 +140,7 @@ export async function processTelegramUpdate(
   }
   const verifiedPhone = extractOwnTelegramPhone(message.contact, userId);
   if (!verifiedPhone) return;
+  if (await recordTelegramMiniAppContact(userId, chatId, verifiedPhone)) return;
 
   const challenge = await firstRow<
     RowDataPacket & { id: string; expected_phone: string | null; return_platform: string }

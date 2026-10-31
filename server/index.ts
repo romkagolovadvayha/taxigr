@@ -28,6 +28,8 @@ const app = Fastify({
       'req.body.exchangeToken',
       'req.body.proxyPassword',
       'req.body.webhookSecret',
+      'req.body.initData',
+      'req.body.contact',
     ],
   },
   trustProxy: config.trustProxy,

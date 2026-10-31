@@ -13,6 +13,7 @@ import { sendMaxMessage } from './max-bot';
 import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
 import { appUrl } from './messenger-notifications';
+import { config } from './config';
 
 export type BookingMessage = MessengerIdentityInput & {
   eventId: string;
@@ -20,7 +21,7 @@ export type BookingMessage = MessengerIdentityInput & {
   /** Only contacts authenticated by the provider adapter may populate this. */
   verifiedPhone?: string | null;
 };
-type Reply = { text: string; buttons?: ({ label: string; data: string } | { label: string; url: string })[]; requestContact?: boolean };
+type Reply = { text: string; buttons?: ({ label: string; data: string } | { label: string; url: string } | { label: string; miniApp: true })[]; requestContact?: boolean };
 export type BookingDraft = {
   id: string;
   flowVersion?: 2;
@@ -39,8 +40,8 @@ export type BookingDraft = {
   orderId?: string;
 };
 const freshDraft = (): BookingDraft => ({ id: randomUUID(), flowVersion: 2, stage: 'idle' });
-const welcome = (text = 'Заказ такси доступен прямо в чате. Нажмите кнопку ниже, чтобы начать.'): Reply => ({
-  text, buttons: [{ label: 'Заказать такси', data: 'b:start' }],
+const welcome = (text = 'Откройте заказ такси: выберите адреса на карте, узнайте стоимость и следите за поездкой прямо здесь.'): Reply => ({
+  text, buttons: [{ label: 'Заказать такси', miniApp: true }, { label: 'Заказать сообщениями', data: 'b:start' }],
 });
 const draftButtons = (draft: BookingDraft): NonNullable<Reply['buttons']> => [
   { label: 'Отменить оформление', data: `b:cancel:${draft.id}` },
@@ -63,6 +64,7 @@ function activeOrderReply(order: ActiveOrder, text = 'У вас уже есть 
 const readJson = <T>(value: unknown): T => typeof value === 'string' ? JSON.parse(value) as T : value as T;
 
 export async function pruneMessengerBookingData(): Promise<void> {
+  await db.execute('DELETE FROM mini_app_phone_challenges WHERE expires_at < UTC_TIMESTAMP(3)');
   await db.execute('DELETE FROM messenger_booking_drafts WHERE expires_at < UTC_TIMESTAMP(3)');
   await db.execute('DELETE FROM messenger_booking_events WHERE created_at < DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 7 DAY)');
 }
@@ -90,7 +92,7 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
         keyboard: [[{ text: 'Поделиться номером для заказа', request_contact: true }]],
         resize_keyboard: true, one_time_keyboard: true,
       } : buttons.length ? {
-        inline_keyboard: buttons.map(button => [{ text: button.label, ...('url' in button ? { url: button.url } : { callback_data: button.data }) }]),
+        inline_keyboard: buttons.map(button => [{ text: button.label, ...('miniApp' in button ? { web_app: { url: appUrl('/telegram') } } : 'url' in button ? { url: button.url } : { callback_data: button.data }) }]),
       } : { remove_keyboard: true },
     });
   } else if (message.provider === 'max') {
@@ -98,13 +100,15 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
       text: reply.text,
       attachments: reply.requestContact || buttons.length ? [{ type: 'inline_keyboard', payload: { buttons: reply.requestContact ?
         [[{ type: 'request_contact', text: 'Поделиться номером для заказа' }]] :
-        buttons.map(button => ['url' in button ? { type: 'link', text: button.label, url: button.url } :
+        buttons.map(button => ['miniApp' in button ? { type: 'open_app', text: button.label, web_app: config.MAX_BOT_USERNAME } : 'url' in button ? { type: 'link', text: button.label, url: button.url } :
           { type: 'callback', text: button.label, payload: button.data }]) } }] : undefined,
     });
   } else {
     await sendVkMessage(message.chatId, {
       message: reply.text,
-      keyboard: buttons.length ? vkInlineKeyboard(buttons.map(button => [{ type: 'url' in button ? 'link' : 'callback', ...button }])) : undefined,
+      keyboard: buttons.length ? vkInlineKeyboard(buttons.map(button => ['miniApp' in button
+        ? { type: 'link' as const, label: button.label, url: `https://vk.com/app${config.VK_MINI_APP_ID}` }
+        : { type: 'url' in button ? 'link' as const : 'callback' as const, ...button }])) : undefined,
     });
   }
 }
