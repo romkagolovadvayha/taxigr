@@ -2,7 +2,7 @@
   "expo": {
     "name": "Такси Грахово",
     "slug": "taxi-grahovo",
-    "version": "1.0.23",
+    "version": "1.0.24",
     "orientation": "default",
     "icon": "./assets/brand/icon.png",
     "scheme": "taxigrahovo",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "ru.grahovo.taxi",
-      "versionCode": 43,
+      "versionCode": 44,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#F6C945",
