@@ -76,7 +76,8 @@ export function registerVkBroadcastRoutes(app: FastifyInstance) {
       r.created_at AS createdAt, r.finished_at AS finishedAt, r.last_error AS lastError,
       COUNT(d.id) AS total, COALESCE(SUM(d.status = 'sent'),0) AS sent, COALESCE(SUM(d.status = 'skipped'),0) AS skipped,
       COALESCE(SUM(d.status = 'failed'),0) AS failed, COALESCE(SUM(d.status = 'pending'),0) AS pending
-      FROM (SELECT * FROM vk_broadcast_runs WHERE community_key = ? ORDER BY created_at DESC LIMIT 30) r
+      FROM (SELECT id, campaign_id, revision, mode, status, created_at, finished_at, last_error
+        FROM vk_broadcast_runs WHERE community_key = ? ORDER BY created_at DESC LIMIT 30) r
       JOIN vk_broadcast_campaigns c ON c.id = r.campaign_id LEFT JOIN vk_broadcast_deliveries d ON d.run_id = r.id
       GROUP BY r.id ORDER BY r.created_at DESC`, [community.key]);
     return { data: { configured: !!community.token && isVkUserId(community.id), communityId: community.id,

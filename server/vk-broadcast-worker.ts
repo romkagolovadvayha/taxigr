@@ -168,7 +168,9 @@ async function processCommunity(community: BroadcastCommunity): Promise<void> {
   try {
     const [locks] = await connection.query<RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [`taxigr_vk_broadcast_worker_${community.key}`]);
     if (!locks[0]?.acquired) return;
-    const run = await firstRow<RowDataPacket>(`SELECT * FROM vk_broadcast_runs WHERE community_key = ? AND status IN ('queued', 'sending')
+    const run = await firstRow<RowDataPacket>(`SELECT id, mode, message_text, image_mime, attachment,
+      IF(attachment IS NULL, image_bytes, NULL) AS image_bytes
+      FROM vk_broadcast_runs WHERE community_key = ? AND status IN ('queued', 'sending')
       AND (next_attempt_at IS NULL OR next_attempt_at <= UTC_TIMESTAMP(3)) ORDER BY created_at LIMIT 1`, [community.key]);
     if (run) await deliverRun(community, run);
     else {
