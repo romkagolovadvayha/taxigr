@@ -17,6 +17,7 @@ export function broadcastError(error: unknown): { message: string; retry: boolea
   if ([18, 900, 901, 902, 917].includes(code)) return { message: `Получатель недоступен или запретил сообщения (ВК ${code})`, retry: false, denied: true };
   if ([5, 7, 15, 27, 28].includes(code)) return { message: `Проверьте доступ сообщества к сообщениям (ВК ${code})`, retry: false, denied: false };
   if ([9, 29].includes(code)) return { message: `ВК ограничил рассылку. Отправка остановлена (ВК ${code})`, retry: false, denied: false };
+  if (code === 912) return { message: 'Включите возможности ботов в настройках сообщений сообщества ВК', retry: false, denied: false };
   const retry = !code || [6, 10, 429, 500, 502, 503, 504].includes(code);
   return { message: retry ? 'ВК временно недоступен. Повторим с задержкой' : `ВК отклонил запрос (код ${code})`, retry, denied: false };
 }
@@ -71,6 +72,12 @@ async function syncAudience(community: BroadcastCommunity, sync: RowDataPacket) 
       await db.execute('UPDATE vk_broadcast_sync SET attempts = 0, last_error = NULL WHERE community_key = ?', [community.key]);
     }
   } catch (error) {
+    // VK documents archive in the shared schema, but community tokens cannot read it.
+    // The all-conversations pass already succeeded; keep members, dialogs and linked accounts.
+    if (sync.stage === 'archive' && error instanceof VkApiError && error.vkCode === 15) {
+      await db.execute("UPDATE vk_broadcast_sync SET stage = 'accounts', page_offset = 0, attempts = 0, last_error = NULL WHERE community_key = ?", [community.key]);
+      return;
+    }
     const problem = broadcastError(error), attempts = sync.attempts + 1;
     await db.execute('UPDATE vk_broadcast_sync SET status = ?, attempts = ?, next_attempt_at = ?, last_error = ? WHERE community_key = ?',
       [problem.retry && attempts < 5 ? 'syncing' : 'failed', attempts, retryAt(attempts), problem.message, community.key]);
@@ -92,7 +99,7 @@ async function uploadImage(community: BroadcastCommunity, run: RowDataPacket, pe
   const response = await fetch(validateVkUploadUrl(server.upload_url), { method: 'POST', body: form, redirect: 'error', signal: AbortSignal.timeout(20_000) });
   if (!response.ok) throw new VkApiError(response.status, 'VK photo upload failed');
   const uploaded = await response.json() as { photo?: string; server?: number; hash?: string };
-  if (!uploaded.photo || uploaded.photo === '[]' || !uploaded.server || !uploaded.hash) throw new VkApiError(100, 'VK rejected photo');
+  if (!uploaded.photo || uploaded.photo === '[]' || !uploaded.server || !uploaded.hash) throw new VkApiError(10, 'VK photo upload incomplete');
   const photos = await api<{ id: number; owner_id: number; access_key?: string }[]>(community, 'photos.saveMessagesPhoto', {
     photo: uploaded.photo, server: String(uploaded.server), hash: uploaded.hash,
   });

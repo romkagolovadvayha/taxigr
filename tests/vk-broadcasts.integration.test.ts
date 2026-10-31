@@ -131,6 +131,28 @@ describe.skipIf(process.env.RUN_BROADCAST_INTEGRATION !== '1')('VK broadcasts wi
     expect((await send(`${base}/campaigns/${c.id}`,'PUT',{title:'x',text:'y',image:null,revision:c.revision})).statusCode).toBe(409);
     expect(await firstRow<RowDataPacket>("SELECT COUNT(*) AS n FROM vk_broadcast_deliveries WHERE peer_id=33")).toMatchObject({n:0});
   });
+  it('continues after the archive filter is unavailable to a community token', async () => {
+    vk.mockImplementation(async (m,p) => {
+      if(m === 'messages.getConversations' && p.filter === 'archive') throw new VkApiError(15,'Access denied');
+      return defaultVk(m,p);
+    });
+    await send(base+'/audience/sync','POST',{});
+    for(let i=0;i<6;i++) await processVkBroadcasts();
+    const state=(await send(base)).json().data;
+    expect(state.sync.status).toBe('ready'); expect(state.audience).toEqual({total:3,allowed:2,checked:3});
+  });
+  it('does not ignore access errors on ordinary conversations or expired archive credentials', async () => {
+    for(const [filter,code] of [['all',15],['archive',5]] as const) {
+      vk.mockImplementation(async (m,p) => {
+        if(m === 'messages.getConversations' && p.filter === filter) throw new VkApiError(code,'Access denied');
+        return defaultVk(m,p);
+      });
+      await db.query("UPDATE vk_broadcast_sync SET status='idle', started_at=NULL, next_attempt_at=NULL");
+      expect((await send(base+'/audience/sync','POST',{})).statusCode).toBe(200);
+      for(let i=0;i<4;i++) await processVkBroadcasts();
+      expect((await send(base)).json().data.sync.status).toBe('failed');
+    }
+  });
   it('does not turn partial VK execute failures into denied permissions and backs off', async () => {
     await send(base+'/audience/sync','POST',{}); for(let i=0;i<4;i++)await processVkBroadcasts();
     vk.mockImplementation(async(m,p)=>m==='execute'?[false,false,false]:defaultVk(m,p));
@@ -171,5 +193,18 @@ describe.skipIf(process.env.RUN_BROADCAST_INTEGRATION !== '1')('VK broadcasts wi
     await processVkBroadcasts(); await processVkBroadcasts();
     expect(vk.mock.calls.filter(c=>c[0]==='messages.send')).toHaveLength(1);
     expect((await send(base)).json().data.runs[0].status).toBe('failed');
+  });
+  it('backs off and retries an incomplete VK photo upload before sending any message', async () => {
+    const png=Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]).toString('base64');
+    await startTest(await draft({image:{mimeType:'image/png',base64:png}}));
+    const upload=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({photo:'[]',server:1,hash:'hash'})))
+      .mockResolvedValue(new Response(JSON.stringify({photo:'[{"id":77}]',server:1,hash:'hash'})));
+    vi.stubGlobal('fetch',upload);
+    await processVkBroadcasts(); await processVkBroadcasts();
+    expect(upload).toHaveBeenCalledTimes(1); expect(vk.mock.calls.some(c=>c[0]==='messages.send')).toBe(false);
+    await db.query('UPDATE vk_broadcast_runs SET next_attempt_at=NULL'); await db.query('UPDATE vk_broadcast_deliveries SET next_attempt_at=NULL');
+    for(let i=0;i<3;i++) await processVkBroadcasts();
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect((await send(base)).json().data.runs[0]).toMatchObject({status:'completed',sent:2});
   });
 });
