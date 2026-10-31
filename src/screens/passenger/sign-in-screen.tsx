@@ -860,11 +860,11 @@ export function SignInScreen() {
               }}
             >
               {maxChallenge
-                ? "В MAX нажмите «Поделиться номером», затем вернитесь сюда."
+                ? "В MAX нажмите «Поделиться номером», затем «Заказать такси»."
                 : telegramChallenge
-                  ? "В Telegram нажмите «Запустить», затем «Поделиться номером» и вернитесь сюда."
+                  ? "В Telegram нажмите «Запустить», «Поделиться номером», затем «Заказать такси»."
                   : vkChallenge?.nativeLoginCode
-                    ? `Подтвердите вход в VK и вернитесь сюда. Код этой попытки: ${vkChallenge.nativeLoginCode}.`
+                    ? `Подтвердите вход в VK и нажмите «Заказать такси». Код этой попытки: ${vkChallenge.nativeLoginCode}.`
                     : "Разрешите VK передать номер телефона. Вход завершится автоматически."}
             </Text>
             <AppButton compact onPress={reopenProvider}>

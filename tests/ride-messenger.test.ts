@@ -5,6 +5,7 @@ import { formatPersonalMessengerNotification } from '../server/messenger-notific
 import { limitOrderRatings } from '../server/presenters';
 import {
   driverRideNotification,
+  driverRideButtons,
   parseRideMessengerActionData,
   passengerRideNotification,
   rideMessengerActionData,
@@ -64,6 +65,23 @@ const assignedDriver: NonNullable<RideOrder['driver']> = {
 };
 
 describe('ride messenger flow', () => {
+  it('includes an HTTPS navigation button in the shared driver message for Telegram, MAX and VK', () => {
+    const pickupRide = ride({ status: 'accepted', driverId: 'driver-1' });
+    const button = driverRideButtons(pickupRide).flat().find(item => item.label === '🧭 Маршрут');
+    expect(button?.type).toBe('link');
+    if (button?.type !== 'link') throw new Error('Navigation button missing');
+    const url = new URL(button.url);
+    expect(url.pathname).toBe('/navigate');
+    expect(url.searchParams.get('lat')).toBe(String(pickupRide.pickup.coordinates.latitude));
+    expect(url.searchParams.get('address')).toBe(pickupRide.pickup.label);
+    const active = ride({ status: 'in_progress', driverId: 'driver-1', destinations: [pickupRide.pickup, pickupRide.destination], nextDestinationIndex: 1 });
+    const nextButton = driverRideButtons(active).flat().find(item => item.label === '🧭 Маршрут');
+    if (nextButton?.type !== 'link') throw new Error('Next stop navigation missing');
+    expect(new URL(nextButton.url).searchParams.get('address')).toBe(active.destination.label);
+  });
+  it.each(['searching', 'completed', 'cancelled'] as const)('does not show a driver navigation action for %s', status => {
+    expect(driverRideButtons(ride({ status })).flat().some(item => item.label === '🧭 Маршрут')).toBe(false);
+  });
   afterEach(() => vi.useRealTimers());
 
   it('keeps callback payloads valid and below the Telegram 64-byte limit', () => {
@@ -140,12 +158,45 @@ describe('ride messenger flow', () => {
     }));
 
     expect(arriving.buttons?.flat()).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: '📍 Я на месте', intent: 'positive' }),
+      expect.objectContaining({ label: '📍 Я приехал', intent: 'positive' }),
     ]));
     expect(inProgress.buttons?.flat()).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: '🏁 Завершить поездку', intent: 'positive' }),
     ]));
     expect(completed.buttons?.[0]).toHaveLength(5);
+  });
+
+  it.each(['accepted', 'driver_arriving'] as const)('goes directly to arrival from %s without a departure action', status => {
+    const buttons = driverRideButtons(ride({ status, driverId: 'driver-1' })).flat();
+    expect(buttons[0]).toMatchObject({ label: '📍 Я приехал', data: `r:here:${orderId}` });
+    expect(buttons.some(button => button.type === 'callback' && button.data === `r:go:${orderId}`)).toBe(false);
+  });
+
+  it.each(['driver_waiting', 'in_progress'] as const)('uses automatic waiting without manual timer buttons during %s', status => {
+    const buttons = driverRideButtons(ride({ status, driverId: 'driver-1', waitingStartedAt: '2026-08-25T10:00:00.000Z' })).flat();
+    expect(buttons.some(button => button.type === 'callback' && /r:wait-(on|off):/.test(button.data))).toBe(false);
+  });
+
+  it.each(['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'] as const)(
+    'offers calling and the shared order chat to both participants while %s', status => {
+      const assigned = ride({ status, driverId: 'driver-1', driver: assignedDriver });
+      for (const [notification, recipient] of [
+        [passengerRideNotification(assigned), 'водителю'],
+        [driverRideNotification(assigned), 'пассажиру'],
+      ] as const) {
+        expect(notification.buttons?.flat()).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'callback', label: `📞 Позвонить ${recipient}`, data: `r:contact:${orderId}` }),
+          expect.objectContaining({ type: 'link', label: `💬 Написать ${recipient}`, url: expect.stringContaining(`/chat/${orderId}`) }),
+        ]));
+      }
+    },
+  );
+
+  it.each(['searching', 'completed', 'cancelled'] as const)('does not offer contacts while %s', status => {
+    const closed = ride({ status, driverId: 'driver-1', driver: assignedDriver });
+    for (const notification of [passengerRideNotification(closed), driverRideNotification(closed)]) {
+      expect(notification.buttons?.flat().some(button => /Позвонить|Написать/.test(button.label))).toBe(false);
+    }
   });
 
   it('does not offer navigation or a status transition for the queued order', () => {

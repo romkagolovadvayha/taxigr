@@ -12,7 +12,7 @@ const connection = { query, execute } as unknown as PoolConnection;
 const challenge = () => ({
   id: 'challenge-id', expected_phone: null, vk_user_id: null,
   expires_at: new Date(Date.now() + 60_000), verified_at: null,
-  completed_at: null, failure_code: null,
+  completed_at: null, failure_code: null, return_platform: 'android',
 });
 const account = { phone: '+79990000000', first_name: 'Иван', last_name: 'Иванов' };
 
@@ -38,7 +38,7 @@ describe('signed VK session approves only the pending Android challenge', () => 
   it('uses the phone linked to the authenticated VK account and does not issue a token', async () => {
     query.mockResolvedValueOnce([[challenge()]]).mockResolvedValueOnce([[account]]);
 
-    await expect(confirmVkNativeLogin(connection, input)).resolves.toBeUndefined();
+    await expect(confirmVkNativeLogin(connection, input)).resolves.toEqual({ challengeId: 'challenge-id', returnPlatform: 'android' });
 
     expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining('FOR UPDATE'), [state]);
     expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('account.external_user_id = ?'), ['taxi-user', '42']);
@@ -74,7 +74,7 @@ describe('signed VK session approves only the pending Android challenge', () => 
     query.mockResolvedValueOnce([[{ ...challenge(), verified_at: new Date(), vk_user_id: '42' }]])
       .mockResolvedValueOnce([[account]]);
 
-    await expect(confirmVkNativeLogin(connection, input)).resolves.toBeUndefined();
+    await expect(confirmVkNativeLogin(connection, input)).resolves.toEqual({ challengeId: 'challenge-id', returnPlatform: 'android' });
     expect(execute).not.toHaveBeenCalled();
   });
 });

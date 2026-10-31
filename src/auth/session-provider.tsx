@@ -10,6 +10,7 @@ import type { InitialLegalAcceptance } from '@/legal/documents';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { clearSessionToken, readSessionToken, readStoredSession, writeSessionToken, writeStoredSession } from '@/storage/auth-storage';
 import { getInstallationId } from '@/storage/device-id';
+import { savePendingMessengerLogin, clearPendingMessengerLogin, type MessengerAuthExchange } from '@/storage/messenger-login-storage';
 import { createVkMiniAppSessionHandoff } from '@/vk-mini-app/session-handoff';
 
 type PhoneAuthStartResult = {
@@ -83,17 +84,17 @@ type SessionContextValue = {
     phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<MaxAuthChallenge>;
-  checkMaxPhoneAuth: (challenge: MaxAuthChallenge) => Promise<MaxAuthStatus['status']>;
+  checkMaxPhoneAuth: (challenge: MessengerAuthExchange) => Promise<MaxAuthStatus['status']>;
   startTelegramPhoneAuth: (
     phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<TelegramAuthChallenge>;
-  checkTelegramPhoneAuth: (challenge: TelegramAuthChallenge) => Promise<MaxAuthStatus['status']>;
+  checkTelegramPhoneAuth: (challenge: MessengerAuthExchange) => Promise<MaxAuthStatus['status']>;
   startVkPhoneAuth: (
     phone: string | undefined,
     legalAcceptance: InitialLegalAcceptance,
   ) => Promise<VkAuthChallenge>;
-  checkVkPhoneAuth: (challenge: VkAuthChallenge) => Promise<VkAuthStatus['status']>;
+  checkVkPhoneAuth: (challenge: MessengerAuthExchange) => Promise<VkAuthStatus['status']>;
   signInWithVkMiniApp: (input: VkMiniAppAuthInput) => Promise<void>;
   consumeVkMiniAppSessionHandoff: (launchParams: string) => boolean;
   verifyVkMiniAppSession: (launchParams: string) => Promise<boolean>;
@@ -255,10 +256,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAuthError(null);
       try {
         const installationId = await getInstallationId();
-        return await apiRequest<MaxAuthChallenge>('/v1/auth/max/start', {
+        return await savePendingMessengerLogin('max', await apiRequest<MaxAuthChallenge>('/v1/auth/max/start', {
           method: 'POST',
-          body: JSON.stringify({ phone, legalAcceptance, installationId }),
-        });
+          body: JSON.stringify({ phone, legalAcceptance, installationId, platform: Platform.OS, supportsAuthReturn: true }),
+        }));
       } catch (error) {
         const message =
           error instanceof ApiError
@@ -274,7 +275,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const checkMaxPhoneAuth = useCallback(
-    async (challenge: MaxAuthChallenge): Promise<MaxAuthStatus['status']> => {
+    async (challenge: MessengerAuthExchange): Promise<MaxAuthStatus['status']> => {
       try {
         const installationId = await getInstallationId();
         const result = await apiRequest<MaxAuthStatus>('/v1/auth/max/status', {
@@ -297,6 +298,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           await applySession(result);
           if (!result.user.profileComplete) router.replace('/profile-setup');
         }
+        if (result.status !== 'pending') await clearPendingMessengerLogin(challenge.challengeId).catch(() => undefined);
         return result.status;
       } catch (error) {
         const message =
@@ -316,10 +318,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAuthError(null);
       try {
         const installationId = await getInstallationId();
-        return await apiRequest<TelegramAuthChallenge>('/v1/auth/telegram/start', {
+        return await savePendingMessengerLogin('telegram', await apiRequest<TelegramAuthChallenge>('/v1/auth/telegram/start', {
           method: 'POST',
-          body: JSON.stringify({ phone, legalAcceptance, installationId }),
-        });
+          body: JSON.stringify({ phone, legalAcceptance, installationId, platform: Platform.OS, supportsAuthReturn: true }),
+        }));
       } catch (error) {
         const message =
           error instanceof ApiError
@@ -335,7 +337,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const checkTelegramPhoneAuth = useCallback(
-    async (challenge: TelegramAuthChallenge): Promise<MaxAuthStatus['status']> => {
+    async (challenge: MessengerAuthExchange): Promise<MaxAuthStatus['status']> => {
       try {
         const installationId = await getInstallationId();
         const result = await apiRequest<MaxAuthStatus>('/v1/auth/telegram/status', {
@@ -358,6 +360,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           await applySession(result);
           if (!result.user.profileComplete) router.replace('/profile-setup');
         }
+        if (result.status !== 'pending') await clearPendingMessengerLogin(challenge.challengeId).catch(() => undefined);
         return result.status;
       } catch (error) {
         const message =
@@ -377,10 +380,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAuthError(null);
       try {
         const installationId = await getInstallationId();
-        return await apiRequest<VkAuthChallenge>('/v1/auth/vk/start', {
+        return await savePendingMessengerLogin('vk', await apiRequest<VkAuthChallenge>('/v1/auth/vk/start', {
           method: 'POST',
-          body: JSON.stringify({ phone, legalAcceptance, installationId, platform: Platform.OS }),
-        });
+          body: JSON.stringify({ phone, legalAcceptance, installationId, platform: Platform.OS, supportsAuthReturn: true }),
+        }));
       } catch (error) {
         const message = error instanceof ApiError
           ? error.message
@@ -395,7 +398,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const checkVkPhoneAuth = useCallback(
-    async (challenge: VkAuthChallenge): Promise<VkAuthStatus['status']> => {
+    async (challenge: MessengerAuthExchange): Promise<VkAuthStatus['status']> => {
       try {
         const installationId = await getInstallationId();
         const result = await apiRequest<VkAuthStatus>('/v1/auth/vk/status', {
@@ -421,6 +424,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setVkCommunityPromptUrl(result.communityPrompt?.url ?? null);
           if (!result.user.profileComplete) router.replace('/profile-setup');
         }
+        if (result.status !== 'pending') await clearPendingMessengerLogin(challenge.challengeId).catch(() => undefined);
         return result.status;
       } catch (error) {
         const message = error instanceof ApiError
@@ -599,6 +603,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const signOut = useCallback(async () => {
+    await clearPendingMessengerLogin().catch(() => undefined);
     sessionRevision.current += 1;
     vkMiniAppSessionHandoff.clear();
     await syncDriverBackgroundLocation(false).catch(() => undefined);

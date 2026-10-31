@@ -1,4 +1,5 @@
 import type { RideOrder } from '../src/domain/models';
+import { driverNavigationAddress, navigationPagePath } from '../src/domain/external-navigation';
 import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
@@ -24,6 +25,7 @@ export type RideMessengerAction =
   | 'increase'
   | 'increase-confirm'
   | 'refresh'
+  | 'contact'
   | `rate-${1 | 2 | 3 | 4 | 5}`;
 
 const actionCodes: Record<RideMessengerAction, string> = {
@@ -40,6 +42,7 @@ const actionCodes: Record<RideMessengerAction, string> = {
   increase: 'raise',
   'increase-confirm': 'raise-ok',
   refresh: 'refresh',
+  contact: 'contact',
   'rate-1': 'rate-1',
   'rate-2': 'rate-2',
   'rate-3': 'rate-3',
@@ -84,6 +87,16 @@ function link(label: string, url: string): MessengerButton {
   return { type: 'link', label, url };
 }
 
+function contactButtons(ride: RideOrder, audience: 'passenger' | 'driver'): MessengerButton[][] {
+  if (!ride.driverId || !['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(ride.status)) return [];
+  const person = audience === 'passenger' ? ride.driver : ride.passenger;
+  const recipient = audience === 'passenger' ? 'водителю' : 'пассажиру';
+  return [
+    ...(person?.phone ? [[callback(ride, 'contact', `📞 Позвонить ${recipient}`)]] : []),
+    [link(`💬 Написать ${recipient}`, appUrl(`/chat/${ride.id}`))],
+  ];
+}
+
 export function passengerRideButtons(ride: RideOrder): MessengerButton[][] {
   const openOrder = [link('📱 Открыть заказ', appUrl(`/orders/${ride.id}`))];
   if (ride.status === 'searching') {
@@ -98,13 +111,14 @@ export function passengerRideButtons(ride: RideOrder): MessengerButton[][] {
   }
   if (['accepted', 'driver_arriving', 'driver_waiting'].includes(ride.status)) {
     return [
+      ...contactButtons(ride, 'passenger'),
       [callback(ride, 'refresh', '🔄 Обновить')],
       [callback(ride, 'cancel', '✖️ Отменить заказ', 'negative')],
       openOrder,
     ];
   }
   if (ride.status === 'in_progress') {
-    return [[callback(ride, 'refresh', '🔄 Обновить')], openOrder];
+    return [...contactButtons(ride, 'passenger'), [callback(ride, 'refresh', '🔄 Обновить')], openOrder];
   }
   if (ride.status === 'completed') {
     const rating = ride.ratings?.byPassenger
@@ -135,30 +149,32 @@ export function driverRideButtons(ride: RideOrder): MessengerButton[][] {
   }
   if (ride.driverQueuePosition === 2) {
     return [
+      ...contactButtons(ride, 'driver'),
       [callback(ride, 'refresh', '🔄 Обновить')],
       [link('📱 Открыть следующий заказ', appUrl('/driver'))],
     ];
   }
   const nextActions: Partial<Record<RideOrder['status'], [RideMessengerAction, string]>> = {
-    accepted: ['driver-arriving', '🚗 Выехал к пассажиру'],
-    driver_arriving: ['driver-waiting', '📍 Я на месте'],
+    accepted: ['driver-waiting', '📍 Я приехал'],
+    driver_arriving: ['driver-waiting', '📍 Я приехал'],
     driver_waiting: ['start-trip', '▶️ Начать поездку'],
   };
   const nextAction = nextActions[ride.status];
+  const navigationAddress = driverNavigationAddress(ride);
+  const navigationButtons = navigationAddress ? [[link('🧭 Маршрут', appUrl(navigationPagePath(navigationAddress)))]] : [];
   if (nextAction) {
     return [
       [callback(ride, nextAction[0], nextAction[1], 'positive')],
+      ...contactButtons(ride, 'driver'),
+      ...navigationButtons,
       [callback(ride, 'refresh', '🔄 Обновить')],
       [link('📱 Открыть поездку', appUrl('/driver'))],
     ];
   }
   if (ride.status === 'in_progress') {
     return [
-      [
-        ride.waitingStartedAt
-          ? callback(ride, 'waiting-stop', '⏹ Остановить ожидание', 'negative')
-          : callback(ride, 'waiting-start', '⏱ Включить ожидание'),
-      ],
+      ...contactButtons(ride, 'driver'),
+      ...navigationButtons,
       [callback(ride, 'complete', '🏁 Завершить поездку', 'positive')],
       [callback(ride, 'refresh', '🔄 Обновить')],
     ];

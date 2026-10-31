@@ -10,6 +10,7 @@ import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMoney } from './admin-telegram';
 import { db, firstRow } from './db';
 import {
+  appUrl,
   notifyMessengerAccount,
   refreshMessengerAccountOrderMessages,
 } from './messenger-notifications';
@@ -23,6 +24,7 @@ import {
 } from './ride-messenger';
 import { signSession } from './security';
 import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
+import { normalizeRussianPhone } from './phone-verification';
 
 export type MessengerOrderActionRequest = {
   provider: 'max' | 'telegram' | 'vk';
@@ -57,6 +59,7 @@ function secondsUntil(timestamp: number): string {
 }
 
 export function createMessengerOrderActionHandler(app: FastifyInstance) {
+  const recentContacts = new Map<string, number>();
   return async (
     request: MessengerOrderActionRequest,
   ): Promise<MessengerOrderActionResult> => {
@@ -159,6 +162,37 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         : null;
     if (!audience) return { text: 'Этот заказ вам недоступен.', alert: true };
 
+    if (parsed.action === 'contact') {
+      if (!ride.driverId || !['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(ride.status)) {
+        return { text: 'Связь доступна после назначения водителя и до завершения поездки.', alert: true };
+      }
+      const person = audience === 'passenger' ? ride.driver : ride.passenger;
+      const phone = person?.phone ? normalizeRussianPhone(person.phone) : null;
+      if (!phone) return { text: 'Номер телефона пока недоступен. Напишите в чат заказа.', alert: true };
+      const now = Date.now();
+      const key = `${request.provider}:${request.externalUserId}:${ride.id}`;
+      for (const [cachedKey, expiresAt] of recentContacts) if (expiresAt <= now) recentContacts.delete(cachedKey);
+      if (recentContacts.has(key)) return { text: 'Контакт уже отправлен ниже.' };
+      if (recentContacts.size >= 10_000) return { text: 'Попробуйте ещё раз через полминуты.', alert: true };
+      recentContacts.set(key, now + 30_000);
+      try {
+        await notifyMessengerAccount(request.provider, request.externalUserId, {
+          syncExistingOrderMessages: false,
+          icon: '📞',
+          title: audience === 'passenger' ? 'Связаться с водителем' : 'Связаться с пассажиром',
+          body: `${person?.name ?? ''}\n${phone}\n${request.provider === 'vk'
+            ? 'Нажмите на номер телефона для звонка.'
+            : 'Откройте карточку контакта для звонка.'}`,
+          contact: { name: person?.name || (audience === 'passenger' ? 'Водитель' : 'Пассажир'), phone },
+          buttons: [[{ type: 'link', label: '💬 Написать в чат заказа', url: appUrl(`/chat/${ride.id}`) }]],
+        });
+      } catch (error) {
+        recentContacts.delete(key);
+        throw error;
+      }
+      return { text: 'Контакт отправлен ниже.' };
+    }
+
     const refreshCurrentStatus = async (currentRide = ride): Promise<void> => {
       await refreshMessengerAccountOrderMessages(
         request.provider,
@@ -258,37 +292,14 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
       return { text: 'Подтвердите новую цену ниже.' };
     }
 
-    if (parsed.action === 'complete') {
+    if (parsed.action === 'complete' || parsed.action === 'complete-confirm') {
       if (isRidePricePending(ride)) return {
         text: 'Сначала согласуйте сумму с пассажиром и отправьте «Цена 350» (вашу сумму в рублях).', alert: true,
       };
-      if (audience !== 'driver' || ride.status !== 'in_progress') {
+      if (audience !== 'driver' || !['in_progress', 'completed'].includes(ride.status)) {
         await refreshCurrentStatus().catch(() => undefined);
         return { text: 'Завершить эту поездку сейчас нельзя.', alert: true };
       }
-      await notifyMessengerAccount(request.provider, request.externalUserId, {
-        orderId: ride.id,
-        audience,
-        syncExistingOrderMessages: false,
-        icon: '🏁',
-        title: 'Оплата получена?',
-        body: 'Подтвердите, что пассажир доставлен в место назначения и оплата получена.',
-        details: [['💳 Итого', ridePriceLabel(ride)]],
-        buttons: [
-          [{
-            type: 'callback',
-            label: 'Оплата получена, завершить',
-            data: rideMessengerActionData(ride.id, 'complete-confirm'),
-            intent: 'positive',
-          }],
-          [{
-            type: 'callback',
-            label: 'Продолжить поездку',
-            data: rideMessengerActionData(ride.id, 'refresh'),
-          }],
-        ],
-      });
-      return { text: 'Подтвердите завершение ниже.' };
     }
 
     const endpoint = (() => {
@@ -299,11 +310,12 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
           return ['POST', `/v1/driver/orders/${ride.id}/transition`, { status: 'driver_waiting' }] as const;
         case 'start-trip':
           return ['POST', `/v1/driver/orders/${ride.id}/transition`, { status: 'in_progress' }] as const;
+        case 'complete':
         case 'complete-confirm':
           return [
             'POST',
             `/v1/driver/orders/${ride.id}/transition`,
-            { status: 'completed', paymentReceived: true },
+            { status: 'completed' },
           ] as const;
         case 'waiting-start':
           return ['POST', `/v1/driver/orders/${ride.id}/waiting/start`] as const;
@@ -338,6 +350,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
             'driver-arriving': 'Пассажир видит, что вы выехали 🚗',
             'driver-waiting': 'Пассажир получил уведомление 📍',
             'start-trip': 'Поездка началась ▶️',
+            complete: 'Поездка завершена 🏁',
             'complete-confirm': 'Поездка завершена 🏁',
             'waiting-start': 'Ожидание включено ⏱',
             'waiting-stop': 'Ожидание остановлено ⏹',

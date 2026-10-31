@@ -12,6 +12,7 @@ import { sendTelegramMessage } from './telegram-bot';
 import { sendMaxMessage } from './max-bot';
 import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
+import { appUrl } from './messenger-notifications';
 
 export type BookingMessage = MessengerIdentityInput & {
   eventId: string;
@@ -19,7 +20,7 @@ export type BookingMessage = MessengerIdentityInput & {
   /** Only contacts authenticated by the provider adapter may populate this. */
   verifiedPhone?: string | null;
 };
-type Reply = { text: string; buttons?: { label: string; data: string }[]; requestContact?: boolean };
+type Reply = { text: string; buttons?: ({ label: string; data: string } | { label: string; url: string })[]; requestContact?: boolean };
 export type BookingDraft = {
   id: string;
   flowVersion?: 2;
@@ -50,6 +51,10 @@ function activeOrderReply(order: ActiveOrder, text = 'У вас уже есть 
   return {
     text: `${text}\nСтатус заказа: https://taxigr.ru/orders/${order.id}`,
     buttons: [
+      ...(['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(order.status) ? [
+        { label: '📞 Позвонить водителю', data: rideMessengerActionData(order.id, 'contact') },
+        { label: '💬 Написать водителю', url: appUrl(`/chat/${order.id}`) },
+      ] : []),
       { label: 'Обновить статус', data: rideMessengerActionData(order.id, 'refresh') },
       ...(canCancel(order) ? [{ label: 'Отменить заказ', data: rideMessengerActionData(order.id, 'cancel') }] : []),
     ],
@@ -85,7 +90,7 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
         keyboard: [[{ text: 'Поделиться номером для заказа', request_contact: true }]],
         resize_keyboard: true, one_time_keyboard: true,
       } : buttons.length ? {
-        inline_keyboard: buttons.map(button => [{ text: button.label, callback_data: button.data }]),
+        inline_keyboard: buttons.map(button => [{ text: button.label, ...('url' in button ? { url: button.url } : { callback_data: button.data }) }]),
       } : { remove_keyboard: true },
     });
   } else if (message.provider === 'max') {
@@ -93,12 +98,13 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
       text: reply.text,
       attachments: reply.requestContact || buttons.length ? [{ type: 'inline_keyboard', payload: { buttons: reply.requestContact ?
         [[{ type: 'request_contact', text: 'Поделиться номером для заказа' }]] :
-        buttons.map(button => [{ type: 'callback', text: button.label, payload: button.data }]) } }] : undefined,
+        buttons.map(button => ['url' in button ? { type: 'link', text: button.label, url: button.url } :
+          { type: 'callback', text: button.label, payload: button.data }]) } }] : undefined,
     });
   } else {
     await sendVkMessage(message.chatId, {
       message: reply.text,
-      keyboard: buttons.length ? vkInlineKeyboard(buttons.map(button => [{ type: 'callback', ...button }])) : undefined,
+      keyboard: buttons.length ? vkInlineKeyboard(buttons.map(button => [{ type: 'url' in button ? 'link' : 'callback', ...button }])) : undefined,
     });
   }
 }

@@ -5,6 +5,7 @@ import webpush from 'web-push';
 import { config } from './config';
 import { db } from './db';
 import { getVapidConfig } from './vapid';
+import { pushRoute } from '../src/notifications/push-route';
 
 export type PushMessage = {
   title: string;
@@ -56,12 +57,7 @@ function chunks<T>(items: T[], size: number): T[][] {
 }
 
 function pushDeepLink(data?: Record<string, string>): string {
-  const orderId = data?.orderId ? encodeURIComponent(data.orderId) : null;
-  if (!orderId) return 'taxigrahovo:///';
-  if (data?.chat === 'true') return `taxigrahovo:///chat/${orderId}`;
-  return data?.role === 'driver'
-    ? `taxigrahovo:///driver/trips/${orderId}`
-    : `taxigrahovo:///orders/${orderId}`;
+  return `taxigrahovo://${pushRoute(data)}`;
 }
 
 async function sendRuStorePush(token: string, message: PushMessage): Promise<'sent' | 'removed'> {
@@ -198,13 +194,7 @@ export async function notifyUsers(
   if (webRows.length) {
     const vapid = getVapidConfig();
     webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
-    const url = message.data?.orderId
-      ? message.data.chat === 'true'
-        ? `/chat/${message.data.orderId}`
-        : message.data.role === 'driver'
-          ? `/driver/trips/${message.data.orderId}`
-          : `/orders/${message.data.orderId}`
-      : '/';
+    const url = pushRoute(message.data);
     for (const subscription of webRows) {
       try {
         await webpush.sendNotification(

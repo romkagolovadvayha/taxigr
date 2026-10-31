@@ -56,6 +56,17 @@ export async function sendTelegramMessage(
   return message.message_id == null ? null : String(message.message_id);
 }
 
+export async function sendTelegramContact(
+  chatId: string,
+  body: { phone_number: string; first_name: string; reply_markup?: unknown },
+): Promise<string | null> {
+  const message = await callTelegramApi<{ message_id?: number | string }>(
+    'sendContact',
+    { chat_id: chatId, ...body },
+  );
+  return message.message_id == null ? null : String(message.message_id);
+}
+
 export async function editTelegramMessage(
   chatId: string,
   messageId: string,
@@ -156,11 +167,17 @@ export async function requestTelegramContact(chatId: string): Promise<void> {
 export async function sendTelegramConfirmation(
   chatId: string,
   success: boolean,
+  returnUrl?: string,
 ): Promise<void> {
   await sendTelegramMessage(chatId, {
     text: success
-      ? 'Номер подтверждён. Вернитесь в приложение Такси Грахово — вход завершится автоматически.'
+      ? returnUrl
+        ? 'Номер подтверждён. Нажмите «Заказать такси», чтобы продолжить там, где вы начали вход.'
+        : 'Номер подтверждён. Вернитесь туда, где начали вход в «Такси Грахово».'
       : 'Номер Telegram не совпадает с номером, указанным в приложении. Вернитесь в приложение и проверьте номер.',
-    reply_markup: { remove_keyboard: true },
+    reply_markup: success && returnUrl
+      ? { inline_keyboard: [[{ text: '🚕 Заказать такси', url: returnUrl }]] }
+      : { remove_keyboard: true },
+    disable_web_page_preview: true,
   });
 }

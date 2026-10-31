@@ -206,12 +206,11 @@ function AddressResult({
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+        <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
           {displayLines.primary}
         </Text>
         {!!displayLines.secondary && (
           <Text
-            selectable
             style={{ ...typography.caption, color: colors.inkSecondary }}
           >
             {displayLines.secondary}
@@ -226,7 +225,7 @@ function AddressResult({
           <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Точка запомнена</Text>
         )}
         {!!place?.description && (
-          <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
+          <Text style={{ ...typography.caption, color: colors.inkMuted }}>
             {place.description}
           </Text>
         )}
@@ -241,7 +240,6 @@ function AddressResult({
       </View>
       {manual ? (
         <Text
-          selectable
           numberOfLines={2}
           style={{
             ...typography.caption,
@@ -256,7 +254,6 @@ function AddressResult({
         <AppIcon name="chevron" color={colors.inkMuted} size={20} />
       ) : !precise ? (
         <Text
-          selectable
           numberOfLines={2}
           style={{
             ...typography.caption,
@@ -269,7 +266,6 @@ function AddressResult({
         </Text>
       ) : history ? (
         <Text
-          selectable
           numberOfLines={2}
           style={{
             ...typography.caption,
@@ -315,6 +311,7 @@ export function AddressSearchScreen() {
   } | null>(null);
   const [remoteResults, setRemoteResults] = useState<Address[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchNeedsSubmit, setSearchNeedsSubmit] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const isFocused = useForegroundScreen();
   const lastSearchQuery = useRef('');
@@ -380,23 +377,22 @@ export function AddressSearchScreen() {
   const canSearchRemote = query.trim().length >= 2 && !!token;
   const showPersonalSuggestions =
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
-  const overlaidResults = overlayRememberedAddresses(
-    mergeAddresses(localResults, canSearchRemote && edited ? remoteResults : []), rememberedAddresses,
-  ).flatMap(address => { const searchable = searchableAddress(address); return searchable ? [searchable] : []; });
-  const baseResults = filterRequestedHouse(normalizedQuery ? rankAddressSearchResults(overlaidResults, normalizedQuery) : overlaidResults, query);
   const queryTokens = searchTokens(query);
   const queryMatchesKnownStreetName = queryTokens.some((token) => knownStreetTokens.has(token));
   const showHouseSuggestions =
     !!selectedStreet || queryHasHouseNumber(query) || queryMatchesKnownStreetName;
-  const results = mergeAddresses(
-    overlayRememberedAddresses(matchingHistory.map((item) => item.address), rememberedAddresses)
-      .filter(address => matchesAddress(address, normalizedQuery)),
-    baseResults,
-  ).filter(
-    (address) =>
-      (!selectedStreet || hasHouseNumber(address)) &&
-      (Boolean(address.place) || showHouseSuggestions || !hasHouseNumber(address)),
-  );
+  const results = useMemo(() => {
+    const overlaidResults = overlayRememberedAddresses(
+      mergeAddresses(localResults, canSearchRemote && edited ? remoteResults : []), rememberedAddresses,
+    ).flatMap(address => { const searchable = searchableAddress(address); return searchable ? [searchable] : []; });
+    const baseResults = filterRequestedHouse(normalizedQuery ? rankAddressSearchResults(overlaidResults, normalizedQuery) : overlaidResults, query);
+    return mergeAddresses(
+      overlayRememberedAddresses(matchingHistory.map((item) => item.address), rememberedAddresses)
+        .filter(address => matchesAddress(address, normalizedQuery)),
+      baseResults,
+    ).filter(address => (!selectedStreet || hasHouseNumber(address)) &&
+      (Boolean(address.place) || showHouseSuggestions || !hasHouseNumber(address)));
+  }, [localResults, canSearchRemote, edited, remoteResults, rememberedAddresses, normalizedQuery, query, matchingHistory, selectedStreet, showHouseSuggestions]);
   const hasPlaceResults = results.some((address) => Boolean(address.place));
   const clock = useScreenClock(30_000, hasPlaceResults && !pendingAddress);
   const now = useMemo(() => new Date(clock), [clock]);
@@ -436,7 +432,20 @@ export function AddressSearchScreen() {
     ? pointMapCenter.coordinates
     : pendingAddress?.coordinates;
 
+  const cancelSearch = useCallback(() => {
+    searchRequestId.current += 1;
+    searchAbortController.current?.abort();
+    searchAbortController.current = null;
+    lastSearchQuery.current = '';
+    setSearching(false);
+    setSearchNeedsSubmit(false);
+    setSearchError(null);
+    setEdited(false);
+  }, []);
+
   const applyAddress = useCallback((address: Address) => {
+    cancelSearch();
+    Keyboard.dismiss();
     if (field === 'pickup') setPickup(address);
     else if (append === '1') addDestination(address);
     else {
@@ -445,7 +454,7 @@ export function AddressSearchScreen() {
       else setDestination(address);
     }
     goBackOrReplace((append === '1' || destinationIndex != null ? '/stops' : '/') as never);
-  }, [field, append, destinationIndex, setPickup, addDestination, setDestinationAt, setDestination]);
+  }, [cancelSearch, field, append, destinationIndex, setPickup, addDestination, setDestinationAt, setDestination]);
 
   useEffect(() => {
     if (!pendingAddress) return;
@@ -489,13 +498,14 @@ export function AddressSearchScreen() {
     setSearching(true);
     const endpoint = demoSession ? '/v1/addresses/preview' : '/v1/addresses/search';
     void apiRequest<Address[]>(
-      `${endpoint}?query=${encodeURIComponent(normalized)}`,
-      { token: demoSession ? undefined : token, signal: controller.signal, timeoutMs: 25_000 },
+      `${endpoint}?query=${encodeURIComponent(normalized)}${selectAfterSearch ? '' : '&mode=suggest'}`,
+      { token: demoSession ? undefined : token, signal: controller.signal, timeoutMs: 12_000 },
     )
       .then((items) => {
         if (requestId !== searchRequestId.current) return;
         setRemoteResults(items);
-        setSearchError(items.length ? null : 'Точного совпадения нет');
+        setSearchError(selectAfterSearch && !items.length && !localResults.length ? 'Точного совпадения нет' : null);
+        setSearchNeedsSubmit(!selectAfterSearch && !items.length && !localResults.length);
         if (selectAfterSearch) {
           const candidates = overlayRememberedAddresses(mergeAddresses(localResults, items), rememberedAddresses)
             .flatMap(address => { const candidate = searchableAddress(address); return candidate ? [candidate] : []; });
@@ -519,11 +529,8 @@ export function AddressSearchScreen() {
 
   const submitSearch = () => {
     const selected = selectUnambiguousAddress(query, results, field === 'pickup');
-    if (selected) {
-      searchRequestId.current += 1;
-      searchAbortController.current?.abort();
-      applyAddress(selected);
-    } else runRemoteSearch(true);
+    if (selected) applyAddress(selected);
+    else runRemoteSearch(true);
   };
 
   useEffect(() => {
@@ -546,8 +553,7 @@ export function AddressSearchScreen() {
   );
 
   const selectAddress = async (address: Address) => {
-    if (searchAbortController.current) lastSearchQuery.current = '';
-    searchAbortController.current?.abort();
+    cancelSearch();
     if (hasApproximateCoordinates(address) &&
       (hasHouseNumber(address) || address.placeId) &&
       !(field === 'destination' && address.kind === 'settlement')) {
@@ -702,6 +708,8 @@ export function AddressSearchScreen() {
             setResolvingHouse(false);
             searchRequestId.current += 1;
             searchAbortController.current?.abort();
+            lastSearchQuery.current = '';
+            setSearchNeedsSubmit(false);
             setEdited(true);
             if (
               selectedStreet &&
@@ -729,9 +737,7 @@ export function AddressSearchScreen() {
           onSubmitEditing={submitSearch}
           accessibilityLabel="Поиск адреса или места"
         />
-        {searching ? (
-          <ActivityIndicator color={colors.ink} />
-        ) : (
+        {searching && !results.length && <ActivityIndicator color={colors.ink} accessibilityLabel="Ищем адрес" />}
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Найти адрес"
@@ -750,7 +756,6 @@ export function AddressSearchScreen() {
           >
             <AppIcon name="search" color={canSearchRemote ? colors.brandInk : colors.inkMuted} />
           </AnimatedPressable>
-        )}
       </View>
       {field === 'pickup' && (
         <AnimatedPressable
@@ -825,6 +830,12 @@ export function AddressSearchScreen() {
         <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.warning }}>
           {searchError}.{results.length ? ' Можно выбрать адрес из подсказок.' : ' Полный адрес с номером дома можно использовать вручную.'}
         </Text>
+      )}
+      {searchNeedsSubmit && !results.length && !searching && (
+        <AnimatedPressable accessibilityRole="button" onPress={submitSearch} style={{ padding: spacing.x3 }}>
+          <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Найти на карте</Text>
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>В подсказках адреса нет. Нажмите, чтобы продолжить поиск.</Text>
+        </AnimatedPressable>
       )}
       {!!manualAddress && (
         <View style={{ gap: spacing.x3 }}>

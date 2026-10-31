@@ -15,6 +15,26 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it('does not enqueue external requests for unfinished or unknown autocomplete queries', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    await expect(searchAddresses('Несуществующийтест', false, false, true)).resolves.toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('shares one upstream lookup between simultaneous identical searches', async () => {
+    const fetch = vi.fn(async () => new Response('[]')); vi.stubGlobal('fetch', fetch);
+    const results = await Promise.all(Array.from({ length: 8 }, () => searchAddresses('Грахово Проверкадубликатов')));
+    expect(results).toEqual(Array.from({ length: 8 }, () => []));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('does not make a nationwide fallback after finding the exact district house', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify([{ place_id: 'precise-lookup',
+      display_name: 'Проверочная, 999, Грахово', lat: '56.05', lon: '51.96',
+      address: { road: 'Проверочная', house_number: '999', village: 'Грахово', county: 'Граховский район' } }])));
+    vi.stubGlobal('fetch', fetch);
+    const result = await searchAddresses('Проверочная 999', false, true);
+    expect(result[0]?.houseNumber).toBe('999');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it.each(['Можга', 'в можгу', 'я хочу в можгу', 'Можга Придорожная 10'])('returns a city centre without streets for %s', async query => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     const results = await searchAddresses(query);

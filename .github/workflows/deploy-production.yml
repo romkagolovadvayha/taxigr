@@ -115,6 +115,8 @@ jobs:
           VK_CALLBACK_SECRET: ${{ secrets.VK_CALLBACK_SECRET }}
           VK_CALLBACK_CONFIRMATION: ${{ secrets.VK_CALLBACK_CONFIRMATION }}
           VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
+          RUSTORE_PUSH_PROJECT_ID: ${{ vars.RUSTORE_PUSH_PROJECT_ID }}
+          RUSTORE_PUSH_SERVICE_TOKEN: ${{ secrets.RUSTORE_PUSH_SERVICE_TOKEN }}
         run: |
           python3 - <<'PY'
           import os, shlex

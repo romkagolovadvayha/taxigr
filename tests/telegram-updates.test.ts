@@ -49,7 +49,7 @@ describe("Telegram update processing", () => {
     expect(mocks.requestTelegramContact).toHaveBeenCalledWith("42");
   });
 
-  it("records a matching shared phone and confirms it", async () => {
+  it("records a matching shared phone and preserves the legacy return flow", async () => {
     mocks.telegramStartPayload.mockReturnValue(null);
     mocks.extractOwnTelegramPhone.mockReturnValue("+79990000000");
     mocks.firstRow.mockResolvedValue({
@@ -68,7 +68,7 @@ describe("Telegram update processing", () => {
     await processTelegramUpdate(update);
 
     expect(mocks.execute).toHaveBeenCalledOnce();
-    expect(mocks.sendTelegramConfirmation).toHaveBeenCalledWith("42", true);
+    expect(mocks.sendTelegramConfirmation).toHaveBeenCalledWith("42", true, undefined);
   });
 
   it.each([
@@ -82,6 +82,7 @@ describe("Telegram update processing", () => {
       mocks.firstRow.mockResolvedValue({
         id: "challenge-id",
         expected_phone: expectedPhone,
+        return_platform: 'web',
       });
       await processTelegramUpdate(
         telegramUpdateSchema.parse({
@@ -104,6 +105,7 @@ describe("Telegram update processing", () => {
       expect(mocks.sendTelegramConfirmation).toHaveBeenCalledWith(
         "42",
         matches,
+        expect.stringContaining('/auth-return?provider=telegram&challenge=challenge-id&target=web'),
       );
     },
   );

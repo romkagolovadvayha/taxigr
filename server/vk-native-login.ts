@@ -12,7 +12,7 @@ function invalid(message: string, statusCode = 409): Error {
 export async function confirmVkNativeLogin(
   connection: PoolConnection,
   input: { state: string; sessionUserId: string; vkUserId: string },
-): Promise<void> {
+): Promise<{ challengeId: string; returnPlatform: string }> {
   const [challenges] = await connection.query<(RowDataPacket & {
     id: string;
     expected_phone: string | null;
@@ -21,8 +21,9 @@ export async function confirmVkNativeLogin(
     verified_at: Date | string | null;
     completed_at: Date | string | null;
     failure_code: string | null;
+    return_platform: string;
   })[]>(
-    `SELECT id, expected_phone, vk_user_id, expires_at, verified_at, completed_at, failure_code
+    `SELECT id, expected_phone, vk_user_id, expires_at, verified_at, completed_at, failure_code, return_platform
      FROM vk_auth_challenges WHERE state_token = ? FOR UPDATE`,
     [input.state],
   );
@@ -49,7 +50,8 @@ export async function confirmVkNativeLogin(
   if (!account?.phone || !matchesMessengerPhone(account.phone, challenge.expected_phone)) {
     throw invalid('Аккаунт такси не соответствует подтверждённому профилю VK.', 403);
   }
-  if (challenge.verified_at) return; // A retry after a lost response is harmless.
+  const confirmed = { challengeId: challenge.id, returnPlatform: challenge.return_platform };
+  if (challenge.verified_at) return confirmed; // A retry after a lost response is harmless.
   await connection.execute(
     `UPDATE vk_auth_challenges
      SET verified_phone = ?, vk_user_id = ?, vk_first_name = ?, vk_last_name = ?,
@@ -57,4 +59,5 @@ export async function confirmVkNativeLogin(
      WHERE id = ? AND verified_at IS NULL AND completed_at IS NULL`,
     [account.phone, input.vkUserId, account.first_name, account.last_name, challenge.id],
   );
+  return confirmed;
 }

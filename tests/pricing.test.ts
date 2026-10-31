@@ -19,7 +19,6 @@ describe('route pricing', () => {
     districtPerKilometer07To22Minor: 6_000,
     districtPerKilometer22To02Minor: 7_000,
     districtPerKilometer02To07Minor: 8_000,
-    intercityPerKilometerMinor: 3_000,
   };
 
   it('uses a fixed time-based fare inside Grahovo', () => {
@@ -33,11 +32,36 @@ describe('route pricing', () => {
     expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(57_000);
   });
 
-  it('keeps a separate intercity per-kilometer rate', () => {
+  it('uses the configured intercity rate for each period', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z');
     const late = new Date('2026-08-03T18:00:00.000Z');
-    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(183_000);
-    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(183_000);
+    const night = new Date('2026-08-03T22:00:00.000Z');
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(305_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(427_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, night)).toBe(610_000);
+  });
+
+  it.each([
+    ['2026-08-03T17:59:59.999Z', 50_000],
+    ['2026-08-03T18:00:00.000Z', 70_000],
+    ['2026-08-03T20:00:00.000Z', 70_000],
+    ['2026-08-03T21:59:59.999Z', 70_000],
+    ['2026-08-03T22:00:00.000Z', 100_000],
+    ['2026-08-04T02:59:59.999Z', 100_000],
+    ['2026-08-04T03:00:00.000Z', 50_000],
+  ])('prices a 10 km intercity route correctly at %s', (timestamp, expected) => {
+    expect(calculateFareMinor(10_000, 'economy', 'intercity', rules, new Date(timestamp))).toBe(expected);
+  });
+
+  it('keeps the configured old flat rate when reading an older API response', () => {
+    const legacy = JSON.parse(JSON.stringify(rules));
+    delete legacy.intercityPerKilometer07To22Minor;
+    delete legacy.intercityPerKilometer22To02Minor;
+    delete legacy.intercityPerKilometer02To07Minor;
+    legacy.intercityPerKilometerMinor = 4_500;
+    for (const time of ['03:00', '18:00', '22:00']) {
+      expect(calculateFareMinor(10_000, 'economy', 'intercity', legacy, new Date(`2026-08-03T${time}:00Z`))).toBe(45_000);
+    }
   });
 
   it('switches periods exactly at 22:00, 02:00 and 07:00 Samara time', () => {
@@ -87,8 +111,19 @@ describe('route pricing', () => {
       { distanceMeters: 50_000, scope: 'intercity' as const },
     ];
 
-    expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(210_000);
-    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(217_000);
+    expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(310_000);
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(317_000);
+  });
+
+  it.each([
+    ['03:00', 342_000], ['18:00', 462_000], ['22:00', 637_000],
+  ])('uses the same period for all legs, charges approach and child seat once at %s', (time, expected) => {
+    const segments = [
+      {distanceMeters: 10_000, scope: 'district' as const},
+      {distanceMeters: 20_000, scope: 'intercity' as const},
+      {distanceMeters: 30_000, scope: 'intercity' as const},
+    ];
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, new Date(`2026-08-03T${time}:00Z`), 5_000)).toBe(expected);
   });
 
   it('adds a district leg to an earlier fixed Grahovo leg', () => {

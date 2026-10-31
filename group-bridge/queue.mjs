@@ -8,6 +8,7 @@ export class EventQueue {
   }
   add(event) {
     this.prune();
+    if (this.db.prepare('SELECT 1 FROM events WHERE id = ?').get(event.eventId)) return false;
     if (this.pendingCount() >= 1000) throw new Error('QUEUE_FULL');
     return this.db.prepare('INSERT OR IGNORE INTO events(id,payload,created) VALUES(?,?,?)').run(event.eventId, JSON.stringify(event), event.sentAt).changes > 0;
   }
@@ -19,5 +20,6 @@ export class EventQueue {
   pendingCount() { return this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE payload IS NOT NULL AND delivered IS NULL').get().n; }
   pending() { this.prune(); return this.db.prepare('SELECT id,payload FROM events WHERE payload IS NOT NULL AND delivered IS NULL ORDER BY created LIMIT 20').all(); }
   done(id) { this.db.prepare('UPDATE events SET delivered = ?, payload = NULL WHERE id = ?').run(Date.now(), id); }
+  discard(id) { this.db.prepare('UPDATE events SET payload = NULL WHERE id = ?').run(id); }
   close() { this.db.close(); }
 }

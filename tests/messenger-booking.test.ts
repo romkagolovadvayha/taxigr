@@ -14,6 +14,7 @@ vi.mock('../server/vk-bot',()=>({sendVkMessage:mocks.send,vkInlineKeyboard:(rows
 vi.mock('../server/messenger-notifications',()=>({appUrl:(path:string)=>`https://taxigr.ru${path}`}));
 import { createMessengerBookingHandler } from '../server/messenger-booking';
 import type { FastifyInstance } from 'fastify';
+import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
 
 const initial=():BookingDraft=>({id:'test-draft',flowVersion:2,stage:'idle'});
 const orderId='123e4567-e89b-12d3-a456-426614174000';
@@ -23,7 +24,7 @@ let expiresAt:Date;
 const events=new Map<string,unknown>();
 const message=(text:string,eventId=text):BookingMessage=>({provider:'telegram',externalUserId:'42',chatId:'42',eventId,text});
 const handle=createMessengerBookingHandler({inject:mocks.inject} as unknown as FastifyInstance);
-const replyText=()=>mocks.send.mock.calls.at(-1)?.[1]?.text as string;
+const replyText=()=> (mocks.send.mock.calls.at(-1)?.[1]?.text ?? mocks.send.mock.calls.at(-1)?.[1]?.message) as string;
 const replyButtons=()=>mocks.send.mock.calls.at(-1)?.[1]?.reply_markup?.inline_keyboard?.flat() ?? [];
 const start=()=>handle(message('b:start'));
 
@@ -49,6 +50,31 @@ beforeEach(()=>{
 });
 
 describe('taxi booking in messenger conversations',()=>{
+  it.each(['max', 'telegram', 'vk'] as const)('preserves apartment and entrance details after %s addresses resolve to mapped houses', async provider => {
+    const pickupRaw='Грахово, ул 50 лет победы дом 10 кв 2';
+    const destinationRaw='Ул Ачинцева 11 подъезд 3 15 квартира';
+    const pickup=grahovoAddressCatalog.find(a=>a.label==='с. Грахово, ул. 50 лет Победы, 10')!;
+    const destination=grahovoAddressCatalog.find(a=>a.label==='с. Грахово, ул. Ачинцева, 11')!;
+    mocks.resolve.mockImplementation(async (_raw, isPickup)=>isPickup?pickup:destination);
+    mocks.inject.mockImplementation(async ({url}: {url:string})=>({statusCode:200,json:()=>({data:url==='/v1/quotes'
+      ? {quoteToken:'fixed-quote',tariffs:[{code:'economy',priceMinor:25000}]} : {id:orderId,status:'searching'}})}));
+    for(const text of ['b:start',pickupRaw,destinationRaw])await handle({...message(text),provider});
+    expect(replyText()).toContain('Стоимость: 250 ₽');
+    await handle({...message(`b:confirm:${draft.id}`),provider});
+    expect(mocks.inject).toHaveBeenCalledWith(expect.objectContaining({url:'/v1/orders',payload:expect.objectContaining({
+      pickup,destination,quoteToken:'fixed-quote',comment:`Из ${provider}. Со слов пассажира: ${pickupRaw} → ${destinationRaw}`,
+    })}));
+  });
+  it.each(['max', 'telegram', 'vk'] as const)('keeps call and write controls when reopening an assigned order in %s', async provider => {
+    active={id:orderId,status:'accepted'};
+    await handle({...message('/start'),provider});
+    const body=JSON.stringify(mocks.send.mock.calls.at(-1)?.[1]);
+    expect(body).toContain(`r:contact:${orderId}`);
+    expect(body).toContain(`https://taxigr.ru/chat/${orderId}`);
+    expect(body).toContain('Позвонить водителю');
+    expect(body).toContain('Написать водителю');
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
   it.each(['telegram', 'vk', 'max'] as const)('lets a driver with an older app set the negotiated fare through %s', async provider => {
     mocks.user.mockResolvedValue({id:'user',roles:['passenger','driver'],phone:'+79000000000'});
     mocks.firstRow.mockImplementation(async(sql:string) => sql.includes('user_messenger_accounts')

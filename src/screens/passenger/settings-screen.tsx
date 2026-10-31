@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Text, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
@@ -11,11 +11,8 @@ import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { useRideFeedback } from '@/feedback/ride-feedback-provider';
-import {
-  hasNotificationPermission,
-  requestNotificationPermission,
-} from '@/notifications/permissions';
 import { syncPushRegistration } from '@/notifications/push-registration';
+import { sendTestPush } from '@/notifications/test-push';
 import { goBackOrReplace } from '@/navigation/back';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { usePassengerPreferences } from '@/preferences/passenger-preferences-provider';
@@ -90,6 +87,7 @@ export function SettingsScreen() {
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [pushSettingsRequired, setPushSettingsRequired] = useState(false);
   const [pushTesting, setPushTesting] = useState(false);
+  const pushOperation = useRef<object | null>(null);
   const [notificationChannels, setNotificationChannels] = useState(emptyNotificationChannels);
   const [notificationChannelsLoading, setNotificationChannelsLoading] = useState(true);
   const [notificationChannelChanging, setNotificationChannelChanging] = useState<MessengerProvider | null>(null);
@@ -124,24 +122,44 @@ export function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    const refreshPermission = async () => {
-      const granted = await hasNotificationPermission();
-      if (!active) return;
-      setPush(granted);
-      if (granted) {
-        setPushError(null);
-        setPushSettingsRequired(false);
+    let ownedOperation: object | undefined;
+    const refreshRegistration = async () => {
+      if (!token || token.startsWith('demo:')) { setPush(false); return; }
+      if (pushOperation.current) return;
+      const operation = {};
+      ownedOperation = operation;
+      pushOperation.current = operation;
+      setPushChanging(true);
+      try {
+        // Permission alone does not mean the device token reached our server.
+        const registered = await syncPushRegistration(token);
+        if (!active) return;
+        setPush(registered);
+        if (registered) {
+          setPushError(null);
+          setPushSettingsRequired(false);
+        }
+      } catch (error) {
+        if (!active) return;
+        setPush(false);
+        setPushError(error instanceof Error ? error.message : 'Не удалось подключить push-уведомления.');
+      } finally {
+        if (pushOperation.current === operation) {
+          pushOperation.current = null;
+          if (active) setPushChanging(false);
+        }
       }
     };
-    void refreshPermission();
+    void refreshRegistration();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshPermission();
+      if (state === 'active') void refreshRegistration();
     });
     return () => {
       active = false;
+      if (pushOperation.current === ownedOperation) pushOperation.current = null;
       subscription.remove();
     };
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     let active = true;
@@ -194,7 +212,9 @@ export function SettingsScreen() {
   };
 
   const changePush = async (enabled: boolean) => {
-    if (pushChanging) return;
+    if (pushOperation.current) return;
+    const operation = {};
+    pushOperation.current = operation;
     setPushChanging(true);
     setPushError(null);
     setPushInfo(null);
@@ -202,25 +222,20 @@ export function SettingsScreen() {
     try {
       if (enabled) {
         try {
-          const granted = await requestNotificationPermission();
-          if (!granted) {
-            setPush(false);
-            setPushSettingsRequired(Platform.OS !== 'web');
-            setPushError(
-              Platform.OS === 'web'
-                ? 'Разрешите уведомления в настройках сайта браузера.'
-                : 'Android не разрешил уведомления. Откройте настройки приложения и включите их вручную.',
-            );
-            return;
-          }
-          if (!token) {
+          if (!token || token.startsWith('demo:')) {
             setPush(false);
             setPushError('Не удалось определить активную сессию. Войдите в приложение ещё раз.');
             return;
           }
-          const registered = await syncPushRegistration(token);
+          // On Android the notification channels must exist before the prompt.
+          const registered = await syncPushRegistration(token, true);
           setPush(registered);
-          if (!registered) setPushError('Не удалось зарегистрировать устройство для push.');
+          if (!registered) {
+            setPushSettingsRequired(Platform.OS !== 'web');
+            setPushError(Platform.OS === 'web'
+              ? 'Разрешите уведомления в настройках сайта браузера.'
+              : 'Уведомления запрещены в настройках устройства. Разрешите их для приложения.');
+          }
         } catch (error) {
           setPush(false);
           setPushError(error instanceof Error ? error.message : 'Не удалось подключить push.');
@@ -232,8 +247,13 @@ export function SettingsScreen() {
           await Linking.openSettings();
         }
       }
+    } catch (error) {
+      setPushError(error instanceof Error ? error.message : 'Не удалось открыть настройки уведомлений.');
     } finally {
-      setPushChanging(false);
+      if (pushOperation.current === operation) {
+        pushOperation.current = null;
+        setPushChanging(false);
+      }
     }
   };
 
@@ -246,17 +266,31 @@ export function SettingsScreen() {
   };
 
   const testPush = async () => {
-    if (!token) return;
+    if (!token || token.startsWith('demo:') || pushOperation.current) return;
+    const operation = {};
+    pushOperation.current = operation;
     setPushTesting(true);
     setPushError(null);
     setPushInfo(null);
+    setPushSettingsRequired(false);
     try {
-      await apiRequest('/v1/push/test', { method: 'POST', token });
+      const registered = await sendTestPush(token, () => setPush(true));
+      setPush(registered);
+      if (!registered) {
+        setPushSettingsRequired(Platform.OS !== 'web');
+        setPushError(Platform.OS === 'web'
+          ? 'Разрешите уведомления в настройках сайта браузера.'
+          : 'Уведомления запрещены в настройках устройства. Разрешите их для приложения.');
+        return;
+      }
       setPushInfo('Тестовое уведомление отправлено.');
     } catch (error) {
       setPushError(error instanceof Error ? error.message : 'Не удалось отправить тестовый push.');
     } finally {
-      setPushTesting(false);
+      if (pushOperation.current === operation) {
+        pushOperation.current = null;
+        setPushTesting(false);
+      }
     }
   };
 
@@ -345,7 +379,7 @@ export function SettingsScreen() {
           title="Push-уведомления"
           subtitle="Новые заказы, назначение и прибытие водителя"
           value={push}
-          disabled={pushChanging}
+          disabled={pushChanging || pushTesting}
           onValueChange={(value) => void changePush(value)}
         />
         {!!pushError && (
@@ -365,7 +399,7 @@ export function SettingsScreen() {
         )}
         <AppButton
           variant="secondary"
-          disabled={!push}
+          disabled={pushChanging || !token || token.startsWith('demo:')}
           loading={pushTesting}
           onPress={() => void testPush()}
         >

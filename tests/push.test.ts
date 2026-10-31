@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { notifyUsers } from '../server/push';
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -28,8 +29,6 @@ vi.mock('web-push', () => ({
     sendNotification: mocks.sendNotification,
   },
 }));
-
-import { notifyUsers } from '../server/push';
 
 describe('Expo push delivery', () => {
   beforeEach(() => {
@@ -142,7 +141,7 @@ describe('Expo push delivery', () => {
     );
   });
 
-  it('delivers browser notifications to the current user subscription', async () => {
+  it('delivers browser offers to the driver workspace where unassigned orders are accessible', async () => {
     mocks.query
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[
@@ -163,9 +162,23 @@ describe('Expo push delivery', () => {
     );
     expect(mocks.sendNotification).toHaveBeenCalledWith(
       expect.objectContaining({ endpoint: 'https://push.example.test/subscription' }),
-      expect.stringContaining('/driver/trips/11111111-1111-1111-1111-111111111111'),
+      expect.stringContaining('"url":"/driver"'),
       expect.objectContaining({ urgency: 'high' }),
     );
+  });
+
+  it('opens the driver workspace from RuStore offer notifications', async () => {
+    mocks.query
+      .mockResolvedValueOnce([[{ token: 'rustore-device-token-1234567890', provider: 'rustore' }]])
+      .mockResolvedValueOnce([[]]);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    await notifyUsers(['driver-1'], {
+      title: 'Новый заказ', body: 'Примите заказ',
+      data: { orderId: 'available-order', role: 'driver' }, channelId: 'driver-orders-v2',
+    });
+    const payload = JSON.parse(String(fetchMock.mock.calls[0]?.[1].body));
+    expect(payload.message.android.notification.click_action).toBe('taxigrahovo:///driver');
   });
 
   it('keeps chat message text and the chat deep link in browser push payloads', async () => {

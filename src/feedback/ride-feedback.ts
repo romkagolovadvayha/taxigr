@@ -53,16 +53,16 @@ export function feedbackForRideChange(
     if (isDriver && !passengerOwnsRide && current.status === 'searching') {
       return spoken((current.searchPriceIncreaseMinor ?? 0) > 0 ? 'order-updated' : 'new-order', 'warning');
     }
-    if (isDriver && !passengerOwnsRide && current.status === 'accepted') {
+    if (isDriver && !passengerOwnsRide && ['accepted', 'driver_arriving'].includes(current.status)) {
       return spoken(current.driverQueuePosition === 2 ? 'order-accepted-queued' : 'order-accepted');
     }
     return null;
   }
 
+  if (['accepted', 'driver_arriving'].includes(current.status) && previous.driverQueuePosition === 2 && current.driverQueuePosition !== 2) {
+    return passengerOwnsRide ? spoken('driver-ready') : isDriver ? spoken('next-order-ready') : null;
+  }
   if (previous.status === current.status) {
-    if (current.status === 'accepted' && previous.driverQueuePosition === 2 && current.driverQueuePosition !== 2) {
-      return passengerOwnsRide ? spoken('driver-ready') : isDriver ? spoken('next-order-ready') : null;
-    }
     if (isDriver && !passengerOwnsRide && current.status === 'searching' && current.priceMinor > previous.priceMinor) {
       return { kind: 'order-updated', haptic: 'warning', sound: 'order-updated' };
     }
@@ -90,7 +90,7 @@ export function feedbackForRideChange(
   }
   switch (current.status) {
     case 'accepted': return spoken(current.driverQueuePosition === 2 ? 'order-accepted-queued' : 'order-accepted');
-    case 'driver_arriving': return spoken('driver-departed');
+    case 'driver_arriving': return spoken(previous.status === 'searching' ? 'order-accepted' : 'driver-departed');
     case 'driver_waiting': return spoken('driver-waiting', 'warning');
     case 'in_progress': return spoken('ride-started');
     default: return null;

@@ -13,6 +13,9 @@ export type PricingRules = {
   districtPerKilometer22To02Minor: number;
   districtPerKilometer02To07Minor: number;
   intercityPerKilometerMinor: number;
+  intercityPerKilometer07To22Minor: number;
+  intercityPerKilometer22To02Minor: number;
+  intercityPerKilometer02To07Minor: number;
   childSurchargeMinor: number;
   additionalStopGrahovoSurchargeBps: number;
   waitingFreeMinutes: number;
@@ -33,7 +36,10 @@ export const defaultPricingRules: PricingRules = {
   districtPerKilometer07To22Minor: 6_000,
   districtPerKilometer22To02Minor: 6_000,
   districtPerKilometer02To07Minor: 6_000,
-  intercityPerKilometerMinor: 3_000,
+  intercityPerKilometerMinor: 5_000,
+  intercityPerKilometer07To22Minor: 5_000,
+  intercityPerKilometer22To02Minor: 7_000,
+  intercityPerKilometer02To07Minor: 10_000,
   childSurchargeMinor: 7_000,
   additionalStopGrahovoSurchargeBps: 6_000,
   waitingFreeMinutes: 3,
@@ -149,6 +155,24 @@ function districtPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   return rules.districtPerKilometer02To07Minor;
 }
 
+// Old API/cache responses only have the single rate. Do not substitute today's
+// defaults for a previously configured rate while clients are being updated.
+export function intercityTimeRates(rules: PricingRules) {
+  return {
+    intercityPerKilometer07To22Minor: rules.intercityPerKilometer07To22Minor ?? rules.intercityPerKilometerMinor,
+    intercityPerKilometer22To02Minor: rules.intercityPerKilometer22To02Minor ?? rules.intercityPerKilometerMinor,
+    intercityPerKilometer02To07Minor: rules.intercityPerKilometer02To07Minor ?? rules.intercityPerKilometerMinor,
+  };
+}
+
+function intercityPerKilometerMinorAt(rules: PricingRules, date: Date): number {
+  const rates = intercityTimeRates(rules);
+  const period = farePeriodAt(date);
+  if (period === '07-22') return rates.intercityPerKilometer07To22Minor;
+  if (period === '22-02') return rates.intercityPerKilometer22To02Minor;
+  return rates.intercityPerKilometer02To07Minor;
+}
+
 function roundToTenRubles(minor: number): number {
   return Math.ceil(minor / 1_000) * 1_000;
 }
@@ -166,7 +190,7 @@ export function calculateFareMinor(
         (distanceMeters / 1_000) *
           (scope === 'district'
             ? districtPerKilometerMinorAt(rules, date)
-            : rules.intercityPerKilometerMinor),
+            : intercityPerKilometerMinorAt(rules, date)),
       );
   return routePrice +
     (tariff === 'child' ? rules.childSurchargeMinor : 0);

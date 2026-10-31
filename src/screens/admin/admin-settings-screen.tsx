@@ -14,7 +14,7 @@ import {
   defaultDriverDispatchSettings,
   type DriverDispatchSettings,
 } from '@/domain/driver-priority';
-import { defaultPricingRules, type PricingRules } from '@/domain/pricing';
+import { defaultPricingRules, intercityTimeRates, type PricingRules } from '@/domain/pricing';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -26,7 +26,9 @@ type EditableKey =
   | 'districtPerKilometer07To22Minor'
   | 'districtPerKilometer22To02Minor'
   | 'districtPerKilometer02To07Minor'
-  | 'intercityPerKilometerMinor'
+  | 'intercityPerKilometer07To22Minor'
+  | 'intercityPerKilometer22To02Minor'
+  | 'intercityPerKilometer02To07Minor'
   | 'childSurchargeMinor'
   | 'additionalStopGrahovoSurchargeBps'
   | 'waitingFreeMinutes'
@@ -60,7 +62,7 @@ export function AdminSettingsScreen() {
       }),
     ])
       .then(([nextRules, nextDispatchSettings]) => {
-        setRules(nextRules);
+        setRules({ ...nextRules, ...intercityTimeRates(nextRules) });
         setDispatchSettings(nextDispatchSettings);
       })
       .catch((reason: unknown) => {
@@ -102,7 +104,7 @@ export function AdminSettingsScreen() {
           body: JSON.stringify(dispatchSettings),
         }),
       ]);
-      setRules(updatedRules);
+      setRules({ ...updatedRules, ...intercityTimeRates(updatedRules) });
       setDispatchSettings(updatedDispatchSettings);
       setSaved(true);
       setError(null);
@@ -322,14 +324,29 @@ export function AdminSettingsScreen() {
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-          Межгород
+          Межгород · стоимость за километр
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'Стоимость за километр',
-            String(rules.intercityPerKilometerMinor / 100),
-            (value) => changeRubles('intercityPerKilometerMinor', value),
+            'С 07:00 до 22:00',
+            String(rules.intercityPerKilometer07To22Minor / 100),
+            (value) => changeRubles('intercityPerKilometer07To22Minor', value),
             '₽/км',
+            'Межгород, с 07:00 до 22:00',
+          )}
+          {field(
+            'С 22:00 до 02:00',
+            String(rules.intercityPerKilometer22To02Minor / 100),
+            (value) => changeRubles('intercityPerKilometer22To02Minor', value),
+            '₽/км',
+            'Межгород, с 22:00 до 02:00',
+          )}
+          {field(
+            'С 02:00 до 07:00',
+            String(rules.intercityPerKilometer02To07Minor / 100),
+            (value) => changeRubles('intercityPerKilometer02To07Minor', value),
+            '₽/км',
+            'Межгород, с 02:00 до 07:00',
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
@@ -352,8 +369,8 @@ export function AdminSettingsScreen() {
         </View>
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
           В Грахово действует фиксированная сумма, в Граховском районе — ставка за
-          километр по времени оформления заказа. Межгород рассчитывается по отдельной
-          ставке за километр. Временные интервалы считаются по самарскому времени.
+          километр по времени оформления заказа. В межгороде действует отдельная
+          ставка за километр для каждого периода. Временные интервалы считаются по самарскому времени.
           Если весь маршрут проходит по Грахово, каждая дополнительная точка добавляет{' '}
           {rules.additionalStopGrahovoSurchargeBps / 100}% текущей фиксированной стоимости.
           Для точек в районе и межгороде каждый следующий участок считается по действующему тарифу.

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { db, firstRow } from './db';
 import { matchesMessengerPhone } from './messenger-auth-phone';
+import { messengerAuthReturnUrl } from './messenger-auth-return';
 import type { BookingMessage } from './messenger-booking';
 import {
   answerTelegramCallback,
@@ -140,9 +141,9 @@ export async function processTelegramUpdate(
   if (!verifiedPhone) return;
 
   const challenge = await firstRow<
-    RowDataPacket & { id: string; expected_phone: string | null }
+    RowDataPacket & { id: string; expected_phone: string | null; return_platform: string }
   >(
-    `SELECT id, expected_phone FROM telegram_auth_challenges
+    `SELECT id, expected_phone, return_platform FROM telegram_auth_challenges
      WHERE telegram_user_id = ? AND expires_at > UTC_TIMESTAMP(3)
        AND verified_at IS NULL
      ORDER BY created_at DESC LIMIT 1`,
@@ -161,5 +162,6 @@ export async function processTelegramUpdate(
      WHERE id = ? AND verified_at IS NULL`,
     [verifiedPhone, matches ? null : 'PHONE_MISMATCH', matches, challenge.id],
   );
-  await sendTelegramConfirmation(chatId, matches);
+  await sendTelegramConfirmation(chatId, matches,
+    messengerAuthReturnUrl('telegram', challenge.id, challenge.return_platform));
 }

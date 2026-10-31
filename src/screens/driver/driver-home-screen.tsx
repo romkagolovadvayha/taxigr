@@ -1,4 +1,4 @@
-import { isRidePricePending, ridePriceLabel } from '@/domain/ride-price';
+import { isRidePricePending } from '@/domain/ride-price';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
@@ -11,15 +11,16 @@ import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
+import { YandexNavigationButton } from '@/components/ride/yandex-navigation-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
 import { AppModal } from '@/components/ui/app-modal';
-import { AppIcon } from '@/components/ui/app-icon';
 import { MoneyValue } from '@/components/ui/money-value';
 import { IconButton } from '@/components/ui/icon-button';
 import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
+import { driverNavigationAddress } from '@/domain/external-navigation';
 import { headingBetweenCoordinates } from '@/domain/route-tracking';
 import {
   formatRoutePointCount,
@@ -47,19 +48,16 @@ function DriverOrderCard({
   remainingDistanceMeters,
   remainingDurationSeconds,
   navigationLoading,
-  onNavigate,
 }: {
   demo: boolean;
   remainingDistanceMeters?: number;
   remainingDurationSeconds?: number;
   navigationLoading: boolean;
-  onNavigate: () => void;
 }) {
   const colors = useThemeColors();
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
-  const [completionConfirmVisible, setCompletionConfirmVisible] = useState(false);
   const {
     driverRide: currentRide,
     nextDriverRide,
@@ -67,8 +65,6 @@ function DriverOrderCard({
     createDriverOffer: createRide,
     transitionDriverRide: transitionRide,
     completeDriverStop,
-    startWaiting,
-    stopWaiting,
     releaseDriverRide,
     resetDriverRide: resetRide,
     refresh,
@@ -179,16 +175,15 @@ function DriverOrderCard({
   }
 
   const nextStatus =
-    currentRide.status === 'accepted'
-      ? 'driver_arriving'
-      : currentRide.status === 'driver_arriving'
-        ? 'driver_waiting'
-        : currentRide.status === 'driver_waiting'
-          ? 'in_progress'
-          : currentRide.status === 'in_progress'
-            ? 'completed'
-            : null;
+    currentRide.status === 'accepted' || currentRide.status === 'driver_arriving'
+      ? 'driver_waiting'
+      : currentRide.status === 'driver_waiting'
+        ? 'in_progress'
+        : currentRide.status === 'in_progress'
+          ? 'completed'
+          : null;
   const routeTarget = driverRouteTarget(currentRide.status);
+  const navigationAddress = driverNavigationAddress(currentRide);
   const nextDestinationIndex = currentRide.nextDestinationIndex ?? 0;
   const hasIntermediateStop = nextDestinationIndex < rideDestinations.length - 1;
   const routePointLabels = [routeAddresses.pickup, ...routeAddresses.destinations];
@@ -416,22 +411,9 @@ function DriverOrderCard({
                 style={{ flex: 1, minWidth: 0 }}
               />
             )}
-            {routeTarget && (
-              <AppButton
-                variant="secondary"
-                compact
-                fullWidth={false}
-                accessibilityLabel={
-                  routeTarget === 'pickup'
-                    ? 'Показать маршрут к пассажиру на карте'
-                    : 'Показать маршрут до места назначения на карте'
-                }
-                icon={<AppIcon name="location" size={20} color={colors.ink} />}
-                style={{ flex: 1, minWidth: 0 }}
-                onPress={onNavigate}
-              >
-                Маршрут
-              </AppButton>
+            {navigationAddress && (
+              <YandexNavigationButton key={`${currentRide.id}:${routeTarget}:${currentRide.nextDestinationIndex ?? 0}`}
+                address={navigationAddress} pickup={routeTarget === 'pickup'} />
             )}
           </View>
         )}
@@ -557,18 +539,6 @@ function DriverOrderCard({
       )}
       {currentRide.status === 'driver_waiting' ? (
         <View style={{ gap: spacing.x2 }}>
-          <AppButton
-            variant={currentRide.waitingStartedAt ? 'danger' : 'secondary'}
-            compact
-            loading={busy}
-            onPress={() =>
-              void (currentRide.waitingStartedAt ? stopWaiting() : startWaiting())
-            }
-          >
-            {currentRide.waitingStartedAt
-              ? 'Завершить ожидание'
-              : 'Начать ожидание'}
-          </AppButton>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
             <AppButton
               variant="secondary"
@@ -593,43 +563,14 @@ function DriverOrderCard({
           </View>
         </View>
       ) : currentRide.status === 'in_progress' ? (
-        <>
-          <AppButton
-            compact
-            loading={busy}
-            disabled={busy}
-            onPress={() => hasIntermediateStop ? void completeDriverStop() : !isRidePricePending(currentRide) && setCompletionConfirmVisible(true)}
-          >
-            {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : isRidePricePending(currentRide) ? 'Сначала укажите стоимость выше' : 'Завершить поездку'}
-          </AppButton>
-          <AppModal
-            visible={completionConfirmVisible}
-            title="Оплата получена?"
-            description={`Подтвердите получение оплаты: ${ridePriceLabel(currentRide)}. Способ оплаты: ${paymentLabel.toLowerCase()}. После этого поездка будет завершена.`}
-            onClose={() => setCompletionConfirmVisible(false)}
-          >
-            <AppButton
-              loading={busy}
-              onPress={() => {
-                void transitionRide('completed').then((completed) => {
-                  if (completed) setCompletionConfirmVisible(false);
-                });
-              }}
-            >
-              Оплата получена, завершить
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              disabled={busy}
-              onPress={() => {
-                setCompletionConfirmVisible(false);
-                router.push('/driver/support');
-              }}
-            >
-              Есть проблема с оплатой
-            </AppButton>
-          </AppModal>
-        </>
+        <AppButton
+          compact
+          loading={busy}
+          disabled={busy || (!hasIntermediateStop && isRidePricePending(currentRide))}
+          onPress={() => hasIntermediateStop ? void completeDriverStop() : void transitionRide('completed')}
+        >
+          {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : isRidePricePending(currentRide) ? 'Сначала укажите стоимость выше' : 'Завершить поездку'}
+        </AppButton>
       ) : nextStatus ? (
         <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
           <AppButton
@@ -728,7 +669,6 @@ export function DriverHomeScreen() {
   const statusChangeInFlight = useRef(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
-  const [mapFollowRequestId, setMapFollowRequestId] = useState(0);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone } = useResponsiveLayout();
   const { driverRide: currentRide, refresh } = useRide();
@@ -866,7 +806,6 @@ export function DriverHomeScreen() {
           remainingDistanceMeters={navigation.summary?.distanceMeters}
           remainingDurationSeconds={navigation.summary?.durationSeconds}
           navigationLoading={navigation.loading}
-          onNavigate={() => { setMapVisible(true); setMapFollowRequestId(value => value + 1); }}
         />
       ) : (
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -912,7 +851,6 @@ export function DriverHomeScreen() {
           passenger={currentRide?.passengerCoordinates}
           followDriver={navigation.active || !currentRide}
           navigationMode={navigation.active}
-          followRequestId={mapFollowRequestId}
           trimCompletedRoute={navigation.active}
         />
       </View>}

@@ -15,9 +15,26 @@ import {
 import {
   buildTariffs,
   calculateCommissionMinor,
+  calculateWaitingChargeMinor,
   classifyPricingScope,
   defaultPricingRules,
 } from './pricing';
+import { rideWaitingSeconds } from './waiting';
+
+export function demoWaitingTransition(ride: RideOrder, status: RideStatus, now = Date.now()): Partial<RideOrder> {
+  if (status === 'driver_waiting') {
+    return { waitingStartedAt: ride.waitingStartedAt ?? new Date(now).toISOString() };
+  }
+  if ((status === 'in_progress' || status === 'completed') && ride.waitingStartedAt) {
+    const waitingSeconds = rideWaitingSeconds(ride, now);
+    const waitingPriceMinor = calculateWaitingChargeMinor(waitingSeconds, ride.waitingFreeMinutes, ride.waitingPerMinuteMinor);
+    const priceMinor = (ride.basePriceMinor ?? ride.priceMinor - (ride.waitingPriceMinor ?? 0) - (ride.searchPriceIncreaseMinor ?? 0)) +
+      (ride.searchPriceIncreaseMinor ?? 0) + waitingPriceMinor;
+    return { waitingSeconds, waitingPriceMinor, waitingStartedAt: undefined, priceMinor,
+      serviceCommissionMinor: calculateCommissionMinor(priceMinor) };
+  }
+  return {};
+}
 
 type DemoProgression = {
   next: RideStatus;
@@ -25,8 +42,8 @@ type DemoProgression = {
 };
 
 const passengerProgression: Partial<Record<RideStatus, DemoProgression>> = {
-  searching: { next: 'accepted', delay: 2_400 },
-  accepted: { next: 'driver_arriving', delay: 2_800 },
+  searching: { next: 'driver_arriving', delay: 2_400 },
+  accepted: { next: 'driver_waiting', delay: 2_800 },
   driver_arriving: { next: 'driver_waiting', delay: 3_200 },
   driver_waiting: { next: 'in_progress', delay: 3_500 },
   in_progress: { next: 'completed', delay: 4_000 },

@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildDemoDriverOffer,
+  demoWaitingTransition,
   getDemoDriverSnapshot,
   getDemoPassengerProgression,
   placeDemoDriverNearPickup,
 } from '../src/domain/demo-flow';
-import type { RideStatus } from '../src/domain/models';
+import type { RideOrder, RideStatus } from '../src/domain/models';
 import { canTransitionRide } from '../src/domain/ride-state';
 import { coordinatesDistanceMeters } from '../src/domain/route-tracking';
 
@@ -26,7 +27,6 @@ describe('demo passenger journey', () => {
 
     expect(visited).toEqual([
       'searching',
-      'accepted',
       'driver_arriving',
       'driver_waiting',
       'in_progress',
@@ -129,6 +129,20 @@ describe('demo passenger journey', () => {
 });
 
 describe('demo driver journey', () => {
+  it('starts waiting on arrival and settles it only once when driving starts', () => {
+    const now = Date.parse('2026-10-31T07:00:00Z');
+    const current = { basePriceMinor: 15_000, priceMinor: 18_000, searchPriceIncreaseMinor: 3_000,
+      waitingSeconds: 0, waitingFreeMinutes: 3, waitingPerMinuteMinor: 200 } as RideOrder;
+    const waiting = { ...current, ...demoWaitingTransition(current, 'driver_waiting', now) };
+    expect(waiting.waitingStartedAt).toBe(new Date(now).toISOString());
+    expect(demoWaitingTransition(waiting, 'driver_waiting', now + 60_000).waitingStartedAt).toBe(waiting.waitingStartedAt);
+    expect(demoWaitingTransition(waiting, 'in_progress', now + 120_000).waitingPriceMinor).toBe(0);
+    const driving = { ...waiting, ...demoWaitingTransition(waiting, 'in_progress', now + 270_000) };
+    expect(driving).toMatchObject({ waitingStartedAt: undefined, waitingSeconds: 270, waitingPriceMinor: 400, priceMinor: 18_400 });
+    expect(demoWaitingTransition(driving, 'in_progress', now + 600_000)).toEqual({});
+    expect(demoWaitingTransition(driving, 'completed', now + 900_000)).toEqual({});
+  });
+
   it('creates a road-based offer that the driver can accept', () => {
     const offer = buildDemoDriverOffer(
       {

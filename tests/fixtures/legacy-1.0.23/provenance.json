@@ -1,0 +1,7 @@
+{
+  "version": "1.0.23",
+  "versionCode": 43,
+  "commit": "509ca0567cb91fbed40a2f6354f8a528e63c511e",
+  "sourceFiles": ["src/domain/ride-state.ts", "src/domain/driver-order-queue.ts"],
+  "purpose": "Frozen released-client behavior for backward-compatibility tests. Do not update with current domain changes."
+}

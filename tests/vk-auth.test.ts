@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../server/config', () => ({
   config: {
+    PUBLIC_URL: 'https://taxigr.ru',
     VK_APP_ID: '123456',
     VK_REDIRECT_URI: 'https://api.taxigr.ru/v1/auth/vk/callback',
   },

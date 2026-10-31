@@ -273,7 +273,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
       expect(response.status, JSON.stringify(response.error)).toBe(200);
     }
     const responses = await Promise.all([
-      api(`/v1/driver/orders/${current.id}/transition`, drivers[0]!, { status: 'completed', paymentReceived: true }),
+      api(`/v1/driver/orders/${current.id}/transition`, drivers[0]!, { status: 'completed' }),
       cancel(passengers[1]!, next),
     ]);
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
@@ -282,22 +282,54 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(rows[0]!.status).toBe('online');
   }, 30_000);
 
-  it('records payment and completion only once for 12 simultaneous finish requests', async () => {
+  it('starts and settles waiting once when arrival and trip-start requests are retried concurrently', async () => {
+    const order = await create(passengers[0]!);
+    const accepted = await accept(drivers[0]!, order);
+    expect(accepted.data?.status).toBe('driver_arriving');
+    const path = `/v1/driver/orders/${order.id}/transition`;
+    const arrivals = await Promise.all(Array.from({ length: 12 }, () => api(path, drivers[0]!, { status: 'driver_waiting' })));
+    expect(arrivals.every(result => result.status === 200 && result.data?.waitingStartedAt)).toBe(true);
+    expect(new Set(arrivals.map(result => result.data!.waitingStartedAt)).size).toBe(1);
+    await connection.execute('UPDATE orders SET waiting_started_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 270 SECOND) WHERE id = ?', [order.id]);
+    const starts = await Promise.all(Array.from({ length: 12 }, () => api(path, drivers[0]!, { status: 'in_progress' })));
+    expect(starts.every(result => result.status === 200 && !result.data?.waitingStartedAt)).toBe(true);
+    expect(new Set(starts.map(result => result.data!.priceMinor)).size).toBe(1);
+    expect(new Set(starts.map(result => result.data!.waitingSeconds)).size).toBe(1);
+    expect(starts[0]!.data?.waitingSeconds).toBeGreaterThanOrEqual(270);
+    const [events] = await connection.query<RowDataPacket[]>(
+      "SELECT to_status, COUNT(*) AS total FROM order_events WHERE order_id=? AND event_type='order.transition' GROUP BY to_status ORDER BY to_status", [order.id]);
+    expect(events.map(row => [row.to_status, Number(row.total)])).toEqual([['driver_waiting', 1], ['in_progress', 1]]);
+  }, 30_000);
+
+  it('completes once and promotes the queued ride once for 12 simultaneous finish requests', async () => {
     const order = await create(passengers[0]!);
     expect((await accept(drivers[0]!, order)).status).toBe(200);
+    const queued = await create(passengers[1]!);
+    const queuedAcceptance = await accept(drivers[0]!, queued);
+    expect(queuedAcceptance.status).toBe(200);
+    expect(queuedAcceptance.data?.status).toBe('accepted');
+    expect(queuedAcceptance.data?.driverQueuePosition).toBe(2);
+    expect((await api(`/v1/driver/orders/${queued.id}/transition`, drivers[0]!, { status: 'driver_waiting' })).status).toBe(409);
     await api('/v1/driver/location', drivers[0]!, { ...pickup.coordinates, accuracyMeters: 10 }, 'PUT');
     for (const status of ['driver_arriving', 'driver_waiting', 'in_progress']) {
       const response = await api(`/v1/driver/orders/${order.id}/transition`, drivers[0]!, { status });
       expect(response.status, JSON.stringify(response.error)).toBe(200);
     }
     const responses = await Promise.all(Array.from({ length: 12 }, () => api(`/v1/driver/orders/${order.id}/transition`,
-      drivers[0]!, { status: 'completed', paymentReceived: true })));
-    expect(responses.filter((response) => response.status === 200)).toHaveLength(1);
-    expect(responses.filter((response) => response.status === 409)).toHaveLength(11);
+      drivers[0]!, { status: 'completed' })));
+    expect(responses.every(response => response.status === 200 && response.data?.status === 'completed')).toBe(true);
     const [events] = await connection.query<RowDataPacket[]>(
       "SELECT COUNT(*) AS total FROM order_events WHERE order_id=? AND to_status='completed'", [order.id]);
     expect(Number(events[0]!.total)).toBe(1);
-    expect(await assignedOrders()).toHaveLength(0);
+    expect(await assignedOrders()).toEqual([expect.objectContaining({ id: queued.id, status: 'driver_arriving', driver_queue_position: 1 })]);
+    const [promotions] = await connection.query<RowDataPacket[]>(
+      "SELECT COUNT(*) AS total FROM order_events WHERE order_id=? AND event_type='driver.queue.promoted'", [queued.id]);
+    expect(Number(promotions[0]!.total)).toBe(1);
+    const next = await api(`/v1/orders/${queued.id}`, passengers[1]!);
+    expect(next.data?.waitingStartedAt).toBeUndefined();
+    const arrival = await api(`/v1/driver/orders/${queued.id}/transition`, drivers[0]!, { status: 'driver_waiting' });
+    expect(arrival.status).toBe(200);
+    expect(arrival.data?.waitingStartedAt).toBeTruthy();
   }, 30_000);
 
   it('keeps an order cancelled when its driver releases it simultaneously', async () => {

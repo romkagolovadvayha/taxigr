@@ -1,10 +1,14 @@
 """Exercise release contents and upload recovery without contacting a server."""
 import os
 from pathlib import Path
+import re
+import shlex
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +61,22 @@ class ReleaseToolsTests(unittest.TestCase):
             self.assertFalse(set(unwanted).intersection(files))
             for name in required:
                 self.assertEqual(bundle.extractfile(name).read(), name.encode())
+
+    def test_deploy_preserves_rustore_push_credentials_in_generated_environment(self):
+        workflow = (ROOT / '.github/workflows/deploy-production.yml').read_text(encoding='utf-8')
+        global_env = workflow.split('    env:\n', 1)[1].split('\n    steps:', 1)[0]
+        step = workflow.split('      - name: Create server environment file\n', 1)[1].split('\n      - name:', 1)[0]
+        step_env = step.split('        env:\n', 1)[1].split('        run:', 1)[0]
+        # Supply only variables actually in scope in this workflow step.
+        names = re.findall(r'^\s+([A-Z_]+):', global_env + step_env, re.MULTILINE)
+        env = {name: 'fixture-' + name.lower() for name in names}
+        script = textwrap.dedent(step.split("python3 - <<'PY'\n", 1)[1].split('\n          PY', 1)[0])
+        result = subprocess.run([sys.executable, '-c', script], env=env, cwd=self.root,
+                                text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        generated = dict(line.split('=', 1) for line in (self.root / '.taxigr.env').read_text().splitlines())
+        for name in ['RUSTORE_PUSH_PROJECT_ID', 'RUSTORE_PUSH_SERVICE_TOKEN']:
+            self.assertEqual(shlex.split(generated[name]), ['fixture-' + name.lower()])
 
     def upload(self, mode):
         bin_dir = self.root / 'bin'

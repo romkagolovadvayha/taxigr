@@ -89,8 +89,14 @@ function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): 
   return score;
 }
 
+/** Compile a query once when scoring a directory, rather than once per address. */
+export function createAddressSearchScorer(query: string): (address: SearchableAddress) => number {
+  const variants = addressQueryVariants(query).map(tokens);
+  return address => Math.max(...variants.map(part => scoreAddressTokens(address, part)));
+}
+
 export function addressSearchScore(address: SearchableAddress, query: string): number {
-  return Math.max(...addressQueryVariants(query).map(variant => scoreAddressTokens(address, tokens(variant))));
+  return createAddressSearchScorer(query)(address);
 }
 
 export function uniqueAddressesByLabel<T extends SearchableAddress>(addresses: readonly T[]): T[] {

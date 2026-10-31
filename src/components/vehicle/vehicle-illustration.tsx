@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
 import { radius } from "@/theme/tokens";
 import { useAppTheme } from "@/theme/theme-provider";
@@ -27,7 +27,8 @@ export function VehicleIllustration({
         borderRadius: 10,
         overflow: "hidden",
         backgroundColor: "#FFFFFF",
-        mixBlendMode: dark ? "normal" : "multiply",
+        // Some Android GL drivers abort when drawing advanced blend equations.
+        mixBlendMode: dark || Platform.OS === "android" ? "normal" : "multiply",
       }}
     >
       <Image

@@ -4,7 +4,7 @@ import { getAddressDirectory } from './address-directory';
 import { getRememberedAddresses } from './remembered-addresses';
 import { overlayRememberedAddresses } from '../src/domain/remembered-address';
 import { hasApproximateCoordinates, extractQueryHouseNumber, normalizeHouseNumber } from '../src/domain/address-precision';
-import { addressSearchScore } from '../src/domain/address-search';
+import { addressSearchScore, createAddressSearchScorer } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import { normalizeBotAddress, addressQueryVariants } from '../src/domain/free-text-address';
 import { intercitySettlements } from '../src/data/intercity-settlements';
@@ -12,6 +12,7 @@ import { isGrahovoDistrictAddress } from '../src/domain/pricing';
 import type { AddressKind } from '../src/domain/models';
 import { config } from './config';
 import { db } from './db';
+import { createGeocoderQueue, withGeocoderDeadline } from './geocoder-queue';
 
 export type GeocodedAddress = {
   id: string;
@@ -61,8 +62,8 @@ const localAddresses: GeocodedAddress[] = [
 ];
 
 const memoryCache = new Map<string, MemoryEntry>();
-let geocoderQueue: Promise<void> = Promise.resolve();
-let lastExternalRequestAt = 0;
+const queuedGeocoderRequest = createGeocoderQueue();
+const externalSearches = new Map<string, Promise<GeocodedAddress[]>>();
 
 // Address routes prepend up to 12 local places and return 30 items. Nine district
 // addresses leave room for one full scoped Nominatim page plus an outside locality.
@@ -192,7 +193,7 @@ export function filterExactHouseResults(
 }
 
 function localMatches(query: string, directory: GeocodedAddress[]): GeocodedAddress[] {
-  const localAddresses = [...directory];
+  const score = createAddressSearchScorer(query);
   const normalized = normalizeForSearch(query);
   const queryTokens = normalized
     .split(' ')
@@ -203,19 +204,18 @@ function localMatches(query: string, directory: GeocodedAddress[]): GeocodedAddr
     );
   const numericOnly = /^\d+$/u.test(normalized);
   const matches = (address: GeocodedAddress) => {
-    const fullHaystack = normalizeForSearch(`${address.label} ${address.details ?? ''}`);
-    if (!queryTokens.length) return fullHaystack.includes(normalized) ? 1 : 0;
+    if (!queryTokens.length) return normalizeForSearch(`${address.label} ${address.details ?? ''}`).includes(normalized) ? 1 : 0;
     if (numericOnly && address.houseNumber) {
       const streetLabel = normalizeForSearch(
         address.label.replace(new RegExp(`(?:,\\s*|\\s+)${address.houseNumber}\\s*$`, 'iu'), ''),
       );
-      return streetLabel.includes(normalized) ? addressSearchScore(address, query) : 0;
+      return streetLabel.includes(normalized) ? score(address) : 0;
     }
-    return addressSearchScore(address, query);
+    return score(address);
   };
-  const houses = localAddresses.filter((address) =>
-    address.houseNumber ? matches(address) > 0 : false,
-  ).sort((left, right) => matches(right) - matches(left));
+  const ranked = directory.map(address => ({ address, score: matches(address) }))
+    .filter(item => item.score > 0).sort((left, right) => right.score - left.score);
+  const houses = ranked.filter(item => item.address.houseNumber).map(item => item.address);
   const parsed = trailingHouseNumber(query);
   const exactHouses = parsed?.streetPart ? filterExactHouseResults(query, houses) : houses;
   if (parsed?.streetPart) {
@@ -228,12 +228,9 @@ function localMatches(query: string, directory: GeocodedAddress[]): GeocodedAddr
     });
   }
 
-  const directSuggestions = localAddresses.filter(
-    (address) => !address.houseNumber && matches(address) > 0,
-  ).sort((left, right) => matches(right) - matches(left));
-  const streets = buildStreetSuggestions(localAddresses).filter((address) =>
-    matches(address) > 0,
-  ).sort((left, right) => matches(right) - matches(left));
+  const directSuggestions = ranked.filter(item => !item.address.houseNumber).map(item => item.address);
+  const streets = buildStreetSuggestions(directory).map(address => ({ address, score: matches(address) }))
+    .filter(item => item.score > 0).sort((left, right) => right.score - left.score).map(item => item.address);
   const seenLabels = new Set<string>();
   return [...directSuggestions, ...streets, ...exactHouses]
     .filter((address) => {
@@ -316,25 +313,6 @@ async function writePersistentCache(key: string, value: GeocodedAddress[]): Prom
   }
 }
 
-async function limitedFetch(url: string): Promise<Response> {
-  const task = geocoderQueue.then(async () => {
-    const waitMs = Math.max(0, 1_050 - (Date.now() - lastExternalRequestAt));
-    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
-    lastExternalRequestAt = Date.now();
-    return fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'Accept-Language': 'ru',
-        Referer: config.PUBLIC_URL,
-        'User-Agent': 'TaxiGrahovo/1.0',
-      },
-      signal: AbortSignal.timeout(8_000),
-    });
-  });
-  geocoderQueue = task.then(() => undefined, () => undefined);
-  return task;
-}
-
 function fromNominatim(item: {
   place_id?: number | string;
   display_name?: string;
@@ -392,7 +370,7 @@ function fromNominatim(item: {
   };
 }
 
-async function requestNominatimOnce(query: string, settlementsOnly = false): Promise<GeocodedAddress[]> {
+async function requestNominatimOnce(query: string, signal: AbortSignal, settlementsOnly = false): Promise<GeocodedAddress[]> {
   const baseUrl = config.NOMINATIM_BASE_URL.replace(/\/$/, '');
   const coordinates = coordinateQuery(query);
   const params = new URLSearchParams({
@@ -415,9 +393,9 @@ async function requestNominatimOnce(query: string, settlementsOnly = false): Pro
     params.set('bounded', '0');
     if (settlementsOnly) params.set('featureType', 'settlement');
   }
-  const response = await limitedFetch(`${baseUrl}/${endpoint}?${params}`);
-  if (!response.ok) throw new Error(`Nominatim returned ${response.status}`);
-  const payload = (await response.json()) as unknown;
+  const payload = await queuedGeocoderRequest(`${baseUrl}/${endpoint}?${params}`, {
+    Accept: 'application/json', 'Accept-Language': 'ru', Referer: config.PUBLIC_URL, 'User-Agent': 'TaxiGrahovo/1.0',
+  }, signal);
   const items = Array.isArray(payload) ? payload : [payload];
   const mapped = items
     .map((item) => fromNominatim(item as Parameters<typeof fromNominatim>[0]))
@@ -436,7 +414,7 @@ async function requestNominatimOnce(query: string, settlementsOnly = false): Pro
   }
   for (const name of [...names].slice(0, 3)) {
     const known = intercitySettlements.filter(item => normalizeNamedPlace(item.label) === normalizeNamedPlace(name));
-    const found = known.length ? known : await requestNominatimOnce(name, true).catch(() => []);
+    const found = known.length ? known : await requestNominatimOnce(name, signal, true).catch(() => []);
     result.push(...found.filter(item => normalizeNamedPlace(item.label) === normalizeNamedPlace(name)));
   }
   return result;
@@ -471,13 +449,18 @@ function mergeLocalAndExternalResults(
   return exactNamedPlaces.length ? exactNamedPlaces : merged;
 }
 
-async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
+async function requestNominatim(query: string, signal: AbortSignal): Promise<GeocodedAddress[]> {
   const combined: GeocodedAddress[] = [];
   let successfulRequests = 0;
   for (const candidate of buildNominatimQueries(query)) {
+    if (signal.aborted) break;
     try {
-      combined.push(...(await requestNominatimOnce(candidate)));
+      combined.push(...(await requestNominatimOnce(candidate, signal)));
       successfulRequests += 1;
+      // An exact district house needs no second nationwide lookup.
+      if (trailingHouseNumber(query) && filterExactHouseResults(query, combined).some(
+        address => address.houseNumber && !hasApproximateCoordinates(address) && isGrahovoDistrictAddress(address),
+      )) break;
     } catch {
       // A fallback query can still provide useful results when one upstream request fails.
     }
@@ -487,16 +470,16 @@ async function requestNominatim(query: string): Promise<GeocodedAddress[]> {
   return prioritizeGrahovoDistrict(preciseResults);
 }
 
-export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false): Promise<GeocodedAddress[]> {
+export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false, localOnly = false): Promise<GeocodedAddress[]> {
   const variants = addressQueryVariants(query).map(normalizeBotAddress);
-  const knownCity = intercitySettlements.filter(address => addressSearchScore(address, query) > 0);
+  const score = createAddressSearchScorer(query);
+  const knownCity = intercitySettlements.filter(address => score(address) > 0);
   query = coordinateQuery(query) ? query : normalizeBotAddress(query);
   if (knownCity.length) return knownCity;
   // Street anchors in GAR are approximate. Point selection needs an actual
   // street from OSM when available, bypassing the local-address shortcut.
-  const directory = streetOnly ? [] : overlayRememberedAddresses(
-    [...localAddresses, ...await getAddressDirectory()], await getRememberedAddresses(),
-  );
+  const [catalog, remembered] = streetOnly ? [[], []] : await Promise.all([getAddressDirectory(), getRememberedAddresses()]);
+  const directory = streetOnly ? [] : overlayRememberedAddresses([...localAddresses, ...catalog], remembered);
   const local = deduplicateAddresses(variants.flatMap(variant => localMatches(variant, directory)));
   if (local.length && variants.some(variant => hasStrongLocalMatch(variant, local)) &&
       (!resolveHouse || local.some(address => address.houseNumber && !hasApproximateCoordinates(address)))) {
@@ -510,28 +493,35 @@ export async function searchAddresses(query: string, streetOnly = false, resolve
   }
   if (memory) memoryCache.delete(key);
 
-  const persisted = await readPersistentCache(key);
-  if (persisted) {
-    memoryCache.set(key, {
-      value: persisted,
-      expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
-    });
-    return mergeLocalAndExternalResults(query, resolveHouse && persisted.length ? [] : local, persisted);
+  // Keystrokes use the directory and existing cache only. They must never queue
+  // upstream requests or wait for a full search another passenger started.
+  if (localOnly) {
+    const persisted = await readPersistentCache(key);
+    return mergeLocalAndExternalResults(query, local, persisted ?? []);
   }
-
-  let results: GeocodedAddress[];
+  let pending = externalSearches.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const persisted = await readPersistentCache(key);
+      const results: GeocodedAddress[] = persisted ?? await withGeocoderDeadline<GeocodedAddress[]>(signal => streetOnly
+        ? requestNominatimOnce(streetGeocoderQuery(query), signal).then(items => items.filter(item => item.kind === 'street'))
+        : requestNominatim(resolveHouse ? streetGeocoderQuery(query) : query, signal));
+      memoryCache.set(key, {
+        value: results,
+        expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
+      });
+      if (!persisted) void writePersistentCache(key, results);
+      return results;
+    })();
+    externalSearches.set(key, pending);
+    const cleanup = () => { externalSearches.delete(key); };
+    void pending.then(cleanup, cleanup);
+  }
   try {
-    results = streetOnly
-      ? (await requestNominatimOnce(streetGeocoderQuery(query))).filter(item => item.kind === 'street')
-      : await requestNominatim(resolveHouse ? streetGeocoderQuery(query) : query);
+    const results = await pending;
+    return mergeLocalAndExternalResults(query, resolveHouse && results.length ? [] : local, results);
   } catch (error) {
     if (local.length) return prioritizeGrahovoDistrict(local);
     throw error;
   }
-  memoryCache.set(key, {
-    value: results,
-    expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
-  });
-  await writePersistentCache(key, results);
-  return mergeLocalAndExternalResults(query, resolveHouse && results.length ? [] : local, results);
 }

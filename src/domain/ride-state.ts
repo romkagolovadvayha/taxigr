@@ -12,16 +12,16 @@ export const rideStatusLabel: Record<RideStatus, string> = {
 };
 
 export const driverTransitionLabel: Partial<Record<RideStatus, string>> = {
-  accepted: 'Выехать к пассажиру',
-  driver_arriving: 'Я на месте',
+  accepted: 'Я приехал',
+  driver_arriving: 'Я приехал',
   driver_waiting: 'Начать поездку',
   in_progress: 'Завершить поездку',
 };
 
 const transitions: Partial<Record<RideStatus, readonly RideStatus[]>> = {
   draft: ['searching', 'cancelled'],
-  searching: ['accepted', 'cancelled'],
-  accepted: ['driver_arriving', 'cancelled'],
+  searching: ['accepted', 'driver_arriving', 'cancelled'],
+  accepted: ['driver_arriving', 'driver_waiting', 'cancelled'],
   driver_arriving: ['driver_waiting', 'cancelled'],
   driver_waiting: ['in_progress', 'cancelled'],
   in_progress: ['completed'],

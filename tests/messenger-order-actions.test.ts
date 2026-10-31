@@ -78,6 +78,64 @@ describe('messenger order actions', () => {
     mocks.refreshMessengerAccountOrderMessages.mockResolvedValue(undefined);
   });
 
+  const contactOrder = (overrides: Partial<RideOrder> = {}) => order({
+    status: 'accepted', driverId: 'driver-1',
+    driver: { id: 'driver-1', name: 'Водитель', phone: '+7 999 444-55-66', rating: 5 } as RideOrder['driver'],
+    passenger: { id: 'passenger-user', name: 'Пассажир', phone: '+7 999 111-22-33', rating: 5, ratingCount: 0 },
+    ...overrides,
+  });
+  const contactRequest = { provider: 'max' as const, externalUserId: '42', chatId: 'chat', data: `r:contact:${orderId}` };
+  const asParticipant = (role: 'driver' | 'passenger', driverId = 'driver-1') => {
+    mocks.firstRow.mockImplementation(async (sql: string) => sql.includes('FROM drivers')
+      ? { id: driverId } : { user_id: `${role}-user`, chat_id: 'chat' });
+    mocks.findUserWithRoles.mockResolvedValue({ id: `${role}-user`, roles: [role] });
+  };
+
+  it.each((['max', 'telegram', 'vk'] as const).flatMap(provider =>
+    (['driver', 'passenger'] as const).map(role => ({provider, role})),
+  ))('sends only the counterpart contact to the assigned $role in $provider', async ({role, provider}) => {
+    asParticipant(role);
+    const inject = vi.fn().mockResolvedValue(response(contactOrder()));
+    const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
+    expect(await handle({...contactRequest, provider})).toEqual({ text: 'Контакт отправлен ниже.' });
+    expect(mocks.notifyMessengerAccount).toHaveBeenCalledWith(provider, '42', expect.objectContaining({
+      contact: { name: role === 'driver' ? 'Пассажир' : 'Водитель', phone: role === 'driver' ? '+79991112233' : '+79994445566' },
+      syncExistingOrderMessages: false,
+      buttons: [[expect.objectContaining({ url: `https://taxi.example/chat/${orderId}` })]],
+    }));
+    expect(inject).toHaveBeenCalledOnce();
+    expect(inject).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET', url: `/v1/orders/${orderId}` }));
+  });
+
+  it('rejects contact requests by a driver not assigned to the order', async () => {
+    asParticipant('driver', 'another-driver');
+    const handle = createMessengerOrderActionHandler({ inject: vi.fn().mockResolvedValue(response(contactOrder())) } as unknown as FastifyInstance);
+    expect(await handle(contactRequest)).toMatchObject({ alert: true, text: 'Этот заказ вам недоступен.' });
+    expect(mocks.notifyMessengerAccount).not.toHaveBeenCalled();
+  });
+
+  it.each(['searching', 'completed', 'cancelled'] as const)('rejects old call buttons when the order is %s', async status => {
+    asParticipant('passenger');
+    const handle = createMessengerOrderActionHandler({ inject: vi.fn().mockResolvedValue(response(contactOrder({ status }))) } as unknown as FastifyInstance);
+    expect(await handle(contactRequest)).toMatchObject({ alert: true });
+    expect(mocks.notifyMessengerAccount).not.toHaveBeenCalled();
+  });
+
+  it.each(['max', 'telegram', 'vk'] as const)('does not send duplicate contacts on concurrent repeated taps in %s', async provider => {
+    asParticipant('passenger');
+    const handle = createMessengerOrderActionHandler({ inject: vi.fn().mockResolvedValue(response(contactOrder())) } as unknown as FastifyInstance);
+    await Promise.all([handle({...contactRequest, provider}), handle({...contactRequest, provider})]);
+    expect(mocks.notifyMessengerAccount).toHaveBeenCalledOnce();
+  });
+
+  it('allows retry after a failed contact delivery', async () => {
+    asParticipant('passenger');
+    const handle = createMessengerOrderActionHandler({ inject: vi.fn().mockResolvedValue(response(contactOrder())) } as unknown as FastifyInstance);
+    mocks.notifyMessengerAccount.mockRejectedValueOnce(new Error('Provider unavailable'));
+    await expect(handle(contactRequest)).rejects.toThrow('Provider unavailable');
+    expect(await handle(contactRequest)).toEqual({ text: 'Контакт отправлен ниже.' });
+  });
+
   it('rejects a callback coming from a different Telegram chat', async () => {
     mocks.firstRow.mockResolvedValueOnce({ user_id: 'user-1', chat_id: 'expected-chat' });
     const inject = vi.fn();
@@ -156,12 +214,13 @@ describe('messenger order actions', () => {
     );
   });
 
-  it('confirms payment when a driver completes a ride from a messenger', async () => {
+  it.each((['telegram', 'vk', 'max'] as const).flatMap(provider =>
+    ['done', 'done-ok'].map(action => ({ provider, action })),
+  ))('completes immediately from $provider with $action, including old buttons', async ({ provider, action }) => {
     const inProgress = order({ status: 'in_progress', driverId: 'driver-1' });
     const completed = order({
       status: 'completed',
       driverId: 'driver-1',
-      paymentConfirmedAt: '2026-08-25T10:10:00.000Z',
     });
     mocks.firstRow
       .mockResolvedValueOnce({ user_id: 'driver-user', chat_id: 'tg-chat' })
@@ -177,18 +236,20 @@ describe('messenger order actions', () => {
     const handle = createMessengerOrderActionHandler({ inject } as unknown as FastifyInstance);
 
     const result = await handle({
-      provider: 'telegram',
+      provider,
       externalUserId: '42',
       chatId: 'tg-chat',
-      data: `r:done-ok:${orderId}`,
+      data: `r:${action}:${orderId}`,
     });
 
     expect(result).toEqual({ text: 'Поездка завершена 🏁' });
     expect(inject).toHaveBeenNthCalledWith(2, expect.objectContaining({
       method: 'POST',
       url: `/v1/driver/orders/${orderId}/transition`,
-      payload: { status: 'completed', paymentReceived: true },
+      payload: { status: 'completed' },
     }));
+    expect(inject).toHaveBeenCalledTimes(2);
+    expect(mocks.notifyMessengerAccount).not.toHaveBeenCalled();
   });
 
   it.each(['telegram', 'vk', 'max'] as const)('cancels through the protected API in %s and handles repeated confirmation', async provider => {

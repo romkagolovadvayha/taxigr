@@ -14,6 +14,8 @@ describe('ride state machine', () => {
   });
   it('allows only the ordered driver lifecycle', () => {
     expect(canTransitionRide('searching', 'accepted')).toBe(true);
+    expect(canTransitionRide('searching', 'driver_arriving')).toBe(true);
+    expect(canTransitionRide('accepted', 'driver_waiting')).toBe(true);
     expect(canTransitionRide('accepted', 'driver_arriving')).toBe(true);
     expect(canTransitionRide('driver_arriving', 'driver_waiting')).toBe(true);
     expect(canTransitionRide('driver_waiting', 'in_progress')).toBe(true);

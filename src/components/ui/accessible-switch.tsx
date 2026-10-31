@@ -1,6 +1,6 @@
+import { Host, Switch as NativeSwitch } from '@expo/ui';
 import {
   Platform,
-  Switch,
   type StyleProp,
   type SwitchProps,
   View,
@@ -41,6 +41,34 @@ export function AccessibleSwitch({
   };
   const resolvedThumbColor =
     thumbColor ?? (value ? colors.brandInk : colors.surface);
+  const changeValue = (nextValue: boolean) => {
+    if (!disabled && nextValue !== value) void onValueChange(nextValue);
+  };
+
+  if (Platform.OS !== 'web') {
+    // Let the native toggle own touch/drag events. A touchable parent around a
+    // controlled switch without onValueChange swallows/reverts Android changes.
+    return (
+      <View
+        accessible
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value, disabled }}
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'activate') changeValue(!value);
+        }}
+        onAccessibilityTap={() => changeValue(!value)}
+        style={[{ minWidth: 44, minHeight: 48, justifyContent: 'center', alignItems: 'center' }, style]}
+      >
+        <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Host matchContents seedColor={resolvedTrackColor.true}>
+            <NativeSwitch value={value} disabled={disabled} onValueChange={changeValue} />
+          </Host>
+        </View>
+      </View>
+    );
+  }
   return (
     <AnimatedPressable
       accessibilityLabel={accessibilityLabel}
@@ -50,7 +78,7 @@ export function AccessibleSwitch({
       aria-disabled={disabled}
       disabled={disabled}
       feedback="subtle"
-      onPress={() => void onValueChange(!value)}
+      onPress={() => changeValue(!value)}
       style={({ pressed }) => [
         {
           minWidth: 44,
@@ -62,7 +90,6 @@ export function AccessibleSwitch({
         style,
       ]}
     >
-      {Platform.OS === "web" ? (
         <View
           style={{
             width: 51,
@@ -84,19 +111,6 @@ export function AccessibleSwitch({
             }}
           />
         </View>
-      ) : (
-        <Switch
-          accessible={false}
-          accessibilityElementsHidden
-          disabled={disabled}
-          importantForAccessibility="no-hide-descendants"
-          pointerEvents="none"
-          style={{ minWidth: 44, minHeight: 44 }}
-          thumbColor={resolvedThumbColor}
-          trackColor={resolvedTrackColor}
-          value={value}
-        />
-      )}
     </AnimatedPressable>
   );
 }

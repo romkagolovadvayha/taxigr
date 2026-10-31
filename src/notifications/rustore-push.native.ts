@@ -16,7 +16,7 @@ type RuStorePushModule = {
 function getModule(): RuStorePushModule {
   const module = NativeModules.RustorePush as RuStorePushModule | undefined;
   if (!module) {
-    throw new Error('RuStore Push native module is unavailable in this build.');
+    throw new Error('В этой сборке отсутствует модуль RuStore Push. Установите актуальную версию приложения.');
   }
   return module;
 }
@@ -30,9 +30,11 @@ export async function getRuStorePushToken(): Promise<string | null> {
   const module = getModule();
   module.offNativeErrorHandling();
   const availability = await module.checkPushAvailability();
-  if (availability !== true) return null;
+  if (availability !== true) {
+    throw new Error('RuStore Push недоступен на устройстве. Проверьте, что RuStore установлен и обновлён, откройте его и повторите подключение уведомлений.');
+  }
   const token = await module.getToken();
-  if (!token) throw new Error('RuStore Push returned an empty device token.');
+  if (!token?.trim()) throw new Error('RuStore не вернул push-токен. Проверьте интернет и повторите подключение уведомлений.');
   return token;
 }
 

@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import sys
 import time
 from pathlib import Path
@@ -26,14 +27,17 @@ class Password:
         return json.loads(line).get('password', '')
 
 async def run():
+    global connected_at
     client = WebClient(session_name='max-session.db', work_dir=str(ROOT), auth_flow=QrAuthFlow(Qr(), Password()),
-        extra_config=ExtraConfig(telemetry=False, log_level='CRITICAL', reconnect_delay=10))
+        extra_config=ExtraConfig(telemetry=False, log_level='CRITICAL', reconnect=False))
     logging.disable(logging.CRITICAL)
     selected = None
 
     @client.on_start()
     async def ready(current):
+        global connected_at
         nonlocal selected
+        connected_at = time.monotonic()
         config = json.loads(CONFIG.read_text(encoding='utf-8'))
         pinned = config.get('groups', {}).get('max', {}).get('id')
         if pinned:
@@ -67,13 +71,32 @@ async def run():
     async def disconnected(exception, reconnect, delay):
         emit('status', value='reconnecting')
 
-    await client.start()
-
-while True:
     try:
-        asyncio.run(run())
-    except KeyboardInterrupt:
-        break
-    except Exception as error:
-        emit('status', value='reconnecting', error=type(error).__name__)
-        time.sleep(15)
+        await client.start()
+    finally:
+        await client.close()
+
+def reconnect_delay(failures, jitter=random.random):
+    return min(300, 15 * 2 ** min(failures, 10) * (1 + jitter() * 0.25))
+
+def main():
+    global connected_at
+    failures = 0
+    while True:
+        connected_at = None
+        try:
+            asyncio.run(run())
+        except KeyboardInterrupt:
+            break
+        except Exception as error:
+            emit('status', value='reconnecting', error=type(error).__name__)
+        # Also wait after a clean disconnect. Otherwise start() returning normally
+        # creates a tight reconnect loop. Only a stable connection resets backoff.
+        if connected_at is not None and time.monotonic() - connected_at >= 60:
+            failures = 0
+        emit('status', value='reconnecting')
+        time.sleep(reconnect_delay(failures))
+        failures += 1
+
+if __name__ == '__main__':
+    main()

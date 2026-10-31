@@ -42,6 +42,15 @@ test('stale retry payload expires without being sent as a new request', () => {
   assert.equal(queue.pendingCount(), 0);
   queue.close();
 });
+
+test('permanently rejected payload is removed and cannot be queued again', () => {
+  const queue = new EventQueue(':memory:');
+  const event = makeEvent(message, group, now - 1000, now);
+  queue.add(event); queue.discard(event.eventId);
+  assert.equal(queue.pendingCount(), 0);
+  assert.equal(queue.add(event), false);
+  queue.close();
+});
 test('queue and duplicate protection survive a process restart', () => {
   const directory = mkdtempSync(join(tmpdir(), 'taxigr-bridge-test-'));
   const path = join(directory, 'queue.sqlite');

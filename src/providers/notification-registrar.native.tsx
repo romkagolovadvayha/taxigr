@@ -7,6 +7,7 @@ import { useSession } from '@/auth/session-provider';
 import { reportCriticalClientError } from '@/errors/critical-error-reporter';
 import { useRideFeedback } from '@/feedback/ride-feedback-provider';
 import { syncPushRegistration } from '@/notifications/push-registration';
+import { pushRoute } from '@/notifications/push-route';
 import {
   addRuStorePushTokenListener,
   isRuStorePushEnabled,
@@ -27,6 +28,7 @@ export function NotificationRegistrar() {
   const { announceMessage } = useRideFeedback();
   const router = useRouter();
   const initialResponseHandled = useRef(false);
+  const lastResponseId = useRef<string | null>(null);
 
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
@@ -41,18 +43,16 @@ export function NotificationRegistrar() {
   useEffect(() => {
     if (!token || token.startsWith('demo:')) return;
     const openOrder = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const responseId = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+      if (lastResponseId.current === responseId) return;
+      lastResponseId.current = responseId;
+      // A handled tap must not reopen an old order after a restart or account switch.
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
       const data = response?.notification.request.content.data;
       const orderId = typeof data?.orderId === 'string' ? data.orderId : null;
       if (!orderId) return;
-      if (data?.chat === 'true') {
-        router.push({ pathname: '/chat/[id]', params: { id: orderId } } as never);
-        return;
-      }
-      const role = data?.role === 'driver' ? 'driver' : 'passenger';
-      router.push({
-        pathname: role === 'driver' ? '/driver/trips/[id]' : '/orders/[id]',
-        params: { id: orderId },
-      } as never);
+      router.push(pushRoute(data) as never);
     };
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(openOrder);
     if (!initialResponseHandled.current) {
@@ -71,17 +71,23 @@ export function NotificationRegistrar() {
       // The user requests it explicitly from the notification settings switch.
       await syncPushRegistration(token);
     };
-    const retryRegistration = () => void register().catch((error) => {
+    const reportRegistrationError = (error: unknown) => {
       void reportCriticalClientError(error, {
         source: 'push-registration',
         token,
         resource: 'expo-notifications',
       });
-      // Registration is retried when the app becomes active again.
-    });
-    const pushTokenSubscription = isRuStorePushEnabled()
-      ? addRuStorePushTokenListener(() => retryRegistration())
-      : Notifications.addPushTokenListener(retryRegistration);
+    };
+    const retryRegistration = () => void register().catch(reportRegistrationError);
+    let pushTokenSubscription: { remove: () => void } | undefined;
+    try {
+      pushTokenSubscription = isRuStorePushEnabled()
+        ? addRuStorePushTokenListener(() => retryRegistration())
+        : Notifications.addPushTokenListener(retryRegistration);
+    } catch (error) {
+      // A missing/broken native push service must not crash the settings screen.
+      reportRegistrationError(error);
+    }
     retryRegistration();
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') retryRegistration();
@@ -89,7 +95,7 @@ export function NotificationRegistrar() {
 
     return () => {
       active = false;
-      pushTokenSubscription.remove();
+      pushTokenSubscription?.remove();
       appStateSubscription.remove();
     };
   }, [token]);

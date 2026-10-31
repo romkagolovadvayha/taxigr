@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2/promise';
 
 import { config } from './config';
+import { normalizeRussianPhone } from './phone-verification';
 import { db, firstRow } from './db';
 import {
   deleteMaxMessage,
@@ -11,6 +12,7 @@ import {
 import {
   deleteTelegramMessage,
   editTelegramMessage,
+  sendTelegramContact,
   sendTelegramMessage,
   sendTelegramVenue,
 } from './telegram-bot';
@@ -52,6 +54,7 @@ export type PersonalMessengerNotification = {
   details?: ReadonlyArray<readonly [label: string, value: unknown]>;
   buttons?: ReadonlyArray<ReadonlyArray<MessengerButton>>;
   locations?: ReadonlyArray<MessengerLocation>;
+  contact?: { name: string; phone: string };
   action?: {
     label: string;
     url: string;
@@ -112,9 +115,16 @@ function notificationButtonRows(
 
 function maxMessageBody(notification: PersonalMessengerNotification): Record<string, unknown> {
   const buttonRows = notificationButtonRows(notification);
+  const phone = notification.contact ? normalizeRussianPhone(notification.contact.phone) : null;
+  const name = notification.contact ? (clean(notification.contact.name) ?? 'Контакт').replace(/[\r\n]/gu, ' ') : '';
+  const vcardName = name.replace(/\\/gu, '\\\\').replace(/[,;]/gu, '\\$&');
+  const contact = phone ? [{ type: 'contact', payload: {
+    name,
+    vcf_info: `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${vcardName}\r\nTEL;TYPE=CELL:${phone}\r\nEND:VCARD\r\n`,
+  } }] : [];
   return {
     text: formatPersonalMessengerNotification(notification),
-    attachments: buttonRows.length
+    attachments: [...contact, ...(buttonRows.length
       ? [{
           type: 'inline_keyboard',
           payload: {
@@ -134,7 +144,7 @@ function maxMessageBody(notification: PersonalMessengerNotification): Record<str
             )),
           },
         }]
-      : [],
+      : [])],
   };
 }
 
@@ -325,7 +335,15 @@ async function deliver(
   }
 
   if (!config.TELEGRAM_BOT_TOKEN) return;
-  const messageId = await sendTelegramMessage(account.chat_id, telegramMessageBody(notification));
+  const body = telegramMessageBody(notification);
+  const phone = notification.contact ? normalizeRussianPhone(notification.contact.phone) : null;
+  const messageId = phone
+    ? await sendTelegramContact(account.chat_id, {
+        phone_number: phone,
+        first_name: (clean(notification.contact!.name) ?? 'Контакт').replace(/[\r\n]/gu, ' '),
+        reply_markup: body.reply_markup,
+      })
+    : await sendTelegramMessage(account.chat_id, body);
   if (messageId) {
     await trackOrderMessage(account, notification, messageId);
     await removePreviousOrderMessages(account, notification, previousMessageIds);

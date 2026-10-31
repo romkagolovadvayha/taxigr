@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Address } from '../src/domain/models';
+import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
 vi.mock('../server/address-directory', () => ({ getAddressDirectory: vi.fn().mockResolvedValue([]) }));
 vi.mock('../server/geocoding', () => ({ searchAddresses: vi.fn().mockResolvedValue([]) }));
 vi.mock('../server/places', () => ({ listPlaces: vi.fn().mockResolvedValue([]), placeToAddress: vi.fn() }));
@@ -47,6 +48,25 @@ describe('messenger free-text addresses', () => {
 
 describe('bot resolution through the real parsing pipeline', () => {
   beforeEach(() => { vi.mocked(getAddressDirectory).mockResolvedValue([house]); vi.mocked(searchAddresses).mockReset().mockResolvedValue([]); });
+  it.each([
+    ['Грахово, ул 50 лет победы дом 10 кв 2', 'с. Грахово, ул. 50 лет Победы, 10'],
+    ['Ул Ачинцева 11 подъезд 3 15 квартира', 'с. Грахово, ул. Ачинцева, 11'],
+    ['Ачинцева 11, кв.15, подъезд 3, этаж 2', 'с. Грахово, ул. Ачинцева, 11'],
+    ['Ачинцева 11 кв15', 'с. Грахово, ул. Ачинцева, 11'],
+    ['Ачинцева дом11кв15', 'с. Грахово, ул. Ачинцева, 11'],
+  ])('resolves the real catalogue house in %s without confusing access details', async (raw, label) => {
+    vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
+    const result = await resolveBotAddressOptions(raw, true);
+    expect(result.address).toMatchObject({ label, coordinatePrecision: 'precise' });
+    expect(result.candidates).toEqual([]);
+    expect(searchAddresses).not.toHaveBeenCalled();
+  });
+  it('keeps actual compound house numbers and building suffixes intact', () => {
+    expect(normalizeBotAddress('Молодёжная 4-1')).toBe('молодежная 4-1');
+    expect(normalizeBotAddress('Советская 10/2 кв 15')).toBe('советская 10/2');
+    expect(normalizeBotAddress('Советская 10 корпус 2 кв 15')).toBe('советская 10 к 2');
+    expect(chooseBotAddress('Советская 11 кв 10', [house], true)).toBeNull();
+  });
   it('resolves a typo locally without geocoding', async () => {
     expect((await resolveBotAddressOptions('заберите меня с советской10', true)).address?.label).toBe(house.label);
     expect(searchAddresses).not.toHaveBeenCalled();

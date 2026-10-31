@@ -47,7 +47,7 @@ describe('feedbackForRideChange', () => {
   });
 
   it.each([
-    ['accepted', 'order-accepted'], ['driver_arriving', 'driver-departed'],
+    ['accepted', 'order-accepted'], ['driver_arriving', 'order-accepted'],
     ['driver_waiting', 'driver-waiting'], ['in_progress', 'ride-started'],
   ] as const)('announces driver status %s', (status, sound) => {
     expect(feedbackForRideChange(ride('searching'), ride(status), 'driver-user', true)?.sound).toBe(sound);
@@ -59,6 +59,9 @@ describe('feedbackForRideChange', () => {
     expect(feedbackForRideChange(null, queued, 'driver-user', true)?.sound).toBe('order-accepted-queued');
     expect(feedbackForRideChange(queued, ride('accepted', { driverQueuePosition: 1 }), 'driver-user', true)?.sound).toBe('next-order-ready');
     expect(feedbackForRideChange(queued, ride('accepted', { driverQueuePosition: 1 }), 'passenger-1', false)?.sound).toBe('driver-ready');
+    expect(feedbackForRideChange(queued, ride('driver_arriving', { driverQueuePosition: 1 }), 'driver-user', true)?.sound).toBe('next-order-ready');
+    expect(feedbackForRideChange(queued, ride('driver_arriving', { driverQueuePosition: 1 }), 'passenger-1', false)?.sound).toBe('driver-ready');
+    expect(feedbackForRideChange(null, ride('driver_arriving', { driverQueuePosition: 1 }), 'driver-user', true)?.sound).toBe('order-accepted');
   });
 
   it('distinguishes a driver release and different cancellation reasons', () => {
@@ -140,7 +143,7 @@ describe('ride feedback tracking across concurrent orders', () => {
     const next = ride('accepted', { id: 'ride-2', driverQueuePosition: 2 });
     tracker.seed([ride('in_progress'), next]);
     expect(tracker.observe(ride('completed'), 'driver-user', true)?.feedback.sound).toBe('driver-complete-cash');
-    expect(tracker.observe({ ...next, driverQueuePosition: 1 }, 'driver-user', true)?.feedback.sound).toBe('next-order-ready');
+    expect(tracker.observe({ ...next, status: 'driver_arriving', driverQueuePosition: 1 }, 'driver-user', true)?.feedback.sound).toBe('next-order-ready');
   });
 
   it('announces cancellation of a queued order even if the UI removes it', () => {

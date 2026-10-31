@@ -116,7 +116,9 @@ function RootNavigator() {
       !user ||
       user.profileComplete ||
       pathname === '/profile-setup' ||
-      pathname === '/vk'
+      pathname === '/vk' ||
+      pathname === '/auth-return' ||
+      pathname === '/navigate'
     ) return;
     router.replace('/profile-setup' as Href);
   }, [pathname, sessionReady, user]);
@@ -178,6 +180,8 @@ function RootNavigator() {
         <Stack.Screen name="driver-data-consent" />
         <Stack.Screen name="safety" />
         <Stack.Screen name="vk" />
+        <Stack.Screen name="auth-return" />
+        <Stack.Screen name="navigate" />
         <Stack.Protected guard={!user}>
           <Stack.Screen name="sign-in" />
         </Stack.Protected>

@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 // No real database, credentials or provider requests are used by these API tests.
 vi.mock("../server/config", () => ({
   config: {
+    PUBLIC_URL: 'https://taxigr.ru',
     JWT_SECRET: "isolated-messenger-login-test-secret",
     PHONE_CODE_TTL_MINUTES: 10,
     MAX_BOT_USERNAME: "test_bot",
@@ -125,6 +126,25 @@ describe.each(providers)("%s login without manual phone entry", (provider) => {
     );
     expect(insert).toBeDefined();
     expect(insert![1][provider === "vk" ? 4 : 3]).toBeNull();
+    expect(insert![1].at(-1)).toBe('legacy');
+  });
+
+  it.each(['android', 'ios', 'web'])('stores the originating %s platform for the return button', async platform => {
+    const response = await app.inject({method: 'POST', url: `/v1/auth/${provider}/start`,
+      payload: {legalAcceptance, installationId, platform, supportsAuthReturn: true}});
+    expect(response.statusCode).toBe(200);
+    const insert = mocks.execute.mock.calls.find(([sql]) => sql.includes(`INSERT INTO ${provider}_auth_challenges`));
+    expect(insert![0]).toContain('return_platform');
+    expect(insert![1].at(-1)).toBe(platform);
+    expect(insert![0].match(/\?/gu)).toHaveLength(insert![1].length);
+  });
+
+  it('does not infer return-route support from the platform sent by released apps', async () => {
+    const response = await app.inject({ method: 'POST', url: `/v1/auth/${provider}/start`,
+      payload: { legalAcceptance, installationId, platform: 'android' } });
+    expect(response.statusCode).toBe(200);
+    const insert = mocks.execute.mock.calls.find(([sql]) => sql.includes(`INSERT INTO ${provider}_auth_challenges`));
+    expect(insert![1].at(-1)).toBe('legacy');
   });
 
   it("preserves the phone constraint for older clients", async () => {
@@ -144,6 +164,7 @@ describe.each(providers)("%s login without manual phone entry", (provider) => {
     { installationId },
     { installationId, legalAcceptance, phone: "+12025550123" },
     { installationId, legalAcceptance, phone: null },
+    { installationId, legalAcceptance, platform: 'https://evil.example' },
   ])("rejects invalid input without creating a challenge", async (payload) => {
     const response = await app.inject({
       method: "POST",
@@ -244,7 +265,7 @@ function signedNativeLaunch(): string {
 describe('VK native confirmation API', () => {
   const state = 'x'.repeat(43);
   const pending = () => ({
-    id: challengeId, expected_phone: null, vk_user_id: null, verified_at: null,
+    id: challengeId, expected_phone: null, vk_user_id: null, verified_at: null, return_platform: 'android',
     completed_at: null, failure_code: null, expires_at: new Date(Date.now() + 60_000),
   });
 
@@ -256,10 +277,20 @@ describe('VK native confirmation API', () => {
       payload: { state, launchParams: signedNativeLaunch() },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json().data).toEqual({ confirmed: true });
+    expect(response.json().data).toEqual({ confirmed: true,
+      returnUrl: `https://taxigr.ru/auth-return?provider=vk&challenge=${challengeId}&target=android` });
     expect(mocks.query).toHaveBeenNthCalledWith(2, expect.stringContaining('account.external_user_id = ?'), ['test-user', '42']);
     expect(mocks.execute).toHaveBeenCalledWith(expect.stringContaining('UPDATE vk_auth_challenges'),
       ['+79990000000', '42', 'Test', null, challengeId]);
+  });
+
+  it('confirms a released Android login without redirecting it to an unsupported route', async () => {
+    mocks.query.mockResolvedValueOnce([[{ ...pending(), return_platform: 'legacy' }]])
+      .mockResolvedValueOnce([[{ phone: '+79990000000', first_name: 'Test', last_name: null }]]);
+    const response = await app.inject({ method: 'POST', url: '/v1/auth/vk/native/confirm',
+      payload: { state, launchParams: signedNativeLaunch() } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual({ confirmed: true });
   });
 
   it('rejects forged VK identity before looking up a challenge', async () => {

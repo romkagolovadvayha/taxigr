@@ -86,4 +86,29 @@ describe('ensureForegroundLocationPermission', () => {
     await expect(request).resolves.toBe(grantedPermission);
     expect(ensureLocationConsent).toHaveBeenCalledWith('driver');
   });
+
+  it('does not repeat a declined disclosure on ride transitions, but allows an explicit retry', async () => {
+    vi.mocked(ensureLocationConsent).mockResolvedValue(false);
+    await expect(ensureForegroundLocationPermission('driver')).resolves.toMatchObject({ granted: false });
+    vi.clearAllMocks();
+    for (let transition = 0; transition < 4; transition++) {
+      await expect(ensureForegroundLocationPermission('driver', { retryDenied: false })).resolves.toMatchObject({ granted: false });
+    }
+    expect(ensureLocationConsent).not.toHaveBeenCalled();
+    expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    vi.mocked(ensureLocationConsent).mockResolvedValue(true);
+    vi.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(grantedPermission);
+    await expect(ensureForegroundLocationPermission('driver')).resolves.toBe(grantedPermission);
+    await expect(ensureForegroundLocationPermission('driver', { retryDenied: false })).resolves.toBe(grantedPermission);
+  });
+
+  it('does not repeat a declined Android permission during automatic tracking setup', async () => {
+    vi.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(deniedPermission);
+    vi.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValue(deniedPermission);
+    await expect(ensureForegroundLocationPermission('driver')).resolves.toBe(deniedPermission);
+    await expect(ensureForegroundLocationPermission('driver', { retryDenied: false })).resolves.toMatchObject({ granted: false });
+    expect(Location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+    vi.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(grantedPermission);
+    await ensureForegroundLocationPermission('driver');
+  });
 });

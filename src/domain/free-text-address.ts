@@ -19,6 +19,13 @@ export function normalizeBotAddress(value: string): string {
     .replace(/[^\p{L}\p{N}\s/\-]/gu, ' ')
     .replace(/\s+/gu, ' ').trim()
     .replace(/(^|\s)(?:улца|улеца|улиса|улиц)(?=\s|$)/gu, '$1улица');
+  // Flats, entrances and floors describe access to a house, not a different house.
+  // The booking keeps the original text in the driver's order comment.
+  text = text
+    .replace(/(\d[а-я]?)(?=(?:кв(?:артира|артиры|артире)?|под[ъь]?езд|этаж|эт|домофон)\s*\d)/gu, '$1 ')
+    .replace(/(^|\s)(?:кв(?:артира|артиры|артире)?|под[ъь]?езд(?:а)?|под|этаж|эт|домофон)\s*\d+[а-я]?(?:[/-]\d+[а-я]?)?(?=\s|$)/gu, '$1')
+    .replace(/(^|\s)\d+[а-я]?(?:[/-]\d+[а-я]?)?\s*(?:квартира|кв|под[ъь]?езд|этаж|эт)(?=\s|$)/gu, '$1')
+    .replace(/\s+/gu, ' ').trim();
   // These are conversational words, not part of a street/settlement name.
   text = text.replace(/^(?:(?:я|хочу|поехать|ехать|поедем|нужно|надо|мне|меня|заберите|забрать|пожалуйста|в|на|до|от|из)\s+)+/u, '');
   return text.replace(/^(\d+[а-я]?(?:[/-]\d+[а-я]?)?)\s+(?!лет(?:\s|$))([а-я][а-я\s-]+)$/u, '$2 $1');

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 
 import { apiRequest } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
@@ -15,6 +16,7 @@ export function VkNativeLoginConfirmation({ state, token }: { state: string; tok
   const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [returnUrl, setReturnUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const confirm = async () => {
@@ -23,11 +25,12 @@ export function VkNativeLoginConfirmation({ state, token }: { state: string; tok
     setBusy(true);
     setError(null);
     try {
-      await apiRequest('/v1/auth/vk/native/confirm', {
+      const result = await apiRequest<{ returnUrl?: string }>('/v1/auth/vk/native/confirm', {
         method: 'POST',
         token,
         body: JSON.stringify({ state, launchParams: getVkMiniAppLaunchParams() }),
       });
+      setReturnUrl(result.returnUrl ?? 'taxigrahovo://sign-in');
       setConfirmed(true);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Не удалось подтвердить вход.');
@@ -46,7 +49,7 @@ export function VkNativeLoginConfirmation({ state, token }: { state: string; tok
         </Text>
         <Text style={{ ...typography.body, color: colors.inkSecondary, textAlign: 'center' }}>
           {confirmed
-            ? 'Вернитесь в приложение «Такси Грахово» на Android. Вход завершится автоматически.'
+            ? 'Нажмите «Заказать такси», чтобы вернуться в приложение и продолжить.'
             : 'Подтвердите вход, если вы начали его в приложении «Такси Грахово» на Android и код совпадает.'}
         </Text>
         {!confirmed && (
@@ -61,6 +64,11 @@ export function VkNativeLoginConfirmation({ state, token }: { state: string; tok
               Чтобы отказаться, закройте это окно.
             </Text>
           </>
+        )}
+        {confirmed && returnUrl && (
+          <AppButton onPress={() => void Linking.openURL(returnUrl).catch(() => setError('Не удалось открыть приложение. Откройте Такси Грахово с главного экрана телефона.'))} style={{ alignSelf: 'stretch' }}>
+            Заказать такси
+          </AppButton>
         )}
         {error && (
           <Text accessibilityRole="alert" style={{ ...typography.body, color: colors.danger }}>

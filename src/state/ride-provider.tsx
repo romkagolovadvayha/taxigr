@@ -24,6 +24,7 @@ import { driverRatingQueueReducer, emptyDriverRatingQueue } from '@/domain/drive
 import type { InitialLegalAcceptance } from '@/legal/documents';
 import {
   buildDemoDriverOffer,
+  demoWaitingTransition,
   placeDemoDriverNearPickup,
 } from '@/domain/demo-flow';
 import type {
@@ -1056,7 +1057,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         ...current,
         status,
         updatedAt: new Date().toISOString(),
-        ...(status === 'accepted'
+        ...demoWaitingTransition(current, status),
+        ...(status === 'accepted' || (status === 'driver_arriving' && current.status === 'searching')
           ? {
               driverId: demoDriver.id,
               driver: placeDemoDriverNearPickup(demoDriver, current.pickup.coordinates),
@@ -1080,10 +1082,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
         const acceptingAsNext = status === 'accepted' && Boolean(
           driverRide && isAssignedDriverOrder(driverRide),
         );
-        let next: RideOrder = {
+        const next: RideOrder = {
           ...current,
-          status,
+          status: status === 'accepted' && !acceptingAsNext ? 'driver_arriving' : status,
           updatedAt: new Date().toISOString(),
+          ...demoWaitingTransition(current, status),
           ...(status === 'accepted'
             ? {
                 driverId: demoDriver.id,
@@ -1092,31 +1095,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
               }
             : {}),
         };
-        if (status === 'in_progress' && current.waitingStartedAt) {
-          const waitingSeconds =
-            (current.waitingSeconds ?? 0) + activeWaitingSeconds(current.waitingStartedAt);
-          const waitingPriceMinor = calculateWaitingChargeMinor(
-            waitingSeconds,
-            current.waitingFreeMinutes,
-            current.waitingPerMinuteMinor,
-          );
-          const priceMinor =
-            (current.basePriceMinor ?? current.priceMinor) +
-            (current.searchPriceIncreaseMinor ?? 0) +
-            waitingPriceMinor;
-          next = {
-            ...next,
-            waitingSeconds,
-            waitingPriceMinor,
-            waitingStartedAt: undefined,
-            priceMinor,
-            serviceCommissionMinor: calculateCommissionMinor(priceMinor),
-          };
-        }
         applyDriverOrder(next);
         if (status === 'completed' && nextDriverRide) {
           applyDriverOrder({
             ...nextDriverRide,
+            status: 'driver_arriving',
             driverQueuePosition: 1,
             updatedAt: new Date().toISOString(),
           });
@@ -1138,7 +1121,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(
             status === 'accepted'
               ? {}
-              : { status, ...(status === 'completed' ? { paymentReceived: true } : {}) },
+              : { status },
           ),
         });
         applyDriverOrder(ride);

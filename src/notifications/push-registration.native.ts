@@ -9,6 +9,21 @@ import {
 } from '@/notifications/rustore-push';
 
 let channelsConfiguration: Promise<void> | undefined;
+const registrations = new Map<string, { promise: Promise<boolean>; requestPermission: boolean }>();
+
+async function readDeviceToken<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Не удалось получить push-токен устройства. Проверьте интернет и повторите подключение.')), 20_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function configureAndroidChannels(): Promise<void> {
   // Token refresh and foreground events can arrive together on first launch.
@@ -74,7 +89,7 @@ async function createMissingAndroidChannels(): Promise<void> {
   }
 }
 
-export async function syncPushRegistration(
+async function registerDevice(
   sessionToken: string,
   requestPermission = false,
 ): Promise<boolean> {
@@ -95,18 +110,33 @@ export async function syncPushRegistration(
   const provider = isRuStorePushEnabled() ? 'rustore' : 'expo';
   let pushToken: string;
   if (provider === 'rustore') {
-    const rustoreToken = await getRuStorePushToken();
-    if (!rustoreToken) return false;
+    const rustoreToken = await readDeviceToken(getRuStorePushToken());
+    if (!rustoreToken) throw new Error('Не удалось получить push-токен RuStore. Проверьте, что RuStore установлен и обновлён, и повторите подключение.');
     pushToken = rustoreToken;
   } else {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     if (!projectId) throw new Error('В сборке отсутствует EAS projectId для push-уведомлений.');
-    pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    pushToken = (await readDeviceToken(Notifications.getExpoPushTokenAsync({ projectId }))).data;
   }
+  if (!pushToken?.trim()) throw new Error('Сервис уведомлений вернул пустой push-токен. Повторите подключение.');
   await apiRequest('/v1/push-tokens', {
     method: 'PUT',
     token: sessionToken,
     body: JSON.stringify({ token: pushToken, platform: Platform.OS, provider }),
   });
   return true;
+}
+
+export function syncPushRegistration(sessionToken: string, requestPermission = false): Promise<boolean> {
+  const pending = registrations.get(sessionToken);
+  if (pending) {
+    if (!requestPermission || pending.requestPermission) return pending.promise;
+    // A background permission check must not swallow an explicit Enable/Test tap.
+    return pending.promise.catch(() => false).then(registered => registered || syncPushRegistration(sessionToken, true));
+  }
+  const promise = registerDevice(sessionToken, requestPermission).finally(() => {
+    if (registrations.get(sessionToken)?.promise === promise) registrations.delete(sessionToken);
+  });
+  registrations.set(sessionToken, { promise, requestPermission });
+  return promise;
 }

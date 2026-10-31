@@ -73,6 +73,7 @@ import {
 import { config } from './config';
 import { registerAppReleaseRoutes } from './app-releases';
 import { matchesMessengerPhone } from './messenger-auth-phone';
+import { messengerAuthReturnUrl } from './messenger-auth-return';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db, firstRow, withTransaction } from './db';
 import { searchAddresses } from './geocoding';
@@ -303,10 +304,11 @@ const verifyPhoneCodeSchema = requestPhoneCodeSchema.extend({
 const phoneAuthStartSchema = requestPhoneCodeSchema.extend({
   legalAcceptance: initialLegalAcceptanceSchema,
 });
-const messengerAuthStartSchema = phoneAuthStartSchema.partial({ phone: true });
-const vkAuthStartSchema = messengerAuthStartSchema.extend({
+const messengerAuthStartSchema = phoneAuthStartSchema.partial({ phone: true }).extend({
   platform: z.enum(['android', 'ios', 'web']).optional(),
+  supportsAuthReturn: z.boolean().optional(),
 });
+const vkAuthStartSchema = messengerAuthStartSchema;
 const vkNativeLoginConfirmSchema = z.object({
   state: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
   launchParams: z.string().min(1).max(8_192),
@@ -599,6 +601,9 @@ type PricingRow = RowDataPacket & {
   district_per_kilometer_22_02_minor: number;
   district_per_kilometer_02_07_minor: number;
   intercity_per_kilometer_minor: number;
+  intercity_per_kilometer_07_22_minor: number;
+  intercity_per_kilometer_22_02_minor: number;
+  intercity_per_kilometer_02_07_minor: number;
   child_surcharge_minor: number;
   additional_stop_grahovo_surcharge_bps: number;
   waiting_free_minutes: number;
@@ -625,6 +630,9 @@ async function pricingRules(connection?: PoolConnection): Promise<PricingRules> 
     districtPerKilometer22To02Minor: row.district_per_kilometer_22_02_minor,
     districtPerKilometer02To07Minor: row.district_per_kilometer_02_07_minor,
     intercityPerKilometerMinor: row.intercity_per_kilometer_minor,
+    intercityPerKilometer07To22Minor: row.intercity_per_kilometer_07_22_minor,
+    intercityPerKilometer22To02Minor: row.intercity_per_kilometer_22_02_minor,
+    intercityPerKilometer02To07Minor: row.intercity_per_kilometer_02_07_minor,
     childSurchargeMinor: row.child_surcharge_minor,
     additionalStopGrahovoSurchargeBps: row.additional_stop_grahovo_surcharge_bps,
     waitingFreeMinutes: row.waiting_free_minutes,
@@ -660,7 +668,7 @@ function quoteTariffs(
           ? `Фиксированная цена по Грахово · ${periodDescription}`
           : scope === 'district'
             ? `По Граховскому району · ${periodDescription}${approachDescription}`
-            : `Междугородняя поездка${approachDescription}`,
+            : `Междугородняя поездка · ${periodDescription}${approachDescription}`,
     childSeatIncluded: code === 'child',
     etaMinutes: etaMinutes[code],
     priceMinor:
@@ -1445,13 +1453,13 @@ async function rebalanceDriverOrderQueue(
   }
 
   await connection.execute(
-    'UPDATE orders SET active_driver_id = ? WHERE id = ? AND active_driver_id IS NULL',
+    "UPDATE orders SET active_driver_id = ?, status = 'driver_arriving' WHERE id = ? AND active_driver_id IS NULL",
     [driverId, queued.id],
   );
   await connection.execute(
     `INSERT INTO order_events
       (order_id, event_type, from_status, to_status, payload)
-     VALUES (?, 'driver.queue.promoted', 'accepted', 'accepted', ?)`,
+     VALUES (?, 'driver.queue.promoted', 'accepted', 'driver_arriving', ?)`,
     [queued.id, JSON.stringify({ driverId })],
   );
   await connection.execute(
@@ -1985,8 +1993,8 @@ export async function registerRoutes(
         await db.execute(
           `INSERT INTO vk_auth_challenges
             (id, state_token, code_verifier, exchange_secret_hash, expected_phone,
-             legal_acceptance, consent_ip, consent_user_agent, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             legal_acceptance, consent_ip, consent_user_agent, expires_at, return_platform)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             challengeId,
             stateToken,
@@ -1997,6 +2005,7 @@ export async function registerRoutes(
             identity.ipAddress,
             request.headers['user-agent']?.slice(0, 255) ?? null,
             expiresAt,
+            input.supportsAuthReturn ? input.platform ?? 'web' : 'legacy',
           ],
         );
         await finalize('vk_challenge_created', challengeId);
@@ -2036,12 +2045,12 @@ export async function registerRoutes(
       secret: config.VK_MINI_APP_SECRET,
       maxAgeSeconds: config.VK_MINI_APP_MAX_AGE_SECONDS,
     });
-    await withTransaction((connection) => confirmVkNativeLogin(connection, {
+    const confirmed = await withTransaction((connection) => confirmVkNativeLogin(connection, {
       state: input.state,
       sessionUserId: session.id,
       vkUserId: launch.userId,
     }));
-    return { data: { confirmed: true } };
+    return { data: { confirmed: true, returnUrl: messengerAuthReturnUrl('vk', confirmed.challengeId, confirmed.returnPlatform) } };
   });
 
   app.get('/v1/auth/vk/callback', { logLevel: 'warn' }, async (request, reply) => {
@@ -2053,9 +2062,9 @@ export async function registerRoutes(
       const input = parse(vkCallbackSchema, request.query);
       state = input.state;
       const challenge = await firstRow<
-        RowDataPacket & { id: string; code_verifier: string; expected_phone: string | null; expires_at: Date | string }
+        RowDataPacket & { id: string; code_verifier: string; expected_phone: string | null; expires_at: Date | string; return_platform: string }
       >(
-        `SELECT id, code_verifier, expected_phone, expires_at
+        `SELECT id, code_verifier, expected_phone, expires_at, return_platform
          FROM vk_auth_challenges WHERE state_token = ? LIMIT 1`,
         [input.state],
       );
@@ -2085,7 +2094,7 @@ export async function registerRoutes(
           challenge.id,
         ],
       );
-      return reply.send(vkCallbackHtml(matches));
+      return reply.send(vkCallbackHtml(matches, messengerAuthReturnUrl('vk', challenge.id, challenge.return_platform)));
     } catch (error) {
       if (state) {
         await db.execute(
@@ -2402,9 +2411,9 @@ export async function registerRoutes(
         ) {
           const verifiedPhone = extractPhoneFromMaxVcf(contact.payload.vcf_info);
           const challenge = await firstRow<
-            RowDataPacket & { id: string; expected_phone: string | null }
+            RowDataPacket & { id: string; expected_phone: string | null; return_platform: string }
           >(
-            `SELECT id, expected_phone FROM max_auth_challenges
+            `SELECT id, expected_phone, return_platform FROM max_auth_challenges
              WHERE max_user_id = ? AND expires_at > UTC_TIMESTAMP(3)
                AND verified_at IS NULL
              ORDER BY created_at DESC LIMIT 1`,
@@ -2419,7 +2428,7 @@ export async function registerRoutes(
                WHERE id = ? AND verified_at IS NULL`,
               [verifiedPhone, matches ? null : 'PHONE_MISMATCH', matches, challenge.id],
             );
-            await sendMaxConfirmation(userId, matches);
+            await sendMaxConfirmation(userId, matches, messengerAuthReturnUrl('max', challenge.id, challenge.return_platform));
             return { success: true };
           }
           if (verifiedPhone && update.message.body?.mid) await handleBookingMessage({
@@ -2493,8 +2502,8 @@ export async function registerRoutes(
         await db.execute(
           `INSERT INTO max_auth_challenges
             (id, payload_token, exchange_secret_hash, expected_phone, legal_acceptance,
-             consent_ip, consent_user_agent, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             consent_ip, consent_user_agent, expires_at, return_platform)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             challengeId,
             payloadToken,
@@ -2504,6 +2513,7 @@ export async function registerRoutes(
             identity.ipAddress,
             request.headers['user-agent']?.slice(0, 255) ?? null,
             expiresAt,
+            input.supportsAuthReturn ? input.platform ?? 'web' : 'legacy',
           ],
         );
         await finalize('max_challenge_created', undefined, challengeId);
@@ -2715,8 +2725,8 @@ export async function registerRoutes(
         await db.execute(
           `INSERT INTO telegram_auth_challenges
             (id, payload_token, exchange_secret_hash, expected_phone, legal_acceptance,
-             consent_ip, consent_user_agent, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             consent_ip, consent_user_agent, expires_at, return_platform)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             challengeId,
             payloadToken,
@@ -2726,6 +2736,7 @@ export async function registerRoutes(
             identity.ipAddress,
             request.headers['user-agent']?.slice(0, 255) ?? null,
             expiresAt,
+            input.supportsAuthReturn ? input.platform ?? 'web' : 'legacy',
           ],
         );
         await finalize('telegram_challenge_created', undefined, challengeId);
@@ -3487,10 +3498,10 @@ export async function registerRoutes(
 
   app.get('/v1/addresses/search', async (request) => {
     await auth(request, 'passenger');
-    const { query, kind } = parse(z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional() }), request.query);
+    const { query, kind, mode } = parse(z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional(), mode: z.enum(['suggest']).optional() }), request.query);
     const placeResults = kind ? [] : filterRequestedHouse((await searchPlaces(query)).map(placeToAddress), query);
     try {
-      const addressResults = await searchAddresses(query, kind === 'street', kind === 'house');
+      const addressResults = await searchAddresses(query, kind === 'street', kind === 'house', mode === 'suggest' || placeResults.length > 0);
       return { data: [...placeResults, ...addressResults].slice(0, 30) };
     } catch {
       if (placeResults.length) return { data: placeResults };
@@ -3513,13 +3524,13 @@ export async function registerRoutes(
           code: 'NOT_FOUND',
         });
       }
-      const { query, kind } = parse(
-        z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional() }),
+      const { query, kind, mode } = parse(
+        z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional(), mode: z.enum(['suggest']).optional() }),
         request.query,
       );
       const placeResults = kind ? [] : filterRequestedHouse((await searchPlaces(query)).map(placeToAddress), query);
       try {
-        const addressResults = await searchAddresses(query, kind === 'street', kind === 'house');
+        const addressResults = await searchAddresses(query, kind === 'street', kind === 'house', mode === 'suggest' || placeResults.length > 0);
         return { data: [...placeResults, ...addressResults].slice(0, 30) };
       } catch {
         if (placeResults.length) return { data: placeResults };
@@ -5235,17 +5246,18 @@ export async function registerRoutes(
       const commissionMinor = calculateCommissionMinor(row.price_minor, commissionBps);
       const queuePosition = activeRows.length === 0 ? 1 : 2;
       const activeDriverId = queuePosition === 1 ? driver.id : null;
+      const acceptedStatus = queuePosition === 1 ? 'driver_arriving' : 'accepted';
       await connection.execute(
-        `UPDATE orders SET driver_id = ?, active_driver_id = ?, vehicle_id = ?, status = 'accepted',
+        `UPDATE orders SET driver_id = ?, active_driver_id = ?, vehicle_id = ?, status = ?,
           commission_minor = ?, commission_bps = ?
          WHERE id = ? AND status = 'searching'`,
-        [driver.id, activeDriverId, driver.vehicle_id, commissionMinor, commissionBps, id],
+        [driver.id, activeDriverId, driver.vehicle_id, acceptedStatus, commissionMinor, commissionBps, id],
       );
       await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, from_status, to_status)
-         VALUES (?, ?, 'order.accepted', 'searching', 'accepted')`,
-        [id, session.id],
+         VALUES (?, ?, 'order.accepted', 'searching', ?)`,
+        [id, session.id, acceptedStatus],
       );
       return { passengerId: row.passenger_id, driverId: driver.id, queuePosition };
     }, { isolationLevel: 'READ COMMITTED' });
@@ -5636,6 +5648,11 @@ export async function registerRoutes(
       if (!driver || !row || row.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
       }
+      // A retried arrival/start/completion must not restart the timer, charge
+      // waiting again, promote another order or send duplicate notifications.
+      if (row.status === status) {
+        return { passengerId: row.passenger_id, driverId: driver.id, promotion: null, changed: false };
+      }
       if (row.active_driver_id !== driver.id) {
         throw Object.assign(new Error('Сначала завершите текущую поездку'), {
           statusCode: 409,
@@ -5646,12 +5663,6 @@ export async function registerRoutes(
         throw Object.assign(new Error('Недопустимый переход статуса'), {
           statusCode: 409,
           code: 'INVALID_STATUS_TRANSITION',
-        });
-      }
-      if (status === 'completed' && paymentReceived !== true) {
-        throw Object.assign(new Error('Подтвердите получение оплаты перед завершением поездки'), {
-          statusCode: 409,
-          code: 'PAYMENT_CONFIRMATION_REQUIRED',
         });
       }
       if (status === 'completed' && row.pricing_mode === 'driver' && !row.manual_price_set) {
@@ -5670,11 +5681,12 @@ export async function registerRoutes(
       }
       await connection.execute(
         `UPDATE orders SET status = ?,
+          waiting_started_at = IF(? = 'driver_waiting', COALESCE(waiting_started_at, UTC_TIMESTAMP(3)), waiting_started_at),
           active_driver_id = IF(? = 'completed', NULL, active_driver_id),
           completed_at = IF(? = 'completed', UTC_TIMESTAMP(3), completed_at),
-          payment_confirmed_at = IF(? = 'completed', UTC_TIMESTAMP(3), payment_confirmed_at)
+          payment_confirmed_at = IF(? = 'completed' AND ? = TRUE, UTC_TIMESTAMP(3), payment_confirmed_at)
          WHERE id = ?`,
-        [status, status, status, status, id],
+        [status, status, status, status, status, paymentReceived === true, id],
       );
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, from_status, to_status)
@@ -5686,11 +5698,12 @@ export async function registerRoutes(
         promotion = await rebalanceDriverOrderQueue(connection, driver.id);
         await connection.execute('DELETE FROM passenger_locations WHERE order_id = ?', [id]);
       }
-      return { passengerId: row.passenger_id, driverId: driver.id, promotion };
+      return { passengerId: row.passenger_id, driverId: driver.id, promotion, changed: true };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
     const payload = presentOrder(updated);
+    if (!participants.changed) return { data: payload };
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
@@ -6946,6 +6959,9 @@ export async function registerRoutes(
         districtPerKilometer22To02Minor: z.number().int().min(0).max(1_000_000),
         districtPerKilometer02To07Minor: z.number().int().min(0).max(1_000_000),
         intercityPerKilometerMinor: z.number().int().min(0).max(1_000_000),
+        intercityPerKilometer07To22Minor: z.number().int().min(0).max(1_000_000).optional(),
+        intercityPerKilometer22To02Minor: z.number().int().min(0).max(1_000_000).optional(),
+        intercityPerKilometer02To07Minor: z.number().int().min(0).max(1_000_000).optional(),
         childSurchargeMinor: z.number().int().min(0).max(1_000_000),
         additionalStopGrahovoSurchargeBps: z.number().int().min(0).max(20_000),
         waitingFreeMinutes: z.number().int().min(0).max(120),
@@ -6956,10 +6972,32 @@ export async function registerRoutes(
         passengerCancellationLimit: z.number().int().min(1).max(20),
         passengerCancellationWindowHours: z.number().int().min(1).max(720),
         passengerCancellationBlockHours: z.number().int().min(1).max(720),
-      }),
+      }).refine(value => {
+        const rates = [value.intercityPerKilometer07To22Minor, value.intercityPerKilometer22To02Minor, value.intercityPerKilometer02To07Minor];
+        return rates.every(rate => rate === undefined) || rates.every(rate => rate !== undefined);
+      }, { message: 'Укажите ставки межгорода для всех трёх периодов.' }),
       request.body,
     );
     const before = await pricingRules();
+    // An older admin app can still change its single rate. Merely saving other
+    // settings from that app must not flatten the evening/night rates.
+    const legacyRateChanged = input.intercityPerKilometerMinor !== before.intercityPerKilometerMinor;
+    // Released admin apps spread the GET response and post it back wholesale,
+    // including period fields their UI does not know about. Honor their edited
+    // flat rate when the echoed periods were not edited.
+    const periodRatesUnchanged = ([
+      'intercityPerKilometer07To22Minor',
+      'intercityPerKilometer22To02Minor',
+      'intercityPerKilometer02To07Minor',
+    ] as const).every(key => input[key] === undefined || input[key] === before[key]);
+    const legacyFlatRate = legacyRateChanged && periodRatesUnchanged ? input.intercityPerKilometerMinor : undefined;
+    const saved = {
+      ...input,
+      intercityPerKilometer07To22Minor: legacyFlatRate ?? input.intercityPerKilometer07To22Minor ?? before.intercityPerKilometer07To22Minor,
+      intercityPerKilometer22To02Minor: legacyFlatRate ?? input.intercityPerKilometer22To02Minor ?? before.intercityPerKilometer22To02Minor,
+      intercityPerKilometer02To07Minor: legacyFlatRate ?? input.intercityPerKilometer02To07Minor ?? before.intercityPerKilometer02To07Minor,
+    };
+    saved.intercityPerKilometerMinor = saved.intercityPerKilometer07To22Minor;
     await db.execute(
       `UPDATE tariff_settings SET grahovo_fare_07_22_minor = ?,
        grahovo_fare_22_02_minor = ?, grahovo_fare_02_07_minor = ?,
@@ -6967,6 +7005,9 @@ export async function registerRoutes(
        district_per_kilometer_22_02_minor = ?,
        district_per_kilometer_02_07_minor = ?,
        intercity_per_kilometer_minor = ?,
+       intercity_per_kilometer_07_22_minor = ?,
+       intercity_per_kilometer_22_02_minor = ?,
+       intercity_per_kilometer_02_07_minor = ?,
        child_surcharge_minor = ?, additional_stop_grahovo_surcharge_bps = ?,
        waiting_free_minutes = ?,
        waiting_per_minute_minor = ?, search_price_increase_interval_minutes = ?,
@@ -6981,7 +7022,10 @@ export async function registerRoutes(
         input.districtPerKilometer07To22Minor,
         input.districtPerKilometer22To02Minor,
         input.districtPerKilometer02To07Minor,
-        input.intercityPerKilometerMinor,
+        saved.intercityPerKilometerMinor,
+        saved.intercityPerKilometer07To22Minor,
+        saved.intercityPerKilometer22To02Minor,
+        saved.intercityPerKilometer02To07Minor,
         input.childSurchargeMinor,
         input.additionalStopGrahovoSurchargeBps,
         input.waitingFreeMinutes,
@@ -6995,9 +7039,9 @@ export async function registerRoutes(
         session.id,
       ],
     );
-    await audit(session.id, 'tariffs.update', 'tariff_settings', '1', before, input, request.ip);
-    publish('admins', 'tariffs:updated', input);
-    return { data: { currency: 'RUB', ...input } };
+    await audit(session.id, 'tariffs.update', 'tariff_settings', '1', before, saved, request.ip);
+    publish('admins', 'tariffs:updated', saved);
+    return { data: { currency: 'RUB', ...saved } };
   });
 
   return {
