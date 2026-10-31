@@ -194,6 +194,24 @@ describe.skipIf(process.env.RUN_BROADCAST_INTEGRATION !== '1')('VK broadcasts wi
     expect(vk.mock.calls.filter(c=>c[0]==='messages.send')).toHaveLength(1);
     expect((await send(base)).json().data.runs[0].status).toBe('failed');
   });
+  it('skips a missing VK contact and continues a public campaign without repeating previous deliveries', async () => {
+    await send(base+'/audience/sync','POST',{});
+    for(let i=0;i<6;i++)await processVkBroadcasts();
+    await db.execute('INSERT INTO vk_broadcast_audience (community_key,peer_id,allowed,checked_at) VALUES (?,?,TRUE,UTC_TIMESTAMP(3))',['taxi','44']);
+    const c=await draft(),generation=(await send(base)).json().data.sync.generation;
+    expect((await send(`${base}/campaigns/${c.id}/runs`,'POST',{id:randomUUID(),revision:c.revision,mode:'all',expectedCount:3,audienceGeneration:generation})).statusCode).toBe(200);
+    vk.mockImplementation(async(m,p)=>{
+      if(m==='messages.send'&&p.peer_id==='22')throw new VkApiError(936,'Contact not found');
+      return defaultVk(m,p);
+    });
+    for(let i=0;i<5;i++)await processVkBroadcasts();
+    const messages=vk.mock.calls.filter(c=>c[0]==='messages.send');
+    expect(messages.map(c=>c[1].peer_id)).toEqual(['11','22','44']);
+    expect(messages.every(c=>c[1].message==='Заказать такси')).toBe(true);
+    expect((await send(base)).json().data.runs[0]).toMatchObject({status:'completed',total:3,sent:2,skipped:1,failed:0,pending:0});
+    expect(await firstRow<RowDataPacket>('SELECT allowed FROM vk_broadcast_audience WHERE community_key=? AND peer_id=?',['taxi','22'])).toMatchObject({allowed:0});
+    expect(await firstRow<RowDataPacket>('SELECT status,last_error FROM vk_broadcast_deliveries WHERE peer_id=?',['22'])).toMatchObject({status:'skipped',last_error:'ВК не нашёл контакт получателя (код 936)'});
+  });
   it('backs off and retries an incomplete VK photo upload before sending any message', async () => {
     const png=Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]).toString('base64');
     await startTest(await draft({image:{mimeType:'image/png',base64:png}}));

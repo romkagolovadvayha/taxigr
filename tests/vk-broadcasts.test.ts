@@ -22,6 +22,7 @@ describe('broadcast safety contracts', () => {
   });
   it('does not leak provider messages and distinguishes blocked recipients, temporary and global failures', () => {
     expect(broadcastError(new VkApiError(901,'private provider details'))).toMatchObject({retry:false,denied:true});
+    expect(broadcastError(new VkApiError(936,'private provider details'))).toMatchObject({retry:false,denied:true});
     expect(broadcastError(new VkApiError(6,'private provider details'))).toMatchObject({retry:true,denied:false});
     expect(broadcastError(new VkApiError(9,'private provider details'))).toMatchObject({retry:false,denied:false});
     expect(broadcastError(new VkApiError(5,'private provider details')).message).not.toContain('private');

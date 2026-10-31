@@ -14,6 +14,7 @@ async function api<T>(community: BroadcastCommunity, method: string, params: Rec
 }
 export function broadcastError(error: unknown): { message: string; retry: boolean; denied: boolean } {
   const code = error instanceof VkApiError ? error.vkCode : 0;
+  if (code === 936) return { message: 'ВК не нашёл контакт получателя (код 936)', retry: false, denied: true };
   if ([18, 900, 901, 902, 917].includes(code)) return { message: `Получатель недоступен или запретил сообщения (ВК ${code})`, retry: false, denied: true };
   if ([5, 7, 15, 27, 28].includes(code)) return { message: `Проверьте доступ сообщества к сообщениям (ВК ${code})`, retry: false, denied: false };
   if ([9, 29].includes(code)) return { message: `ВК ограничил рассылку. Отправка остановлена (ВК ${code})`, retry: false, denied: false };
