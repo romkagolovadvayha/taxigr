@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 
 import { config } from './config';
+import { legacyMessengerReturnUrl } from './messenger-auth-return';
 import { normalizeRussianPhone } from './phone-verification';
 
 // Keep server-generated authorization links compatible with the current
@@ -147,13 +148,13 @@ export async function exchangeVkAuthorizationCode(input: {
 export function vkCallbackHtml(success: boolean, returnUrl?: string): string {
   const title = success ? 'Вход подтверждён' : 'Не удалось подтвердить вход';
   const message = success
-    ? 'Номер подтверждён. Возвращаем вас в «Такси Грахово»…'
+    ? 'Номер успешно подтверждён'
     : 'Закройте это окно и попробуйте войти через VK ещё раз.';
   const closeScript = success
     ? '<script>window.setTimeout(function(){window.close()},150)</script>'
     : '';
-  const href = (returnUrl ?? new URL('/sign-in', config.PUBLIC_URL).href)
+  const href = (returnUrl ?? legacyMessengerReturnUrl())
     .replace(/&/gu, '&amp;').replace(/"/gu, '&quot;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
-  const button = success && returnUrl ? `<a class="continue" href="${href}">🚕 Заказать такси</a>` : '';
+  const button = success ? `<a class="continue" href="${href}">🚕 Заказать такси</a>` : '';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;background:#f4f4f2;color:#181818;font-family:Arial,sans-serif;display:grid;min-height:100vh;place-items:center}.card{width:min(520px,calc(100% - 48px));box-sizing:border-box;margin:24px;padding:32px;border:1px solid #ddd;border-radius:28px;background:white;text-align:center}h1{margin:0 0 16px}p{line-height:1.5}.continue{display:block;margin-top:24px;padding:16px;background:#f6c945;color:#181818;text-decoration:none;border-radius:16px;font-weight:bold}.mark{width:64px;height:64px;border-radius:18px;background:#0077ff;color:white;display:grid;place-items:center;margin:0 auto 20px;font-size:30px;font-weight:800}</style></head><body><main class="card"><div class="mark">VK</div><h1>${title}</h1><p>${message}</p>${button}</main>${closeScript}</body></html>`;
 }

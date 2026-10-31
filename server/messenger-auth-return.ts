@@ -1,5 +1,9 @@
 import { config } from './config';
 
+export function legacyMessengerReturnUrl(): string {
+  return new URL('/return-to-taxi.html', config.PUBLIC_URL).href;
+}
+
 // This link carries navigation context only. The exchange secret stays on the
 // device that started login, never in bot messages, browser history or referrers.
 export function messengerAuthReturnUrl(

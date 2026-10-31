@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { config } from './config';
+import { legacyMessengerReturnUrl } from './messenger-auth-return';
 import { normalizeRussianPhone } from './phone-verification';
 
 type MaxContactPayload = {
@@ -239,12 +240,10 @@ export async function requestMaxContact(userId: string): Promise<void> {
 export async function sendMaxConfirmation(userId: string, success: boolean, returnUrl?: string): Promise<void> {
   await sendMaxMessage(userId, {
     text: success
-      ? returnUrl
-        ? 'Номер подтверждён. Нажмите «Заказать такси», чтобы продолжить там, где вы начали вход.'
-        : 'Номер подтверждён. Вернитесь туда, где начали вход в «Такси Грахово».'
+      ? 'Номер успешно подтверждён'
       : 'Номер MAX не совпадает с номером, указанным в приложении. Вернитесь в приложение и проверьте номер.',
-    ...(success && returnUrl ? { attachments: [{ type: 'inline_keyboard', payload: {
-      buttons: [[{ type: 'link', text: '🚕 Заказать такси', url: returnUrl }]],
+    ...(success ? { attachments: [{ type: 'inline_keyboard', payload: {
+      buttons: [[{ type: 'link', text: '🚕 Заказать такси', url: returnUrl ?? legacyMessengerReturnUrl() }]],
     } }] } : {}),
   });
 }

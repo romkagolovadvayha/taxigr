@@ -83,7 +83,7 @@ describe('VK ID authorization', () => {
     const html = vkCallbackHtml(true);
     expect(html).toContain('Вход подтверждён');
     expect(html).toContain('window.close()');
-    expect(html).toContain('Возвращаем вас в «Такси Грахово»');
+    expect(html).toContain('Номер успешно подтверждён');
     expect(html).not.toContain('AllowMessagesFromCommunity');
     expect(html).not.toContain('Открыть чат сообщества');
   });

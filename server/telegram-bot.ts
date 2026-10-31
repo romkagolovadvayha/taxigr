@@ -2,6 +2,7 @@ import { fetch as undiciFetch } from 'undici';
 
 import { config } from './config';
 import { telegramDispatcher } from './gateway-proxy';
+import { legacyMessengerReturnUrl } from './messenger-auth-return';
 import { normalizeRussianPhone } from './phone-verification';
 
 type TelegramApiResponse<T = unknown> = {
@@ -171,12 +172,10 @@ export async function sendTelegramConfirmation(
 ): Promise<void> {
   await sendTelegramMessage(chatId, {
     text: success
-      ? returnUrl
-        ? 'Номер подтверждён. Нажмите «Заказать такси», чтобы продолжить там, где вы начали вход.'
-        : 'Номер подтверждён. Вернитесь туда, где начали вход в «Такси Грахово».'
+      ? 'Номер успешно подтверждён'
       : 'Номер Telegram не совпадает с номером, указанным в приложении. Вернитесь в приложение и проверьте номер.',
-    reply_markup: success && returnUrl
-      ? { inline_keyboard: [[{ text: '🚕 Заказать такси', url: returnUrl }]] }
+    reply_markup: success
+      ? { inline_keyboard: [[{ text: '🚕 Заказать такси', url: returnUrl ?? legacyMessengerReturnUrl() }]] }
       : { remove_keyboard: true },
     disable_web_page_preview: true,
   });

@@ -90,7 +90,7 @@ describe('returning from messenger verification', () => {
     for (const provider of ['max', 'telegram', 'vk'] as const) {
       expect(messengerAuthReturnUrl(provider, id, platform)).toBeUndefined();
     }
-    expect(vkCallbackHtml(true)).not.toContain('class="continue"');
+    expect(vkCallbackHtml(true)).toContain('https://taxigr.ru/return-to-taxi.html');
   });
 
   it.each(['max', 'telegram'] as const)('sends one return button after successful %s phone verification', async provider => {
@@ -101,6 +101,7 @@ describe('returning from messenger verification', () => {
     const returnUrl = messengerAuthReturnUrl(provider, id, 'android');
     await send('42', true, returnUrl);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.text).toBe('Номер успешно подтверждён');
     expect(JSON.stringify(body)).toContain('Заказать такси');
     expect(JSON.stringify(body)).toContain(returnUrl);
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -110,7 +111,9 @@ describe('returning from messenger verification', () => {
     fetchMock.mockClear();
     await send('42', true, messengerAuthReturnUrl(provider, id, 'legacy'));
     expect(fetchMock.mock.calls[0]![1].body).not.toContain('/auth-return');
-    expect(fetchMock.mock.calls[0]![1].body).not.toContain('Заказать такси');
+    expect(fetchMock.mock.calls[0]![1].body).toContain('Заказать такси');
+    expect(fetchMock.mock.calls[0]![1].body).toContain('https://taxigr.ru/return-to-taxi.html');
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).text).toBe('Номер успешно подтверждён');
   });
 
   it('includes a VK return link when a browser refuses to close the callback tab', () => {
