@@ -3,7 +3,11 @@ import { chooseBotAddress, normalizeBotAddress } from './free-text-address';
 import type { Address } from './models';
 
 export function addressSuggestionKey(address: Address): string {
-  return address.placeId ? `place:${address.placeId}` : address.label.toLocaleLowerCase('ru').replace(/ё/gu, 'е').replace(/\s+/gu, ' ').trim();
+  if (address.placeId) return `place:${address.placeId}`;
+  const label = address.label.toLocaleLowerCase('ru').replace(/ё/gu, 'е').replace(/\s+/gu, ' ').trim();
+  return address.kind === 'settlement'
+    ? `${label}:${address.coordinates.latitude.toFixed(2)}:${address.coordinates.longitude.toFixed(2)}`
+    : label;
 }
 
 /** Keep the known house point when the geocoder also returns its street centre. */

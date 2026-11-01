@@ -95,7 +95,7 @@ export function OrderConfirmationScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
     >
       <Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, alignSelf: 'center', paddingHorizontal: spacing.x4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>

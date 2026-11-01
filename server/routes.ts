@@ -5605,7 +5605,7 @@ export async function registerRoutes(
     const session = await auth(request, 'driver');
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
     const { priceMinor } = parse(z.object({ priceMinor: z.number().int().min(100).max(10_000_000) }), request.body);
-    await withTransaction(async connection => {
+    const changed = await withTransaction(async connection => {
       const driver = await getDriver(session.id, connection, true);
       const [rows] = await connection.query<OrderRow[]>('SELECT * FROM orders WHERE id = ? FOR UPDATE', [id]);
       const row = rows[0];
@@ -5615,11 +5615,15 @@ export async function registerRoutes(
       if (row.pricing_mode !== 'driver' || !['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(row.status)) {
         throw Object.assign(new Error('Стоимость этого заказа нельзя менять'), { statusCode: 409 });
       }
+      // Android may replay a POST when its successful response is lost.
+      // Saving the same agreed fare must not create another event or notification.
+      if (row.manual_price_set && Number(row.base_price_minor) === priceMinor) return false;
       const commission = calculateCommissionMinor(priceMinor, Number(row.commission_bps));
       await connection.execute(`UPDATE orders SET base_price_minor = ?, price_minor = ?, commission_minor = ?, manual_price_set = TRUE WHERE id = ?`,
         [priceMinor, priceMinor, commission, id]);
       await connection.execute(`INSERT INTO order_events (order_id, actor_user_id, event_type, payload) VALUES (?, ?, 'order.driver_fare', ?)`,
         [id, session.id, JSON.stringify({ priceMinor })]);
+      return true;
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
@@ -5627,7 +5631,7 @@ export async function registerRoutes(
     publish(`user:${order.passengerId}`, 'order:updated', order);
     publish(`driver:${order.driverId}`, 'order:updated', order);
     publish('admins', 'order:updated', order);
-    notifyMessengers(notifyUsersInMessengers([order.passengerId], passengerRideNotification(order, {
+    if (changed) notifyMessengers(notifyUsersInMessengers([order.passengerId], passengerRideNotification(order, {
       title: 'Водитель указал стоимость', body: `Стоимость поездки: ${ridePriceLabel(order)}. Если сумма не согласована, свяжитесь с водителем.`,
     })), 'order.driver-fare');
     return { data: order };

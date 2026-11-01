@@ -5,6 +5,6 @@ export function isRidePricePending(ride: Pick<RideOrder, 'pricingMode' | 'manual
 }
 
 export function ridePriceLabel(ride: Pick<RideOrder, 'pricingMode' | 'manualPriceSet' | 'priceMinor'>): string {
-  return isRidePricePending(ride) ? 'Стоимость определит водитель' :
+  return isRidePricePending(ride) ? '—' :
     `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(ride.priceMinor / 100)} ₽`;
 }

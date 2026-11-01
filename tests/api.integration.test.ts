@@ -508,6 +508,14 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     const fare = await api<RideOrder>(`/v1/driver/orders/${id}/fare`, { method: 'POST', token: driverOneToken, body: { priceMinor: 35000 } });
     expect(fare.data).toMatchObject({ manualPriceSet: true, priceMinor: 35000, basePriceMinor: 35000 });
     expect(fare.data?.comment).toBeUndefined();
+    const retries = await Promise.all([1, 2].map(() => api<RideOrder>(`/v1/driver/orders/${id}/fare`, {
+      method: 'POST', token: driverOneToken, body: { priceMinor: 35000 },
+    })));
+    expect(retries.map(result => result.status)).toEqual([200, 200]);
+    const [fareEvents] = await connection.execute<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) AS count FROM order_events WHERE order_id = ? AND event_type = 'order.driver_fare'", [id],
+    );
+    expect(Number(fareEvents[0]?.count)).toBe(1);
     const completed = await api<RideOrder>(`/v1/driver/orders/${id}/transition`, { method: 'POST', token: driverOneToken,
       body: { status: 'completed' } });
     expect(completed.data).toMatchObject({ status: 'completed', priceMinor: 35000 });

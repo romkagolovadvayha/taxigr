@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { resolveStreetCenter } from '@/api/street-center';
@@ -18,7 +18,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { StatusChip } from '@/components/ui/status-chip';
 import { grahovoAddressCatalog, grahovoAddressSuggestions, grahovoSettlement } from '@/data/grahovo-address-catalog';
-import { intercitySettlements } from '@/data/intercity-settlements';
+import { searchIntercitySettlements } from '@/domain/intercity-search';
 import type { DestinationHistoryItem } from '@/domain/address-history';
 import {
   addressSearchScore,
@@ -61,36 +61,13 @@ function mergeAddresses(primary: Address[], secondary: Address[]): Address[] {
   return mergeAddressSuggestions(primary, secondary);
 }
 
-const localAddressDirectory = uniqueAddressesByLabel([...grahovoAddressCatalog, ...intercitySettlements]);
+const localAddressDirectory = uniqueAddressesByLabel(grahovoAddressCatalog);
+const localStreetDirectory = localAddressDirectory.filter(address => !hasHouseNumber(address));
 
 function searchableAddress(address: Address): Address | null {
   if (address.kind === 'settlement' || isGrahovoDistrictAddress(address)) return address;
-  return intercitySettlements.find(city => addressSearchScore(city, address.label) > 0) ?? null;
+  return searchIntercitySettlements(address.label, 1)[0] ?? null;
 }
-
-function searchTokens(value: string): string[] {
-  return value
-    .toLocaleLowerCase('ru')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .split(' ')
-    .filter((token) => token.length > 1);
-}
-
-function collectKnownStreetTokens(addresses: readonly Address[]): Set<string> {
-  const result = new Set<string>();
-  for (const address of addresses) {
-    if (!address.details?.includes('улица') || hasHouseNumber(address)) continue;
-    const addressParts = address.label.split(',');
-    const streetPart = addressParts[addressParts.length - 1] ?? address.label;
-    for (const token of searchTokens(streetPart)) {
-      if (!['ул', 'улица', 'пер', 'переулок'].includes(token)) result.add(token);
-    }
-  }
-  return result;
-}
-
-const knownStreetTokens = collectKnownStreetTokens(localAddressDirectory);
 
 function relativeDate(value: string): string {
   const date = new Date(value);
@@ -360,8 +337,13 @@ export function AddressSearchScreen() {
   const normalizedQuery = query.trim().toLocaleLowerCase('ru');
   const localResults = useMemo(() => {
     if (!normalizedQuery) return grahovoAddressSuggestions;
-    return filterRequestedHouse(rankAddressSearchResults(addressDirectory, normalizedQuery), normalizedQuery);
-  }, [addressDirectory, normalizedQuery]);
+    const directory = queryHasHouseNumber(normalizedQuery) ? addressDirectory
+      : selectedStreet ? addressDirectory.filter(address => address.label.startsWith(`${selectedStreet.label},`))
+        : localStreetDirectory;
+    const local = rankAddressSearchResults(directory, normalizedQuery);
+    return local.length && (selectedStreet || queryHasHouseNumber(normalizedQuery))
+      ? local : mergeAddresses(local, searchIntercitySettlements(normalizedQuery));
+  }, [addressDirectory, normalizedQuery, selectedStreet]);
   const matchingHistory = useMemo(
     () =>
       field === 'destination'
@@ -377,10 +359,8 @@ export function AddressSearchScreen() {
   const canSearchRemote = query.trim().length >= 2 && !!token;
   const showPersonalSuggestions =
     field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
-  const queryTokens = searchTokens(query);
-  const queryMatchesKnownStreetName = queryTokens.some((token) => knownStreetTokens.has(token));
   const showHouseSuggestions =
-    !!selectedStreet || queryHasHouseNumber(query) || queryMatchesKnownStreetName;
+    !!selectedStreet || queryHasHouseNumber(query);
   const results = useMemo(() => {
     const overlaidResults = overlayRememberedAddresses(
       mergeAddresses(localResults, canSearchRemote && edited ? remoteResults : []), rememberedAddresses,
@@ -657,6 +637,8 @@ export function AddressSearchScreen() {
   }
 
   return (
+    <KeyboardAvoidingView style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
     <Screen scroll={false} contentStyle={{ maxWidth: 760, paddingVertical: 0 }}>
       <FlatList
         style={{ flex: 1 }}
@@ -678,7 +660,7 @@ export function AddressSearchScreen() {
         ListHeaderComponent={<View style={{ gap: spacing.x5, marginBottom: spacing.x3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
-        <View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             {field === 'pickup' ? 'Место подачи' : 'Куда поедем?'}
           </Text>
@@ -893,16 +875,17 @@ export function AddressSearchScreen() {
       ListFooterComponent={<>
       {!!remoteResults.length && (
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted, textAlign: 'center' }}>
-          Места из справочника сервиса · адресные данные © участники OpenStreetMap
+          Места из справочника сервиса · адресные данные © участники OpenStreetMap · GeoNames (CC BY 4.0)
         </Text>
       )}
       {!remoteResults.length && edited && !!results.length && (
         <Text selectable style={{ ...typography.caption, color: colors.inkMuted, textAlign: 'center' }}>
-          ГАР/ФИАС · OpenStreetMap · сохранённые точки
+          ГАР/ФИАС · OpenStreetMap · GeoNames (CC BY 4.0) · сохранённые точки
         </Text>
       )}
       </>}
       />
     </Screen>
+    </KeyboardAvoidingView>
   );
 }

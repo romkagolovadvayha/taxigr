@@ -42,7 +42,7 @@ export function OrdersScreen() {
     <PassengerWorkspace><Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 900 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
-        <View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
             Мои поездки
           </Text>
@@ -108,7 +108,7 @@ export function OrdersScreen() {
             })}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x3 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3, flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3, flex: 1, minWidth: 0 }}>
                 <View
                   style={{
                     width: 46,
@@ -121,7 +121,7 @@ export function OrdersScreen() {
                 >
                   <AppIcon name={order.tariff === 'child' ? 'child-seat' : 'car'} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text selectable style={{ ...typography.bodyStrong, fontSize: 14, color: colors.ink }}>
                     {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {formatDateTime(order.createdAt)}
                   </Text>

@@ -49,7 +49,7 @@ import {
   defaultPricingRules,
   isGrahovoAddress,
 } from '@/domain/pricing';
-import { canTransitionRide } from '@/domain/ride-state';
+import { canTransitionRide, driverTransitionConfirmed } from '@/domain/ride-state';
 import { normalizeRouteStops, replaceRouteStop } from '@/domain/route-stops';
 import {
   searchPriceIncreaseOfferSlot,
@@ -249,6 +249,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [driverRatingBusy, setDriverRatingBusy] = useState(false);
   const [driverRatingError, setDriverRatingError] = useState<string | null>(null);
   const driverRatingInFlight = useRef(false);
+  const passengerRatingInFlight = useRef(false);
   const [orders, setOrders] = useState<RideOrderSummary[]>([]);
   const [adminOrders, setAdminOrders] = useState<RideOrderSummary[]>([]);
   const [passengerOrdersHasMore, setPassengerOrdersHasMore] = useState(false);
@@ -453,7 +454,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     try {
       const bootstrap = await apiRequest<RideBootstrap>('/v1/bootstrap', { token });
       if (sessionUserIdRef.current !== sessionUserId) return;
-      setCurrentRide(bootstrap.activePassengerOrder);
+      // Bootstrap only contains active trips. Reconnecting after a failed
+      // rating request must not discard the completed trip and selected stars.
+      setCurrentRide(current => bootstrap.activePassengerOrder ??
+        (current?.status === 'completed' && !current.ratings?.byPassenger ? current : null));
       setDriverRide(bootstrap.driverQueue.current ?? bootstrap.driverQueue.offer);
       setNextDriverRide(bootstrap.driverQueue.next);
       setDriverOffer(bootstrap.driverQueue.offer);
@@ -1129,6 +1133,27 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setError(null);
         return true;
       } catch (reason) {
+        if (reason instanceof ApiError &&
+          (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT' || reason.status >= 500 || reason.status === 409)) {
+          try {
+            let recovered: RideOrder | null = null;
+            if (status === 'accepted') {
+              // Only the authenticated driver's queue can prove acceptance;
+              // an admin/driver might otherwise be able to read a rival's order.
+              const state = await apiRequest<RideBootstrap>('/v1/bootstrap', { token, timeoutMs: 8_000 });
+              recovered = [state.driverQueue.current, state.driverQueue.next].find(ride => ride?.id === current.id) ?? null;
+            } else {
+              const saved = await apiRequest<RideOrder>(`/v1/orders/${current.id}`, { token, timeoutMs: 8_000 });
+              if (saved.driverId && saved.driverId === current.driverId) recovered = saved;
+            }
+            if (recovered && driverTransitionConfirmed(status, recovered.status)) {
+              applyDriverOrder(recovered);
+              if (status === 'completed') await refresh();
+              setError(null);
+              return true;
+            }
+          } catch { /* Preserve the failed action until the server state can be confirmed. */ }
+        }
         setError(reason instanceof Error ? reason.message : 'Не удалось изменить статус');
         await refresh();
         return false;
@@ -1159,6 +1184,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
       });
       applyDriverOrder(ride);
     } catch (reason) {
+      if (reason instanceof ApiError &&
+        (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT' || reason.status >= 500 || reason.status === 409)) {
+        try {
+          const saved = await apiRequest<RideOrder>(`/v1/orders/${current.id}`, { token, timeoutMs: 8_000, cache: 'no-store' });
+          if (saved.driverId && saved.driverId === current.driverId &&
+            (saved.status === 'in_progress' || saved.status === 'completed') &&
+            (saved.nextDestinationIndex ?? 0) > destinationIndex) {
+            applyDriverOrder(saved);
+            setError(null);
+            return;
+          }
+        } catch { /* Keep the error if the stop cannot be confirmed on the server. */ }
+      }
       setError(reason instanceof Error ? reason.message : 'Не удалось подтвердить остановку');
       await refresh();
     } finally {
@@ -1353,7 +1391,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const rateRide = useCallback(
     async (score: number) => {
       const current = currentRide;
-      if (!current || current.status !== 'completed' || score < 1 || score > 5) return;
+      if (!current || current.status !== 'completed' || current.ratings?.byPassenger ||
+        !Number.isInteger(score) || score < 1 || score > 5 || passengerRatingInFlight.current) return;
       if (demoSession) {
         applyPassengerOrder({
           ...current,
@@ -1366,6 +1405,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!token) return;
+      passengerRatingInFlight.current = true;
       setBusy(true);
       setError(null);
       try {
@@ -1376,8 +1416,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
         });
         applyPassengerOrder(ride);
       } catch (reason) {
+        if (reason instanceof ApiError && reason.code === 'RATING_ALREADY_SUBMITTED') {
+          try {
+            const ride = await apiRequest<RideOrder>(`/v1/orders/${current.id}`, { token });
+            if (ride.ratings?.byPassenger) { applyPassengerOrder(ride); return; }
+          } catch { /* Keep the form for retry until the saved rating is confirmed. */ }
+        }
         setError(reason instanceof Error ? reason.message : 'Не удалось отправить оценку');
       } finally {
+        passengerRatingInFlight.current = false;
         setBusy(false);
       }
     },
@@ -1435,7 +1482,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const resetRide = useCallback(() => {
     pendingOrderCreation.current = null;
     setCurrentRide(null);
-  }, []);
+    setError(null);
+    // The completed trip may have consumed a first-trip discount or crossed a
+    // fare period. The next booking needs a fresh quote even on the same route.
+    invalidateQuote();
+  }, [invalidateQuote]);
   const resetDriverRide = useCallback(() => {
     setDriverOffer(null);
     setDriverRide((current) =>

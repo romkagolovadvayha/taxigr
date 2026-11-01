@@ -4,6 +4,12 @@ import { formatAddressSuggestionLines } from '../src/domain/address-suggestion-d
 import type { Address } from '../src/domain/models';
 
 describe('address suggestion display', () => {
+  it('shows the region for identically named intercity settlements', () => {
+    for (const region of ['Кировская область', 'Калининградская область']) {
+      expect(formatAddressSuggestionLines({ label: 'Советск', kind: 'settlement', details: `${region} · межгород` }))
+        .toEqual({ primary: 'Советск', secondary: `${region} · межгород` });
+    }
+  });
   it('shows street and house above locality and district', () => {
     expect(
       formatAddressSuggestionLines({

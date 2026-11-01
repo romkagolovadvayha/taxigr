@@ -10,7 +10,7 @@ import { demoEarnings } from '@/data/demo';
 import type { EarningsSummary } from '@/domain/models';
 import { useThemeColors } from '@/theme/theme-provider';
 import { spacing, typography } from '@/theme/tokens';
-import { formatDuration, formatMoney } from '@/utils/format';
+import { formatDuration, formatMoney, formatRideCount } from '@/utils/format';
 
 export function ShiftSummary() {
   const colors = useThemeColors();
@@ -36,7 +36,7 @@ export function ShiftSummary() {
         {summary ? formatMoney(summary.netMinor) : '— ₽'}
       </Text>
       <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
-        {failed ? 'Не удалось обновить доход · откройте расчёты' : summary ? `${summary.rides} поездок · ${formatDuration(summary.onlineMinutes)} на линии` : 'Загружаем итоги смены…'}
+        {failed ? 'Не удалось обновить доход · откройте расчёты' : summary ? `${formatRideCount(summary.rides)} · ${formatDuration(summary.onlineMinutes)} на линии` : 'Загружаем итоги смены…'}
       </Text>
     </AnimatedPressable>
   );

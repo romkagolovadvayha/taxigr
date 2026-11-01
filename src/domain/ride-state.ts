@@ -31,6 +31,13 @@ export function canTransitionRide(from: RideStatus, to: RideStatus): boolean {
   return transitions[from]?.includes(to) ?? false;
 }
 
+/** A lost HTTP response is successful only when the server confirms this step or a later one. */
+export function driverTransitionConfirmed(requested: RideStatus, observed: RideStatus): boolean {
+  const progression: readonly RideStatus[] = ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress', 'completed'];
+  const target = progression.indexOf(requested);
+  return target >= 0 && progression.indexOf(observed) >= target;
+}
+
 export type DriverRouteTarget = 'pickup' | 'destination';
 
 export function driverRouteTarget(status: RideStatus): DriverRouteTarget | null {

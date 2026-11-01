@@ -40,7 +40,6 @@ export function DriverRatingPrompt() {
           loading={driverRatingBusy}
           onSubmit={rateDriverRide}
           onContinue={dismissDriverRating}
-          continueLabel="К заказам"
         />
         {!!driverRatingError && (
           <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.danger }}>

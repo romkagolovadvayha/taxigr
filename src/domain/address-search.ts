@@ -16,6 +16,7 @@ export function filterRequestedHouse<T extends SearchableAddress>(addresses: T[]
 type SearchIndex = {
   labelTokens: string[];
   haystackTokens: string[];
+  wordKey: string;
 };
 
 const IGNORED_TOKENS = new Set([
@@ -59,6 +60,7 @@ function searchIndex(address: SearchableAddress): SearchIndex {
   const index = {
     labelTokens,
     haystackTokens,
+    wordKey: JSON.stringify([address.kind, labelTokens.filter(token => !/\d/u.test(token)), haystackTokens.filter(token => !/\d/u.test(token))]),
   };
   searchIndexCache.set(address, index);
   return index;
@@ -92,7 +94,18 @@ function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): 
 /** Compile a query once when scoring a directory, rather than once per address. */
 export function createAddressSearchScorer(query: string): (address: SearchableAddress) => number {
   const variants = addressQueryVariants(query).map(tokens);
-  return address => Math.max(...variants.map(part => scoreAddressTokens(address, part)));
+  const wordOnly = variants.every(part => part.every(token => !/\d/u.test(token)));
+  const scores = new Map<string, number>();
+  return address => {
+    // All houses on a street have the same relevance to a word-only query.
+    // Compute typo/stem matching once per street, not once per house.
+    const key = wordOnly ? searchIndex(address).wordKey : null;
+    const cached = key == null ? undefined : scores.get(key);
+    if (cached !== undefined) return cached;
+    const score = Math.max(...variants.map(part => scoreAddressTokens(address, part)));
+    if (key != null) scores.set(key, score);
+    return score;
+  };
 }
 
 export function addressSearchScore(address: SearchableAddress, query: string): number {
@@ -116,12 +129,13 @@ export function rankAddressSearchResults<T extends SearchableAddress>(
 ): T[] {
   const queryTokens = addressQueryVariants(query).map(tokens);
   if (!queryTokens.some(part => part.length) || limit <= 0) return [];
+  const score = createAddressSearchScorer(query);
 
   return filterRequestedHouse([...addresses], query)
     .map((address, position) => ({
       address,
       position,
-      score: Math.max(...queryTokens.map(part => scoreAddressTokens(address, part))),
+      score: score(address),
     }))
     .filter((result) => result.score > 0)
     .sort((left, right) => right.score - left.score || left.position - right.position)

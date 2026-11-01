@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 
 import { MoneyValue } from '@/components/ui/money-value';
 import type { RideOrder } from '@/domain/models';
+import { isRidePricePending } from '@/domain/ride-price';
 import {
   formatWaitingDuration,
   rideLivePriceMinor,
@@ -43,7 +44,7 @@ export function WaitingBreakdown({
         gap: spacing.x3,
       }}
     >
-      <View style={{ flex: 1, gap: spacing.x1 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
         <Text
           selectable
           style={{ ...typography.bodyStrong, color: colors.ink }}
@@ -64,7 +65,7 @@ export function WaitingBreakdown({
         </Text>
         <MoneyValue valueMinor={priceMinor} compact />
         <Text selectable style={{ ...typography.micro, color: colors.inkSecondary }}>
-          Итого {formatMoney(rideLivePriceMinor(ride, now))}
+          Итого {isRidePricePending(ride) ? '—' : formatMoney(rideLivePriceMinor(ride, now))}
         </Text>
       </View>
     </View>

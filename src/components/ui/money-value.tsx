@@ -17,13 +17,15 @@ export function MoneyValue({ valueMinor, compact = false, color: customColor, pe
   return (
     <Text
       selectable
+      accessibilityLabel={pending ? 'Стоимость пока не указана' : undefined}
+      numberOfLines={1}
       style={{
         ...(compact || pending ? typography.bodyStrong : typography.money),
         color,
         fontVariant: ['tabular-nums'],
       }}
     >
-      {pending ? 'Стоимость определит водитель' : formatMoney(valueMinor)}
+      {pending ? '—' : formatMoney(valueMinor)}
     </Text>
   );
 }

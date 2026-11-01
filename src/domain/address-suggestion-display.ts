@@ -93,8 +93,13 @@ function isGrahovoLocality(value: string | undefined): boolean {
 }
 
 export function formatAddressSuggestionLines(
-  address: Pick<Address, 'label' | 'details' | 'houseNumber' | 'place'>,
+  address: Pick<Address, 'label' | 'details' | 'houseNumber' | 'place' | 'kind'>,
 ): AddressSuggestionLines {
+  // Nationwide names can repeat in different regions. Keep the region visible
+  // instead of interpreting "межгород" as a locality and dropping the region.
+  if (address.kind === 'settlement' && /(?:^|·)\s*межгород\s*$/iu.test(address.details ?? '')) {
+    return { primary: address.label, secondary: address.details };
+  }
   const district = districtFrom([address.label, address.details]);
 
   if (address.place) {

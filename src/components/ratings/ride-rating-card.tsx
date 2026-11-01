@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { RatingBadge } from '@/components/ratings/rating-badge';
@@ -16,7 +16,6 @@ type Props = {
   loading?: boolean;
   onSubmit: (score: number) => Promise<void>;
   onContinue: () => void;
-  continueLabel?: string;
 };
 
 export function RideRatingCard({
@@ -28,10 +27,15 @@ export function RideRatingCard({
   loading = false,
   onSubmit,
   onContinue,
-  continueLabel = 'Новая поездка',
 }: Props) {
   const colors = useThemeColors();
   const [score, setScore] = useState(submittedScore ?? 0);
+
+  // Close only after the server (or a recovered socket update) confirms the
+  // score. A failed save must leave the selected stars available for retry.
+  useEffect(() => {
+    if (submittedScore && !loading) onContinue();
+  }, [submittedScore, loading, onContinue]);
 
   if (submittedScore) {
     return (
@@ -49,7 +53,6 @@ export function RideRatingCard({
           Спасибо за оценку
         </Text>
         <StarRating value={submittedScore} disabled size={26} />
-        <AppButton onPress={onContinue}>{continueLabel}</AppButton>
       </View>
     );
   }

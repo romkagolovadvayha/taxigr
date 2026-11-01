@@ -4,9 +4,21 @@ import {
   canTransitionRide,
   driverRoutePointState,
   driverRouteTarget,
+  driverTransitionConfirmed,
 } from '../src/domain/ride-state';
 
 describe('ride state machine', () => {
+  it('recovers committed actions without treating stale or cancelled states as success', () => {
+    expect(driverTransitionConfirmed('accepted', 'driver_arriving')).toBe(true);
+    expect(driverTransitionConfirmed('accepted', 'accepted')).toBe(true);
+    expect(driverTransitionConfirmed('driver_waiting', 'in_progress')).toBe(true);
+    expect(driverTransitionConfirmed('completed', 'completed')).toBe(true);
+    expect(driverTransitionConfirmed('completed', 'in_progress')).toBe(false);
+    expect(driverTransitionConfirmed('driver_waiting', 'driver_arriving')).toBe(false);
+    expect(driverTransitionConfirmed('accepted', 'searching')).toBe(false);
+    expect(driverTransitionConfirmed('accepted', 'cancelled')).toBe(false);
+    expect(driverTransitionConfirmed('cancelled', 'completed')).toBe(false);
+  });
   it('advances the current point after a confirmed intermediate stop', () => {
     expect([0, 1, 2, 3].map(index => driverRoutePointState('in_progress', index, 1))).toEqual([
       'completed', 'completed', 'current', 'pending',

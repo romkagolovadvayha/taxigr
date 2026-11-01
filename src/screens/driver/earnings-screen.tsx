@@ -12,7 +12,7 @@ import { SurfaceCard } from '@/components/ui/surface-card';
 import { demoEarnings } from '@/data/demo';
 import type { EarningsSummary } from '@/domain/models';
 import { spacing, typography } from '@/theme/tokens';
-import { formatDuration } from '@/utils/format';
+import { formatDuration, formatRideCount } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
 
 type EarningsPeriod = EarningsSummary['period'];
@@ -132,7 +132,7 @@ export function EarningsScreen() {
             Получено от пассажиров
           </Text>
           <MoneyValue valueMinor={earnings.grossMinor} />
-          <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>{earnings.rides} поездок</Text>
+          <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>{formatRideCount(earnings.rides)}</Text>
         </SurfaceCard>
         <SurfaceCard style={{ flexGrow: 1, flexBasis: 220 }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>

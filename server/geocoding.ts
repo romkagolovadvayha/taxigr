@@ -8,6 +8,7 @@ import { addressSearchScore, createAddressSearchScorer } from '../src/domain/add
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import { normalizeBotAddress, addressQueryVariants } from '../src/domain/free-text-address';
 import { intercitySettlements } from '../src/data/intercity-settlements';
+import { searchIntercitySettlements } from '../src/domain/intercity-search';
 import { isGrahovoDistrictAddress } from '../src/domain/pricing';
 import type { AddressKind } from '../src/domain/models';
 import { config } from './config';
@@ -58,7 +59,6 @@ const localAddresses: GeocodedAddress[] = [
     houseNumber: '53А',
     coordinates: { latitude: 55.9995786, longitude: 51.8684492 },
   },
-  ...intercitySettlements,
 ];
 
 const memoryCache = new Map<string, MemoryEntry>();
@@ -472,19 +472,25 @@ async function requestNominatim(query: string, signal: AbortSignal): Promise<Geo
 
 export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false, localOnly = false): Promise<GeocodedAddress[]> {
   const variants = addressQueryVariants(query).map(normalizeBotAddress);
-  const score = createAddressSearchScorer(query);
-  const knownCity = intercitySettlements.filter(address => score(address) > 0);
+  const knownCity = searchIntercitySettlements(query);
   query = coordinateQuery(query) ? query : normalizeBotAddress(query);
-  if (knownCity.length) return knownCity;
   // Street anchors in GAR are approximate. Point selection needs an actual
   // street from OSM when available, bypassing the local-address shortcut.
   const [catalog, remembered] = streetOnly ? [[], []] : await Promise.all([getAddressDirectory(), getRememberedAddresses()]);
   const directory = streetOnly ? [] : overlayRememberedAddresses([...localAddresses, ...catalog], remembered);
   const local = deduplicateAddresses(variants.flatMap(variant => localMatches(variant, directory)));
+  const exactCities = knownCity.filter(address => normalizeNamedPlace(address.label) === normalizeNamedPlace(query));
+  const exactDistrictSettlement = local.some(address => address.kind === 'settlement' &&
+    normalizeNamedPlace(address.label) === normalizeNamedPlace(query));
+  // An exact city (Советск) must not be hidden by a district street prefix
+  // (Советская). An exact district locality still keeps its local priority.
+  if (!streetOnly && !resolveHouse && exactCities.length && !exactDistrictSettlement) return exactCities;
   if (local.length && variants.some(variant => hasStrongLocalMatch(variant, local)) &&
       (!resolveHouse || local.some(address => address.houseNumber && !hasApproximateCoordinates(address)))) {
     return prioritizeGrahovoDistrict(local);
   }
+
+  if (knownCity.length && !streetOnly && !resolveHouse) return [...local, ...knownCity];
 
   const key = `${streetOnly ? 'street-v3' : resolveHouse ? 'house-v2' : 'v14'}:${normalize(query)}`;
   const memory = memoryCache.get(key);

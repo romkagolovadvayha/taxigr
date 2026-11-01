@@ -39,6 +39,10 @@ export function formatRetryAfter(seconds: number): string {
   return russianCount(Math.ceil(safeSeconds / 3_600), ['час', 'часа', 'часов']);
 }
 
+export function formatRideCount(count: number): string {
+  return russianCount(count, ['поездка', 'поездки', 'поездок']);
+}
+
 export function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat('ru-RU', {
     day: 'numeric',

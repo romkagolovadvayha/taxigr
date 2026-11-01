@@ -228,7 +228,7 @@ export function RideChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
       style={{ flex: 1, backgroundColor: colors.canvas }}
     >
       <View
@@ -322,6 +322,7 @@ export function RideChatScreen() {
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
               style={{ flex: 1 }}
+              onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
               contentContainerStyle={{
                 flexGrow: 1,
                 justifyContent: messages.length ? 'flex-start' : 'center',

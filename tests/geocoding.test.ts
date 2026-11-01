@@ -1,7 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('../server/db', () => ({ db: { query: vi.fn(async () => [[]]), execute: vi.fn(async () => []) } }));
-
 import {
   buildNominatimQueries,
   filterExactHouseResults,
@@ -10,11 +7,20 @@ import {
   streetGeocoderQuery,
 } from '../server/geocoding';
 
+vi.mock('../server/db', () => ({ db: { query: vi.fn(async () => [[]]), execute: vi.fn(async () => []) } }));
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('local address directory', () => {
+  it('keeps an exact nationwide city ahead of a similar district street', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses('Советск', false, false, true);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every(address => address.kind === 'settlement' && address.label === 'Советск')).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('does not enqueue external requests for unfinished or unknown autocomplete queries', async () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     await expect(searchAddresses('Несуществующийтест', false, false, true)).resolves.toEqual([]);
@@ -167,8 +173,9 @@ describe('local address directory', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.label).toBe('Алнаши');
-    expect(results[0]?.details).toContain('Алнашский район');
+    expect(results[0]?.details).toContain('Удмуртия');
     expect(results[0]?.kind).toBe('settlement');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('prioritizes Grahovo for a short street query and keeps a Russia-wide fallback', () => {

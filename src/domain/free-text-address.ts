@@ -66,7 +66,13 @@ export function addressQueryVariants(value: string): string[] {
   const pairs: Record<string, string> = {shch:'щ',sch:'щ',zh:'ж',ch:'ч',sh:'ш',kh:'х',ts:'ц',yu:'ю',ya:'я',yo:'е'};
   const transliterated = value.toLowerCase().replace(/shch|sch|zh|ch|sh|kh|ts|yu|ya|yo|[a-z]/gu,
     part => pairs[part] ?? letters[part] ?? part);
-  return [value, transliterated];
+  // "tsk" is ambiguous: Sovetsk is Советск, while Novokuznetsk is
+  // Новокузнецк. Keep both spellings instead of losing one of the cities.
+  const separateTs = /tsk/iu.test(value)
+    ? value.toLowerCase().replace(/tsk|shch|sch|zh|ch|sh|kh|ts|yu|ya|yo|[a-z]/gu,
+      part => part === 'tsk' ? 'тск' : pairs[part] ?? letters[part] ?? part)
+    : transliterated;
+  return [...new Set([value, transliterated, separateTs])];
 }
 
 // Small misspellings are accepted only in words, never in house numbers.
