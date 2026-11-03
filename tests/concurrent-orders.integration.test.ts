@@ -149,7 +149,8 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(quoteResult.status).toBe(200);
     for (const tariff of quoteResult.data!.tariffs) {
       expect(tariff.discountPercent).toBe(20);
-      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 5_000) * 5_000);
+      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 1_000) * 1_000);
+      expect(tariff.originalPriceMinor! % 5_000).toBe(0);
     }
     const first = await submit(actor, quoteResult.data!.quoteToken);
     expect(first.status, JSON.stringify(first.error)).toBe(201);
@@ -232,6 +233,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
   it.each([
     ['д. Поршур',56.0263962,51.7065836,'Граховский район'],
     ['д. Котловка',56.1180852,52.0150708,'Граховский район'],
+    ['д. Яги-Какси',56.0906036,51.9506647,'Граховский район'],
     ['Резиденция Бабы Яги',56.1169,52.012,'Удмуртия'],
     ['г. Елабуга',55.76,52.05,'Республика Татарстан'],
   ] as const)('quotes %s to Grahovo at the same fare as the outward ride', async (label,latitude,longitude,details) => {
@@ -243,10 +245,14 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(inbound.status, JSON.stringify(inbound.error)).toBe(200);
     expect(inbound.data!.tariffs.map(tariff=>tariff.priceMinor)).toEqual(outward.data!.tariffs.map(tariff=>tariff.priceMinor));
     expect(inbound.data!.pricingDistanceMeters).toBe(outward.data!.pricingDistanceMeters);
-    for (const tariff of outward.data!.tariffs) expect(tariff.priceMinor % 5_000).toBe(0);
+    for (const tariff of outward.data!.tariffs) {
+      expect((tariff.originalPriceMinor ?? tariff.priceMinor) % 5_000).toBe(0);
+      expect(tariff.priceMinor % 1_000).toBe(0);
+    }
     if (label==='д. Котловка' || label==='Резиденция Бабы Яги') {
       expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':85_000,'22-02':125_000,'02-07':195_000}[farePeriodAt()]);
     }
+    if (label==='д. Яги-Какси') expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':40_000,'22-02':60_000,'02-07':85_000}[farePeriodAt()]);
   }, 30_000);
 
   it('adds the Grahovo pickup leg for a Selyanur to Porshur order', async () => {
@@ -256,7 +262,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(result.status,JSON.stringify(result.error)).toBe(200);
     expect(result.data!.driverApproachDistanceMeters).toBeGreaterThan(10_000);
     expect(result.data!.pricingDistanceMeters).toBe(result.data!.driverApproachDistanceMeters+result.data!.route.distanceMeters);
-    expect(result.data!.tariffs[0]!.priceMinor % 5_000).toBe(0);
+    expect(result.data!.tariffs[0]!.priceMinor % 1_000).toBe(0);
   }, 30_000);
 
   it('settles discounted waiting to the same ten-ruble total shown to the passenger', async () => {
@@ -273,9 +279,9 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     const stopped = await api(`/v1/driver/orders/${order.id}/waiting/stop`, driver, {});
     expect(stopped.status, JSON.stringify(stopped.error)).toBe(200);
     expect(stopped.data!.waitingPerMinuteMinor).toBe(320);
-    expect(stopped.data!.fareRoundingMinor).toBe(5_000);
-    expect(stopped.data!.waitingPriceMinor).toBe(5_000);
-    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 5_000);
+    expect(stopped.data!.fareRoundingMinor).toBe(1_000);
+    expect(stopped.data!.waitingPriceMinor).toBe(1_000);
+    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 1_000);
     expect(rideLivePriceMinor(preview.data!)).toBe(stopped.data!.priceMinor);
     expect(rideLivePriceMinor(stopped.data!)).toBe(stopped.data!.priceMinor);
   }, 30_000);

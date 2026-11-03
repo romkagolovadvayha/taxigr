@@ -24,12 +24,13 @@ describe('first local order discount', () => {
     [0, 0],
     [15_000, 12_000],
     [15_500, 13_000],
+    [20_000, 16_000],
     [22_000, 18_000],
     [25_000, 20_000],
     [25_001, 21_000],
     [57_000, 46_000],
   ])('prices %i kopeks with 20 percent off, rounded up to %i', (original, expected) => {
-    expect(firstOrderPriceMinor(original, 1_000)).toBe(expected);
+    expect(firstOrderPriceMinor(original)).toBe(expected);
   });
 
   it.each([[15_000,15_000],[22_000,20_000],[57_000,50_000],[85_000,70_000]])(

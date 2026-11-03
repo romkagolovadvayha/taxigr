@@ -8,10 +8,11 @@ const grahovo: Address = {id:'g',label:'с. Грахово',coordinates:{latitud
 const selyanur: Address = {id:'s',label:'д. Селянур',details:'Граховский район',coordinates:{latitude:56.0503949,longitude:51.7220116}};
 const porshur: Address = {id:'p',label:'д. Поршур',details:'Граховский район',coordinates:{latitude:56.0263962,longitude:51.7065836}};
 const kotlovka: Address = {id:'k',label:'д. Котловка',details:'Граховский район',coordinates:{latitude:56.1180852,longitude:52.0150708}};
+const yagiKaksi: Address = {id:'y',label:'д. Яги-Какси',details:'Граховский район',coordinates:{latitude:56.0906036,longitude:51.9506647}};
 const elabuga: Address = {id:'e',label:'г. Елабуга',coordinates:{latitude:55.76,longitude:52.05}};
 const rules = {...defaultPricingRules,districtPerKilometer07To22Minor:6_000,districtPerKilometer22To02Minor:10_000,districtPerKilometer02To07Minor:15_000};
-const distances: Record<string,number> = {'g:s':23327,'s:g':23500,'g:p':25950,'p:g':26050,'s:p':3359,'p:s':3359,'g:k':11709,'k:g':11800,'g:e':89001,'e:g':90002};
-const points = [grahovo,selyanur,porshur,kotlovka,elabuga];
+const distances: Record<string,number> = {'g:s':23327,'s:g':23500,'g:p':25950,'p:g':26050,'s:p':3359,'p:s':3359,'g:k':11709,'k:g':11800,'g:y':4989,'y:g':5100,'g:e':89001,'e:g':90002};
+const points = [grahovo,selyanur,porshur,kotlovka,yagiKaksi,elabuga];
 function resolver() {
   return vi.fn(async (origin, destination): Promise<RouteMetrics> => {
     const a=points.find(point=>point.coordinates.latitude===origin.latitude)!.id;
@@ -57,6 +58,13 @@ describe('fares for a driver based in Grahovo',()=>{
   it.each([['03:00',85_000],['18:00',125_000],['22:00',195_000]] as const)('uses the requested Kotlovka fare at %s in either direction',async(time,expected)=>{
     expect((await price(grahovo,[kotlovka],time)).amount).toBe(expected);
     expect((await price(kotlovka,[grahovo],time)).amount).toBe(expected);
+  });
+  it.each([['03:00',40_000],['18:00',60_000],['22:00',85_000]] as const)('raises Yagi-Kaksi proportionally at %s, in either direction',async(time,expected)=>{
+    expect((await price(grahovo,[yagiKaksi],time)).amount).toBe(expected);
+    expect((await price(yagiKaksi,[grahovo],time)).amount).toBe(expected);
+    const elsewhere = {...yagiKaksi,details:undefined,coordinates:elabuga.coordinates};
+    expect(classifyPricingScope(grahovo,elsewhere)).toBe('intercity');
+    expect(calculateFareMinor(80_000,'economy','intercity',rules,new Date('2026-11-03T03:00:00Z'),[grahovo,elsewhere])).toBe(400_000);
   });
   it('uses the Kotlovka fare for the nearby Baba Yaga residence, including an address without the village name', async () => {
     const residence = {...kotlovka, label:'Резиденция Бабы Яги'};

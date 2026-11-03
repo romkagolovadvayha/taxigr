@@ -94,7 +94,8 @@ export function billableRoutePoints(pickup: Address, destinations: readonly Addr
 
 export function isGrahovoDistrictAddress(address: Address): boolean {
   const context = addressContext(address);
-  return (grahovoPattern.test(context) || grahovoDistrictPattern.test(context) || isKotlovkaFareAddress(address)) &&
+  return (grahovoPattern.test(context) || grahovoDistrictPattern.test(context) ||
+    isKotlovkaFareAddress(address) || isYagiKaksiFareAddress(address)) &&
     distanceFromGrahovo(address) <= GRAHOVO_DISTRICT_RADIUS_METERS;
 }
 
@@ -226,13 +227,22 @@ function isKotlovkaFareAddress(address: Address): boolean {
     Math.abs(address.coordinates.longitude - 52.0150708) <= 0.04;
 }
 
+function isYagiKaksiFareAddress(address: Address): boolean {
+  const named = /(?:^|[\s.,])яги(?:[\s-]+какси)?(?:[\s,]|$)/iu.test(addressContext(address));
+  return named && Math.abs(address.coordinates.latitude - 56.0906036) <= 0.02 &&
+    Math.abs(address.coordinates.longitude - 51.9506647) <= 0.025;
+}
+
 function fixedGrahovoFareMinor(origin: Address, destination: Address, date: Date): number | undefined {
   let remote: Address;
   if (isGrahovoAddress(origin)) remote = destination;
   else if (isGrahovoAddress(destination)) remote = origin;
   else return undefined;
-  if (!isKotlovkaFareAddress(remote)) return undefined;
-  return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[farePeriodAt(date)];
+  const period = farePeriodAt(date);
+  if (isKotlovkaFareAddress(remote)) return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[period];
+  // The village gets the same proportional increase as Kotlovka, rounded up to 50 rubles.
+  if (isYagiKaksiFareAddress(remote)) return { '07-22': 40_000, '22-02': 60_000, '02-07': 85_000 }[period];
+  return undefined;
 }
 
 /**

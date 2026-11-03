@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { registerGroupAlertRoutes } from './group-alerts';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
-import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
+import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 import { isCrawlerImageError } from '../src/errors/web-error-classifier';
 
@@ -3590,6 +3590,7 @@ export async function registerRoutes(
     const prices = discountEligible
       ? { economy: firstOrderPriceMinor(originalPrices.economy), child: firstOrderPriceMinor(originalPrices.child) }
       : originalPrices;
+    const quoteRoundingMinor = discountEligible ? discountedFareRoundingMinor : fareRoundingMinor;
     const promotion = discountEligible ? { code: firstLocalOrderPromotion, originalPrices } : undefined;
     const tariffs = quoteTariffs(
       pricingDistanceMeters,
@@ -3617,7 +3618,7 @@ export async function registerRoutes(
       },
       pricingDistanceMeters,
       driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
-      fareRoundingMinor,
+      fareRoundingMinor: quoteRoundingMinor,
       prices: {
         economy: prices.economy,
         child: prices.child,
@@ -3632,7 +3633,7 @@ export async function registerRoutes(
         pricingScope,
         pricingDistanceMeters,
         driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
-        fareRoundingMinor,
+        fareRoundingMinor: quoteRoundingMinor,
         tariffs,
         currency: 'RUB',
       },
