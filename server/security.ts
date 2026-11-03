@@ -25,6 +25,7 @@ export type OrderQuoteClaims = {
   route: Omit<RouteSummary, 'coordinates'>;
   pricingDistanceMeters: number;
   driverApproachDistanceMeters: number;
+  fareRoundingMinor?: number;
   prices: Record<TariffCode, number>;
   promotion?: {
     code: NonNullable<RideOrder['promotionCode']>;

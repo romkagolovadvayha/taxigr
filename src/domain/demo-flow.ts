@@ -18,6 +18,8 @@ import {
   calculateWaitingChargeMinor,
   classifyPricingScope,
   defaultPricingRules,
+  fareRoundingMinor,
+  roundFareMinor,
 } from './pricing';
 import { rideWaitingSeconds } from './waiting';
 
@@ -27,7 +29,7 @@ export function demoWaitingTransition(ride: RideOrder, status: RideStatus, now =
   }
   if ((status === 'in_progress' || status === 'completed') && ride.waitingStartedAt) {
     const waitingSeconds = rideWaitingSeconds(ride, now);
-    const waitingPriceMinor = calculateWaitingChargeMinor(waitingSeconds, ride.waitingFreeMinutes, ride.waitingPerMinuteMinor);
+    const waitingPriceMinor = calculateWaitingChargeMinor(waitingSeconds, ride.waitingFreeMinutes, ride.waitingPerMinuteMinor, ride.fareRoundingMinor);
     const priceMinor = (ride.basePriceMinor ?? ride.priceMinor - (ride.waitingPriceMinor ?? 0) - (ride.searchPriceIncreaseMinor ?? 0)) +
       (ride.searchPriceIncreaseMinor ?? 0) + waitingPriceMinor;
     return { waitingSeconds, waitingPriceMinor, waitingStartedAt: undefined, priceMinor,
@@ -127,7 +129,7 @@ export function buildDemoDriverOffer(
   now = new Date(),
 ): RideOrder {
   const pricingScope = classifyPricingScope(pickup, destination);
-  const tariff = buildTariffs(route.distanceMeters, pricingScope)[0]!;
+  const tariff = buildTariffs(route.distanceMeters, pricingScope, defaultPricingRules, now, [pickup, destination])[0]!;
   const timestamp = now.toISOString();
 
   return {
@@ -139,6 +141,8 @@ export function buildDemoDriverOffer(
     status: 'searching',
     pricingScope,
     basePriceMinor: tariff.priceMinor,
+    fareRoundingMinor,
+    searchPriceIncreaseStepMinor: roundFareMinor(defaultPricingRules.searchPriceIncreaseStepMinor),
     priceMinor: tariff.priceMinor,
     serviceCommissionMinor: calculateCommissionMinor(tariff.priceMinor),
     waitingSeconds: 0,

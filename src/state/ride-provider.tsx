@@ -41,12 +41,15 @@ import type {
 } from '@/domain/models';
 import {
   buildTariffs,
+  billableRoutePoints,
   calculateCommissionMinor,
   calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
   classifyMultiStopPricingScope,
   classifyPricingScope,
   defaultPricingRules,
+  fareRoundingMinor,
+  roundFareMinor,
   isGrahovoAddress,
 } from '@/domain/pricing';
 import { canTransitionRide, driverTransitionConfirmed } from '@/domain/ride-state';
@@ -746,9 +749,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
         );
         if (controller.signal.aborted || quoteRequestId.current !== requestId) return;
         const allPointsInGrahovo = [pickup, ...destinations].every(isGrahovoAddress);
-        const segments = destinations.map((item, index) => ({
-          distanceMeters: route.segmentDistances[index]!,
-          scope: classifyPricingScope(index === 0 ? pickup : destinations[index - 1]!, item),
+        const pricingPoints = billableRoutePoints(pickup, destinations);
+        const pricingRoute = pricingPoints[0] === pickup ? route : await getDemoRoadRoute(
+          pricingPoints[0]!.coordinates, pricingPoints.slice(1).map(point => point.coordinates), controller.signal,
+        );
+        if (controller.signal.aborted || quoteRequestId.current !== requestId) return;
+        const segments = pricingPoints.slice(1).map((item, index) => ({
+          origin: pricingPoints[index]!, destination: item,
+          distanceMeters: pricingRoute.segmentDistances[index]!,
+          scope: classifyPricingScope(pricingPoints[index]!, item),
         }));
         const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
         setTariffs(
@@ -927,6 +936,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
           status: 'searching',
           pricingScope,
           basePriceMinor: tariff.priceMinor,
+          fareRoundingMinor,
+          searchPriceIncreaseStepMinor: roundFareMinor(defaultPricingRules.searchPriceIncreaseStepMinor),
           priceMinor: tariff.priceMinor,
           serviceCommissionMinor: calculateCommissionMinor(tariff.priceMinor),
           waitingSeconds: 0,
@@ -1284,6 +1295,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         waitingSeconds,
         current.waitingFreeMinutes,
         current.waitingPerMinuteMinor,
+        current.fareRoundingMinor,
       );
       const priceMinor =
         (current.basePriceMinor ?? current.priceMinor) +

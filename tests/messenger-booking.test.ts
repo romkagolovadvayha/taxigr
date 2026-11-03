@@ -177,14 +177,14 @@ describe('taxi booking in messenger conversations',()=>{
   it.each(['telegram', 'vk', 'max'] as const)('shows the discounted rounded fare in %s', async provider => {
     mocks.resolve.mockImplementation(async (raw: string) => ({id:raw,label:raw,houseNumber:'10',coordinates:{latitude:56,longitude:52}}));
     mocks.inject.mockResolvedValueOnce({statusCode:200,json:()=>({data:{quoteToken:'discount-20',tariffs:[{
-      code:'economy',priceMinor:18000,originalPriceMinor:22000,discountPercent:20,
+      code:'economy',priceMinor:20000,originalPriceMinor:22000,discountPercent:20,
     }]}})});
     await handle({...message('b:start'),provider});
     await handle({...message('Советская 10 → Ачинцева 5'),provider});
     const reply = mocks.send.mock.calls.at(-1)![1];
     expect(reply.text ?? reply.message).toContain('Скидка 20%');
-    expect(reply.text ?? reply.message).toContain('220 ₽ → 180 ₽');
-    expect(JSON.stringify(reply)).toContain('Вызвать за 180 ₽');
+    expect(reply.text ?? reply.message).toContain('220 ₽ → 200 ₽');
+    expect(JSON.stringify(reply)).toContain('Вызвать за 200 ₽');
     expect(draft.discountPercent).toBe(20);
   });
   it('refreshes a pending 50 percent draft and asks to confirm the new fare', async () => {
@@ -192,12 +192,12 @@ describe('taxi booking in messenger conversations',()=>{
       priceMinor:11000,originalPriceMinor:22000,quoteToken:'old-discount',quotedAt:Date.now()};
     mocks.resolve.mockImplementation(async (raw: string) => ({id:raw,label:raw,houseNumber:'10',coordinates:{latitude:56,longitude:52}}));
     mocks.inject.mockResolvedValueOnce({statusCode:200,json:()=>({data:{quoteToken:'discount-20',tariffs:[{
-      code:'economy',priceMinor:18000,originalPriceMinor:22000,discountPercent:20,
+      code:'economy',priceMinor:20000,originalPriceMinor:22000,discountPercent:20,
     }]}})});
     await handle(message(`b:confirm:${draft.id}`));
-    expect(replyText()).toContain('Условия скидки изменились');
+    expect(replyText()).toContain('Условия расчёта изменились');
     expect(replyText()).toContain('Скидка 20%');
-    expect(draft.priceMinor).toBe(18000);
+    expect(draft.priceMinor).toBe(20000);
     expect(mocks.inject).toHaveBeenCalledTimes(1);
     expect(mocks.inject.mock.calls[0]![0].url).toBe('/v1/quotes');
     expect(draft.stage).toBe('confirm');

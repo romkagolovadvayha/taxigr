@@ -28,7 +28,7 @@ export function rideWaitingPriceMinor(ride: RideOrder, now = Date.now()): number
     rideWaitingSeconds(ride, now),
     ride.waitingFreeMinutes ?? 3,
     ride.waitingPerMinuteMinor ?? 400,
-    ride.promotionCode === firstLocalOrderPromotion ? 1_000 : 1,
+    ride.fareRoundingMinor ?? (ride.promotionCode === firstLocalOrderPromotion ? 1_000 : 1),
   );
 }
 

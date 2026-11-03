@@ -6,6 +6,7 @@ import {
   getRouteMetrics,
   getPricedRouteMetrics,
   getMultiStopRouteMetrics,
+  getMultiStopPricedRouteMetrics,
   haversineMeters,
   parseOsrmRoute,
   type RouteMetrics,
@@ -247,7 +248,7 @@ describe('pricing route from the driver base', () => {
     coordinates: [],
   };
 
-  it('does not add the route from Grahovo when both points are in the district', async () => {
+  it('adds the route from Grahovo once when both points are outside Grahovo in the district', async () => {
     const pickup = {
       id: 'porshur-pickup',
       label: 'д. Поршур, ул. Центральная, 1',
@@ -278,9 +279,9 @@ describe('pricing route from the driver base', () => {
       },
     );
 
-    expect(result.tripRoute).toBe(tripRoute);
+    expect(result.tripRoute).toEqual(tripRoute);
     expect(result.driverApproachRoute).toBe(driverApproachRoute);
-    expect(result.pricingDistanceMeters).toBe(12_000);
+    expect(result.pricingDistanceMeters).toBe(20_000);
     expect(calls).toEqual([
       { origin: pickup.coordinates, destination: destination.coordinates },
       { origin: GRAHOVO_DRIVER_BASE, destination: pickup.coordinates },
@@ -300,7 +301,7 @@ describe('pricing route from the driver base', () => {
       details: 'Граховский район, Удмуртская Республика',
       coordinates: grahovo,
     };
-    const approachRoute: RouteMetrics = {
+    const reverseRoadRoute: RouteMetrics = {
       ...tripRoute,
       distanceMeters: 11_900,
     };
@@ -310,7 +311,7 @@ describe('pricing route from the driver base', () => {
       porshur,
       async () => tripRoute,
     );
-    const routes = [tripRoute, approachRoute];
+    const routes = [reverseRoadRoute, tripRoute];
     let call = 0;
     const toGrahovo = await getPricedRouteMetrics(
       porshur,
@@ -319,7 +320,8 @@ describe('pricing route from the driver base', () => {
     );
 
     expect(fromGrahovo.pricingDistanceMeters).toBe(12_000);
-    expect(toGrahovo.driverApproachRoute).toBe(approachRoute);
+    expect(toGrahovo.tripRoute.distanceMeters).toBe(11_900);
+    expect(toGrahovo.driverApproachRoute).toBeNull();
     expect(toGrahovo.pricingDistanceMeters).toBe(12_000);
   });
 
@@ -369,7 +371,7 @@ describe('pricing route from the driver base', () => {
       return tripRoute;
     });
 
-    expect(result.tripRoute).toBe(tripRoute);
+    expect(result.tripRoute).toEqual(tripRoute);
     expect(result.driverApproachRoute).toBeNull();
     expect(result.pricingDistanceMeters).toBe(tripRoute.distanceMeters);
     expect(calls).toBe(1);

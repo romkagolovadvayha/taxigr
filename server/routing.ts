@@ -1,8 +1,8 @@
 import type { Address } from '../src/domain/models';
 import {
-  classifyMultiStopPricingScope,
   classifyPricingScope,
-  isGrahovoAddress,
+  billableRoutePoints,
+  grahovoDriverBaseAddress,
   type PricingScope,
 } from '../src/domain/pricing';
 import { normalizeRouteStops } from '../src/domain/route-stops';
@@ -33,14 +33,12 @@ export type MultiStopRouteSegment = {
 export type MultiStopPricedRouteMetrics = {
   tripRoute: RouteMetrics;
   segments: MultiStopRouteSegment[];
+  pricingSegments: MultiStopRouteSegment[];
   driverApproachRoute: RouteMetrics | null;
   pricingDistanceMeters: number;
 };
 
-export const GRAHOVO_DRIVER_BASE: Point = {
-  latitude: 56.04758,
-  longitude: 51.95842,
-};
+export const GRAHOVO_DRIVER_BASE: Point = grahovoDriverBaseAddress.coordinates;
 
 type RouteMetricsResolver = (
   origin: Point,
@@ -276,22 +274,34 @@ export async function getMultiStopPricedRouteMetrics(
   destinations: readonly Address[],
   resolveRoute: RouteMetricsResolver = getRouteMetrics,
 ): Promise<MultiStopPricedRouteMetrics> {
-  const tripPromise = getMultiStopRouteMetrics(pickup, destinations, resolveRoute);
-  const approachPromise = isGrahovoAddress(pickup)
-    ? Promise.resolve<RouteMetrics | null>(null)
-    : resolveRoute(GRAHOVO_DRIVER_BASE, pickup.coordinates);
-  const [{ tripRoute, segments }, driverApproachRoute] = await Promise.all([
+  const stops = normalizeRouteStops(pickup, destinations);
+  const pricingPoints = billableRoutePoints(pickup, stops);
+  const pending = new Map<string, Promise<RouteMetrics>>();
+  const resolveOnce: RouteMetricsResolver = (origin, destination) => {
+    const key = `${origin.latitude},${origin.longitude}:${destination.latitude},${destination.longitude}`;
+    let route = pending.get(key);
+    if (!route) {
+      route = resolveRoute(origin, destination);
+      pending.set(key, route);
+    }
+    return route;
+  };
+  const tripPromise = getMultiStopRouteMetrics(pickup, stops, resolveOnce);
+  const pricingPromise = pricingPoints[0] !== pickup
+    ? getMultiStopRouteMetrics(pricingPoints[0]!, pricingPoints.slice(1), resolveOnce)
+    : tripPromise;
+  const [{ tripRoute, segments }, pricingTrip] = await Promise.all([
     tripPromise,
-    approachPromise,
+    pricingPromise,
   ]);
-  const scope = classifyMultiStopPricingScope(pickup, destinations);
+  const pricingSegments = pricingTrip.segments;
+  const driverApproachRoute = pricingPoints.length === stops.length + 2 ? pricingSegments[0]!.route : null;
   return {
     tripRoute,
     segments,
+    pricingSegments,
     driverApproachRoute,
-    pricingDistanceMeters:
-      tripRoute.distanceMeters +
-      (scope === 'intercity' ? (driverApproachRoute?.distanceMeters ?? 0) : 0),
+    pricingDistanceMeters: pricingSegments.reduce((total, segment) => total + segment.route.distanceMeters, 0),
   };
 }
 
@@ -300,21 +310,7 @@ export async function getPricedRouteMetrics(
   destination: Address,
   resolveRoute: RouteMetricsResolver = getRouteMetrics,
 ): Promise<PricedRouteMetrics> {
-  const pricingScope = classifyPricingScope(pickup, destination);
-  const tripRoutePromise = resolveRoute(pickup.coordinates, destination.coordinates);
-  const driverApproachRoutePromise = isGrahovoAddress(pickup)
-    ? Promise.resolve<RouteMetrics | null>(null)
-    : resolveRoute(GRAHOVO_DRIVER_BASE, pickup.coordinates);
-  const [tripRoute, driverApproachRoute] = await Promise.all([
-    tripRoutePromise,
-    driverApproachRoutePromise,
-  ]);
-
-  return {
-    tripRoute,
-    driverApproachRoute,
-    pricingDistanceMeters:
-      tripRoute.distanceMeters +
-      (pricingScope === 'intercity' ? (driverApproachRoute?.distanceMeters ?? 0) : 0),
-  };
+  const { tripRoute, driverApproachRoute, pricingDistanceMeters } =
+    await getMultiStopPricedRouteMetrics(pickup, [destination], resolveRoute);
+  return { tripRoute, driverApproachRoute, pricingDistanceMeters };
 }

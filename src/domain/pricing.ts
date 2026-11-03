@@ -1,4 +1,5 @@
 import type { Address, Tariff, TariffCode } from './models';
+import { normalizeRouteStops } from './route-stops';
 
 export type PricingScope = 'grahovo' | 'district' | 'intercity';
 
@@ -56,6 +57,9 @@ const grahovoPattern = /(?:^|[\s,])(?:село|с\.)?\s*грахово(?:[\s,]|$
 const grahovoDistrictPattern =
   /граховск(?:ий|ого|ом).{0,40}(?:район|муниципальн\w*\s+округ)/iu;
 const GRAHOVO_CENTER = { latitude: 56.04758, longitude: 51.95842 } as const;
+export const grahovoDriverBaseAddress: Address = {
+  id: 'grahovo-driver-base', label: 'с. Грахово', coordinates: GRAHOVO_CENTER,
+};
 const GRAHOVO_RADIUS_METERS = 6_000;
 const GRAHOVO_DISTRICT_RADIUS_METERS = 40_000;
 
@@ -79,9 +83,18 @@ export function isGrahovoAddress(address: Address): boolean {
     distanceFromGrahovo(address) <= GRAHOVO_RADIUS_METERS;
 }
 
+/** The driver starts in Grahovo; a return uses the same outward itinerary. */
+export function billableRoutePoints(pickup: Address, destinations: readonly Address[]): Address[] {
+  const stops = normalizeRouteStops(pickup, destinations);
+  const points = [pickup, ...stops];
+  if (!stops.length || isGrahovoAddress(pickup)) return points;
+  if (isGrahovoAddress(stops[stops.length - 1]!)) return points.reverse();
+  return [grahovoDriverBaseAddress, ...points];
+}
+
 export function isGrahovoDistrictAddress(address: Address): boolean {
   const context = addressContext(address);
-  return (grahovoPattern.test(context) || grahovoDistrictPattern.test(context)) &&
+  return (grahovoPattern.test(context) || grahovoDistrictPattern.test(context) || isKotlovkaFareAddress(address)) &&
     distanceFromGrahovo(address) <= GRAHOVO_DISTRICT_RADIUS_METERS;
 }
 
@@ -173,8 +186,10 @@ function intercityPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   return rates.intercityPerKilometer02To07Minor;
 }
 
-export function roundToTenRubles(minor: number): number {
-  return Math.ceil(minor / 1_000) * 1_000;
+export const fareRoundingMinor = 5_000;
+
+export function roundFareMinor(minor: number, roundingMinor = fareRoundingMinor): number {
+  return Math.ceil(minor / roundingMinor) * roundingMinor;
 }
 
 export function calculateFareMinor(
@@ -183,23 +198,42 @@ export function calculateFareMinor(
   scope: PricingScope,
   rules = defaultPricingRules,
   date = new Date(),
+  endpoints?: readonly [Address, Address],
 ): number {
   const routePrice = scope === 'grahovo'
     ? grahovoFareMinorAt(rules, date)
-    : roundToTenRubles(
+    : roundFareMinor(
         (distanceMeters / 1_000) *
           (scope === 'district'
             ? districtPerKilometerMinorAt(rules, date)
             : intercityPerKilometerMinorAt(rules, date)),
       );
-  return routePrice +
-    (tariff === 'child' ? rules.childSurchargeMinor : 0);
+  const fixedFare = endpoints && fixedGrahovoFareMinor(endpoints[0], endpoints[1], date);
+  return roundFareMinor((fixedFare ?? routePrice) +
+    (tariff === 'child' ? rules.childSurchargeMinor : 0));
 }
 
 export type PricedRouteSegment = {
   distanceMeters: number;
   scope: PricingScope;
+  origin?: Address;
+  destination?: Address;
 };
+
+function isKotlovkaFareAddress(address: Address): boolean {
+  const named = /котловк[а-яё]*|баб[а-яё]*[\s-]*яг[а-яё]*|^яг[аи](?:[\s,]|$)/iu.test(addressContext(address));
+  return named && Math.abs(address.coordinates.latitude - 56.1180852) <= 0.025 &&
+    Math.abs(address.coordinates.longitude - 52.0150708) <= 0.04;
+}
+
+function fixedGrahovoFareMinor(origin: Address, destination: Address, date: Date): number | undefined {
+  let remote: Address;
+  if (isGrahovoAddress(origin)) remote = destination;
+  else if (isGrahovoAddress(destination)) remote = origin;
+  else return undefined;
+  if (!isKotlovkaFareAddress(remote)) return undefined;
+  return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[farePeriodAt(date)];
+}
 
 /**
  * Prices an ordered route. When every point is inside Grahovo, each extra stop
@@ -213,7 +247,6 @@ export function calculateMultiStopFareMinor(
   allPointsInGrahovo: boolean,
   rules = defaultPricingRules,
   date = new Date(),
-  driverApproachDistanceMeters = 0,
 ): number {
   if (!segments.length) return 0;
 
@@ -223,20 +256,14 @@ export function calculateMultiStopFareMinor(
     const extraStopFare = Math.round(
       (baseFare * rules.additionalStopGrahovoSurchargeBps) / 10_000,
     );
-    return baseFare + extraStopFare * Math.max(0, segments.length - 1) + childSurcharge;
+    return roundFareMinor(baseFare + extraStopFare * Math.max(0, segments.length - 1) + childSurcharge);
   }
 
-  let approachApplied = false;
-  const routeFare = segments.reduce((total, segment) => {
-    const includeApproach =
-      !approachApplied && segment.scope === 'intercity' && driverApproachDistanceMeters > 0;
-    if (includeApproach) approachApplied = true;
-    const distanceMeters =
-      segment.distanceMeters +
-      (includeApproach ? driverApproachDistanceMeters : 0);
-    return total + calculateFareMinor(distanceMeters, 'economy', segment.scope, rules, date);
-  }, 0);
-  return routeFare + childSurcharge;
+  const routeFare = segments.reduce((total, segment) => total + calculateFareMinor(
+    segment.distanceMeters, 'economy', segment.scope, rules, date,
+    segment.origin && segment.destination ? [segment.origin, segment.destination] : undefined,
+  ), 0);
+  return roundFareMinor(routeFare + childSurcharge);
 }
 
 export function calculateWaitingChargeMinor(
@@ -262,6 +289,7 @@ export function buildTariffs(
   scope: PricingScope,
   rules = defaultPricingRules,
   date = new Date(),
+  endpoints?: readonly [Address, Address],
 ): Tariff[] {
   return [
     {
@@ -270,7 +298,7 @@ export function buildTariffs(
       description: 'Обычная поездка',
       childSeatIncluded: false,
       etaMinutes: 4,
-      priceMinor: calculateFareMinor(distanceMeters, 'economy', scope, rules, date),
+      priceMinor: calculateFareMinor(distanceMeters, 'economy', scope, rules, date, endpoints),
     },
     {
       code: 'child',
@@ -278,7 +306,7 @@ export function buildTariffs(
       description: 'Приедет машина с подходящим креслом',
       childSeatIncluded: true,
       etaMinutes: 7,
-      priceMinor: calculateFareMinor(distanceMeters, 'child', scope, rules, date),
+      priceMinor: calculateFareMinor(distanceMeters, 'child', scope, rules, date, endpoints),
     },
   ];
 }

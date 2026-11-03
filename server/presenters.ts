@@ -38,6 +38,7 @@ export type OrderRow = RowDataPacket & {
   duration_seconds: number;
   route_geometry: unknown;
   base_price_minor: number;
+  fare_rounding_minor?: number | null;
   promotion_code?: RideOrder['promotionCode'] | null;
   original_price_minor?: number | null;
   search_price_increase_minor: number;
@@ -227,6 +228,7 @@ export function presentOrder(row: OrderRow): RideOrder {
     pricingMode: row.pricing_mode ?? 'fixed',
     manualPriceSet: Boolean(row.manual_price_set),
     basePriceMinor: row.base_price_minor,
+    fareRoundingMinor: row.fare_rounding_minor ?? undefined,
     promotionCode: row.promotion_code ?? undefined,
     originalPriceMinor: row.original_price_minor ?? undefined,
     searchPriceIncreaseMinor: row.search_price_increase_minor,

@@ -14,6 +14,8 @@ import {
   calculateFareMinor,
   calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
+  fareRoundingMinor,
+  roundFareMinor,
   classifyMultiStopPricingScope,
   farePeriodAt,
   farePeriodLabel,
@@ -157,6 +159,7 @@ import {
   getMultiStopRouteMetrics,
   getRouteMetrics,
   haversineMeters,
+  type MultiStopRouteSegment,
 } from './routing';
 import {
   authenticate,
@@ -684,16 +687,16 @@ function quoteTariffs(
 function multiStopPrices(
   pickup: Address,
   destinations: readonly Address[],
-  segmentDistances: readonly number[],
-  segmentScopes: readonly PricingScope[],
-  driverApproachDistanceMeters: number,
+  pricingSegments: readonly MultiStopRouteSegment[],
   rules: PricingRules,
   pricedAt: Date,
 ): Record<TariffCode, number> {
   const allPointsInGrahovo = [pickup, ...destinations].every(isGrahovoAddress);
-  const segments = segmentDistances.map((distanceMeters, index) => ({
-    distanceMeters,
-    scope: segmentScopes[index]!,
+  const segments = pricingSegments.map((segment) => ({
+    distanceMeters: segment.route.distanceMeters,
+    scope: segment.scope,
+    origin: segment.origin,
+    destination: segment.destination,
   }));
   return {
     economy: calculateMultiStopFareMinor(
@@ -702,7 +705,6 @@ function multiStopPrices(
       allPointsInGrahovo,
       rules,
       pricedAt,
-      driverApproachDistanceMeters,
     ),
     child: calculateMultiStopFareMinor(
       segments,
@@ -710,7 +712,6 @@ function multiStopPrices(
       allPointsInGrahovo,
       rules,
       pricedAt,
-      driverApproachDistanceMeters,
     ),
   };
 }
@@ -1016,7 +1017,7 @@ async function settleWaiting(
     waitingSeconds,
     Number(row.waiting_free_minutes),
     Number(row.waiting_per_minute_minor),
-    row.promotion_code === firstLocalOrderPromotion ? 1_000 : 1,
+    row.fare_rounding_minor ?? (row.promotion_code === firstLocalOrderPromotion ? 1_000 : 1),
   );
   const priceMinor =
     Number(row.base_price_minor) +
@@ -3577,14 +3578,12 @@ export async function registerRoutes(
       estimateTariffEtaMinutes(pickup),
       firstLocalOrderEligible(session.id, pricingScope),
     ]);
-    const { tripRoute: route, segments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
+    const { tripRoute: route, pricingSegments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
     const pricedAt = new Date();
     const originalPrices = multiStopPrices(
       pickup,
       destinations,
-      segments.map((segment) => segment.route.distanceMeters),
-      segments.map((segment) => segment.scope),
-      driverApproachRoute?.distanceMeters ?? 0,
+      pricingSegments,
       rules,
       pricedAt,
     );
@@ -3618,6 +3617,7 @@ export async function registerRoutes(
       },
       pricingDistanceMeters,
       driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
+      fareRoundingMinor,
       prices: {
         economy: prices.economy,
         child: prices.child,
@@ -3632,6 +3632,7 @@ export async function registerRoutes(
         pricingScope,
         pricingDistanceMeters,
         driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
+        fareRoundingMinor,
         tariffs,
         currency: 'RUB',
       },
@@ -3657,14 +3658,12 @@ export async function registerRoutes(
         getMultiStopPricedRouteMetrics(pickup, destinations),
         pricingRules(),
       ]);
-      const { tripRoute: route, segments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
+      const { tripRoute: route, pricingSegments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
       const pricedAt = new Date();
       const prices = multiStopPrices(
         pickup,
         destinations,
-        segments.map((segment) => segment.route.distanceMeters),
-        segments.map((segment) => segment.scope),
-        driverApproachRoute?.distanceMeters ?? 0,
+        pricingSegments,
         rules,
         pricedAt,
       );
@@ -3840,7 +3839,7 @@ export async function registerRoutes(
       const discountEligible = !manualPricing && await firstLocalOrderEligible(session.id, pricingScope, connection);
       if (Boolean(quote.promotion) !== discountEligible || (quote.promotion &&
           (quote.promotion.code !== firstLocalOrderPromotion ||
-           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff]) !== price))) {
+           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff], quote.fareRoundingMinor ?? 1_000) !== price))) {
         throw Object.assign(new Error('Условия скидки изменились. Обновите расчёт и подтвердите новую стоимость'), {
           statusCode: 409, code: 'PROMOTION_QUOTE_CHANGED',
         });
@@ -3869,8 +3868,8 @@ export async function registerRoutes(
           base_price_minor, price_minor, commission_minor, commission_bps,
           waiting_free_minutes, waiting_per_minute_minor,
           search_price_increase_interval_minutes, search_price_increase_step_minor,
-          payment_method, comment, idempotency_key
-        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          payment_method, comment, idempotency_key, fare_rounding_minor
+        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           session.id,
@@ -3896,10 +3895,14 @@ export async function registerRoutes(
           rules.waitingFreeMinutes,
           manualPricing ? 0 : discountEligible ? firstOrderRateMinor(rules.waitingPerMinuteMinor) : rules.waitingPerMinuteMinor,
           rules.searchPriceIncreaseIntervalMinutes,
-          manualPricing ? 0 : discountEligible ? firstOrderPriceMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
+          manualPricing ? 0 : roundFareMinor(
+            discountEligible ? firstOrderRateMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
+            quote.fareRoundingMinor ?? (discountEligible ? 1_000 : 1),
+          ),
           input.paymentMethod,
           input.comment ?? null,
           input.idempotencyKey,
+          manualPricing ? null : quote.fareRoundingMinor ?? null,
         ],
       );
       if (manualPricing) await connection.execute("UPDATE orders SET pricing_mode = 'driver' WHERE id = ?", [orderId]);

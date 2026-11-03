@@ -6,6 +6,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { RideChatMessage, RideOrder, Tariff } from '../src/domain/models';
 import { confirmAddressPoint } from '../src/domain/route-stops';
 import { rideLivePriceMinor } from '../src/domain/waiting';
+import { firstOrderPriceMinor } from '../src/domain/first-order-discount';
+import { farePeriodAt } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
 import { signOrderQuote, signSession, verifyOrderQuote } from '../server/security';
 
@@ -147,7 +149,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(quoteResult.status).toBe(200);
     for (const tariff of quoteResult.data!.tariffs) {
       expect(tariff.discountPercent).toBe(20);
-      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 1_000) * 1_000);
+      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 5_000) * 5_000);
     }
     const first = await submit(actor, quoteResult.data!.quoteToken);
     expect(first.status, JSON.stringify(first.error)).toBe(201);
@@ -214,6 +216,49 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     }
   }, 30_000);
 
+  it('accepts a still-valid older quote and preserves its ten-ruble rounding rule', async () => {
+    const actor = passengers[0]!;
+    const current = await verifyOrderQuote(await quote(actor), actor.id);
+    const original = current.promotion!.originalPrices;
+    const legacyToken = await signOrderQuote({...current, fareRoundingMinor:undefined,
+      prices:{economy:firstOrderPriceMinor(original.economy,1_000),child:firstOrderPriceMinor(original.child,1_000)},
+    });
+    const created = await submit(actor, legacyToken);
+    expect(created.status, JSON.stringify(created.error)).toBe(201);
+    expect(created.data!.fareRoundingMinor).toBeUndefined();
+    expect(created.data!.priceMinor).toBe(firstOrderPriceMinor(original.economy,1_000));
+  }, 30_000);
+
+  it.each([
+    ['д. Поршур',56.0263962,51.7065836,'Граховский район'],
+    ['д. Котловка',56.1180852,52.0150708,'Граховский район'],
+    ['Резиденция Бабы Яги',56.1169,52.012,'Удмуртия'],
+    ['г. Елабуга',55.76,52.05,'Республика Татарстан'],
+  ] as const)('quotes %s to Grahovo at the same fare as the outward ride', async (label,latitude,longitude,details) => {
+    const remote = confirmAddressPoint({id:label,label:`${label}, дом 1`,houseNumber:'1',details,kind:'house',coordinates:{latitude,longitude}}, {latitude,longitude});
+    type Quote = {tariffs:Tariff[];pricingDistanceMeters:number};
+    const outward = await api<Quote>('/v1/quotes',passengers[0]!,{pickup,destination:remote});
+    const inbound = await api<Quote>('/v1/quotes',passengers[0]!,{pickup:remote,destination:pickup});
+    expect(outward.status, JSON.stringify(outward.error)).toBe(200);
+    expect(inbound.status, JSON.stringify(inbound.error)).toBe(200);
+    expect(inbound.data!.tariffs.map(tariff=>tariff.priceMinor)).toEqual(outward.data!.tariffs.map(tariff=>tariff.priceMinor));
+    expect(inbound.data!.pricingDistanceMeters).toBe(outward.data!.pricingDistanceMeters);
+    for (const tariff of outward.data!.tariffs) expect(tariff.priceMinor % 5_000).toBe(0);
+    if (label==='д. Котловка' || label==='Резиденция Бабы Яги') {
+      expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':85_000,'22-02':125_000,'02-07':195_000}[farePeriodAt()]);
+    }
+  }, 30_000);
+
+  it('adds the Grahovo pickup leg for a Selyanur to Porshur order', async () => {
+    const selyanur = confirmAddressPoint({id:'selyanur',label:'д. Селянур, ул. Средняя, 1',houseNumber:'1',details:'Граховский район',kind:'house',coordinates:{latitude:56.0503949,longitude:51.7220116}}, {latitude:56.0503949,longitude:51.7220116});
+    const porshur = confirmAddressPoint({id:'porshur',label:'д. Поршур',details:'Граховский район',kind:'settlement',coordinates:{latitude:56.0263962,longitude:51.7065836}}, {latitude:56.0263962,longitude:51.7065836});
+    const result = await api<{driverApproachDistanceMeters:number;pricingDistanceMeters:number;route:{distanceMeters:number};tariffs:Tariff[]}>('/v1/quotes',passengers[0]!,{pickup:selyanur,destination:porshur});
+    expect(result.status,JSON.stringify(result.error)).toBe(200);
+    expect(result.data!.driverApproachDistanceMeters).toBeGreaterThan(10_000);
+    expect(result.data!.pricingDistanceMeters).toBe(result.data!.driverApproachDistanceMeters+result.data!.route.distanceMeters);
+    expect(result.data!.tariffs[0]!.priceMinor % 5_000).toBe(0);
+  }, 30_000);
+
   it('settles discounted waiting to the same ten-ruble total shown to the passenger', async () => {
     const order = await create(passengers[0]!);
     const driver = drivers[0]!;
@@ -228,8 +273,9 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     const stopped = await api(`/v1/driver/orders/${order.id}/waiting/stop`, driver, {});
     expect(stopped.status, JSON.stringify(stopped.error)).toBe(200);
     expect(stopped.data!.waitingPerMinuteMinor).toBe(320);
-    expect(stopped.data!.waitingPriceMinor).toBe(1_000);
-    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 1_000);
+    expect(stopped.data!.fareRoundingMinor).toBe(5_000);
+    expect(stopped.data!.waitingPriceMinor).toBe(5_000);
+    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 5_000);
     expect(rideLivePriceMinor(preview.data!)).toBe(stopped.data!.priceMinor);
     expect(rideLivePriceMinor(stopped.data!)).toBe(stopped.data!.priceMinor);
   }, 30_000);

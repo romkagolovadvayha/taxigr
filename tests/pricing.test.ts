@@ -29,7 +29,7 @@ describe('route pricing', () => {
 
   it('uses a separate time-based per-kilometer rate inside Grahovo district', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z');
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(57_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(60_000);
   });
 
   it('uses the configured intercity rate for each period', () => {
@@ -37,7 +37,7 @@ describe('route pricing', () => {
     const late = new Date('2026-08-03T18:00:00.000Z');
     const night = new Date('2026-08-03T22:00:00.000Z');
     expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(305_000);
-    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(427_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(430_000);
     expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, night)).toBe(610_000);
   });
 
@@ -72,15 +72,16 @@ describe('route pricing', () => {
     expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('02-07');
     expect(farePeriodAt(new Date('2026-08-04T03:00:00.000Z'))).toBe('07-22');
 
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(67_000);
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(76_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(70_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(80_000);
   });
 
   it('adds the fixed child tariff surcharge without seat selection', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z');
     const economy = calculateFareMinor(9_500, 'economy', 'district', rules, daytime);
     const child = calculateFareMinor(9_500, 'child', 'district', rules, daytime);
-    expect(child - economy).toBe(defaultPricingRules.childSurchargeMinor);
+    expect(child - economy).toBe(10_000);
+    expect(child % 5_000).toBe(0);
   });
 
   it('adds 60 percent of the Grahovo fare for every additional local stop', () => {
@@ -91,7 +92,7 @@ describe('route pricing', () => {
       { distanceMeters: 900, scope: 'grahovo' as const },
     ];
 
-    expect(calculateMultiStopFareMinor(segments, 'economy', true, rules, daytime)).toBe(33_000);
+    expect(calculateMultiStopFareMinor(segments, 'economy', true, rules, daytime)).toBe(35_000);
     expect(calculateMultiStopFareMinor(segments, 'child', true, rules, daytime)).toBe(40_000);
     expect(
       calculateMultiStopFareMinor(
@@ -101,7 +102,7 @@ describe('route pricing', () => {
         { ...rules, additionalStopGrahovoSurchargeBps: 4_000 },
         daytime,
       ),
-    ).toBe(27_000);
+    ).toBe(30_000);
   });
 
   it('adds each district or intercity leg by its current tariff', () => {
@@ -112,18 +113,19 @@ describe('route pricing', () => {
     ];
 
     expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(310_000);
-    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(317_000);
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(320_000);
   });
 
   it.each([
-    ['03:00', 342_000], ['18:00', 462_000], ['22:00', 637_000],
+    ['03:00', 350_000], ['18:00', 465_000], ['22:00', 630_000],
   ])('uses the same period for all legs, charges approach and child seat once at %s', (time, expected) => {
     const segments = [
+      {distanceMeters: 5_000, scope: 'district' as const},
       {distanceMeters: 10_000, scope: 'district' as const},
       {distanceMeters: 20_000, scope: 'intercity' as const},
       {distanceMeters: 30_000, scope: 'intercity' as const},
     ];
-    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, new Date(`2026-08-03T${time}:00Z`), 5_000)).toBe(expected);
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, new Date(`2026-08-03T${time}:00Z`))).toBe(expected);
   });
 
   it('adds a district leg to an earlier fixed Grahovo leg', () => {
