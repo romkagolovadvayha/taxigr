@@ -63,5 +63,5 @@ jobs:
           ssh -T -i "$directory/key" -p "$BUILD_SSH_CONNECT_PORT" -o "HostName=$BUILD_SSH_CONNECT_HOST" -o
           "HostKeyAlias=$BUILD_SSH_HOST" -o IdentitiesOnly=yes -o BatchMode=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$directory/known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=15 \
+            -o ConnectTimeout=20 -o ConnectionAttempts=3 -o ServerAliveInterval=30 -o ServerAliveCountMax=15 \
             "root@$BUILD_SSH_HOST" "deploy $DEPLOY_BRANCH $DEPLOY_COMMIT" < "$directory/settings.json"
