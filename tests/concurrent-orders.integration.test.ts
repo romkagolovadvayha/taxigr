@@ -5,8 +5,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { RideChatMessage, RideOrder, Tariff } from '../src/domain/models';
 import { confirmAddressPoint } from '../src/domain/route-stops';
+import { rideLivePriceMinor } from '../src/domain/waiting';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
-import { signSession } from '../server/security';
+import { signOrderQuote, signSession, verifyOrderQuote } from '../server/security';
 
 const enabled = process.env.RUN_API_INTEGRATION === '1';
 const apiUrl = process.env.INTEGRATION_API_URL ?? 'http://127.0.0.1:4110';
@@ -145,18 +146,19 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     const quoteResult = await api<{ quoteToken: string; tariffs: Tariff[] }>('/v1/quotes', actor, { pickup, destination });
     expect(quoteResult.status).toBe(200);
     for (const tariff of quoteResult.data!.tariffs) {
-      expect(tariff.discountPercent).toBe(50);
-      expect(tariff.priceMinor).toBe(Math.floor(tariff.originalPriceMinor! / 2));
+      expect(tariff.discountPercent).toBe(20);
+      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 1_000) * 1_000);
     }
     const first = await submit(actor, quoteResult.data!.quoteToken);
     expect(first.status, JSON.stringify(first.error)).toBe(201);
-    expect(first.data!.promotionCode).toBe('first-local-order-50');
+    expect(first.data!.promotionCode).toBe('first-local-order-20');
+    expect(first.data!.waitingPerMinuteMinor).toBe(320);
     expect(first.data!.priceMinor).toBe(quoteResult.data!.tariffs[0]!.priceMinor);
     expect((await cancel(actor, first.data!)).status).toBe(200);
     const second = await create(actor);
-    expect(second.promotionCode).toBe('first-local-order-50');
+    expect(second.promotionCode).toBe('first-local-order-20');
     const stale = await quote(actor);
-    await connection.execute("UPDATE orders SET status='completed' WHERE id=?", [second.id]);
+    await connection.execute("UPDATE orders SET status='completed', promotion_code='first-local-order-50' WHERE id=?", [second.id]);
     const rejected = await submit(actor, stale);
     expect(rejected.status).toBe(409);
     expect(rejected.error?.code).toBe('PROMOTION_QUOTE_CHANGED');
@@ -180,18 +182,56 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     }
   }, 30_000);
 
+  it('rejects an unspent quote from the old 50 percent offer and accepts a fresh quote', async () => {
+    const actor = passengers[0]!;
+    const currentToken = await quote(actor);
+    const current = await verifyOrderQuote(currentToken, actor.id);
+    const original = current.promotion!.originalPrices;
+    const staleToken = await signOrderQuote({...current,
+      prices:{economy:Math.floor(original.economy / 2),child:Math.floor(original.child / 2)},
+      promotion:{code:'first-local-order-50',originalPrices:original},
+    });
+    const rejected = await submit(actor, staleToken);
+    expect(rejected.status).toBe(409);
+    expect(rejected.error?.code).toBe('PROMOTION_QUOTE_CHANGED');
+    const created = await submit(actor, currentToken);
+    expect(created.status, JSON.stringify(created.error)).toBe(201);
+    expect(created.data!.promotionCode).toBe('first-local-order-20');
+    expect(created.data!.priceMinor % 1_000).toBe(0);
+  }, 30_000);
+
   it('discounts district routes but excludes intercity, including an intermediate intercity stop', async () => {
     const actor = passengers[0]!;
     const district = confirmAddressPoint({ id: 'qa-district-promo', label: 'д. Лолошур-Возжи', kind: 'settlement', details: 'Граховский район', coordinates: { latitude: 55.998771, longitude: 51.7719962 } }, { latitude: 55.998771, longitude: 51.7719962 });
     const intercity = confirmAddressPoint({ id: 'qa-intercity-promo', label: 'Можга', kind: 'settlement', coordinates: { latitude: 56.4439, longitude: 52.2274 } }, { latitude: 56.4439, longitude: 52.2274 });
     for (const [destinations, scope, discount] of [
-      [[district], 'district', 50], [[intercity], 'intercity', undefined], [[intercity, destination], 'intercity', undefined],
+      [[district], 'district', 20], [[intercity], 'intercity', undefined], [[intercity, destination], 'intercity', undefined],
     ] as const) {
       const result = await api<{ pricingScope: string; tariffs: Tariff[] }>('/v1/quotes', actor, { pickup, destination: destinations.at(-1), destinations });
       expect(result.status, JSON.stringify(result.error)).toBe(200);
       expect(result.data!.pricingScope).toBe(scope);
       expect(result.data!.tariffs[0]!.discountPercent).toBe(discount);
     }
+  }, 30_000);
+
+  it('settles discounted waiting to the same ten-ruble total shown to the passenger', async () => {
+    const order = await create(passengers[0]!);
+    const driver = drivers[0]!;
+    expect((await accept(driver, order)).status).toBe(200);
+    for (const status of ['driver_arriving', 'driver_waiting']) {
+      expect((await api(`/v1/driver/orders/${order.id}/transition`, driver, {status})).status).toBe(200);
+    }
+    expect((await api(`/v1/driver/orders/${order.id}/waiting/start`, driver, {})).status).toBe(200);
+    await connection.execute('UPDATE orders SET waiting_started_at=DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 270 SECOND) WHERE id=?', [order.id]);
+    const preview = await api(`/v1/orders/${order.id}`, passengers[0]!);
+    expect(preview.status).toBe(200);
+    const stopped = await api(`/v1/driver/orders/${order.id}/waiting/stop`, driver, {});
+    expect(stopped.status, JSON.stringify(stopped.error)).toBe(200);
+    expect(stopped.data!.waitingPerMinuteMinor).toBe(320);
+    expect(stopped.data!.waitingPriceMinor).toBe(1_000);
+    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 1_000);
+    expect(rideLivePriceMinor(preview.data!)).toBe(stopped.data!.priceMinor);
+    expect(rideLivePriceMinor(stopped.data!)).toBe(stopped.data!.priceMinor);
   }, 30_000);
 
   it('allows only one active order when one passenger submits 16 different requests', async () => {

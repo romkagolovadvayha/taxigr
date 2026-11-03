@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { registerGroupAlertRoutes } from './group-alerts';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
-import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor } from '../src/domain/first-order-discount';
+import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 
 import {
@@ -1015,6 +1015,7 @@ async function settleWaiting(
     waitingSeconds,
     Number(row.waiting_free_minutes),
     Number(row.waiting_per_minute_minor),
+    row.promotion_code === firstLocalOrderPromotion ? 1_000 : 1,
   );
   const priceMinor =
     Number(row.base_price_minor) +
@@ -3889,7 +3890,7 @@ export async function registerRoutes(
           commission,
           rules.serviceCommissionBps,
           rules.waitingFreeMinutes,
-          manualPricing ? 0 : discountEligible ? firstOrderPriceMinor(rules.waitingPerMinuteMinor) : rules.waitingPerMinuteMinor,
+          manualPricing ? 0 : discountEligible ? firstOrderRateMinor(rules.waitingPerMinuteMinor) : rules.waitingPerMinuteMinor,
           rules.searchPriceIncreaseIntervalMinutes,
           manualPricing ? 0 : discountEligible ? firstOrderPriceMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
           input.paymentMethod,

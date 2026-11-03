@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
+import { firstLocalOrderDiscountPercent } from '../src/domain/first-order-discount';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
 import { resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
 import { db, firstRow, withTransaction } from './db';
@@ -36,6 +37,7 @@ export type BookingDraft = {
   quoteToken?: string;
   priceMinor?: number;
   originalPriceMinor?: number;
+  discountPercent?: number;
   quotedAt?: number;
   orderId?: string;
 };
@@ -118,7 +120,7 @@ function review(draft: BookingDraft): Reply {
     text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
       (draft.priceMinor == null ? 'Адрес не удалось определить точно. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
-      (draft.originalPriceMinor === undefined ? '' : `\nСкидка 50% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽.`) +
+      (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена вверх до 10 ₽.`) +
       '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
       [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
@@ -245,6 +247,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.quotedAt = undefined;
         draft.priceMinor = undefined;
         draft.originalPriceMinor = undefined;
+        draft.discountPercent = undefined;
         const [pickupResult, destinationResult] = await Promise.all([
           resolveBotAddressOptions(draft.pickupRaw!, true, draft.selectedPickup),
           resolveBotAddressOptions(draft.destinationRaw!, false, draft.selectedDestination),
@@ -273,6 +276,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
             if (economy && economy.priceMinor > 0) {
               draft.priceMinor = economy.priceMinor;
               draft.originalPriceMinor = economy.originalPriceMinor;
+              draft.discountPercent = economy.discountPercent;
               draft.quoteToken = result.quoteToken;
             }
           } catch (error) {
@@ -324,6 +328,15 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           draft = freshDraft();
           return welcome('Оформление отменено. Активного заказа нет.');
         }
+        if (startRequested || message.verifiedPhone || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
+          draft = { ...freshDraft(), stage: 'pickup' };
+          return { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
+        }
+        if (draft.stage === 'confirm' && draft.originalPriceMinor !== undefined &&
+            draft.discountPercent !== firstLocalOrderDiscountPercent) {
+          const updated = await quote();
+          return { ...updated, text: 'Условия скидки изменились. Проверьте новую стоимость.\n\n' + updated.text };
+        }
         if (draft.stage === 'done' && (action?.[1] === 'confirm' || /^(?:вызвать|да|подтверждаю)$/iu.test(text))) {
           return welcome(`Этот заказ уже закрыт: https://taxigr.ru/orders/${draft.orderId}`);
         }
@@ -340,10 +353,6 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           });
           draft.stage = 'done'; draft.orderId = order.id;
           return activeOrderReply(order, `Такси вызвано. Ищем водителя.${draft.priceMinor == null ? '\nСтоимость определит водитель и согласует с вами.' : ''}`);
-        }
-        if (startRequested || message.verifiedPhone || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
-          draft = { ...freshDraft(), stage: 'pickup' };
-          return { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
         }
         if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text || draft.stage === 'idle' || draft.stage === 'done') {
           draft = freshDraft();

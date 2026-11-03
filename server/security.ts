@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 import { jwtVerify, SignJWT } from 'jose';
 
-import type { Address, RouteSummary, TariffCode, UserRole } from '../src/domain/models';
+import type { Address, RideOrder, RouteSummary, TariffCode, UserRole } from '../src/domain/models';
 import type { PricingScope } from '../src/domain/pricing';
 import { config } from './config';
 import { firstRow } from './db';
@@ -27,7 +27,7 @@ export type OrderQuoteClaims = {
   driverApproachDistanceMeters: number;
   prices: Record<TariffCode, number>;
   promotion?: {
-    code: 'first-local-order-50';
+    code: NonNullable<RideOrder['promotionCode']>;
     originalPrices: Record<TariffCode, number>;
   };
   pricedAt: string;

@@ -1,13 +1,17 @@
-import type { PricingScope } from './pricing';
+import { roundToTenRubles, type PricingScope } from './pricing';
 
-export const firstLocalOrderPromotion = 'first-local-order-50' as const;
-export const firstLocalOrderDiscountPercent = 50;
+export const firstLocalOrderPromotion = 'first-local-order-20' as const;
+export const firstLocalOrderDiscountPercent = 20;
 
 export function isLocalPromotionScope(scope: PricingScope): boolean {
   return scope === 'grahovo' || scope === 'district';
 }
 
-/** Money remains in kopeks; an odd kopek is rounded in the passenger's favour. */
+/** Per-minute rates retain kopek precision before the total is rounded. */
+export function firstOrderRateMinor(originalPriceMinor: number): number {
+  return Math.ceil(originalPriceMinor * (100 - firstLocalOrderDiscountPercent) / 100);
+}
+
 export function firstOrderPriceMinor(originalPriceMinor: number): number {
-  return Math.floor(originalPriceMinor / 2);
+  return roundToTenRubles(firstOrderRateMinor(originalPriceMinor));
 }

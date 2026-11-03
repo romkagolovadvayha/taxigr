@@ -66,8 +66,8 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
               : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}
-        {!loading && estimateAvailable && tariff.discountPercent === 50 && (
-          <Text selectable style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>Первый заказ −50%</Text>
+        {!loading && estimateAvailable && (tariff.discountPercent ?? 0) > 0 && (
+          <Text selectable style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>Первый заказ −{tariff.discountPercent}%</Text>
         )}
         {!compact && !loading && estimateAvailable && tariff.originalPriceMinor !== undefined && (
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textDecorationLine: 'line-through' }}>{tariff.originalPriceMinor / 100} ₽</Text>

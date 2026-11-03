@@ -121,7 +121,7 @@ export type RideOrder = {
   pricingMode?: 'fixed' | 'driver';
   manualPriceSet?: boolean;
   basePriceMinor?: number;
-  promotionCode?: 'first-local-order-50';
+  promotionCode?: 'first-local-order-50' | 'first-local-order-20';
   originalPriceMinor?: number;
   searchPriceIncreaseMinor?: number;
   searchPriceIncreaseIntervalMinutes?: number;

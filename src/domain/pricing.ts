@@ -173,7 +173,7 @@ function intercityPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   return rates.intercityPerKilometer02To07Minor;
 }
 
-function roundToTenRubles(minor: number): number {
+export function roundToTenRubles(minor: number): number {
   return Math.ceil(minor / 1_000) * 1_000;
 }
 
@@ -243,10 +243,11 @@ export function calculateWaitingChargeMinor(
   totalWaitingSeconds: number,
   freeMinutes = defaultPricingRules.waitingFreeMinutes,
   perMinuteMinor = defaultPricingRules.waitingPerMinuteMinor,
+  roundingStepMinor = 1,
 ): number {
   const billableSeconds = Math.max(0, Math.floor(totalWaitingSeconds) - freeMinutes * 60);
   const billableMinutes = Math.ceil(billableSeconds / 60);
-  return billableMinutes * perMinuteMinor;
+  return Math.ceil(billableMinutes * perMinuteMinor / roundingStepMinor) * roundingStepMinor;
 }
 
 export function calculateCommissionMinor(

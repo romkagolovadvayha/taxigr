@@ -38,7 +38,7 @@ export type OrderRow = RowDataPacket & {
   duration_seconds: number;
   route_geometry: unknown;
   base_price_minor: number;
-  promotion_code?: 'first-local-order-50' | null;
+  promotion_code?: RideOrder['promotionCode'] | null;
   original_price_minor?: number | null;
   search_price_increase_minor: number;
   search_price_increase_interval_minutes: number;
