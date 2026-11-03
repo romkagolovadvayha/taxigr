@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { isCrawlerImageError } from './web-error-classifier';
 
 export type ClientErrorSource =
   | 'react-error-boundary'
@@ -67,6 +68,8 @@ export async function reportCriticalClientError(
   options: ReportOptions,
 ): Promise<void> {
   try {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' &&
+        isCrawlerImageError({ ...options, platform: 'web' }, navigator.userAgent)) return;
     const endpoint = clientErrorEndpoint();
     if (!endpoint) return;
     const normalized = normalizeError(error);

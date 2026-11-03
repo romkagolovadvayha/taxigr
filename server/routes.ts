@@ -7,6 +7,7 @@ import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
 import { firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
+import { isCrawlerImageError } from '../src/errors/web-error-classifier';
 
 import {
   calculateCommissionMinor,
@@ -1784,6 +1785,9 @@ export async function registerRoutes(
     },
     async (request, reply) => {
       const input = parse(clientErrorSchema, request.body);
+      if (isCrawlerImageError(input, request.headers['user-agent'])) {
+        return reply.code(202).send({ data: { accepted: true } });
+      }
       const session = await authenticate(request).catch(() => null);
       const reportedError = new Error(input.message);
       reportedError.name = input.name;

@@ -7,6 +7,37 @@ afterEach(() => {
 });
 
 describe('frontend error reporter', () => {
+  it('does not send crawler image alerts and still sends its runtime errors', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    vi.stubGlobal('window', {location:{hostname:'taxigr.ru'}});
+    vi.stubGlobal('navigator', {userAgent:'Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)'});
+    vi.doMock('expo-constants', () => ({default:{expoConfig:{version:'1.0.25'}}}));
+    vi.doMock('react-native', () => ({Platform:{OS:'web'}}));
+    const fetchMock = vi.fn().mockResolvedValue({ok:true});
+    vi.stubGlobal('fetch', fetchMock);
+    const {reportCriticalClientError} = await import('../src/errors/critical-error-reporter');
+    await reportCriticalClientError(new Error('Image failed'), {
+      source:'resource-error',fatal:false,resource:'https://taxigr.ru/landing/local-roads.webp',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await reportCriticalClientError(new Error('Runtime failed'), {source:'global-error',fatal:true});
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('reports an image failure in a real browser', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    vi.stubGlobal('window', {location:{hostname:'taxigr.ru'}});
+    vi.stubGlobal('navigator', {userAgent:'Mozilla/5.0 (iPhone) Safari/604.1'});
+    vi.doMock('expo-constants', () => ({default:{expoConfig:{version:'1.0.25'}}}));
+    vi.doMock('react-native', () => ({Platform:{OS:'web'}}));
+    const fetchMock = vi.fn().mockResolvedValue({ok:true});
+    vi.stubGlobal('fetch', fetchMock);
+    const {reportCriticalClientError} = await import('../src/errors/critical-error-reporter');
+    await reportCriticalClientError(new Error('Image failed'), {
+      source:'resource-error',fatal:false,resource:'https://taxigr.ru/landing/local-roads.webp',
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it('sends useful browser context once without exposing the Telegram token', async () => {
     vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
     vi.stubGlobal('window', { location: { hostname: 'taxigr.ru' } });

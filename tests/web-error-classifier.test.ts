@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyWebErrorEvent } from '../src/errors/web-error-classifier';
+import { classifyWebErrorEvent, isCrawlerImageError } from '../src/errors/web-error-classifier';
 
 function target(properties: Record<string, unknown>): EventTarget {
   return properties as unknown as EventTarget;
 }
 
 describe('web error classifier', () => {
+  const imageReport = {platform:'web',source:'resource-error',fatal:false,resource:'https://taxigr.ru/landing/local-roads.webp'};
+
+  it('recognizes non-fatal image errors from the Ahrefs crawler', () => {
+    expect(isCrawlerImageError(imageReport, 'Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)')).toBe(true);
+  });
+
+  it('keeps browser failures, script failures and runtime failures reportable', () => {
+    expect(isCrawlerImageError(imageReport, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Safari/604.1')).toBe(false);
+    expect(isCrawlerImageError({...imageReport,resource:'https://taxigr.ru/entry.js'}, 'AhrefsBot/7.0')).toBe(false);
+    expect(isCrawlerImageError({...imageReport,fatal:true}, 'AhrefsBot/7.0')).toBe(false);
+    expect(isCrawlerImageError({...imageReport,source:'global-error'}, 'AhrefsBot/7.0')).toBe(false);
+  });
   it('keeps script failures fatal and strips them from the runtime-error path', () => {
     const windowTarget = target({});
     const result = classifyWebErrorEvent(

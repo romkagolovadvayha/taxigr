@@ -15,7 +15,7 @@ export function NotificationRegistrar() {
       !('Notification' in window)
     ) return;
     const register = () => {
-      if (document.visibilityState !== 'visible' || Notification.permission !== 'granted') return;
+      if (document.visibilityState !== 'visible' || navigator.onLine === false || Notification.permission !== 'granted') return;
       void syncPushRegistration(token).catch((error) =>
         reportCriticalClientError(error, {
           source: 'push-registration',

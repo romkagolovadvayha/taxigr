@@ -8,6 +8,16 @@ export type ClassifiedWebError =
   | { kind: 'resource'; resource: WebResourceFailure }
   | { kind: 'runtime'; error: unknown };
 
+/** Crawlers can skip image downloads while still dispatching DOM load errors. */
+export function isCrawlerImageError(
+  report: { source: string; platform: string; fatal?: boolean; resource?: string },
+  userAgent = '',
+): boolean {
+  return report.platform === 'web' && report.source === 'resource-error' && report.fatal === false &&
+    /\.(?:png|jpe?g|webp|avif|gif|svg|ico)(?:[?#]|$)/i.test(report.resource ?? '') &&
+    /AhrefsBot|SemrushBot|Googlebot|bingbot|YandexBot|Baiduspider|DuckDuckBot|MJ12bot/i.test(userAgent);
+}
+
 type ResourceTarget = EventTarget & {
   currentSrc?: unknown;
   data?: unknown;

@@ -37,6 +37,44 @@ describe('startup recovery after a short API outage', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    ['GET', '/v1/push/config'],
+    ['PUT', '/v1/web-push-subscriptions'],
+  ])('recovers %s %s after a dropped connection without immediate alerting', async (method, path) => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('Load failed')).mockResolvedValue(success());
+    vi.stubGlobal('fetch', fetchMock);
+    const {apiRequest} = await import('../src/api/client');
+    const result = apiRequest(path, {method, token:'session', body:method === 'PUT' ? '{"endpoint":"test"}' : undefined});
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await result).toEqual({ready:true});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]![1].body).toBe(fetchMock.mock.calls[1]![1].body);
+  });
+
+  it('reports a persistent push registration outage after two retries', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockResolvedValue(unavailable());
+    vi.stubGlobal('fetch', fetchMock);
+    const {apiRequest} = await import('../src/api/client');
+    const result = expect(apiRequest('/v1/web-push-subscriptions', {method:'PUT',token:'session'}))
+      .rejects.toMatchObject({status:502});
+    await vi.advanceTimersByTimeAsync(3_000);
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([401, 403, 429])('does not retry rejected push registration (%s)', async status => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
+    const fetchMock = vi.fn().mockResolvedValue({...unavailable(),status});
+    vi.stubGlobal('fetch', fetchMock);
+    const {apiRequest} = await import('../src/api/client');
+    await expect(apiRequest('/v1/web-push-subscriptions', {method:'PUT',token:'session'})).rejects.toMatchObject({status});
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('makes a fresh request after a timeout instead of retaining the aborted signal', async () => {
     vi.useFakeTimers();
     vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');

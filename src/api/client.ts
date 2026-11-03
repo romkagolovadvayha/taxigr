@@ -95,23 +95,24 @@ async function requestFromNetwork<T>(
   options: RequestInit & { token?: string; timeoutMs?: number } = {},
 ): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
-  // These startup requests only read state or sign an equivalent session token.
-  // A failed CORS preflight during an API restart must not strand the page.
-  const recoverStartup = (method === 'GET' && path === '/v1/bootstrap') ||
-    (method === 'POST' && path === '/v1/auth/refresh');
+  // Retrying these reads, session refresh and subscription upsert is safe after
+  // a failed CORS preflight or a brief connection loss on browser resume.
+  const recoverTransient = (method === 'GET' && ['/v1/bootstrap', '/v1/push/config'].includes(path)) ||
+    (method === 'POST' && path === '/v1/auth/refresh') ||
+    (method === 'PUT' && path === '/v1/web-push-subscriptions');
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await requestOnce<T>(path, options);
     } catch (error) {
       const transient = error instanceof ApiError &&
         (['NETWORK_ERROR', 'TIMEOUT'].includes(error.code ?? '') || [502, 503, 504].includes(error.status));
-      if (!recoverStartup || !transient || attempt >= 2 || options.signal?.aborted) throw error;
-      await waitForStartupRetry((attempt + 1) * 1_000, options.signal);
+      if (!recoverTransient || !transient || attempt >= 2 || options.signal?.aborted) throw error;
+      await waitForRequestRetry((attempt + 1) * 1_000, options.signal);
     }
   }
 }
 
-function waitForStartupRetry(delay: number, signal?: AbortSignal | null): Promise<void> {
+function waitForRequestRetry(delay: number, signal?: AbortSignal | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const abort = () => {
       clearTimeout(timer);
