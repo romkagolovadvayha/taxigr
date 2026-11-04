@@ -19,6 +19,7 @@ import {
   classifyPricingScope,
   defaultPricingRules,
   fareRoundingMinor,
+  fareRoundingMode,
   roundFareMinor,
 } from './pricing';
 import { rideWaitingSeconds } from './waiting';
@@ -29,7 +30,7 @@ export function demoWaitingTransition(ride: RideOrder, status: RideStatus, now =
   }
   if ((status === 'in_progress' || status === 'completed') && ride.waitingStartedAt) {
     const waitingSeconds = rideWaitingSeconds(ride, now);
-    const waitingPriceMinor = calculateWaitingChargeMinor(waitingSeconds, ride.waitingFreeMinutes, ride.waitingPerMinuteMinor, ride.fareRoundingMinor);
+    const waitingPriceMinor = calculateWaitingChargeMinor(waitingSeconds, ride.waitingFreeMinutes, ride.waitingPerMinuteMinor, ride.fareRoundingMinor, ride.fareRoundingMode ?? 'up');
     const priceMinor = (ride.basePriceMinor ?? ride.priceMinor - (ride.waitingPriceMinor ?? 0) - (ride.searchPriceIncreaseMinor ?? 0)) +
       (ride.searchPriceIncreaseMinor ?? 0) + waitingPriceMinor;
     return { waitingSeconds, waitingPriceMinor, waitingStartedAt: undefined, priceMinor,
@@ -142,6 +143,7 @@ export function buildDemoDriverOffer(
     pricingScope,
     basePriceMinor: tariff.priceMinor,
     fareRoundingMinor,
+    fareRoundingMode,
     searchPriceIncreaseStepMinor: roundFareMinor(defaultPricingRules.searchPriceIncreaseStepMinor),
     priceMinor: tariff.priceMinor,
     serviceCommissionMinor: calculateCommissionMinor(tariff.priceMinor),

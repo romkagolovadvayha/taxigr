@@ -149,8 +149,8 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(quoteResult.status).toBe(200);
     for (const tariff of quoteResult.data!.tariffs) {
       expect(tariff.discountPercent).toBe(20);
-      expect(tariff.priceMinor).toBe(Math.ceil(tariff.originalPriceMinor! * 0.8 / 1_000) * 1_000);
-      expect(tariff.originalPriceMinor! % 5_000).toBe(0);
+      expect(tariff.priceMinor).toBe(Math.round(tariff.originalPriceMinor! * 0.8 / 1_000) * 1_000);
+      expect(tariff.originalPriceMinor! % 1_000).toBe(0);
     }
     const first = await submit(actor, quoteResult.data!.quoteToken);
     expect(first.status, JSON.stringify(first.error)).toBe(201);
@@ -217,17 +217,19 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     }
   }, 30_000);
 
-  it('accepts a still-valid older quote and preserves its ten-ruble rounding rule', async () => {
+  it.each([undefined,1_000,5_000])('accepts an older quote and preserves upward rounding with step %s', async step => {
     const actor = passengers[0]!;
     const current = await verifyOrderQuote(await quote(actor), actor.id);
-    const original = current.promotion!.originalPrices;
-    const legacyToken = await signOrderQuote({...current, fareRoundingMinor:undefined,
-      prices:{economy:firstOrderPriceMinor(original.economy,1_000),child:firstOrderPriceMinor(original.child,1_000)},
+    const original = {economy:33_000,child:40_000};
+    const legacyToken = await signOrderQuote({...current, fareRoundingMinor:step,fareRoundingMode:undefined,
+      promotion:{code:'first-local-order-20',originalPrices:original},
+      prices:{economy:firstOrderPriceMinor(original.economy,step??1_000,'up'),child:firstOrderPriceMinor(original.child,step??1_000,'up')},
     });
     const created = await submit(actor, legacyToken);
     expect(created.status, JSON.stringify(created.error)).toBe(201);
-    expect(created.data!.fareRoundingMinor).toBeUndefined();
-    expect(created.data!.priceMinor).toBe(firstOrderPriceMinor(original.economy,1_000));
+    expect(created.data!.fareRoundingMinor).toBe(step);
+    expect(created.data!.fareRoundingMode).toBeUndefined();
+    expect(created.data!.priceMinor).toBe(firstOrderPriceMinor(original.economy,step??1_000,'up'));
   }, 30_000);
 
   it.each([
@@ -246,7 +248,7 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(inbound.data!.tariffs.map(tariff=>tariff.priceMinor)).toEqual(outward.data!.tariffs.map(tariff=>tariff.priceMinor));
     expect(inbound.data!.pricingDistanceMeters).toBe(outward.data!.pricingDistanceMeters);
     for (const tariff of outward.data!.tariffs) {
-      expect((tariff.originalPriceMinor ?? tariff.priceMinor) % 5_000).toBe(0);
+      expect((tariff.originalPriceMinor ?? tariff.priceMinor) % 1_000).toBe(0);
       expect(tariff.priceMinor % 1_000).toBe(0);
     }
     if (label==='д. Котловка' || label==='Резиденция Бабы Яги') {
@@ -273,15 +275,16 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
       expect((await api(`/v1/driver/orders/${order.id}/transition`, driver, {status})).status).toBe(200);
     }
     expect((await api(`/v1/driver/orders/${order.id}/waiting/start`, driver, {})).status).toBe(200);
-    await connection.execute('UPDATE orders SET waiting_started_at=DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 270 SECOND) WHERE id=?', [order.id]);
+    await connection.execute('UPDATE orders SET waiting_started_at=DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 181 SECOND) WHERE id=?', [order.id]);
     const preview = await api(`/v1/orders/${order.id}`, passengers[0]!);
     expect(preview.status).toBe(200);
     const stopped = await api(`/v1/driver/orders/${order.id}/waiting/stop`, driver, {});
     expect(stopped.status, JSON.stringify(stopped.error)).toBe(200);
     expect(stopped.data!.waitingPerMinuteMinor).toBe(320);
     expect(stopped.data!.fareRoundingMinor).toBe(1_000);
-    expect(stopped.data!.waitingPriceMinor).toBe(1_000);
-    expect(stopped.data!.priceMinor).toBe(order.priceMinor + 1_000);
+    expect(stopped.data!.fareRoundingMode).toBe('nearest');
+    expect(stopped.data!.waitingPriceMinor).toBe(0);
+    expect(stopped.data!.priceMinor).toBe(order.priceMinor);
     expect(rideLivePriceMinor(preview.data!)).toBe(stopped.data!.priceMinor);
     expect(rideLivePriceMinor(stopped.data!)).toBe(stopped.data!.priceMinor);
   }, 30_000);

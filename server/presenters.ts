@@ -9,7 +9,7 @@ import type {
   RideStatus,
   TariffCode,
 } from '../src/domain/models';
-import type { PricingScope } from '../src/domain/pricing';
+import type { FareRoundingMode, PricingScope } from '../src/domain/pricing';
 import { extractHouseNumber } from '../src/domain/address-precision';
 
 export type OrderRow = RowDataPacket & {
@@ -39,6 +39,7 @@ export type OrderRow = RowDataPacket & {
   route_geometry: unknown;
   base_price_minor: number;
   fare_rounding_minor?: number | null;
+  fare_rounding_mode?: FareRoundingMode | null;
   promotion_code?: RideOrder['promotionCode'] | null;
   original_price_minor?: number | null;
   search_price_increase_minor: number;
@@ -229,6 +230,7 @@ export function presentOrder(row: OrderRow): RideOrder {
     manualPriceSet: Boolean(row.manual_price_set),
     basePriceMinor: row.base_price_minor,
     fareRoundingMinor: row.fare_rounding_minor ?? undefined,
+    fareRoundingMode: row.fare_rounding_mode ?? undefined,
     promotionCode: row.promotion_code ?? undefined,
     originalPriceMinor: row.original_price_minor ?? undefined,
     searchPriceIncreaseMinor: row.search_price_increase_minor,

@@ -122,6 +122,7 @@ export type RideOrder = {
   manualPriceSet?: boolean;
   basePriceMinor?: number;
   fareRoundingMinor?: number;
+  fareRoundingMode?: import('./pricing').FareRoundingMode;
   promotionCode?: 'first-local-order-50' | 'first-local-order-20';
   originalPriceMinor?: number;
   searchPriceIncreaseMinor?: number;

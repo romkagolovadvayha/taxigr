@@ -8,6 +8,7 @@ import {
   defaultPricingRules,
   farePeriodAt,
   classifyPricingScope,
+  roundFareMinor,
 } from '../src/domain/pricing';
 
 describe('route pricing', () => {
@@ -29,7 +30,7 @@ describe('route pricing', () => {
 
   it('uses a separate time-based per-kilometer rate inside Grahovo district', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z');
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(60_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, daytime)).toBe(57_000);
   });
 
   it('uses the configured intercity rate for each period', () => {
@@ -37,7 +38,7 @@ describe('route pricing', () => {
     const late = new Date('2026-08-03T18:00:00.000Z');
     const night = new Date('2026-08-03T22:00:00.000Z');
     expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, daytime)).toBe(305_000);
-    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(430_000);
+    expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, late)).toBe(427_000);
     expect(calculateFareMinor(61_000, 'economy', 'intercity', rules, night)).toBe(610_000);
   });
 
@@ -72,16 +73,16 @@ describe('route pricing', () => {
     expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('02-07');
     expect(farePeriodAt(new Date('2026-08-04T03:00:00.000Z'))).toBe('07-22');
 
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(70_000);
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(80_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(67_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(76_000);
   });
 
   it('adds the fixed child tariff surcharge without seat selection', () => {
     const daytime = new Date('2026-08-03T03:00:00.000Z');
     const economy = calculateFareMinor(9_500, 'economy', 'district', rules, daytime);
     const child = calculateFareMinor(9_500, 'child', 'district', rules, daytime);
-    expect(child - economy).toBe(10_000);
-    expect(child % 5_000).toBe(0);
+    expect(child - economy).toBe(7_000);
+    expect(child % 1_000).toBe(0);
   });
 
   it('adds 60 percent of the Grahovo fare for every additional local stop', () => {
@@ -92,7 +93,7 @@ describe('route pricing', () => {
       { distanceMeters: 900, scope: 'grahovo' as const },
     ];
 
-    expect(calculateMultiStopFareMinor(segments, 'economy', true, rules, daytime)).toBe(35_000);
+    expect(calculateMultiStopFareMinor(segments, 'economy', true, rules, daytime)).toBe(33_000);
     expect(calculateMultiStopFareMinor(segments, 'child', true, rules, daytime)).toBe(40_000);
     expect(
       calculateMultiStopFareMinor(
@@ -102,7 +103,7 @@ describe('route pricing', () => {
         { ...rules, additionalStopGrahovoSurchargeBps: 4_000 },
         daytime,
       ),
-    ).toBe(30_000);
+    ).toBe(27_000);
   });
 
   it('adds each district or intercity leg by its current tariff', () => {
@@ -113,11 +114,11 @@ describe('route pricing', () => {
     ];
 
     expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(310_000);
-    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(320_000);
+    expect(calculateMultiStopFareMinor(segments, 'child', false, rules, daytime)).toBe(317_000);
   });
 
   it.each([
-    ['03:00', 350_000], ['18:00', 465_000], ['22:00', 630_000],
+    ['03:00', 347_000], ['18:00', 462_000], ['22:00', 627_000],
   ])('uses the same period for all legs, charges approach and child seat once at %s', (time, expected) => {
     const segments = [
       {distanceMeters: 5_000, scope: 'district' as const},
@@ -136,6 +137,22 @@ describe('route pricing', () => {
     ];
 
     expect(calculateMultiStopFareMinor(segments, 'economy', false, rules, daytime)).toBe(75_000);
+  });
+});
+
+describe('nearest ten-ruble fare rounding', () => {
+  it.each([[40_332,40_000],[40_600,41_000],[40_499,40_000],[40_500,41_000],
+    [32_676,33_000],[33_360,33_000],[0,0],[41_000,41_000]])(
+    'rounds %i kopeks to %i', (amount,expected) => {
+      expect(roundFareMinor(amount)).toBe(expected);
+    },
+  );
+  it('prices the reported Zarechny routes using the nearest ten rubles', () => {
+    const daytime = new Date('2026-11-04T09:00:00Z');
+    const rules = {...defaultPricingRules,districtPerKilometer07To22Minor:6_000};
+    expect(calculateFareMinor(6722,'economy','district',rules,daytime)).toBe(40_000);
+    expect(calculateFareMinor(5560,'economy','district',rules,daytime)).toBe(33_000);
+    expect(calculateFareMinor(5446,'economy','district',rules,daytime)).toBe(33_000);
   });
 });
 

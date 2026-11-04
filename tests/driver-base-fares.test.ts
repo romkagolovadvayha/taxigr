@@ -33,7 +33,7 @@ async function price(pickup:Address,destinations:Address[],time='03:00') {
 describe('fares for a driver based in Grahovo',()=>{
   it('charges Grahovo–Selyanur plus Selyanur–Porshur and resolves each road only once',async()=>{
     const result=await price(selyanur,[porshur]);
-    expect(result.amount).toBe(165_000);
+    expect(result.amount).toBe(160_000);
     expect(result.route.tripRoute.distanceMeters).toBe(3359);
     expect(result.route.pricingDistanceMeters).toBe(23327+3359);
     expect(result.route.driverApproachRoute?.distanceMeters).toBe(23327);
@@ -50,7 +50,7 @@ describe('fares for a driver based in Grahovo',()=>{
   it('prices a return with intermediate stops using the same outward itinerary',async()=>{
     const outward=await price(grahovo,[porshur,selyanur]);
     const inbound=await price(selyanur,[porshur,grahovo]);
-    expect(outward.amount).toBe(185_000);
+    expect(outward.amount).toBe(176_000);
     expect(inbound.amount).toBe(outward.amount);
     expect(inbound.route.tripRoute.coordinates[0]).toEqual(selyanur.coordinates);
     expect(inbound.route.segments.at(-1)!.destination).toEqual(grahovo);

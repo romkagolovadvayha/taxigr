@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { jwtVerify, SignJWT } from 'jose';
 
 import type { Address, RideOrder, RouteSummary, TariffCode, UserRole } from '../src/domain/models';
-import type { PricingScope } from '../src/domain/pricing';
+import type { FareRoundingMode, PricingScope } from '../src/domain/pricing';
 import { config } from './config';
 import { firstRow } from './db';
 
@@ -26,6 +26,7 @@ export type OrderQuoteClaims = {
   pricingDistanceMeters: number;
   driverApproachDistanceMeters: number;
   fareRoundingMinor?: number;
+  fareRoundingMode?: FareRoundingMode;
   prices: Record<TariffCode, number>;
   promotion?: {
     code: NonNullable<RideOrder['promotionCode']>;

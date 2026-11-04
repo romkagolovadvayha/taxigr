@@ -15,6 +15,7 @@ import {
   calculateMultiStopFareMinor,
   calculateWaitingChargeMinor,
   fareRoundingMinor,
+  fareRoundingMode,
   roundFareMinor,
   classifyMultiStopPricingScope,
   farePeriodAt,
@@ -1018,6 +1019,7 @@ async function settleWaiting(
     Number(row.waiting_free_minutes),
     Number(row.waiting_per_minute_minor),
     row.fare_rounding_minor ?? (row.promotion_code === firstLocalOrderPromotion ? 1_000 : 1),
+    row.fare_rounding_mode ?? 'up',
   );
   const priceMinor =
     Number(row.base_price_minor) +
@@ -3619,6 +3621,7 @@ export async function registerRoutes(
       pricingDistanceMeters,
       driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
       fareRoundingMinor: quoteRoundingMinor,
+      fareRoundingMode,
       prices: {
         economy: prices.economy,
         child: prices.child,
@@ -3634,6 +3637,7 @@ export async function registerRoutes(
         pricingDistanceMeters,
         driverApproachDistanceMeters: driverApproachRoute?.distanceMeters ?? 0,
         fareRoundingMinor: quoteRoundingMinor,
+        fareRoundingMode,
         tariffs,
         currency: 'RUB',
       },
@@ -3840,7 +3844,7 @@ export async function registerRoutes(
       const discountEligible = !manualPricing && await firstLocalOrderEligible(session.id, pricingScope, connection);
       if (Boolean(quote.promotion) !== discountEligible || (quote.promotion &&
           (quote.promotion.code !== firstLocalOrderPromotion ||
-           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff], quote.fareRoundingMinor ?? 1_000) !== price))) {
+           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff], quote.fareRoundingMinor ?? 1_000, quote.fareRoundingMode ?? 'up') !== price))) {
         throw Object.assign(new Error('Условия скидки изменились. Обновите расчёт и подтвердите новую стоимость'), {
           statusCode: 409, code: 'PROMOTION_QUOTE_CHANGED',
         });
@@ -3869,8 +3873,8 @@ export async function registerRoutes(
           base_price_minor, price_minor, commission_minor, commission_bps,
           waiting_free_minutes, waiting_per_minute_minor,
           search_price_increase_interval_minutes, search_price_increase_step_minor,
-          payment_method, comment, idempotency_key, fare_rounding_minor
-        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          payment_method, comment, idempotency_key, fare_rounding_minor, fare_rounding_mode
+        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           session.id,
@@ -3899,11 +3903,13 @@ export async function registerRoutes(
           manualPricing ? 0 : roundFareMinor(
             discountEligible ? firstOrderRateMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
             quote.fareRoundingMinor ?? (discountEligible ? 1_000 : 1),
+            quote.fareRoundingMode ?? 'up',
           ),
           input.paymentMethod,
           input.comment ?? null,
           input.idempotencyKey,
           manualPricing ? null : quote.fareRoundingMinor ?? null,
+          manualPricing ? null : quote.fareRoundingMode ?? null,
         ],
       );
       if (manualPricing) await connection.execute("UPDATE orders SET pricing_mode = 'driver' WHERE id = ?", [orderId]);

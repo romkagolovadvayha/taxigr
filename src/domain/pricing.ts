@@ -187,10 +187,17 @@ function intercityPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   return rates.intercityPerKilometer02To07Minor;
 }
 
-export const fareRoundingMinor = 5_000;
+export type FareRoundingMode = 'nearest' | 'up';
+export const fareRoundingMinor = 1_000;
+export const fareRoundingMode: FareRoundingMode = 'nearest';
 
-export function roundFareMinor(minor: number, roundingMinor = fareRoundingMinor): number {
-  return Math.ceil(minor / roundingMinor) * roundingMinor;
+export function roundFareMinor(
+  minor: number,
+  roundingMinor = fareRoundingMinor,
+  mode: FareRoundingMode = fareRoundingMode,
+): number {
+  const round = mode === 'nearest' ? Math.round : Math.ceil;
+  return round(minor / roundingMinor) * roundingMinor;
 }
 
 export function calculateFareMinor(
@@ -281,10 +288,11 @@ export function calculateWaitingChargeMinor(
   freeMinutes = defaultPricingRules.waitingFreeMinutes,
   perMinuteMinor = defaultPricingRules.waitingPerMinuteMinor,
   roundingStepMinor = 1,
+  roundingMode: FareRoundingMode = 'up',
 ): number {
   const billableSeconds = Math.max(0, Math.floor(totalWaitingSeconds) - freeMinutes * 60);
   const billableMinutes = Math.ceil(billableSeconds / 60);
-  return Math.ceil(billableMinutes * perMinuteMinor / roundingStepMinor) * roundingStepMinor;
+  return roundFareMinor(billableMinutes * perMinuteMinor, roundingStepMinor, roundingMode);
 }
 
 export function calculateCommissionMinor(

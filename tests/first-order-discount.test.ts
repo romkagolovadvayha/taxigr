@@ -23,19 +23,20 @@ describe('first local order discount', () => {
   it.each([
     [0, 0],
     [15_000, 12_000],
-    [15_500, 13_000],
+    [15_500, 12_000],
     [20_000, 16_000],
     [22_000, 18_000],
     [25_000, 20_000],
-    [25_001, 21_000],
+    [25_001, 20_000],
+    [33_000, 26_000],
     [57_000, 46_000],
-  ])('prices %i kopeks with 20 percent off, rounded up to %i', (original, expected) => {
+  ])('prices %i kopeks with 20 percent off, rounded to the nearest %i', (original, expected) => {
     expect(firstOrderPriceMinor(original)).toBe(expected);
   });
 
   it.each([[15_000,15_000],[22_000,20_000],[57_000,50_000],[85_000,70_000]])(
     'can round the discounted %i kopeks up to a fifty-ruble multiple', (original, expected) => {
-      expect(firstOrderPriceMinor(original, 5_000)).toBe(expected);
+      expect(firstOrderPriceMinor(original, 5_000, 'up')).toBe(expected);
     },
   );
 
@@ -58,6 +59,8 @@ describe('first local order discount', () => {
       waitingPerMinuteMinor: 320,
     } as RideOrder;
     expect(rideLivePriceMinor(ride)).toBe(16_000);
+    expect(rideLivePriceMinor({...ride,waitingSeconds:181,fareRoundingMinor:1_000,fareRoundingMode:'nearest'})).toBe(15_000);
+    expect(rideLivePriceMinor({...ride,waitingSeconds:181,fareRoundingMinor:1_000})).toBe(16_000);
     expect(rideLivePriceMinor({ ...ride, basePriceMinor: 15_000, searchPriceIncreaseMinor: 5_000, fareRoundingMinor: 5_000 })).toBe(25_000);
     expect(rideLivePriceMinor({ ...ride, promotionCode: 'first-local-order-50', waitingPerMinuteMinor: 200 })).toBe(15_400);
     expect(rideLivePriceMinor({ ...ride, promotionCode: undefined, waitingPerMinuteMinor: 400 })).toBe(15_800);

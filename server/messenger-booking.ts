@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent } from '../src/domain/first-order-discount';
-import { fareRoundingMinor } from '../src/domain/pricing';
+import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
 import { resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
 import { db, firstRow, withTransaction } from './db';
@@ -40,6 +40,7 @@ export type BookingDraft = {
   originalPriceMinor?: number;
   discountPercent?: number;
   fareRoundingMinor?: number;
+  fareRoundingMode?: FareRoundingMode;
   quotedAt?: number;
   orderId?: string;
 };
@@ -122,7 +123,7 @@ function review(draft: BookingDraft): Reply {
     text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
       (draft.priceMinor == null ? 'Адрес не удалось определить точно. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
-      (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена вверх до ${discountedFareRoundingMinor / 100} ₽.`) +
+      (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
       '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
       [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
@@ -251,6 +252,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.originalPriceMinor = undefined;
         draft.discountPercent = undefined;
         draft.fareRoundingMinor = undefined;
+        draft.fareRoundingMode = undefined;
         const [pickupResult, destinationResult] = await Promise.all([
           resolveBotAddressOptions(draft.pickupRaw!, true, draft.selectedPickup),
           resolveBotAddressOptions(draft.destinationRaw!, false, draft.selectedDestination),
@@ -274,7 +276,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.originalPriceMinor = undefined;
         if (pickup && destination) {
           try {
-            const result = await call<{ quoteToken: string; tariffs: Tariff[]; fareRoundingMinor?: number }>('/v1/quotes', { pickup, destination });
+            const result = await call<{ quoteToken: string; tariffs: Tariff[]; fareRoundingMinor?: number; fareRoundingMode?: FareRoundingMode }>('/v1/quotes', { pickup, destination });
             const economy = result.tariffs.find(tariff => tariff.code === 'economy');
             if (economy && economy.priceMinor > 0) {
               draft.priceMinor = economy.priceMinor;
@@ -282,6 +284,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
               draft.discountPercent = economy.discountPercent;
               draft.fareRoundingMinor = result.fareRoundingMinor ??
                 (economy.originalPriceMinor === undefined ? fareRoundingMinor : discountedFareRoundingMinor);
+              draft.fareRoundingMode = result.fareRoundingMode ?? fareRoundingMode;
               draft.quoteToken = result.quoteToken;
             }
           } catch (error) {
@@ -339,6 +342,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         }
         if (draft.stage === 'confirm' && draft.priceMinor != null &&
             (draft.fareRoundingMinor !== (draft.originalPriceMinor === undefined ? fareRoundingMinor : discountedFareRoundingMinor) ||
+             draft.fareRoundingMode !== fareRoundingMode ||
              (draft.originalPriceMinor !== undefined && draft.discountPercent !== firstLocalOrderDiscountPercent))) {
           const updated = await quote();
           return { ...updated, text: 'Условия расчёта изменились. Проверьте новую стоимость.\n\n' + updated.text };

@@ -49,6 +49,7 @@ import {
   classifyPricingScope,
   defaultPricingRules,
   fareRoundingMinor,
+  fareRoundingMode,
   roundFareMinor,
   isGrahovoAddress,
 } from '@/domain/pricing';
@@ -937,6 +938,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           pricingScope,
           basePriceMinor: tariff.priceMinor,
           fareRoundingMinor,
+          fareRoundingMode,
           searchPriceIncreaseStepMinor: roundFareMinor(defaultPricingRules.searchPriceIncreaseStepMinor),
           priceMinor: tariff.priceMinor,
           serviceCommissionMinor: calculateCommissionMinor(tariff.priceMinor),
@@ -1296,6 +1298,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         current.waitingFreeMinutes,
         current.waitingPerMinuteMinor,
         current.fareRoundingMinor,
+        current.fareRoundingMode ?? 'up',
       );
       const priceMinor =
         (current.basePriceMinor ?? current.priceMinor) +
