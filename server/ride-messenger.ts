@@ -336,3 +336,13 @@ export function driverRideNotification(
     locations: ride.pricingMode === 'driver' ? [] : driverTargetLocation(ride),
   };
 }
+
+export function driverSeatRequiredNotification(ride: RideOrder): PersonalMessengerNotification {
+  return {
+    ...driverRideNotification(ride, {
+      title: 'Новый детский заказ',
+      details: [['Детское кресло', 'Для этого заказа нужно кресло. В вашем профиле оно не указано.']],
+    }),
+    buttons: [[{ type: 'link', label: 'Профиль водителя', url: appUrl('/driver/profile') }]],
+  };
+}

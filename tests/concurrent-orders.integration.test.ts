@@ -10,6 +10,7 @@ import { firstOrderPriceMinor } from '../src/domain/first-order-discount';
 import { farePeriodAt } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
 import { signOrderQuote, signSession, verifyOrderQuote } from '../server/security';
+import { getDriverOrderDispatch } from '../server/driver-dispatch';
 
 const enabled = process.env.RUN_API_INTEGRATION === '1';
 const apiUrl = process.env.INTEGRATION_API_URL ?? 'http://127.0.0.1:4110';
@@ -141,6 +142,59 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     expect(new Set(responses.map((response) => response.data?.id)).size).toBe(1);
     const [rows] = await connection.query<RowDataPacket[]>('SELECT COUNT(*) AS total FROM orders WHERE passenger_id=?', [actor.id]);
     expect(Number(rows[0]!.total)).toBe(1);
+  }, 30_000);
+
+  it('notifies online drivers about a child order even without the seat flag, while preserving acceptance and status restrictions', async () => {
+    const actor=passengers[0]!;
+    const seated=drivers[0]!;
+    const noSeat=drivers[1]!;
+    const offline=drivers[2]!;
+    const suspended=drivers[3]!;
+    await connection.execute('UPDATE drivers SET has_child_seat=FALSE WHERE id=?',[noSeat.driverId!]);
+    await connection.execute("UPDATE drivers SET status='offline' WHERE id=?",[offline.driverId!]);
+    await connection.execute("UPDATE drivers SET status='suspended' WHERE id=?",[suspended.driverId!]);
+    await connection.query("INSERT INTO driver_priority_assignments (driver_id,scope) VALUES (?, 'grahovo'), (?, 'grahovo')",[seated.driverId,noSeat.driverId]);
+    try {
+      const token=await quote(actor);
+      const created=await api('/v1/orders',actor,{pickup,destination,quoteToken:token,tariff:'child',paymentMethod:'cash',
+        deviceId:actor.deviceId,idempotencyKey:randomUUID(),legalAcceptance:currentInitialLegalAcceptance()});
+      expect(created.status,JSON.stringify(created.error)).toBe(201);
+      const order=created.data!;
+      const priority=await getDriverOrderDispatch(order.id,'priority',connection);
+      expect(priority.notificationDriverIds).toEqual(expect.arrayContaining([seated.driverId,noSeat.driverId]));
+      expect(priority.eligibleDriverIds).toContain(seated.driverId);
+      expect(priority.eligibleDriverIds).not.toContain(noSeat.driverId);
+      const all=await getDriverOrderDispatch(order.id,'all',connection);
+      expect(all.notificationDriverIds).not.toContain(offline.driverId);
+      expect(all.notificationDriverIds).not.toContain(suspended.driverId);
+      const denied=await accept(noSeat,order);
+      expect(denied.status).toBe(409);
+      expect(denied.error?.message).toContain('кресло');
+      expect((await accept(seated,order)).status).toBe(200);
+    } finally {
+      await connection.execute('UPDATE drivers SET has_child_seat=TRUE WHERE id=?',[noSeat.driverId!]);
+      await connection.query('DELETE FROM driver_priority_assignments WHERE driver_id IN (?)',[[seated.driverId,noSeat.driverId]]);
+    }
+  }, 30_000);
+
+  it('does not hold a child order for priority drivers who cannot accept it', async () => {
+    const actor=passengers[0]!;
+    const noSeat=drivers[1]!;
+    await connection.execute('UPDATE drivers SET has_child_seat=FALSE WHERE id=?',[noSeat.driverId!]);
+    await connection.execute("INSERT INTO driver_priority_assignments (driver_id,scope) VALUES (?, 'grahovo')",[noSeat.driverId!]);
+    try {
+      const created=await api('/v1/orders',actor,{pickup,destination,quoteToken:await quote(actor),tariff:'child',paymentMethod:'cash',
+        deviceId:actor.deviceId,idempotencyKey:randomUUID(),legalAcceptance:currentInitialLegalAcceptance()});
+      expect(created.status,JSON.stringify(created.error)).toBe(201);
+      const [rows]=await connection.query<RowDataPacket[]>('SELECT priority_released_at FROM orders WHERE id=?',[created.data!.id]);
+      expect(rows[0]!.priority_released_at).not.toBeNull();
+      const dispatch=await getDriverOrderDispatch(created.data!.id,'available',connection);
+      expect(dispatch.notificationDriverIds).toContain(noSeat.driverId);
+      expect(dispatch.eligibleDriverIds).toContain(drivers[0]!.driverId);
+    } finally {
+      await connection.execute('UPDATE drivers SET has_child_seat=TRUE WHERE id=?',[noSeat.driverId!]);
+      await connection.execute('DELETE FROM driver_priority_assignments WHERE driver_id=?',[noSeat.driverId!]);
+    }
   }, 30_000);
 
   it('applies the local discount once, keeps it after cancellation and rejects a spent quote', async () => {

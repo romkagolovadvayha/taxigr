@@ -127,7 +127,8 @@ import {
   type OrderRow,
   type OrderSummaryRow,
 } from './presenters';
-import { driverRideNotification, passengerRideNotification } from './ride-messenger';
+import { driverRideNotification, driverSeatRequiredNotification, passengerRideNotification } from './ride-messenger';
+import { getDriverOrderDispatch, type DriverOrderDispatch } from './driver-dispatch';
 import {
   decodeRideChatImage,
   MAX_RIDE_CHAT_IMAGE_BYTES,
@@ -1415,7 +1416,6 @@ async function checkVkMiniAppMessagesPermission(
   return false;
 }
 
-type DriverAudience = 'all' | 'priority' | 'nonpriority' | 'available';
 
 type DriverQueuePromotion = {
   id: string;
@@ -1488,67 +1488,19 @@ async function driverDispatchSettings(
   return settings;
 }
 
-async function eligibleDriverIdsForOrder(
-  orderId: string,
-  audience: DriverAudience,
-  connection?: PoolConnection,
-): Promise<string[]> {
-  const executor = connection ?? db;
-  const priorityClause =
-    audience === 'priority'
-      ? `AND EXISTS (
-           SELECT 1 FROM driver_priority_assignments priority
-           WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
-         )`
-      : audience === 'nonpriority'
-        ? `AND NOT EXISTS (
-             SELECT 1 FROM driver_priority_assignments priority
-             WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
-           )`
-        : audience === 'available'
-          ? `AND (
-               o.priority_release_at IS NULL
-               OR o.priority_release_at <= UTC_TIMESTAMP(3)
-               OR EXISTS (
-                 SELECT 1 FROM driver_priority_assignments priority
-                 WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
-               )
-             )`
-          : '';
-  const [rows] = await executor.query<(RowDataPacket & { id: string })[]>(
-    `SELECT d.id
-     FROM orders o
-     JOIN drivers d ON d.status IN ('online', 'busy')
-     WHERE o.id = ?
-       AND (o.tariff <> 'child' OR d.has_child_seat = TRUE)
-       AND (
-         SELECT COUNT(*) FROM orders active_order
-         WHERE active_order.driver_id = d.id
-           AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-       ) < ?
-       AND NOT EXISTS (
-         SELECT 1 FROM driver_order_rejections rejected
-         WHERE rejected.order_id = o.id AND rejected.driver_id = d.id
-       )
-       ${priorityClause}`,
-    [orderId, maximumAssignedDriverOrders],
-  );
-  return rows.map((row) => String(row.id));
-}
-
 async function preparePriorityDispatch(
   orderId: string,
   connection: PoolConnection,
-): Promise<string[]> {
+): Promise<DriverOrderDispatch> {
   const [orders] = await connection.query<
     (RowDataPacket & { pricing_scope: DriverPriorityScope })[]
   >('SELECT pricing_scope FROM orders WHERE id = ? LIMIT 1 FOR UPDATE', [orderId]);
   const order = orders[0];
   if (!order) throw new Error('Order dispatch setup failed');
-  const priorityDriverIds = await eligibleDriverIdsForOrder(orderId, 'priority', connection);
+  const priorityDispatch = await getDriverOrderDispatch(orderId, 'priority', connection);
   const settings = await driverDispatchSettings(connection);
   const delayMinutes = settings[order.pricing_scope];
-  if (priorityDriverIds.length > 0 && delayMinutes > 0) {
+  if (priorityDispatch.eligibleDriverIds.length > 0 && delayMinutes > 0) {
     await connection.execute(
       `UPDATE orders
        SET priority_release_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? MINUTE),
@@ -1556,7 +1508,7 @@ async function preparePriorityDispatch(
        WHERE id = ?`,
       [delayMinutes, orderId],
     );
-    return priorityDriverIds;
+    return priorityDispatch;
   }
   await connection.execute(
     `UPDATE orders
@@ -1564,7 +1516,7 @@ async function preparePriorityDispatch(
      WHERE id = ?`,
     [orderId],
   );
-  return eligibleDriverIdsForOrder(orderId, 'all', connection);
+  return getDriverOrderDispatch(orderId, 'all', connection);
 }
 
 export type RegisteredRouteHandlers = {
@@ -1605,19 +1557,22 @@ export async function registerRoutes(
   };
   const sendOrderToDrivers = (
     order: ReturnType<typeof presentOrder>,
-    driverIds: string[],
+    dispatch: DriverOrderDispatch,
     options: { priceIncreased?: boolean; delayed?: boolean } = {},
   ): void => {
-    for (const driverId of driverIds) {
+    const { eligibleDriverIds, notificationDriverIds } = dispatch;
+    const eligible = new Set(eligibleDriverIds);
+    const seatRequiredDriverIds = notificationDriverIds.filter(id => !eligible.has(id));
+    for (const driverId of eligibleDriverIds) {
       publish(`driver:${driverId}`, 'order:available', order);
     }
     void notifyDrivers(
-      driverIds,
+      eligibleDriverIds,
       driverOrderAvailablePush(order.id, options.priceIncreased),
     ).catch((error) => app.log.warn({ error }, 'driver order push failed'));
     notifyMessengers(
       notifyDriversInMessengers(
-        driverIds,
+        eligibleDriverIds,
         driverRideNotification(
           order,
           options.delayed
@@ -1629,6 +1584,21 @@ export async function registerRoutes(
       ),
       options.delayed ? 'order.priority-released.drivers' : 'order.available.drivers',
     );
+    if (seatRequiredDriverIds.length) {
+      void notifyDrivers(seatRequiredDriverIds, {
+        ...driverOrderAvailablePush(order.id, options.priceIncreased),
+        title: 'Новый детский заказ',
+        body: 'Нужно детское кресло. Если оно есть, укажите его в профиле водителя.',
+        data: { role: 'driver' },
+      }).catch(error => app.log.warn({ error }, 'driver child-seat notice push failed'));
+      notifyMessengers(
+        notifyDriversInMessengers(seatRequiredDriverIds, driverSeatRequiredNotification(order)),
+        'order.child-seat-notice.drivers',
+      );
+    }
+    app.log.info({ orderId: order.id, eligibleDrivers: eligibleDriverIds.length,
+      notificationDrivers: notificationDriverIds.length, childSeatNoticeDrivers: seatRequiredDriverIds.length },
+    'driver order dispatch');
   };
   const announcePromotedDriverOrder = async (
     promotion: DriverQueuePromotion,
@@ -1760,8 +1730,8 @@ export async function registerRoutes(
     for (const orderId of dueOrders) {
       const row = await getOrder(orderId);
       if (!row || row.status !== 'searching' || row.driver_id) continue;
-      const driverIds = await eligibleDriverIdsForOrder(orderId, 'nonpriority');
-      sendOrderToDrivers(presentOrder(row), driverIds, { delayed: true });
+      const dispatch = await getDriverOrderDispatch(orderId, 'nonpriority');
+      sendOrderToDrivers(presentOrder(row), dispatch, { delayed: true });
     }
     return dueOrders.length;
   };
@@ -3764,7 +3734,8 @@ export async function registerRoutes(
         [session.id, input.idempotencyKey],
       );
       if (existingRows[0]) {
-        return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
+        return { order: presentOrder(existingRows[0]), created: false,
+          initialDriverIds: { eligibleDriverIds: [], notificationDriverIds: [] } };
       }
       await assertBookingEnabled(connection);
       const passenger = userRows[0];
@@ -4452,8 +4423,8 @@ export async function registerRoutes(
         ],
       });
       if (payload.status === 'searching' && !payload.driverId) {
-        const eligibleDriverIds = await eligibleDriverIdsForOrder(id, 'available');
-        sendOrderToDrivers(payload, eligibleDriverIds, { priceIncreased: true });
+        const dispatch = await getDriverOrderDispatch(id, 'available');
+        sendOrderToDrivers(payload, dispatch, { priceIncreased: true });
       }
     }
     return { data: payload };
@@ -5405,10 +5376,11 @@ export async function registerRoutes(
     publish('admins', 'order:updated', payload);
     await announcePromotedDriverOrder(participants.promotion, participants.driverId);
 
-    const eligibleDriverIds = participants.initialDriverIds.filter(
-      (driverId) => driverId !== participants.driverId,
-    );
-    sendOrderToDrivers(payload, eligibleDriverIds);
+    const dispatch = {
+      eligibleDriverIds: participants.initialDriverIds.eligibleDriverIds.filter(id => id !== participants.driverId),
+      notificationDriverIds: participants.initialDriverIds.notificationDriverIds.filter(id => id !== participants.driverId),
+    };
+    sendOrderToDrivers(payload, dispatch);
     void notifyUsers([participants.passengerId], passengerDriverReleasedPush(payload))
       .catch((error) => app.log.warn({ error }, 'push notification failed'));
     notifyMessengers(
