@@ -59,7 +59,10 @@ describe('fares for a driver based in Grahovo',()=>{
     expect((await price(grahovo,[kotlovka],time)).amount).toBe(expected);
     expect((await price(kotlovka,[grahovo],time)).amount).toBe(expected);
   });
-  it.each([['03:00',40_000],['18:00',60_000],['22:00',85_000]] as const)('raises Yagi-Kaksi proportionally at %s, in either direction',async(time,expected)=>{
+  it.each([
+    ['02:59',120_000], ['03:00',90_000], ['17:59',90_000],
+    ['18:00',100_000], ['21:59',100_000], ['22:00',120_000],
+  ] as const)('uses the fixed Yagi-Kaksi fare at %s UTC in either direction',async(time,expected)=>{
     expect((await price(grahovo,[yagiKaksi],time)).amount).toBe(expected);
     expect((await price(yagiKaksi,[grahovo],time)).amount).toBe(expected);
     const elsewhere = {...yagiKaksi,details:undefined,coordinates:elabuga.coordinates};
