@@ -2446,6 +2446,46 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     );
   }, 20_000);
 
+  it('uses zero commission for new rides and waives historical accruals without changing fares', async () => {
+    expect(new URL(mysqlUrl).pathname).toMatch(/_(?:test|qa)(?:_|$)/u);
+    expect(originalTariffs.serviceCommissionBps).toBe(0);
+    await setDriverStatus(driverOneToken, 'online');
+    const order = await createOrder(passengerToken);
+    expect(order.status).toBe(201);
+    expect(order.data?.serviceCommissionMinor).toBe(0);
+    const id = order.data!.id;
+    const accepted = await api<RideOrder>(`/v1/driver/orders/${id}/accept`, {
+      method: 'POST', token: driverOneToken, body: {},
+    });
+    expect(accepted.status).toBe(200);
+    expect(accepted.data?.serviceCommissionMinor).toBe(0);
+    for (const status of ['driver_waiting', 'in_progress', 'completed']) {
+      const transitioned = await api<RideOrder>(`/v1/driver/orders/${id}/transition`, {
+        method: 'POST', token: driverOneToken, body: { status },
+      });
+      expect(transitioned.status).toBe(200);
+      expect(transitioned.data?.serviceCommissionMinor).toBe(0);
+    }
+    await connection.execute('UPDATE orders SET commission_bps = 1200, commission_minor = ROUND(price_minor * 0.12) WHERE id = ?', [id]);
+    await connection.execute('UPDATE drivers SET commission_bps = 700 WHERE id = ?', [fixture.driverOneId]);
+    await connection.execute('UPDATE tariff_settings SET service_commission_bps = 1200 WHERE id = 1');
+    const before = await api<RideOrder>(`/v1/orders/${id}`, { token: driverOneToken });
+    expect(before.data?.serviceCommissionMinor).toBeGreaterThan(0);
+    const migration = await readFile(new URL('../server/migrations/061_zero_service_commission.sql', import.meta.url), 'utf8');
+    const migrationConnection = await mysql.createConnection({ uri: mysqlUrl, multipleStatements: true });
+    try { await migrationConnection.query(migration); } finally { await migrationConnection.end(); }
+    const after = await api<RideOrder>(`/v1/orders/${id}`, { token: driverOneToken });
+    expect(after.data?.serviceCommissionMinor).toBe(0);
+    expect(after.data?.priceMinor).toBe(before.data?.priceMinor);
+    const earnings = await api<{ grossMinor: number; commissionMinor: number; netMinor: number }>('/v1/driver/earnings?period=today', { token: driverOneToken });
+    expect(earnings.status).toBe(200);
+    expect(earnings.data?.grossMinor).toBeGreaterThan(0);
+    expect(earnings.data?.commissionMinor).toBe(0);
+    expect(earnings.data?.netMinor).toBe(earnings.data?.grossMinor);
+    const tariffs = await api<PricingRules>('/v1/admin/tariffs', { token: adminToken });
+    expect(tariffs.data?.serviceCommissionBps).toBe(0);
+  }, 20_000);
+
   it('applies individual driver commission without rewriting completed orders', async () => {
     const updated = await api(`/v1/admin/drivers/${fixture.driverOneId}`, {
       method: 'PATCH',

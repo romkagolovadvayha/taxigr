@@ -32,7 +32,7 @@ const demoDrivers: AdminAccountSummary[] = [
     createdAt: demoOrders[demoOrders.length - 1]?.createdAt ?? new Date().toISOString(),
     lastOrderAt: demoOrders[0]?.createdAt,
     driverStatus: 'online',
-    commissionBps: 1200,
+    commissionBps: 0,
     hasChildSeat: true,
     hasSezPass: true,
     vehicle: {

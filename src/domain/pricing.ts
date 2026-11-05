@@ -47,7 +47,7 @@ export const defaultPricingRules: PricingRules = {
   waitingPerMinuteMinor: 400,
   searchPriceIncreaseIntervalMinutes: 4,
   searchPriceIncreaseStepMinor: 3_000,
-  serviceCommissionBps: 1_200,
+  serviceCommissionBps: 0,
   passengerCancellationLimit: 3,
   passengerCancellationWindowHours: 24,
   passengerCancellationBlockHours: 24,

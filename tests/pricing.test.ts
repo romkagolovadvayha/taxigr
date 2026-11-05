@@ -189,6 +189,13 @@ describe('paid waiting', () => {
 });
 
 describe('commission', () => {
+  it('does not charge commission by default, including fractional-ruble fares', () => {
+    for (const fareMinor of [0, 1, 15_000, 100_001, 1_500_000]) {
+      expect(calculateCommissionMinor(fareMinor)).toBe(0);
+      expect(calculateCommissionMinor(fareMinor, 0)).toBe(0);
+    }
+  });
+
   it('calculates commission in basis points', () => {
     expect(calculateCommissionMinor(100_000, 1_200)).toBe(12_000);
     expect(calculateCommissionMinor(100_000, 950)).toBe(9_500);

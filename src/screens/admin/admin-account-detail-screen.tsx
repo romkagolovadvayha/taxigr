@@ -149,7 +149,7 @@ function demoDetail(kind: Props['kind']): Detail {
     driver: {
       id: demoDriver.id,
       status: 'online',
-      commissionBps: 1200,
+      commissionBps: 0,
       hasChildSeat: true,
       hasSezPass: true,
       licenseNumber: '18 22 123456',
