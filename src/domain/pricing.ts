@@ -247,7 +247,7 @@ function fixedGrahovoFareMinor(origin: Address, destination: Address, date: Date
   else return undefined;
   const period = farePeriodAt(date);
   if (isKotlovkaFareAddress(remote)) return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[period];
-  if (isYagiKaksiFareAddress(remote)) return { '07-22': 90_000, '22-02': 100_000, '02-07': 120_000 }[period];
+  if (isYagiKaksiFareAddress(remote)) return { '07-22': 50_000, '22-02': 60_000, '02-07': 80_000 }[period];
   return undefined;
 }
 
