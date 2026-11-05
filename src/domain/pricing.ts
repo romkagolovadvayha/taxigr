@@ -47,7 +47,7 @@ export const defaultPricingRules: PricingRules = {
   waitingPerMinuteMinor: 400,
   searchPriceIncreaseIntervalMinutes: 4,
   searchPriceIncreaseStepMinor: 3_000,
-  serviceCommissionBps: 1_200,
+  serviceCommissionBps: 0,
   passengerCancellationLimit: 3,
   passengerCancellationWindowHours: 24,
   passengerCancellationBlockHours: 24,
@@ -247,8 +247,7 @@ function fixedGrahovoFareMinor(origin: Address, destination: Address, date: Date
   else return undefined;
   const period = farePeriodAt(date);
   if (isKotlovkaFareAddress(remote)) return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[period];
-  // The village gets the same proportional increase as Kotlovka, rounded up to 50 rubles.
-  if (isYagiKaksiFareAddress(remote)) return { '07-22': 40_000, '22-02': 60_000, '02-07': 85_000 }[period];
+  if (isYagiKaksiFareAddress(remote)) return { '07-22': 50_000, '22-02': 60_000, '02-07': 80_000 }[period];
   return undefined;
 }
 

@@ -166,8 +166,8 @@ export const demoApplications: DriverApplication[] = [
 export const demoEarnings: EarningsSummary = {
   period: 'today',
   grossMinor: 486_000,
-  commissionMinor: 58_320,
-  netMinor: 427_680,
+  commissionMinor: 0,
+  netMinor: 486_000,
   rides: 9,
   onlineMinutes: 412,
 };
@@ -177,5 +177,5 @@ export const demoAdminMetrics: AdminMetrics = {
   onlineDrivers: 6,
   pendingApplications: demoApplications.length + 1,
   grossTodayMinor: 1_842_000,
-  commissionTodayMinor: 221_040,
+  commissionTodayMinor: 0,
 };
