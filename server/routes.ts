@@ -127,8 +127,7 @@ import {
   type OrderRow,
   type OrderSummaryRow,
 } from './presenters';
-import { driverRideNotification, driverSeatRequiredNotification, passengerRideNotification } from './ride-messenger';
-import { getDriverOrderDispatch, type DriverOrderDispatch } from './driver-dispatch';
+import { driverRideNotification, passengerRideNotification } from './ride-messenger';
 import {
   decodeRideChatImage,
   MAX_RIDE_CHAT_IMAGE_BYTES,
@@ -671,13 +670,13 @@ function quoteTariffs(
     title: code === 'child' ? 'Детский' : 'Эконом',
     description:
       code === 'child'
-        ? `Подходящее детское кресло без выбора типа${approachDescription}`
+        ? `Поездка с ребёнком · просьба вести аккуратно${approachDescription}`
         : scope === 'grahovo'
           ? `Фиксированная цена по Грахово · ${periodDescription}`
           : scope === 'district'
             ? `По Граховскому району · ${periodDescription}${approachDescription}`
             : `Междугородняя поездка · ${periodDescription}${approachDescription}`,
-    childSeatIncluded: code === 'child',
+    childSeatIncluded: false,
     etaMinutes: etaMinutes[code],
     priceMinor:
       priceOverrides?.[code] ??
@@ -721,12 +720,11 @@ function multiStopPrices(
 async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffCode, number>> {
   const [rows] = await db.query<
     (RowDataPacket & {
-      has_child_seat: number;
       latitude: number;
       longitude: number;
     })[]
   >(
-    `SELECT d.has_child_seat, l.latitude, l.longitude
+    `SELECT l.latitude, l.longitude
      FROM drivers d
      JOIN driver_locations l ON l.driver_id = d.id
      WHERE d.status = 'online'
@@ -737,9 +735,8 @@ async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffC
        )
        AND l.recorded_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 10 MINUTE)`,
   );
-  const etaFor = (childSeatRequired: boolean, fallback: number) => {
+  const etaFor = (fallback: number) => {
     const distances = rows
-      .filter((row) => !childSeatRequired || Boolean(row.has_child_seat))
       .map((row) => haversineMeters(
         { latitude: Number(row.latitude), longitude: Number(row.longitude) },
         pickup.coordinates,
@@ -749,8 +746,8 @@ async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffC
     return Math.min(60, Math.max(3, Math.ceil((nearestDistance * 1.28) / 600) + 2));
   };
   return {
-    economy: etaFor(false, 15),
-    child: etaFor(true, 20),
+    economy: etaFor(15),
+    child: etaFor(20),
   };
 }
 
@@ -1086,16 +1083,12 @@ async function loadDriverOfferRows(
           SELECT 1 FROM driver_order_rejections rejected
           WHERE rejected.order_id = o.id AND rejected.driver_id = ?
         )
-        AND (o.tariff <> 'child' OR EXISTS (
-          SELECT 1 FROM drivers eligible WHERE eligible.id = ? AND eligible.has_child_seat = TRUE
-        ))
      ORDER BY o.created_at ASC LIMIT ?`,
     [
       config.ORDER_SEARCH_TTL_MINUTES,
       driver.id,
       driver.id,
       maximumAssignedDriverOrders,
-      driver.id,
       driver.id,
       Math.min(20, Math.max(1, limit)),
     ],
@@ -1416,6 +1409,7 @@ async function checkVkMiniAppMessagesPermission(
   return false;
 }
 
+type DriverAudience = 'all' | 'priority' | 'nonpriority' | 'available';
 
 type DriverQueuePromotion = {
   id: string;
@@ -1488,19 +1482,66 @@ async function driverDispatchSettings(
   return settings;
 }
 
+async function eligibleDriverIdsForOrder(
+  orderId: string,
+  audience: DriverAudience,
+  connection?: PoolConnection,
+): Promise<string[]> {
+  const executor = connection ?? db;
+  const priorityClause =
+    audience === 'priority'
+      ? `AND EXISTS (
+           SELECT 1 FROM driver_priority_assignments priority
+           WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+         )`
+      : audience === 'nonpriority'
+        ? `AND NOT EXISTS (
+             SELECT 1 FROM driver_priority_assignments priority
+             WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+           )`
+        : audience === 'available'
+          ? `AND (
+               o.priority_release_at IS NULL
+               OR o.priority_release_at <= UTC_TIMESTAMP(3)
+               OR EXISTS (
+                 SELECT 1 FROM driver_priority_assignments priority
+                 WHERE priority.driver_id = d.id AND priority.scope = o.pricing_scope
+               )
+             )`
+          : '';
+  const [rows] = await executor.query<(RowDataPacket & { id: string })[]>(
+    `SELECT d.id
+     FROM orders o
+     JOIN drivers d ON d.status IN ('online', 'busy')
+     WHERE o.id = ?
+       AND (
+         SELECT COUNT(*) FROM orders active_order
+         WHERE active_order.driver_id = d.id
+           AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+       ) < ?
+       AND NOT EXISTS (
+         SELECT 1 FROM driver_order_rejections rejected
+         WHERE rejected.order_id = o.id AND rejected.driver_id = d.id
+       )
+       ${priorityClause}`,
+    [orderId, maximumAssignedDriverOrders],
+  );
+  return rows.map((row) => String(row.id));
+}
+
 async function preparePriorityDispatch(
   orderId: string,
   connection: PoolConnection,
-): Promise<DriverOrderDispatch> {
+): Promise<string[]> {
   const [orders] = await connection.query<
     (RowDataPacket & { pricing_scope: DriverPriorityScope })[]
   >('SELECT pricing_scope FROM orders WHERE id = ? LIMIT 1 FOR UPDATE', [orderId]);
   const order = orders[0];
   if (!order) throw new Error('Order dispatch setup failed');
-  const priorityDispatch = await getDriverOrderDispatch(orderId, 'priority', connection);
+  const priorityDriverIds = await eligibleDriverIdsForOrder(orderId, 'priority', connection);
   const settings = await driverDispatchSettings(connection);
   const delayMinutes = settings[order.pricing_scope];
-  if (priorityDispatch.eligibleDriverIds.length > 0 && delayMinutes > 0) {
+  if (priorityDriverIds.length > 0 && delayMinutes > 0) {
     await connection.execute(
       `UPDATE orders
        SET priority_release_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ? MINUTE),
@@ -1508,7 +1549,7 @@ async function preparePriorityDispatch(
        WHERE id = ?`,
       [delayMinutes, orderId],
     );
-    return priorityDispatch;
+    return priorityDriverIds;
   }
   await connection.execute(
     `UPDATE orders
@@ -1516,7 +1557,7 @@ async function preparePriorityDispatch(
      WHERE id = ?`,
     [orderId],
   );
-  return getDriverOrderDispatch(orderId, 'all', connection);
+  return eligibleDriverIdsForOrder(orderId, 'all', connection);
 }
 
 export type RegisteredRouteHandlers = {
@@ -1557,22 +1598,19 @@ export async function registerRoutes(
   };
   const sendOrderToDrivers = (
     order: ReturnType<typeof presentOrder>,
-    dispatch: DriverOrderDispatch,
+    driverIds: string[],
     options: { priceIncreased?: boolean; delayed?: boolean } = {},
   ): void => {
-    const { eligibleDriverIds, notificationDriverIds } = dispatch;
-    const eligible = new Set(eligibleDriverIds);
-    const seatRequiredDriverIds = notificationDriverIds.filter(id => !eligible.has(id));
-    for (const driverId of eligibleDriverIds) {
+    for (const driverId of driverIds) {
       publish(`driver:${driverId}`, 'order:available', order);
     }
     void notifyDrivers(
-      eligibleDriverIds,
-      driverOrderAvailablePush(order.id, options.priceIncreased),
+      driverIds,
+      driverOrderAvailablePush(order.id, options.priceIncreased, order.tariff),
     ).catch((error) => app.log.warn({ error }, 'driver order push failed'));
     notifyMessengers(
       notifyDriversInMessengers(
-        eligibleDriverIds,
+        driverIds,
         driverRideNotification(
           order,
           options.delayed
@@ -1584,21 +1622,6 @@ export async function registerRoutes(
       ),
       options.delayed ? 'order.priority-released.drivers' : 'order.available.drivers',
     );
-    if (seatRequiredDriverIds.length) {
-      void notifyDrivers(seatRequiredDriverIds, {
-        ...driverOrderAvailablePush(order.id, options.priceIncreased),
-        title: 'Новый детский заказ',
-        body: 'Нужно детское кресло. Если оно есть, укажите его в профиле водителя.',
-        data: { role: 'driver' },
-      }).catch(error => app.log.warn({ error }, 'driver child-seat notice push failed'));
-      notifyMessengers(
-        notifyDriversInMessengers(seatRequiredDriverIds, driverSeatRequiredNotification(order)),
-        'order.child-seat-notice.drivers',
-      );
-    }
-    app.log.info({ orderId: order.id, eligibleDrivers: eligibleDriverIds.length,
-      notificationDrivers: notificationDriverIds.length, childSeatNoticeDrivers: seatRequiredDriverIds.length },
-    'driver order dispatch');
   };
   const announcePromotedDriverOrder = async (
     promotion: DriverQueuePromotion,
@@ -1730,8 +1753,8 @@ export async function registerRoutes(
     for (const orderId of dueOrders) {
       const row = await getOrder(orderId);
       if (!row || row.status !== 'searching' || row.driver_id) continue;
-      const dispatch = await getDriverOrderDispatch(orderId, 'nonpriority');
-      sendOrderToDrivers(presentOrder(row), dispatch, { delayed: true });
+      const driverIds = await eligibleDriverIdsForOrder(orderId, 'nonpriority');
+      sendOrderToDrivers(presentOrder(row), driverIds, { delayed: true });
     }
     return dueOrders.length;
   };
@@ -3734,8 +3757,7 @@ export async function registerRoutes(
         [session.id, input.idempotencyKey],
       );
       if (existingRows[0]) {
-        return { order: presentOrder(existingRows[0]), created: false,
-          initialDriverIds: { eligibleDriverIds: [], notificationDriverIds: [] } };
+        return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
       }
       await assertBookingEnabled(connection);
       const passenger = userRows[0];
@@ -4423,8 +4445,8 @@ export async function registerRoutes(
         ],
       });
       if (payload.status === 'searching' && !payload.driverId) {
-        const dispatch = await getDriverOrderDispatch(id, 'available');
-        sendOrderToDrivers(payload, dispatch, { priceIncreased: true });
+        const eligibleDriverIds = await eligibleDriverIdsForOrder(id, 'available');
+        sendOrderToDrivers(payload, eligibleDriverIds, { priceIncreased: true });
       }
     }
     return { data: payload };
@@ -5223,15 +5245,6 @@ export async function registerRoutes(
           code: 'ORDER_PREVIOUSLY_REJECTED',
         });
       }
-      if (row.tariff === 'child') {
-        const [eligibleRows] = await connection.query<(RowDataPacket & { has_child_seat: number })[]>(
-          'SELECT has_child_seat FROM drivers WHERE id = ?',
-          [driver.id],
-        );
-        if (!eligibleRows[0]?.has_child_seat) {
-          throw Object.assign(new Error('Для детского тарифа нужно детское кресло'), { statusCode: 409 });
-        }
-      }
       const rules = await pricingRules(connection);
       const commissionBps = driver.commission_bps ?? rules.serviceCommissionBps;
       const commissionMinor = calculateCommissionMinor(row.price_minor, commissionBps);
@@ -5376,11 +5389,10 @@ export async function registerRoutes(
     publish('admins', 'order:updated', payload);
     await announcePromotedDriverOrder(participants.promotion, participants.driverId);
 
-    const dispatch = {
-      eligibleDriverIds: participants.initialDriverIds.eligibleDriverIds.filter(id => id !== participants.driverId),
-      notificationDriverIds: participants.initialDriverIds.notificationDriverIds.filter(id => id !== participants.driverId),
-    };
-    sendOrderToDrivers(payload, dispatch);
+    const eligibleDriverIds = participants.initialDriverIds.filter(
+      (driverId) => driverId !== participants.driverId,
+    );
+    sendOrderToDrivers(payload, eligibleDriverIds);
     void notifyUsers([participants.passengerId], passengerDriverReleasedPush(payload))
       .catch((error) => app.log.warn({ error }, 'push notification failed'));
     notifyMessengers(

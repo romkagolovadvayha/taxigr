@@ -2,7 +2,8 @@ import { Image } from "expo-image";
 import { Platform, View } from "react-native";
 
 import type { TariffCode } from "@/domain/models";
-import { useAppTheme } from "@/theme/theme-provider";
+import { useAppTheme, useThemeColors } from "@/theme/theme-provider";
+import { AppIcon } from "@/components/ui/app-icon";
 
 import { inlineTariffImageSources, tariffImageSources } from "./tariff-image-sources";
 
@@ -16,6 +17,7 @@ export function TariffIllustration({
   inline?: boolean;
 }) {
   const { dark } = useAppTheme();
+  const colors = useThemeColors();
   const width = inline ? 44 : compact ? 98 : 124;
   const height = inline ? 44 : compact ? 52 : 76;
   return (
@@ -31,7 +33,7 @@ export function TariffIllustration({
       }}
     >
       <Image
-        source={(inline ? inlineTariffImageSources : tariffImageSources)[code]}
+        source={(inline ? inlineTariffImageSources : tariffImageSources).economy}
         contentFit="contain"
         contentPosition="center"
         loading="eager"
@@ -42,6 +44,11 @@ export function TariffIllustration({
         alt=""
         style={{ width, height }}
       />
+      {code === 'child' && <View style={{ position: 'absolute', right: 0, bottom: 0,
+        width: inline ? 18 : 25, height: inline ? 18 : 25, borderRadius: 12,
+        alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand }}>
+        <AppIcon name="users" size={inline ? 12 : 17} color={colors.brandInk} />
+      </View>}
     </View>
   );
 }

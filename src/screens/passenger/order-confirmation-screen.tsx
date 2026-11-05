@@ -223,9 +223,9 @@ export function OrderConfirmationScreen() {
                     backgroundColor: colors.brandSoft,
                   }}
                 >
-                  <AppIcon name="child-seat" size={21} />
+                  <AppIcon name="users" size={21} />
                   <Text selectable style={{ ...typography.caption, color: colors.ink, flex: 1 }}>
-                    Приедет машина с подходящим детским креслом; выбирать его тип не нужно.
+                    Поездка с ребёнком. Водитель увидит пометку и просьбу вести аккуратно.
                   </Text>
                 </View>
               )}

@@ -496,11 +496,11 @@ export function PublicLandingScreen() {
                   {tariff === "economy" ? "ПО ДЕЛАМ" : "С ЗАБОТОЙ"}
                 </span>
                 <img
-                  src={`/landing/${tariff === "economy" ? "economy-car" : "child-seat"}.webp`}
+                  src="/landing/economy-car.webp"
                   alt={
                     tariff === "economy"
                       ? "Иллюстрация автомобиля тарифа «Эконом»"
-                      : "Иллюстрация детского автомобильного кресла"
+                      : "Автомобиль для поездки с ребёнком"
                   }
                   width="600"
                   height="400"
@@ -516,7 +516,7 @@ export function PublicLandingScreen() {
                 <p>
                   {tariff === "economy"
                     ? "За покупками, на работу, к друзьям. Привычные поездки — с понятным заказом."
-                    : "Машина с подходящим детским креслом. Выберите «Детский», чтобы водитель приехал подготовленным."}
+                    : "Поездка с ребёнком. Выберите «Детский», чтобы водитель заранее видел пометку и просьбу вести аккуратно."}
                 </p>
               </div>
               <Link href="/sign-in" onPress={requestBooking} className="lp-tariff-link">
@@ -665,8 +665,8 @@ export function PublicLandingScreen() {
                 Можно поехать с ребёнком?<span>+</span>
               </summary>
               <p>
-                Да. Выберите тариф «Детский» — заказ получит водитель с
-                подходящим детским креслом.
+                Да. Выберите тариф «Детский» — водитель увидит, что поездка с ребёнком,
+                и просьбу вести аккуратно.
               </p>
             </details>
             <details>

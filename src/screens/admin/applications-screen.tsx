@@ -257,7 +257,7 @@ export function ApplicationsScreen() {
               ['Права', selected.licenseNumber],
               ['Автомобиль', `${selected.vehicleMake} ${selected.vehicleModel}, ${selected.vehicleYear}`],
               ['Цвет и номер', `${selected.vehicleColor}, ${selected.plate}`],
-              ['Детский тариф', selected.hasChildSeat ? 'Есть подтверждённое кресло' : 'Недоступен'],
+              ['Детское кресло', selected.hasChildSeat ? 'Есть' : 'Не указано'],
               ['Пропуск в ОЭЗ', selected.hasSezPass ? 'Есть' : 'Нет'],
             ].map(([label, value]) => (
               <View key={label} style={{ gap: spacing.x1 }}>

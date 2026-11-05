@@ -321,8 +321,8 @@ export function buildTariffs(
     {
       code: 'child',
       title: 'Детский',
-      description: 'Приедет машина с подходящим креслом',
-      childSeatIncluded: true,
+      description: 'Поездка с ребёнком · просьба вести аккуратно',
+      childSeatIncluded: false,
       etaMinutes: 7,
       priceMinor: calculateFareMinor(distanceMeters, 'child', scope, rules, date, endpoints),
     },

@@ -39,8 +39,8 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
       accessibilityLabel={loading
         ? `${tariff.title}, рассчитываем стоимость и время подачи`
         : estimateAvailable
-          ? `${tariff.title}, ${tariff.etaMinutes} минут, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', с креслом' : ''}`
-          : `${tariff.title}${tariff.code === 'child' ? ', с креслом' : ''}`}
+          ? `${tariff.title}, ${tariff.etaMinutes} минут, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`
+          : `${tariff.title}${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`}
       onPress={() => onSelect(tariff.code)}
       style={{ flex: 1, minWidth: 0, flexDirection: inline ? 'row' : 'column', alignItems: 'center', justifyContent: 'center', padding: spacing.x2,
         minHeight: inline || !showIllustrations ? 64 : undefined, borderRadius: radius.md, gap: inline ? 6 : 2 }}>
@@ -62,7 +62,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
         {loading ? <SkeletonBlock width={inline ? '100%' : 84} height={17} /> : (
           <Text selectable style={{ ...typography.caption, fontSize: compact ? 12 : 13, lineHeight: 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
             {tariff.code === 'child'
-              ? estimateAvailable ? `С креслом · ~ ${tariff.etaMinutes} мин` : 'С креслом'
+              ? estimateAvailable ? `С ребёнком · ~ ${tariff.etaMinutes} мин` : 'С ребёнком'
               : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}

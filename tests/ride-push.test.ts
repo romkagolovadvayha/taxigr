@@ -43,6 +43,15 @@ const ride: RideOrder = {
   },
 };
 
+it.each([false,true])('marks child order push notifications explicitly, price increased: %s', increased => {
+  const notification=driverOrderAvailablePush(ride.id,increased,'child');
+  expect(notification.title).toContain('Детский');
+  expect(notification.body).toContain('Поездка с ребёнком');
+  expect(notification.body).toContain('вести аккуратно');
+  expect(notification.body).not.toContain('кресло');
+  expect(notification.data).toMatchObject({orderId:ride.id,role:'driver'});
+});
+
 describe('ride push copy', () => {
   it('uses only the plate and short status when a driver is found', () => {
     expect(passengerRidePush(ride)).toMatchObject({

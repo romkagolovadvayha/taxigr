@@ -5,7 +5,6 @@ import { formatPersonalMessengerNotification } from '../server/messenger-notific
 import { limitOrderRatings } from '../server/presenters';
 import {
   driverRideNotification,
-  driverSeatRequiredNotification,
   driverRideButtons,
   parseRideMessengerActionData,
   passengerRideNotification,
@@ -14,17 +13,14 @@ import {
 
 const orderId = '123e4567-e89b-12d3-a456-426614174000';
 
-it('shows the child order and profile link without offering acceptance to a driver missing the seat flag', () => {
-  const notification = driverSeatRequiredNotification(ride({tariff:'child'}));
-  const text = formatPersonalMessengerNotification(notification);
-  expect(text).toContain('Новый детский заказ');
-  expect(text).toContain('Юбилейная');
-  expect(text).toContain('В вашем профиле оно не указано');
-  expect(notification.orderId).toBe(orderId);
-  expect(notification.audience).toBe('driver');
-  const buttons = notification.buttons!.flat();
-  expect(buttons).toEqual([expect.objectContaining({type:'link',label:'Профиль водителя',url:expect.stringContaining('/driver/profile')})]);
-  expect(JSON.stringify(buttons)).not.toContain('r:accept');
+it('labels the child tariff clearly and keeps the accept action for all drivers', () => {
+  const notification=driverRideNotification(ride({tariff:'child'}));
+  const text=formatPersonalMessengerNotification(notification);
+  expect(text).toContain('Детский');
+  expect(text).toContain('поездка с ребёнком');
+  expect(text).toContain('вести аккуратно');
+  expect(text).not.toContain('кресло');
+  expect(JSON.stringify(notification.buttons)).toContain(rideMessengerActionData(orderId,'accept'));
 });
 
 function ride(overrides: Partial<RideOrder> = {}): RideOrder {

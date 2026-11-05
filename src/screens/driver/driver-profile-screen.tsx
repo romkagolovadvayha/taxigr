@@ -338,7 +338,7 @@ export function DriverProfileScreen() {
           </View>
         </View>
         <StatusChip
-          label={activeProfile.hasChildSeat ? 'Детское кресло подтверждено' : 'Детский тариф недоступен'}
+          label={activeProfile.hasChildSeat ? 'Детское кресло подтверждено' : 'Детское кресло не указано'}
           tone={activeProfile.hasChildSeat ? 'info' : 'neutral'}
         />
         <StatusChip label={activeProfile.hasSezPass ? 'Есть пропуск в ОЭЗ' : 'Пропуска в ОЭЗ нет'}

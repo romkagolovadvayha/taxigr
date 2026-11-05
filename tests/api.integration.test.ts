@@ -979,7 +979,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(quote.data?.route.durationSeconds).toBeGreaterThan(0);
     expect(quote.data?.route.coordinates.length).toBeGreaterThanOrEqual(2);
     expect(quote.data?.tariffs.map((tariff) => tariff.code)).toEqual(['economy', 'child']);
-    expect(quote.data?.tariffs[1]?.childSeatIncluded).toBe(true);
+    expect(quote.data?.tariffs[1]?.childSeatIncluded).toBe(false);
     expect(quote.data?.tariffs[1]?.priceMinor).toBeGreaterThan(
       quote.data?.tariffs[0]?.priceMinor ?? 0,
     );
