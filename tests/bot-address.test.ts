@@ -59,6 +59,21 @@ describe('bot resolution through the real parsing pipeline', () => {
     vi.mocked(interpretBotAddress).mockReset().mockResolvedValue(null);
     vi.mocked(listPlaces).mockReset().mockResolvedValue([]);
   });
+  it.each(['Конзовод', 'на Конзавод', 'до Конзовода', 'Заречный'])('uses the same district destination for %s', async query => {
+    vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
+    expect((await resolveBotAddressOptions(query, false)).address?.label).toBe('с. Заречный');
+    expect(searchAddresses).not.toHaveBeenCalled();
+    expect(interpretBotAddress).not.toHaveBeenCalled();
+  });
+
+  it('recognizes a bare alias as a pickup settlement without assigning a house point', async () => {
+    vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
+    expect(await resolveBotAddressOptions('с Конзовода', true)).toMatchObject({
+      address: null, candidates: [], recognized: { label: 'с. Заречный', kind: 'settlement' },
+    });
+    expect(searchAddresses).not.toHaveBeenCalled();
+    expect(interpretBotAddress).not.toHaveBeenCalled();
+  });
   it('removes a time request before looking up a house', async () => {
     const lebed = { ...house, id: 'test-lebed', label: 'с. Заречный, ул. Лебедевская, 3', houseNumber: '3' };
     vi.mocked(getAddressDirectory).mockResolvedValue([lebed]);

@@ -1,6 +1,6 @@
 import { intercitySettlements } from '../data/intercity-settlements';
 import type { Address } from './models';
-import { addressQueryVariants, addressWordsMatch, normalizeBotAddress } from './free-text-address';
+import { addressQueryVariants, addressWordsMatch, hasZarechnyAlias, normalizeBotAddress } from './free-text-address';
 
 function normalizeName(value: string): string {
   return normalizeBotAddress(value).replace(/^(?:город|г|село|с|деревня|д|поселок|п)\s+/u, '');
@@ -11,6 +11,7 @@ const cache = new Map<string, Address[]>();
 
 /** Locality names use a cheap prefix index; never fuzzy-scan every Russian town per keystroke. */
 export function searchIntercitySettlements(query: string, limit = 30): Address[] {
+  if (hasZarechnyAlias(query)) return [];
   const variants = addressQueryVariants(query).map(normalizeName).filter(name => name.length >= 2);
   const key = JSON.stringify([variants, limit]);
   const cached = cache.get(key);

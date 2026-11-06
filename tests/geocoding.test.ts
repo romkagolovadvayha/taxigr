@@ -15,6 +15,35 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it.each(['Конзовод', 'Конзавод', 'из Конзовода', 'Заречный'])('looks up %s in the local directory', async query => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses(query);
+    expect(results[0]).toMatchObject({ label: 'с. Заречный', coordinates: { latitude: 56.0288896, longitude: 51.890713 } });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('uses the exact local street and house when a query includes the alias', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses('Конзовод Школьная 2');
+    expect(results.map(address => address.label)).toEqual(['с. Заречный, ул. Школьная, 2']);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps external lookups for the local alias in the district and matches the house number', async () => {
+    const item = (id: string, house: string, latitude: string) => ({
+      place_id: id, display_name: `Школьная, ${house}, Заречный`, lat: latitude, lon: '51.89',
+      address: { road: 'Школьная', house_number: house, village: 'Заречный', county: 'Граховский район' },
+    });
+    const fetch = vi.fn(async (_input: string | URL | Request) => new Response(JSON.stringify([
+      item('local', '777', '56.0289'), item('wrong-house', '778', '56.0289'), item('faraway', '777', '53.2'),
+    ])));
+    vi.stubGlobal('fetch', fetch);
+    const result = await searchAddresses('Конзовод Школьная 777', false, true);
+    expect(result.map(address => address.id)).toEqual(['osm-local']);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(new URL(String(fetch.mock.calls[0]![0])).searchParams.get('q')).toContain('Граховский район');
+  });
+
   it('keeps an exact nationwide city ahead of a similar district street', async () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     const results = await searchAddresses('Советск', false, false, true);

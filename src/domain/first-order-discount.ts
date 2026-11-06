@@ -1,8 +1,12 @@
 import { fareRoundingMinor, fareRoundingMode, roundFareMinor, type FareRoundingMode, type PricingScope } from './pricing';
 
-export const firstLocalOrderPromotion = 'first-local-order-20' as const;
-export const firstLocalOrderDiscountPercent = 20;
+export const firstLocalOrderPromotion = 'first-local-order-30' as const;
+export const firstLocalOrderDiscountPercent = 30;
 export const discountedFareRoundingMinor = fareRoundingMinor;
+
+export function firstOrderWaitingRoundingMinor(promotionCode: string | null | undefined): number {
+  return promotionCode === firstLocalOrderPromotion || promotionCode === 'first-local-order-20' ? 1_000 : 1;
+}
 
 export function isLocalPromotionScope(scope: PricingScope): boolean {
   return scope === 'grahovo' || scope === 'district';

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
 import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
+import { intercitySettlements } from '../src/data/intercity-settlements';
 import {
   addressSearchScore,
   filterRequestedHouse,
@@ -41,6 +42,20 @@ const alnashiRoad: Address = {
 };
 
 describe('address search ranking', () => {
+  it.each(['Конзовод', 'Конзавод', 'в Конзаводе', 'Заречный'])('finds the local Заречный first for %s', query => {
+    const other = intercitySettlements.find(address => address.label === 'Заречный')!;
+    const results = rankAddressSearchResults([other, ...grahovoAddressCatalog], query);
+    expect(results[0]?.label).toBe('с. Заречный');
+    if (query !== 'Заречный') expect(results).not.toContain(other);
+  });
+
+  it('keeps the street and house number, including on Конзаводская itself', () => {
+    const query = 'Конзовод ул. Конзаводская 2';
+    expect(rankAddressSearchResults(grahovoAddressCatalog, query).map(address => address.label)).toEqual([
+      'с. Заречный, ул. Конзаводская, 2',
+    ]);
+  });
+
   it.each(['Грахово гагарина30/2к1', 'Грахово Гагарина 30/2 корпус 1'])(
     'preserves the building number in %s', query => {
       expect(rankAddressSearchResults(grahovoAddressCatalog, query).map(a=>a.label)).toEqual(['с. Грахово, ул. Гагарина, 30/2 к. 1']);

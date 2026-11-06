@@ -1,9 +1,15 @@
 import type { Address } from './models';
 import { isDestinationAddressComplete, isPickupAddressComplete, extractHouseNumber, extractQueryHouseNumber, normalizeHouseNumber } from './address-precision';
+import { isGrahovoDistrictAddress } from './pricing';
 
 const keyboard = Object.fromEntries([..."qwertyuiop[]asdfghjkl;'zxcvbnm,."]
   .map((letter, index) => [letter, [...'йцукенгшщзхъфывапролджэячсмитьбю'][index]]));
 const ignored = new Set(['ул', 'улица', 'дом', 'д', 'с', 'село', 'г', 'город', 'деревня', 'из', 'от', 'до', 'на', 'в', 'у', 'около', 'возле', 'район', 'хочу', 'поехать', 'ехать', 'поедем', 'нужно', 'надо', 'мне', 'меня', 'заберите', 'забрать', 'пожалуйста', 'такси', 'зд', 'здание', 'стр', 'строение']);
+const zarechnyAlias = /(?<![\p{L}\p{N}])конз[ао]вод(?:ом|а|е|у)?(?!\p{L})/iu;
+
+export function hasZarechnyAlias(query: string): boolean {
+  return zarechnyAlias.test(query);
+}
 
 export function normalizeBotAddress(value: string): string {
   let text = value.trim().toLocaleLowerCase('ru').replace(/ё/gu, 'е');
@@ -28,6 +34,7 @@ export function normalizeBotAddress(value: string): string {
     .replace(/\s+/gu, ' ').trim();
   // These are conversational words, not part of a street/settlement name.
   text = text.replace(/^(?:(?:я|хочу|поехать|ехать|поедем|нужно|надо|мне|меня|заберите|забрать|пожалуйста|в|на|до|от|из)\s+)+/u, '');
+  text = text.replace(zarechnyAlias, 'заречный');
   return text.replace(/^(\d+[а-я]?(?:[/-]\d+[а-я]?)?)\s+(?!лет(?:\s|$))([а-я][а-я\s-]+)$/u, '$2 $1');
 }
 
@@ -65,8 +72,8 @@ export async function interpretConversationalBotRoute(
   if (!parsed?.pickup || !parsed.destination) return fallback;
   const preserve = (literal: string | undefined, inferred: string) => {
     if (!literal) return inferred;
-    // Preserve an explicitly supplied settlement type or exact house number.
-    if (/^(?:[псдг]\.|пос[её]л(?:ок|ка|ке)|сел[оае]|деревн[яию]|город[ае]?)\s+/iu.test(literal)) return literal;
+    // Preserve an explicitly supplied settlement, local name or exact house number.
+    if (hasZarechnyAlias(literal) || /^(?:[псдг]\.|пос[её]л(?:ок|ка|ке)|сел[оае]|деревн[яию]|город[ае]?)\s+/iu.test(literal)) return literal;
     const house = extractQueryHouseNumber(normalizeBotAddress(literal));
     if (house && normalizeHouseNumber(extractQueryHouseNumber(normalizeBotAddress(inferred))) !== normalizeHouseNumber(house)) return literal;
     return inferred;
@@ -130,6 +137,7 @@ export function addressWordDistance(left: string, right: string): number {
 }
 
 export function botAddressScore(query: string, address: Address): number {
+  if (hasZarechnyAlias(query) && !isGrahovoDistrictAddress(address)) return 0;
   return Math.max(...addressQueryVariants(query).map(variant => scoreVariant(variant, address)));
 }
 

@@ -1,6 +1,6 @@
 import type { Address } from './models';
 import { extractHouseNumber, extractQueryHouseNumber, normalizeHouseNumber } from './address-precision';
-import { addressWordsMatch, addressQueryVariants, normalizeBotAddress } from './free-text-address';
+import { addressWordsMatch, addressQueryVariants, hasZarechnyAlias, normalizeBotAddress } from './free-text-address';
 
 type SearchableAddress = Pick<Address, 'label' | 'details' | 'kind'>;
 
@@ -69,8 +69,13 @@ function searchIndex(address: SearchableAddress): SearchIndex {
 function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): number {
   if (!queryTokens.length) return 0;
   const index = searchIndex(address);
-  if (isIntercitySettlement(address) && index.labelTokens.length && index.labelTokens.every(name =>
-    queryTokens.some(word => word === name || addressWordsMatch(word, name)))) return 100;
+  if (address.kind === 'settlement' && index.labelTokens.length) {
+    if (isIntercitySettlement(address)) {
+      if (index.labelTokens.every(name => queryTokens.some(word => addressWordsMatch(word, name)))) return 100;
+    } else if (index.labelTokens.length === queryTokens.length && index.labelTokens.every(name => queryTokens.includes(name))) {
+      return 110;
+    }
+  }
   if (
     queryTokens.length === 1 &&
     !INFRASTRUCTURE_TOKENS.has(queryTokens[0]!) &&
@@ -94,9 +99,11 @@ function scoreAddressTokens(address: SearchableAddress, queryTokens: string[]): 
 /** Compile a query once when scoring a directory, rather than once per address. */
 export function createAddressSearchScorer(query: string): (address: SearchableAddress) => number {
   const variants = addressQueryVariants(query).map(tokens);
+  const districtAlias = hasZarechnyAlias(query);
   const wordOnly = variants.every(part => part.every(token => !/\d/u.test(token)));
   const scores = new Map<string, number>();
   return address => {
+    if (districtAlias && isIntercitySettlement(address)) return 0;
     // All houses on a street have the same relevance to a word-only query.
     // Compute typo/stem matching once per street, not once per house.
     const key = wordOnly ? searchIndex(address).wordKey : null;

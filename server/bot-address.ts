@@ -11,7 +11,7 @@ import { intercitySettlements } from '../src/data/intercity-settlements';
 import { addressSearchScore } from '../src/domain/address-search';
 import { interpretBotAddress } from './bot-address-ai';
 
-import { addressWordsMatch, normalizeBotAddress, chooseBotAddress, rankBotAddresses } from '../src/domain/free-text-address';
+import { addressWordsMatch, hasZarechnyAlias, normalizeBotAddress, chooseBotAddress, rankBotAddresses } from '../src/domain/free-text-address';
 export { normalizeBotAddress, splitBotRoute, botAddressScore, chooseBotAddress } from '../src/domain/free-text-address';
 
 const timingPattern = /(?<![\p{L}\d])(?:через\s+(?:полчаса|\d{1,3}\s*(?:минут[ыу]?|мин\.?|час(?:а|ов)?|ч\.?))|(?:к|на|в)\s+\d{1,2}[:.]\d{2}|(?:завтра|послезавтра)(?:\s+(?:к|на|в)\s+\d{1,2}[:.]\d{2})?)(?![\p{L}\d])/iu;
@@ -50,6 +50,7 @@ function settlementWords(value: string): string[] {
 const intercityNames = intercitySettlements.map(address => ({ address, name: settlementWords(address.label) }));
 
 function intercityBotSettlement(input: string): BotAddressResolution | null {
+  if (hasZarechnyAlias(input)) return null;
   const town = /^(?:п\.?|пос[её]л(?:ок|ка|ке))\s+/iu;
   const village = /^(?:с\.|сел[оае])\s+/iu;
   const qualifier = town.test(input) ? town : village.test(input) ? village : null;
@@ -87,16 +88,18 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
   const clean = (address: Address): Address => ({ ...address, details: address.details?.slice(0, 255) });
   if (!selected) {
     const locality = settlementWords(input).join(' ');
-    const localSettlement = !pickup && directory.find(address => address.kind === 'settlement' &&
+    const localSettlement = (!pickup || hasZarechnyAlias(input)) && directory.find(address => address.kind === 'settlement' &&
       settlementWords(address.label).join(' ') === locality);
-    if (localSettlement) return { address: clean(localSettlement), candidates: [] };
+    if (localSettlement) return pickup
+      ? { address: null, candidates: [], recognized: clean(localSettlement) }
+      : { address: clean(localSettlement), candidates: [] };
   }
   let ranked = selected ? [{ address: selected, score: 10 }] : rankBotAddresses(input, local, pickup, true);
   if (!ranked.length) {
     const city = intercityBotSettlement(input);
     if (city) return city;
   }
-  if (!ranked.length) {
+  if (!ranked.length && !hasZarechnyAlias(input)) {
     const field = pickup ? 'pickup' : 'destination';
     const corrected = (await interpretBotAddress(input, field))?.[field];
     if (corrected) {
@@ -110,7 +113,7 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
     }
   }
   if (!ranked.length) {
-    const external = await searchAddresses(query, false, true).catch(() => []);
+    const external = await searchAddresses(hasZarechnyAlias(input) ? input : query, false, true).catch(() => []);
     ranked = rankBotAddresses(input, external, pickup, true);
     // An explicitly supplied intercity street is intentionally reduced to the city.
     if (!pickup && !ranked.length) ranked = external.filter(address => address.kind === 'settlement' &&
@@ -137,7 +140,7 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
   if (hasApproximateCoordinates(resolved) && resolved.kind !== 'settlement') {
     // Correct spelling and the settlement come from GAR before asking the geocoder.
     const external = await searchAddresses(resolved.label, false, true).catch(() => []);
-    resolved = chooseBotAddress(resolved.label, external, pickup);
+    resolved = chooseBotAddress(hasZarechnyAlias(input) ? input : resolved.label, external, pickup);
   }
   return { address: resolved ? clean(resolved) : null, candidates: [], ...(!resolved ? {recognized: clean(best.address)} : {}) };
 }

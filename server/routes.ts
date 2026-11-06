@@ -8,7 +8,7 @@ import { maxGroupOrderKey } from './max-group-booking-flow';
 import { intercitySettlementById } from '../src/data/intercity-settlements';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
-import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
+import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 import { isCrawlerImageError } from '../src/errors/web-error-classifier';
 
@@ -1024,7 +1024,7 @@ async function settleWaiting(
     waitingSeconds,
     Number(row.waiting_free_minutes),
     Number(row.waiting_per_minute_minor),
-    row.fare_rounding_minor ?? (row.promotion_code === firstLocalOrderPromotion ? 1_000 : 1),
+    row.fare_rounding_minor ?? firstOrderWaitingRoundingMinor(row.promotion_code),
     row.fare_rounding_mode ?? 'up',
   );
   const priceMinor =

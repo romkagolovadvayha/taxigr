@@ -6,7 +6,7 @@ import { overlayRememberedAddresses } from '../src/domain/remembered-address';
 import { hasApproximateCoordinates, extractQueryHouseNumber, normalizeHouseNumber } from '../src/domain/address-precision';
 import { addressSearchScore, createAddressSearchScorer } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
-import { normalizeBotAddress, addressQueryVariants } from '../src/domain/free-text-address';
+import { normalizeBotAddress, addressQueryVariants, hasZarechnyAlias } from '../src/domain/free-text-address';
 import { intercitySettlements } from '../src/data/intercity-settlements';
 import { searchIntercitySettlements } from '../src/domain/intercity-search';
 import { isGrahovoDistrictAddress } from '../src/domain/pricing';
@@ -471,6 +471,7 @@ async function requestNominatim(query: string, signal: AbortSignal): Promise<Geo
 }
 
 export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false, localOnly = false): Promise<GeocodedAddress[]> {
+  const districtAlias = hasZarechnyAlias(query);
   const variants = addressQueryVariants(query).map(normalizeBotAddress);
   const knownCity = searchIntercitySettlements(query);
   query = coordinateQuery(query) ? query : normalizeBotAddress(query);
@@ -492,7 +493,10 @@ export async function searchAddresses(query: string, streetOnly = false, resolve
 
   if (knownCity.length && !streetOnly && !resolveHouse) return [...local, ...knownCity];
 
-  const key = `${streetOnly ? 'street-v3' : resolveHouse ? 'house-v2' : 'v14'}:${normalize(query)}`;
+  const externalQuery = districtAlias && !normalize(query).includes('граховский район')
+    ? `${query}, Граховский район, Удмуртская Республика`
+    : query;
+  const key = `${streetOnly ? 'street-v3' : resolveHouse ? 'house-v2' : 'v14'}:${districtAlias ? 'district-alias:' : ''}${normalize(externalQuery)}`;
   const memory = memoryCache.get(key);
   if (memory && memory.expiresAt > Date.now()) {
     return mergeLocalAndExternalResults(query, resolveHouse && memory.value.length ? [] : local, memory.value);
@@ -510,14 +514,15 @@ export async function searchAddresses(query: string, streetOnly = false, resolve
     pending = (async () => {
       const persisted = await readPersistentCache(key);
       const results: GeocodedAddress[] = persisted ?? await withGeocoderDeadline<GeocodedAddress[]>(signal => streetOnly
-        ? requestNominatimOnce(streetGeocoderQuery(query), signal).then(items => items.filter(item => item.kind === 'street'))
-        : requestNominatim(resolveHouse ? streetGeocoderQuery(query) : query, signal));
+        ? requestNominatimOnce(streetGeocoderQuery(externalQuery), signal).then(items => items.filter(item => item.kind === 'street'))
+        : requestNominatim(resolveHouse ? streetGeocoderQuery(externalQuery) : externalQuery, signal));
+      const scopedResults = districtAlias ? filterExactHouseResults(query, results.filter(isGrahovoDistrictAddress)) : results;
       memoryCache.set(key, {
-        value: results,
+        value: scopedResults,
         expiresAt: Date.now() + config.GEOCODER_CACHE_TTL_DAYS * 86_400_000,
       });
-      if (!persisted) void writePersistentCache(key, results);
-      return results;
+      if (!persisted) void writePersistentCache(key, scopedResults);
+      return scopedResults;
     })();
     externalSearches.set(key, pending);
     const cleanup = () => { externalSearches.delete(key); };
