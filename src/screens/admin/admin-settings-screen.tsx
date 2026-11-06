@@ -14,7 +14,7 @@ import {
   defaultDriverDispatchSettings,
   type DriverDispatchSettings,
 } from '@/domain/driver-priority';
-import { defaultPricingRules, intercityTimeRates, type PricingRules } from '@/domain/pricing';
+import { defaultPricingRules, farePeriodLabel, intercityTimeRates, type PricingRules } from '@/domain/pricing';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
@@ -276,25 +276,25 @@ export function AdminSettingsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'С 07:00 до 22:00',
+            farePeriodLabel['07-22'],
             String(rules.grahovoFare07To22Minor / 100),
             (value) => changeRubles('grahovoFare07To22Minor', value),
             '₽',
-            'Грахово, с 07:00 до 22:00',
+            `Грахово, ${farePeriodLabel['07-22'].toLowerCase()}`,
           )}
           {field(
-            'С 22:00 до 02:00',
+            farePeriodLabel['22-01'],
             String(rules.grahovoFare22To02Minor / 100),
             (value) => changeRubles('grahovoFare22To02Minor', value),
             '₽',
-            'Грахово, с 22:00 до 02:00',
+            `Грахово, ${farePeriodLabel['22-01'].toLowerCase()}`,
           )}
           {field(
-            'С 02:00 до 07:00',
+            farePeriodLabel['01-07'],
             String(rules.grahovoFare02To07Minor / 100),
             (value) => changeRubles('grahovoFare02To07Minor', value),
             '₽',
-            'Грахово, с 02:00 до 07:00',
+            `Грахово, ${farePeriodLabel['01-07'].toLowerCase()}`,
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
@@ -302,25 +302,25 @@ export function AdminSettingsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'С 07:00 до 22:00',
+            farePeriodLabel['07-22'],
             String(rules.districtPerKilometer07To22Minor / 100),
             (value) => changeRubles('districtPerKilometer07To22Minor', value),
             '₽/км',
-            'Граховский район, с 07:00 до 22:00',
+            `Граховский район, ${farePeriodLabel['07-22'].toLowerCase()}`,
           )}
           {field(
-            'С 22:00 до 02:00',
+            farePeriodLabel['22-01'],
             String(rules.districtPerKilometer22To02Minor / 100),
             (value) => changeRubles('districtPerKilometer22To02Minor', value),
             '₽/км',
-            'Граховский район, с 22:00 до 02:00',
+            `Граховский район, ${farePeriodLabel['22-01'].toLowerCase()}`,
           )}
           {field(
-            'С 02:00 до 07:00',
+            farePeriodLabel['01-07'],
             String(rules.districtPerKilometer02To07Minor / 100),
             (value) => changeRubles('districtPerKilometer02To07Minor', value),
             '₽/км',
-            'Граховский район, с 02:00 до 07:00',
+            `Граховский район, ${farePeriodLabel['01-07'].toLowerCase()}`,
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
@@ -328,25 +328,25 @@ export function AdminSettingsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'С 07:00 до 22:00',
+            farePeriodLabel['07-22'],
             String(rules.intercityPerKilometer07To22Minor / 100),
             (value) => changeRubles('intercityPerKilometer07To22Minor', value),
             '₽/км',
-            'Межгород, с 07:00 до 22:00',
+            `Межгород, ${farePeriodLabel['07-22'].toLowerCase()}`,
           )}
           {field(
-            'С 22:00 до 02:00',
+            farePeriodLabel['22-01'],
             String(rules.intercityPerKilometer22To02Minor / 100),
             (value) => changeRubles('intercityPerKilometer22To02Minor', value),
             '₽/км',
-            'Межгород, с 22:00 до 02:00',
+            `Межгород, ${farePeriodLabel['22-01'].toLowerCase()}`,
           )}
           {field(
-            'С 02:00 до 07:00',
+            farePeriodLabel['01-07'],
             String(rules.intercityPerKilometer02To07Minor / 100),
             (value) => changeRubles('intercityPerKilometer02To07Minor', value),
             '₽/км',
-            'Межгород, с 02:00 до 07:00',
+            `Межгород, ${farePeriodLabel['01-07'].toLowerCase()}`,
           )}
         </View>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>

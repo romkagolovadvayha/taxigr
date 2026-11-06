@@ -317,9 +317,9 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
       expect(tariff.priceMinor % 1_000).toBe(0);
     }
     if (label==='д. Котловка' || label==='Резиденция Бабы Яги') {
-      expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':85_000,'22-02':125_000,'02-07':195_000}[farePeriodAt()]);
+      expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':85_000,'22-01':125_000,'01-07':195_000}[farePeriodAt()]);
     }
-    if (label==='д. Яги-Какси') expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':50_000,'22-02':60_000,'02-07':80_000}[farePeriodAt()]);
+    if (label==='д. Яги-Какси') expect(outward.data!.tariffs[0]!.originalPriceMinor).toBe({'07-22':50_000,'22-01':60_000,'01-07':80_000}[farePeriodAt()]);
   }, 30_000);
 
   it('adds the Grahovo pickup leg for a Selyanur to Porshur order', async () => {

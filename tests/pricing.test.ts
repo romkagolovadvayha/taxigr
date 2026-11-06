@@ -46,7 +46,8 @@ describe('route pricing', () => {
     ['2026-08-03T17:59:59.999Z', 50_000],
     ['2026-08-03T18:00:00.000Z', 70_000],
     ['2026-08-03T20:00:00.000Z', 70_000],
-    ['2026-08-03T21:59:59.999Z', 70_000],
+    ['2026-08-03T20:59:59.999Z', 70_000],
+    ['2026-08-03T21:00:00.000Z', 100_000],
     ['2026-08-03T22:00:00.000Z', 100_000],
     ['2026-08-04T02:59:59.999Z', 100_000],
     ['2026-08-04T03:00:00.000Z', 50_000],
@@ -65,16 +66,16 @@ describe('route pricing', () => {
     }
   });
 
-  it('switches periods exactly at 22:00, 02:00 and 07:00 Samara time', () => {
+  it('switches periods exactly at 22:00, 01:00 and 07:00 Samara time', () => {
     expect(farePeriodAt(new Date('2026-08-03T17:59:59.999Z'))).toBe('07-22');
-    expect(farePeriodAt(new Date('2026-08-03T18:00:00.000Z'))).toBe('22-02');
-    expect(farePeriodAt(new Date('2026-08-03T21:59:59.999Z'))).toBe('22-02');
-    expect(farePeriodAt(new Date('2026-08-03T22:00:00.000Z'))).toBe('02-07');
-    expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('02-07');
+    expect(farePeriodAt(new Date('2026-08-03T18:00:00.000Z'))).toBe('22-01');
+    expect(farePeriodAt(new Date('2026-08-03T20:59:59.999Z'))).toBe('22-01');
+    expect(farePeriodAt(new Date('2026-08-03T21:00:00.000Z'))).toBe('01-07');
+    expect(farePeriodAt(new Date('2026-08-04T02:59:59.999Z'))).toBe('01-07');
     expect(farePeriodAt(new Date('2026-08-04T03:00:00.000Z'))).toBe('07-22');
 
     expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T18:00:00.000Z'))).toBe(67_000);
-    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T22:00:00.000Z'))).toBe(76_000);
+    expect(calculateFareMinor(9_500, 'economy', 'district', rules, new Date('2026-08-03T21:00:00.000Z'))).toBe(76_000);
   });
 
   it('adds the fixed child tariff surcharge without seat selection', () => {

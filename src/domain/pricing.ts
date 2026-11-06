@@ -3,10 +3,11 @@ import { normalizeRouteStops } from './route-stops';
 
 export type PricingScope = 'grahovo' | 'district' | 'intercity';
 
-export type FarePeriod = '07-22' | '22-02' | '02-07';
+export type FarePeriod = '07-22' | '22-01' | '01-07';
 
 export type PricingRules = {
   currency: 'RUB';
+  // Rate field names retain the existing API and storage contract.
   grahovoFare07To22Minor: number;
   grahovoFare22To02Minor: number;
   grahovoFare02To07Minor: number;
@@ -145,27 +146,27 @@ export function farePeriodAt(date = new Date()): FarePeriod {
   // Самарское время круглый год соответствует UTC+4 и не использует переход на летнее время.
   const samaraHour = (date.getUTCHours() + 4) % 24;
   if (samaraHour >= 7 && samaraHour < 22) return '07-22';
-  if (samaraHour >= 22 || samaraHour < 2) return '22-02';
-  return '02-07';
+  if (samaraHour >= 22 || samaraHour < 1) return '22-01';
+  return '01-07';
 }
 
 export const farePeriodLabel: Record<FarePeriod, string> = {
   '07-22': 'С 07:00 до 22:00',
-  '22-02': 'С 22:00 до 02:00',
-  '02-07': 'С 02:00 до 07:00',
+  '22-01': 'С 22:00 до 01:00',
+  '01-07': 'С 01:00 до 07:00',
 };
 
 function grahovoFareMinorAt(rules: PricingRules, date: Date): number {
   const period = farePeriodAt(date);
   if (period === '07-22') return rules.grahovoFare07To22Minor;
-  if (period === '22-02') return rules.grahovoFare22To02Minor;
+  if (period === '22-01') return rules.grahovoFare22To02Minor;
   return rules.grahovoFare02To07Minor;
 }
 
 function districtPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   const period = farePeriodAt(date);
   if (period === '07-22') return rules.districtPerKilometer07To22Minor;
-  if (period === '22-02') return rules.districtPerKilometer22To02Minor;
+  if (period === '22-01') return rules.districtPerKilometer22To02Minor;
   return rules.districtPerKilometer02To07Minor;
 }
 
@@ -183,7 +184,7 @@ function intercityPerKilometerMinorAt(rules: PricingRules, date: Date): number {
   const rates = intercityTimeRates(rules);
   const period = farePeriodAt(date);
   if (period === '07-22') return rates.intercityPerKilometer07To22Minor;
-  if (period === '22-02') return rates.intercityPerKilometer22To02Minor;
+  if (period === '22-01') return rates.intercityPerKilometer22To02Minor;
   return rates.intercityPerKilometer02To07Minor;
 }
 
@@ -246,8 +247,8 @@ function fixedGrahovoFareMinor(origin: Address, destination: Address, date: Date
   else if (isGrahovoAddress(destination)) remote = origin;
   else return undefined;
   const period = farePeriodAt(date);
-  if (isKotlovkaFareAddress(remote)) return { '07-22': 85_000, '22-02': 125_000, '02-07': 195_000 }[period];
-  if (isYagiKaksiFareAddress(remote)) return { '07-22': 50_000, '22-02': 60_000, '02-07': 80_000 }[period];
+  if (isKotlovkaFareAddress(remote)) return { '07-22': 85_000, '22-01': 125_000, '01-07': 195_000 }[period];
+  if (isYagiKaksiFareAddress(remote)) return { '07-22': 50_000, '22-01': 60_000, '01-07': 80_000 }[period];
   return undefined;
 }
 
