@@ -13,8 +13,9 @@ import Animated, {
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import {
-  isDestinationAddressComplete,
-  isPickupAddressComplete,
+  isDestinationAddressBookable,
+  isDirectoryHouseEstimate,
+  isPickupAddressBookable,
 } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
 import {
@@ -104,13 +105,14 @@ function AddressRow({
   const multipleDestinations =
     kind === 'destination' && routeDestinations.length > 1;
   const needsAddressDetails = kind === 'destination' && destinations?.length
-    ? destinations.some((item) => !isDestinationAddressComplete(item))
+    ? destinations.some((item) => !isDestinationAddressBookable(item))
     : !!address && (
         kind === 'pickup'
-          ? !isPickupAddressComplete(address)
-          : !isDestinationAddressComplete(address)
+          ? !isPickupAddressBookable(address)
+          : !isDestinationAddressBookable(address)
       );
   const invalid = validationAttempt > 0 && (!address || !!needsAddressDetails);
+  const approximate = isDirectoryHouseEstimate(address) || routeDestinations.some(isDirectoryHouseEstimate);
   const shake = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
@@ -252,6 +254,9 @@ function AddressRow({
             <Text accessibilityRole={invalid ? 'alert' : undefined} selectable style={{ ...typography.micro, color: invalid ? colors.dangerText : colors.warningText }}>
               {address ? 'Уточните адрес' : kind === 'pickup' ? 'Укажите, откуда вас забрать' : 'Укажите, куда поедем'}
             </Text>
+          )}
+          {approximate && !invalid && !needsAddressDetails && (
+            <Text selectable style={{ ...typography.micro, color: colors.warningText }}>Приблизительная точка</Text>
           )}
         </View>
         {!compactLocationAction && !addDestinationAction ? (

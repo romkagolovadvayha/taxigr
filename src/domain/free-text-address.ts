@@ -1,5 +1,5 @@
 import type { Address } from './models';
-import { isDestinationAddressComplete, isPickupAddressComplete, extractHouseNumber, extractQueryHouseNumber, normalizeHouseNumber } from './address-precision';
+import { isDestinationAddressComplete, isDirectoryHouseEstimate, isPickupAddressComplete, extractHouseNumber, extractQueryHouseNumber, normalizeHouseNumber } from './address-precision';
 import { isGrahovoDistrictAddress } from './pricing';
 
 const keyboard = Object.fromEntries([..."qwertyuiop[]asdfghjkl;'zxcvbnm,."]
@@ -177,11 +177,17 @@ export function rankBotAddresses(query: string, candidates: Address[], pickup: b
       (!!other.address.placeId || !!item.address.placeId)))));
 }
 
-export function chooseBotAddress(query: string, candidates: Address[], pickup: boolean): Address | null {
-  const ranked = rankBotAddresses(query, candidates, pickup);
+export function chooseBotAddress(query: string, candidates: Address[], pickup: boolean, allowDirectoryEstimate = false): Address | null {
+  const eligible = allowDirectoryEstimate
+    ? candidates.filter(address => isDirectoryHouseEstimate(address) ||
+      (pickup ? isPickupAddressComplete(address) : isDestinationAddressComplete(address)))
+    : candidates;
+  const ranked = rankBotAddresses(query, eligible, pickup, allowDirectoryEstimate);
   const best = ranked[0];
   if (!best) return null;
-  const rival = ranked.find(item => Math.abs(item.address.coordinates.latitude - best.address.coordinates.latitude) > 0.0002 ||
+  const rival = ranked.find(item => (item.address.id !== best.address.id &&
+      (isDirectoryHouseEstimate(item.address) || isDirectoryHouseEstimate(best.address))) ||
+     Math.abs(item.address.coordinates.latitude - best.address.coordinates.latitude) > 0.0002 ||
      Math.abs(item.address.coordinates.longitude - best.address.coordinates.longitude) > 0.0002);
   return rival && best.score - rival.score < 2 ? null : best.address;
 }

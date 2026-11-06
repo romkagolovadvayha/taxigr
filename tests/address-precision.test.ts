@@ -6,6 +6,7 @@ import {
   hasHouseNumber,
   isDestinationAddressComplete,
   isPickupAddressComplete,
+  parseQueryHouse,
   queryHasHouseNumber,
 } from '../src/domain/address-precision';
 
@@ -31,6 +32,13 @@ describe('address precision', () => {
     expect(queryHasHouseNumber('ул. 50 лет Победы, 19')).toBe(true);
     expect(queryHasHouseNumber('Ачинцева 5')).toBe(true);
     expect(extractQueryHouseNumber('Поршур, Бабаева, 99А')).toBe('99А');
+  });
+
+  it('keeps the district locality when the house number precedes it', () => {
+    expect(parseQueryHouse('Молодёжная 4 Грахово')).toEqual({ houseNumber: '4', streetPart: 'Молодёжная, Грахово' });
+    expect(extractQueryHouseNumber('Советская 12/1, д. Мари-Возжай')).toBe('12/1');
+    expect(queryHasHouseNumber('улица 50 лет Победы Грахово')).toBe(false);
+    expect(queryHasHouseNumber('трасса 94Р-16 Грахово')).toBe(false);
   });
 
   it('allows settlements only as destinations', () => {

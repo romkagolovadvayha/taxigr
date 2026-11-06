@@ -32,4 +32,13 @@ describe('address search submission', () => {
     expect(selectUnambiguousAddress('ачинцева 5',[{...house,coordinatePrecision:'approximate'}],true)).toBeNull();
     expect(selectUnambiguousAddress('ачинцева 55',[house],true)).toBeNull();
   });
+  it('accepts a district catalogue estimate and leaves ambiguous village names for selection', () => {
+    const estimates = grahovoAddressCatalog.filter(a => [
+      'с. Грахово, ул. Молодежная, 4', 'д. Селянур, ул. Молодежная, 4',
+    ].includes(a.label));
+    expect(estimates).toHaveLength(2);
+    expect(selectUnambiguousAddress('молодежная 4 грахово', estimates, true))
+      .toMatchObject({ label: 'с. Грахово, ул. Молодежная, 4', coordinatePrecision: 'approximate' });
+    expect(selectUnambiguousAddress('молодежная 4', estimates, true)).toBeNull();
+  });
 });

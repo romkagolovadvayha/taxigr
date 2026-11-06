@@ -1,7 +1,9 @@
-import { grahovoAddressCatalog, grahovoHouseSnapshot } from '../../src/data/grahovo-address-catalog';
+import { grahovoAddressCatalog, grahovoHouseSnapshot, grahovoPreviousHouseSnapshot } from '../../src/data/grahovo-address-catalog';
+import { grahovoDirectorySnapshotDate } from '../../src/data/grahovo-address-directory';
 import { db, withTransaction } from '../db';
 
 const points = new Map(grahovoHouseSnapshot.points.map(point => [point.id, point]));
+const previousHouseIds = new Set(grahovoPreviousHouseSnapshot.houses.map(([id]) => id));
 try {
   await withTransaction(async connection => {
     // Re-importing a complete snapshot is atomic and leaves no duplicate rows.
@@ -18,7 +20,8 @@ try {
         [batch.map(a => { const point = points.get(a.id); return [a.id, a.label, a.houseNumber ?? null,
           a.coordinatePrecision ?? 'approximate', a.coordinates.latitude, a.coordinates.longitude,
           point ? 'osm' : 'gar', point?.sourceUrl ?? 'https://fias.nalog.ru/',
-          point ? grahovoHouseSnapshot.dataDate : '2026-08-03', JSON.stringify(a), true]; })],
+          point ? grahovoHouseSnapshot.dataDate : previousHouseIds.has(a.id)
+            ? grahovoPreviousHouseSnapshot.dataDate : grahovoDirectorySnapshotDate, JSON.stringify(a), true]; })],
       );
     }
   });

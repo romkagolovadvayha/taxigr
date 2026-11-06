@@ -34,6 +34,13 @@ describe('MapLibre route scene', () => {
     const scene = taxiMapScene({ pickup, destination });
     expect(scene.route.features).toEqual([]); expect(scene.fitCoordinates).toHaveLength(2);
   });
+  it('shows a catalogue estimate and hides a completely unresolved point', () => {
+    const scene = taxiMapScene({
+      pickup: { ...pickup, id: 'gar:street:4', kind: 'house', houseNumber: '4', coordinatePrecision: 'approximate' },
+      destination: { ...destination, id: 'manual:unknown', coordinatePrecision: 'approximate', coordinates: { latitude: 0, longitude: 0 } },
+    });
+    expect(scene.points).toMatchObject([{ kind: 'pickup', coordinates: [51.9586, 56.0477], label: 'Подача · примерно' }]);
+  });
   it('rejects corrupt geometry and does not mutate the original route', () => {
     const input = [...route, { latitude: NaN, longitude: 52 }];
     expect(taxiMapScene({ routeCoordinates: input }).route.features).toEqual([]);

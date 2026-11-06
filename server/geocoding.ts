@@ -3,7 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getAddressDirectory } from './address-directory';
 import { getRememberedAddresses } from './remembered-addresses';
 import { overlayRememberedAddresses } from '../src/domain/remembered-address';
-import { hasApproximateCoordinates, extractQueryHouseNumber, normalizeHouseNumber } from '../src/domain/address-precision';
+import { hasApproximateCoordinates, normalizeHouseNumber, parseQueryHouse } from '../src/domain/address-precision';
 import { addressSearchScore, createAddressSearchScorer } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import { normalizeBotAddress, addressQueryVariants, hasZarechnyAlias } from '../src/domain/free-text-address';
@@ -125,7 +125,7 @@ function tokensStartWith(candidate: string[], query: string[]): boolean {
 }
 
 function hasStrongLocalMatch(query: string, addresses: GeocodedAddress[]): boolean {
-  if (trailingHouseNumber(query)) return addresses.length > 0;
+  if (queryHouse(query)) return addresses.length > 0;
 
   const queryTokens = entityTokens(query);
   return addresses.some((address) => {
@@ -153,10 +153,10 @@ export function prioritizeGrahovoDistrict(addresses: GeocodedAddress[]): Geocode
     .map(({ address }) => address);
 }
 
-function trailingHouseNumber(value: string): { houseNumber: string; streetPart: string } | null {
+function queryHouse(value: string): { houseNumber: string; streetPart: string } | null {
   const normalized = value.trim().replace(/\s+/g, ' ');
-  const fullHouse = extractQueryHouseNumber(normalized);
-  if (fullHouse) return { houseNumber: fullHouse, streetPart: normalized.slice(0, -fullHouse.length).replace(/[,\s]+$/g, '') };
+  const house = parseQueryHouse(normalized);
+  if (house) return house;
   const match = normalized.match(
     /(?:^|[,\s])(?:д(?:ом)?\.?\s*)?(\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?)\s*$/iu,
   );
@@ -181,7 +181,7 @@ export function filterExactHouseResults(
   query: string,
   addresses: GeocodedAddress[],
 ): GeocodedAddress[] {
-  const parsed = trailingHouseNumber(query);
+  const parsed = queryHouse(query);
   if (!parsed) return addresses;
 
 
@@ -216,7 +216,7 @@ function localMatches(query: string, directory: GeocodedAddress[]): GeocodedAddr
   const ranked = directory.map(address => ({ address, score: matches(address) }))
     .filter(item => item.score > 0).sort((left, right) => right.score - left.score);
   const houses = ranked.filter(item => item.address.houseNumber).map(item => item.address);
-  const parsed = trailingHouseNumber(query);
+  const parsed = queryHouse(query);
   const exactHouses = parsed?.streetPart ? filterExactHouseResults(query, houses) : houses;
   if (parsed?.streetPart) {
     const seenLabels = new Set<string>();
@@ -267,7 +267,7 @@ export function buildNominatimQueries(query: string): string[] {
   ) {
     return [query];
   }
-  const parsed = trailingHouseNumber(query);
+  const parsed = queryHouse(query);
   if (parsed?.streetPart) {
     return [
       `${parsed.houseNumber}, ${parsed.streetPart}, Граховский район, Удмуртская Республика`,
@@ -458,7 +458,7 @@ async function requestNominatim(query: string, signal: AbortSignal): Promise<Geo
       combined.push(...(await requestNominatimOnce(candidate, signal)));
       successfulRequests += 1;
       // An exact district house needs no second nationwide lookup.
-      if (trailingHouseNumber(query) && filterExactHouseResults(query, combined).some(
+      if (queryHouse(query) && filterExactHouseResults(query, combined).some(
         address => address.houseNumber && !hasApproximateCoordinates(address) && isGrahovoDistrictAddress(address),
       )) break;
     } catch {

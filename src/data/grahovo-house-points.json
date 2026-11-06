@@ -1,7 +1,7 @@
 {
   "version": 1,
   "districtOsmRelation": 956094,
-  "dataDate": "2026-09-11T00:27:59Z",
+  "dataDate": "2026-11-06",
   "source": "OpenStreetMap contributors",
   "license": "ODbL-1.0",
   "sourceUrl": "https://www.openstreetmap.org/copyright",
@@ -202,6 +202,17 @@
         "longitude": 52.0781578
       },
       "sourceUrl": "https://www.openstreetmap.org/way/1092005760"
+    },
+    {
+      "id": "osm-house:way:1092005740",
+      "garId": "gar:д-мишкино-ул-набережная:д-4",
+      "label": "д. Мишкино, ул. Набережная, 4",
+      "houseNumber": "4",
+      "coordinates": {
+        "latitude": 55.9235534,
+        "longitude": 52.0813727
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/1092005740"
     },
     {
       "id": "osm-house:way:963633538",
@@ -614,6 +625,26 @@
         "longitude": 51.9772432
       },
       "sourceUrl": "https://www.openstreetmap.org/way/718417748"
+    },
+    {
+      "id": "osm-house:way:718298655",
+      "label": "с. Грахово, ул. Советская, 3",
+      "houseNumber": "3",
+      "coordinates": {
+        "latitude": 56.0440985,
+        "longitude": 51.95942
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/718298655"
+    },
+    {
+      "id": "osm-house:way:136072838",
+      "label": "с. Грахово, ул. Советская, 7",
+      "houseNumber": "7",
+      "coordinates": {
+        "latitude": 56.0448579,
+        "longitude": 51.9590763
+      },
+      "sourceUrl": "https://www.openstreetmap.org/way/136072838"
     },
     {
       "id": "osm-house:way:717520261",
@@ -2850,7 +2881,7 @@
     },
     {
       "id": "osm-house:way:718283689",
-      "garId": "gar:с-грахово-ул-колпакова:д-18",
+      "garId": "gar:с-грахово-ул-колпакова:зд-18",
       "label": "с. Грахово, ул. Колпакова, 18",
       "houseNumber": "18",
       "coordinates": {
@@ -4772,28 +4803,6 @@
         "longitude": 51.959257
       },
       "sourceUrl": "https://www.openstreetmap.org/way/718298656"
-    },
-    {
-      "id": "osm-house:way:718298655",
-      "garId": "gar:с-грахово-ул-советская:д-3",
-      "label": "с. Грахово, ул. Советская, 3",
-      "houseNumber": "3",
-      "coordinates": {
-        "latitude": 56.0440985,
-        "longitude": 51.95942
-      },
-      "sourceUrl": "https://www.openstreetmap.org/way/718298655"
-    },
-    {
-      "id": "osm-house:way:136072838",
-      "garId": "gar:с-грахово-ул-советская:д-7",
-      "label": "с. Грахово, ул. Советская, 7",
-      "houseNumber": "7",
-      "coordinates": {
-        "latitude": 56.0448579,
-        "longitude": 51.9590763
-      },
-      "sourceUrl": "https://www.openstreetmap.org/way/136072838"
     },
     {
       "id": "osm-house:way:718298636",

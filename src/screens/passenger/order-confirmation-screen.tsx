@@ -15,8 +15,8 @@ import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
 import { useRide } from '@/state/ride-provider';
 import {
-  isDestinationAddressComplete,
-  isPickupAddressComplete,
+  isDestinationAddressBookable,
+  isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { useSession } from '@/auth/session-provider';
 import { discountedFareRoundingMinor } from '@/domain/first-order-discount';
@@ -48,13 +48,13 @@ export function OrderConfirmationScreen() {
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
-  const addressesArePrecise =
-    isPickupAddressComplete(pickup) &&
+  const addressesAreBookable =
+    isPickupAddressBookable(pickup) &&
     destinations.length > 0 &&
-    destinations.every(isDestinationAddressComplete);
+    destinations.every(isDestinationAddressBookable);
   const quotePending =
-    addressesArePrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
-  const routeReady = addressesArePrecise && quoteStatus === 'ready';
+    addressesAreBookable && (quoteStatus === 'idle' || quoteStatus === 'loading');
+  const routeReady = addressesAreBookable && quoteStatus === 'ready';
   const canSubmit =
     !!pickup &&
     !!destination &&
@@ -64,7 +64,7 @@ export function OrderConfirmationScreen() {
   const routeGuidance =
     !pickup || !destination
       ? null
-      : !addressesArePrecise
+      : !addressesAreBookable
         ? 'Для места подачи укажите номер дома. Назначением может быть точный адрес или населённый пункт.'
         : quotePending
           ? 'Рассчитываем маршрут, стоимость и время подачи…'
@@ -273,10 +273,10 @@ export function OrderConfirmationScreen() {
               etaMinutes={selected.etaMinutes}
               label="Подтвердить"
               loadingLabel={busy ? 'Создаём заказ…' : 'Рассчитываем…'}
-              disabled={!addressesArePrecise || quotePending || busy}
+              disabled={!addressesAreBookable || quotePending || busy}
               loading={busy || quotePending}
               estimateAvailable={routeReady}
-              canRetry={addressesArePrecise && quoteStatus === 'error'}
+              canRetry={addressesAreBookable && quoteStatus === 'error'}
               onPress={() => {
                 if (routeReady) {
                   void confirm();
@@ -291,7 +291,7 @@ export function OrderConfirmationScreen() {
                     ? 'Рассчитываем стоимость и время подачи'
                     : routeReady
                       ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
-                      : addressesArePrecise
+                      : addressesAreBookable
                         ? 'Повторить расчёт стоимости поездки'
                         : 'Подтвердить заказ, сначала укажите маршрут'
               }

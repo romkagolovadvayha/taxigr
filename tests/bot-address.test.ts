@@ -59,6 +59,15 @@ describe('bot resolution through the real parsing pipeline', () => {
     vi.mocked(interpretBotAddress).mockReset().mockResolvedValue(null);
     vi.mocked(listPlaces).mockReset().mockResolvedValue([]);
   });
+  it('recognizes a house before its village without using the other village’s house point', async () => {
+    vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
+    const result = await resolveBotAddressOptions('молодежная 4 грахово', true);
+    expect(result).toMatchObject({ candidates: [], address: {
+      label: 'с. Грахово, ул. Молодежная, 4', houseNumber: '4', coordinatePrecision: 'approximate',
+    } });
+    expect(searchAddresses).not.toHaveBeenCalled();
+    expect(interpretBotAddress).not.toHaveBeenCalled();
+  });
   it.each(['Конзовод', 'на Конзавод', 'до Конзовода', 'Заречный'])('uses the same district destination for %s', async query => {
     vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
     expect((await resolveBotAddressOptions(query, false)).address?.label).toBe('с. Заречный');
@@ -149,8 +158,8 @@ describe('bot resolution through the real parsing pipeline', () => {
     const result = await resolveBotAddressOptions('советкая10', true);
     expect(result.address).toEqual(house); expect(result.candidates).toEqual([]);
   });
-  it('refines the corrected canonical address, and never prices an approximate anchor', async () => {
-    const approximate: Address = { ...house, id:'gar:house', coordinatePrecision:'approximate' };
+  it('refines an unverified external address before using it', async () => {
+    const approximate: Address = { ...house, id:'external:house', coordinatePrecision:'approximate' };
     vi.mocked(getAddressDirectory).mockResolvedValue([approximate]);
     vi.mocked(searchAddresses).mockResolvedValue([house]);
     expect((await resolveBotAddressOptions('советкая10', true)).address).toEqual(house);

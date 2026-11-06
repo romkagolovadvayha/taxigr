@@ -6,6 +6,7 @@ import { registerGroupAlertRoutes } from './group-alerts';
 import { registerMaxGroupBooking } from './max-group-booking';
 import { maxGroupOrderKey } from './max-group-booking-flow';
 import { intercitySettlementById } from '../src/data/intercity-settlements';
+import { grahovoDirectoryHousesById } from '../src/data/grahovo-address-catalog';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
 import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor } from '../src/domain/first-order-discount';
@@ -28,8 +29,8 @@ import {
   type PricingScope,
 } from '../src/domain/pricing';
 import {
-  isDestinationAddressComplete,
-  isPickupAddressComplete,
+  isDestinationAddressBookable,
+  isPickupAddressBookable,
 } from '../src/domain/address-precision';
 import { buildDestinationHistory } from '../src/domain/address-history';
 import { filterRequestedHouse } from '../src/domain/address-search';
@@ -221,13 +222,13 @@ const addressSchema = z.object({
   coordinates: pointSchema,
   coordinatePrecision: z.enum(['approximate', 'precise']).optional(),
 });
-const pickupAddressSchema = addressSchema.refine(address => isPickupAddressComplete(address) ||
+const pickupAddressSchema = addressSchema.refine(address => isPickupAddressBookable(address) ||
   (address.kind === 'settlement' && intercitySettlementById.has(address.id)), {
-  message: 'Для места подачи укажите дом или место и уточните приблизительную точку на карте',
+  message: 'Для места подачи укажите дом или место',
   path: ['label'],
 });
-const destinationAddressSchema = addressSchema.refine(isDestinationAddressComplete, {
-  message: 'Выберите населённый пункт или точный адрес. Приблизительную точку дома уточните на карте',
+const destinationAddressSchema = addressSchema.refine(isDestinationAddressBookable, {
+  message: 'Выберите населённый пункт, дом или место',
   path: ['label'],
 });
 const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u);
@@ -759,6 +760,14 @@ async function resolveTrustedAddress(address: Address): Promise<Address> {
   if (address.kind === 'settlement') {
     const settlement = intercitySettlementById.get(address.id);
     if (settlement) return settlement;
+  }
+  if (address.id.startsWith('gar:') && address.kind === 'house') {
+    const canonical = grahovoDirectoryHousesById.get(address.id);
+    if (canonical) return canonical;
+    throw Object.assign(new Error('Выберите адрес из обновлённого справочника'), {
+      statusCode: 422,
+      code: 'ADDRESS_NOT_AVAILABLE',
+    });
   }
   if (!address.placeId) return address;
   const place = await findPlace(address.placeId);

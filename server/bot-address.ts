@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Address } from '../src/domain/models';
-import { hasApproximateCoordinates } from '../src/domain/address-precision';
+import { hasApproximateCoordinates, isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { getRememberedAddresses } from './remembered-addresses';
 import { houseAddressKey, overlayRememberedAddresses } from '../src/domain/remembered-address';
 import { distanceBetweenCoordinates } from '../src/domain/navigation';
@@ -137,7 +137,7 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
   }));
   if (similar.length > 1) return { address: null, candidates: similar.slice(0, 5).map(item => clean(item.address)) };
   let resolved: Address | null = best.address;
-  if (hasApproximateCoordinates(resolved) && resolved.kind !== 'settlement') {
+  if (hasApproximateCoordinates(resolved) && resolved.kind !== 'settlement' && !isDirectoryHouseEstimate(resolved)) {
     // Correct spelling and the settlement come from GAR before asking the geocoder.
     const external = await searchAddresses(resolved.label, false, true).catch(() => []);
     resolved = chooseBotAddress(hasZarechnyAlias(input) ? input : resolved.label, external, pickup);

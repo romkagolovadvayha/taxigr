@@ -16,8 +16,8 @@ import {
   type DestinationHistoryItem,
 } from '@/domain/address-history';
 import {
-  isDestinationAddressComplete,
-  isPickupAddressComplete,
+  isDestinationAddressBookable,
+  isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { isAssignedDriverOrder } from '@/domain/driver-order-queue';
 import { driverRatingQueueReducer, emptyDriverRatingQueue } from '@/domain/driver-rating-queue';
@@ -724,9 +724,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       !token ||
       !pickup ||
       !destination ||
-      !isPickupAddressComplete(pickup) ||
+      !isPickupAddressBookable(pickup) ||
       destinations.length === 0 ||
-      !destinations.every(isDestinationAddressComplete)
+      !destinations.every(isDestinationAddressBookable)
     ) {
       invalidateQuote();
       setError('Уточните место подачи. Для назначения можно выбрать точный адрес или населённый пункт');
@@ -818,12 +818,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
   ]);
 
   useEffect(() => {
-    const routeIsPrecise =
+    const routeIsBookable =
       !!pickup &&
       !!destination &&
-      isPickupAddressComplete(pickup) &&
+      isPickupAddressBookable(pickup) &&
       destinations.length > 0 &&
-      destinations.every(isDestinationAddressComplete);
+      destinations.every(isDestinationAddressBookable);
 
     if (
       !quoteVisible ||
@@ -831,7 +831,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       !token ||
       currentRide ||
       quoteStatus !== 'idle' ||
-      !routeIsPrecise
+      !routeIsBookable
     ) return;
 
     const timer = setTimeout(() => {
@@ -912,9 +912,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       if (
         !pickup ||
         !destination ||
-        !isPickupAddressComplete(pickup) ||
+        !isPickupAddressBookable(pickup) ||
         !destinations.length ||
-        !destinations.every(isDestinationAddressComplete)
+        !destinations.every(isDestinationAddressBookable)
       ) {
         setError('Уточните место подачи. Для назначения можно выбрать точный адрес или населённый пункт');
         return null;

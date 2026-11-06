@@ -8,8 +8,8 @@ import { BrandMark } from '@/components/brand-mark';
 import { useSession } from '@/auth/session-provider';
 import { getDemoPassengerProgression } from '@/domain/demo-flow';
 import {
-  isDestinationAddressComplete,
-  isPickupAddressComplete,
+  isDestinationAddressBookable,
+  isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { estimatePickupEtaMinutes } from '@/domain/pickup-eta';
 import { TaxiMap } from '@/components/map/taxi-map';
@@ -57,13 +57,13 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
     error,
   } = useRide();
   const selected = tariffs.find((item) => item.code === selectedTariff)!;
-  const routeIsPrecise =
-    isPickupAddressComplete(pickup) &&
+  const routeIsBookable =
+    isPickupAddressBookable(pickup) &&
     destinations.length > 0 &&
-    destinations.every(isDestinationAddressComplete);
+    destinations.every(isDestinationAddressBookable);
   const quotePending =
-    routeIsPrecise && (quoteStatus === 'idle' || quoteStatus === 'loading');
-  const quoteReady = routeIsPrecise && quoteStatus === 'ready';
+    routeIsBookable && (quoteStatus === 'idle' || quoteStatus === 'loading');
+  const quoteReady = routeIsBookable && quoteStatus === 'ready';
 
   if (section === 'action') {
     if (currentRide) return null;
@@ -72,9 +72,9 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
       etaMinutes={selected.etaMinutes}
       loading={quotePending}
       estimateAvailable={quoteReady}
-      canRetry={routeIsPrecise && quoteStatus === 'error'}
+      canRetry={routeIsBookable && quoteStatus === 'error'}
       onPress={() => {
-        if (!routeIsPrecise) { onInvalidRoute(); return; }
+        if (!routeIsBookable) { onInvalidRoute(); return; }
         if (quoteReady) { router.push('/order-confirmation'); return; }
         void requestQuote();
       }}

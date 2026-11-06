@@ -18,8 +18,8 @@ export function getAddressDirectory(): Promise<Address[]> {
         }));
         const bundledIds = new Set(grahovoAddressCatalog.map(a => a.id));
         // Preserve the familiar street/settlement order in the UI.
-        return [...grahovoAddressCatalog.map(a => stored.get(a.id) ?? a),
-          ...[...stored.values()].filter(a => !bundledIds.has(a.id))];
+        return [...grahovoAddressCatalog.map(a => a.id.startsWith('gar:') ? a : stored.get(a.id) ?? a),
+          ...[...stored.values()].filter(a => !bundledIds.has(a.id) && !a.id.startsWith('gar:'))];
       }
     } catch {
       // The bundled catalogue also works before migration and without a database.

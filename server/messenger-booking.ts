@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent } from '../src/domain/first-order-discount';
+import { isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { bookingUnavailableCode } from '../src/domain/booking-availability';
 import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
@@ -136,11 +137,13 @@ function review(draft: BookingDraft): Reply {
   const confirmLabel = draft.priceMinor == null ? 'без цены' : `за ${draft.priceMinor / 100} ₽`;
   const unclearPickup = draft.pickup?.id.startsWith('manual:');
   const unclearDestination = draft.destination?.id.startsWith('manual:');
+  const approximate = isDirectoryHouseEstimate(draft.pickup) || isDirectoryHouseEstimate(draft.destination);
   const compound = unclearPickup ? draft.pickupRaw?.match(/(?:^|\s)(\d+)-(\d+)\s*$/u) : null;
   return {
     text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
       (draft.priceMinor == null ? 'Точную цену не удалось рассчитать. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
+      (approximate ? '\nТочка на карте приблизительная. Водитель получит полный адрес.' : '') +
       (compound ? `\nУточните место подачи: ${compound[1]}-${compound[2]} — это номер дома или дом ${compound[1]}, квартира ${compound[2]}?` : '') +
       (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
       (timing ? `\nВы указали «${timing}». Кнопка ниже начнёт поиск водителя сейчас.` : '') +

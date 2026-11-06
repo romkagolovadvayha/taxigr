@@ -31,7 +31,8 @@ import {
   extractQueryHouseNumber,
   hasHouseNumber,
   hasApproximateCoordinates,
-  isDestinationAddressComplete,
+  isDestinationAddressBookable,
+  isDirectoryHouseEstimate,
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
@@ -118,6 +119,7 @@ function AddressResult({
   manual = false,
   now,
   onPress,
+  onRefinePoint,
 }: {
   address: Address;
   directSelectionAllowed?: boolean;
@@ -125,6 +127,7 @@ function AddressResult({
   manual?: boolean;
   now: Date;
   onPress: () => void;
+  onRefinePoint?: () => void;
 }) {
   const colors = useThemeColors();
   const place = address.place;
@@ -133,12 +136,13 @@ function AddressResult({
   const needsMapPoint = hasHouseNumber(address) && hasApproximateCoordinates(address);
   const precise = hasHouseNumber(address) || Boolean(place) || directSelectionAllowed;
   const refinement = !precise && !history;
-  return (
+  const result = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${address.label}${history ? `, ${historyMeta(history)}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => ({
+        flex: onRefinePoint ? 1 : undefined,
         minHeight: place ? 104 : 72,
         flexDirection: 'row',
         alignItems: 'center',
@@ -195,7 +199,9 @@ function AddressResult({
         )}
         {needsMapPoint && (
           <Text style={{ ...typography.caption, color: colors.warningText }}>
-            Укажите точку дома на карте
+            {isDirectoryHouseEstimate(address)
+              ? address.details?.includes('архивный адрес') ? 'Архивный адрес · приблизительная точка' : 'Приблизительная точка на карте'
+              : 'Укажите точку дома на карте'}
           </Text>
         )}
         {address.id.startsWith('saved-') && (
@@ -258,6 +264,12 @@ function AddressResult({
       )}
     </Pressable>
   );
+  return onRefinePoint ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+      {result}
+      <IconButton icon="location" label={`Уточнить на карте: ${address.label}`} onPress={onRefinePoint} />
+    </View>
+  ) : result;
 }
 
 export function AddressSearchScreen() {
@@ -378,7 +390,7 @@ export function AddressSearchScreen() {
   const clock = useScreenClock(30_000, hasPlaceResults && !pendingAddress);
   const now = useMemo(() => new Date(clock), [clock]);
   const hasCompleteDestinationResult =
-    field === 'destination' && results.some(isDestinationAddressComplete);
+    field === 'destination' && results.some(isDestinationAddressBookable);
   const requestedHouseNumber = extractQueryHouseNumber(query);
   const hasExactHouseResult =
     !!requestedHouseNumber &&
@@ -453,7 +465,7 @@ export function AddressSearchScreen() {
       setPendingAddress(null);
       applyAddress(address);
     }).finally(() => { if (active) setResolvingHouse(false); });
-    void (pendingStreet
+    void (pendingStreet && !isDirectoryHouseEstimate(pendingAddress)
       ? resolveStreetCenter(pendingStreet, {
           token,
           signal: controller.signal,
@@ -541,22 +553,27 @@ export function AddressSearchScreen() {
     [],
   );
 
-  const selectAddress = async (address: Address) => {
+  const openPointEditor = (address: Address) => {
     cancelSearch();
-    if (hasApproximateCoordinates(address) &&
+    Keyboard.dismiss();
+    setResolvingHouse(true);
+    pointInteraction.current = false;
+    setPendingAddress(address);
+    setSavedPointAlternative(null);
+    setPointMapCenter(null);
+    setSelectedPoint(null);
+    setPointMapError(null);
+    setSavePointError(null);
+  };
+
+  const selectAddress = (address: Address) => {
+    if (hasApproximateCoordinates(address) && !isDirectoryHouseEstimate(address) &&
       (hasHouseNumber(address) || address.placeId) &&
       !(field === 'destination' && address.kind === 'settlement')) {
-      Keyboard.dismiss();
-      setResolvingHouse(true);
-      pointInteraction.current = false;
-      setPendingAddress(address);
-      setSavedPointAlternative(null);
-      setPointMapCenter(null);
-      setSelectedPoint(null);
-      setPointMapError(null);
-      setSavePointError(null);
+      openPointEditor(address);
       return;
     }
+    cancelSearch();
     setResolvingHouse(false);
     if (
       !hasHouseNumber(address) &&
@@ -681,7 +698,8 @@ export function AddressSearchScreen() {
           directSelectionAllowed={field === 'destination' && address.kind === 'settlement'}
           history={historyByKey.get(addressKey(address))}
           now={now}
-          onPress={() => { void selectAddress(address); }}
+          onPress={() => selectAddress(address)}
+          onRefinePoint={isDirectoryHouseEstimate(address) ? () => openPointEditor(address) : undefined}
         />}
         ListHeaderComponent={<View style={{ gap: spacing.x5, marginBottom: spacing.x3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
@@ -869,6 +887,7 @@ export function AddressSearchScreen() {
                   history={item}
                   now={now}
                   onPress={() => selectAddress(item.address)}
+                  onRefinePoint={isDirectoryHouseEstimate(item.address) ? () => openPointEditor(item.address) : undefined}
                 />
               ))}
             </View>

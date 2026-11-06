@@ -25,6 +25,7 @@ import { signOrderQuote, signSession } from '../server/security';
 import { unresolvedBotAddress } from '../server/bot-address';
 import { buildAuthIdentity, consumeAuthRateLimits } from '../server/auth-abuse';
 import { confirmAddressPoint } from '../src/domain/route-stops';
+import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
 import { canTransitionRide as legacyCanTransition, driverTransitionLabel as legacyButton } from './fixtures/legacy-1.0.23/ride-state';
 import { selectDriverOrderQueue as legacyQueue } from './fixtures/legacy-1.0.23/driver-order-queue';
 
@@ -708,6 +709,28 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(repeated.data?.tariffs).toEqual(direct.data?.tariffs);
   });
 
+  it('quotes and books a GAR house using its server-side point even when the client has old coordinates', async () => {
+    const address = grahovoAddressCatalog.find(a => a.label === 'с. Грахово, ул. Молодежная, 4')!;
+    expect(address.coordinatePrecision).toBe('approximate');
+    const routeBody = { pickup: { ...address, coordinates: destination.coordinates }, destination };
+    const invalid = await api('/v1/quotes', { method: 'POST', token: passengerToken, body: {
+      ...routeBody, pickup: { ...routeBody.pickup, id: 'gar:unknown:4' },
+    } });
+    expect(invalid.error?.code).toBe('ADDRESS_NOT_AVAILABLE');
+    const quote = await api<{ quoteToken: string }>('/v1/quotes', { method: 'POST', token: passengerToken, body: routeBody });
+    expect(quote.status).toBe(200);
+    const created = await api<RideOrder>('/v1/orders', { method: 'POST', token: passengerToken, body: {
+      ...routeBody, tariff: 'economy', quoteToken: quote.data!.quoteToken, paymentMethod: 'cash',
+      idempotencyKey: randomUUID(), deviceId: 'gar-point-integration-device',
+    } });
+    expect(created.status).toBe(201);
+    expect(created.data?.pickup).toMatchObject({
+      id: address.id, label: address.label, coordinatePrecision: 'approximate',
+    });
+    expect(created.data?.pickup.coordinates.latitude).toBeCloseTo(address.coordinates.latitude, 6);
+    expect(created.data?.pickup.coordinates.longitude).toBeCloseTo(address.coordinates.longitude, 6);
+  });
+
   it('persists stop progress, prevents skipped stops, and routes only through remaining destinations', async () => {
     await setDriverStatus(driverOneToken, 'online');
     const final = { ...pickup, id: 'final', label: 'с. Грахово, ул. 50 лет Победы, 19',
@@ -897,7 +920,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       label: 'д. Поршур, ул. Бабаева, 32',
       houseNumber: '32',
     });
-    expect(porshur.data?.[0]?.coordinates.latitude).toBeCloseTo(56.0248498, 6);
+    expect(porshur.data?.[0]).toMatchObject({
+      coordinatePrecision: 'approximate', coordinates: { latitude: 56.02486, longitude: 51.699435 },
+    });
   });
 
   it('selects mapped district houses directly and keeps unmapped houses approximate', async () => {

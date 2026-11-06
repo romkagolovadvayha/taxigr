@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { grahovoDirectoryAddresses } from '../src/data/grahovo-address-directory';
 
 describe('official Grahovo GAR address directory', () => {
-  it('contains the complete active 2026-08-03 district snapshot', () => {
+  it('contains the complete active 2026-11-02 district snapshot', () => {
     const houses = grahovoDirectoryAddresses.filter((address) => address.houseNumber);
     const parents = grahovoDirectoryAddresses.filter((address) => !address.houseNumber);
     const settlements = parents.filter((address) =>
@@ -16,10 +16,10 @@ describe('official Grahovo GAR address directory', () => {
 
     expect(settlements).toHaveLength(41);
     expect(settlements.every((address) => address.kind === 'settlement')).toBe(true);
-    expect(planningObjects).toHaveLength(37);
+    expect(planningObjects).toHaveLength(38);
     expect(streets).toHaveLength(194);
-    expect(houses).toHaveLength(4266);
-    expect(grahovoDirectoryAddresses).toHaveLength(4538);
+    expect(houses).toHaveLength(4167);
+    expect(grahovoDirectoryAddresses).toHaveLength(4440);
   });
 
   it('has stable unique identifiers and unambiguous visible labels', () => {
@@ -38,12 +38,12 @@ describe('official Grahovo GAR address directory', () => {
     expect(labels).toContain('с. Заречный, ул. Конзаводская');
   });
 
-  it('keeps all 65 active Porshur addressable objects searchable by plain number', () => {
+  it('includes all 56 active Porshur addressable objects', () => {
     const houses = grahovoDirectoryAddresses.filter(
       (address) => address.label.startsWith('д. Поршур,') && address.houseNumber,
     );
 
-    expect(houses).toHaveLength(65);
+    expect(houses).toHaveLength(56);
     expect(houses.map((address) => address.label)).toContain('д. Поршур, ул. Бабаева, 32');
     expect(houses.map((address) => address.label)).toContain('д. Поршур, ул. Тимофеева, 51');
   });

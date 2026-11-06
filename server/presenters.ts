@@ -10,7 +10,11 @@ import type {
   TariffCode,
 } from '../src/domain/models';
 import type { FareRoundingMode, PricingScope } from '../src/domain/pricing';
-import { extractHouseNumber } from '../src/domain/address-precision';
+import { extractHouseNumber, hasApproximateCoordinates, isDirectoryHouseEstimate } from '../src/domain/address-precision';
+import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
+
+const directoryEstimatesByLabel = new Map(grahovoAddressCatalog.filter(isDirectoryHouseEstimate)
+  .map(address => [address.label, address]));
 
 export type OrderRow = RowDataPacket & {
   id: string;
@@ -158,11 +162,14 @@ function address(
   kind?: AddressKind,
 ): Address {
   const normalizedDetails = details ?? undefined;
-  const houseNumber = extractHouseNumber({ label, details: normalizedDetails }) ?? undefined;
   const unresolved = id.startsWith('manual:') || /Точка не определена/u.test(normalizedDetails ?? '');
+  const approximate = hasApproximateCoordinates({ id, label, details: normalizedDetails });
+  // Legacy pickup columns store the label and details, but no catalogue ID.
+  const estimate = approximate && !unresolved ? directoryEstimatesByLabel.get(label) : undefined;
+  const houseNumber = estimate?.houseNumber ?? extractHouseNumber({ label, details: normalizedDetails }) ?? undefined;
   return {
-    id: unresolved && !id.startsWith('manual:') ? `manual:${id}` : id,
-    ...(unresolved ? { coordinatePrecision: 'approximate' as const } : {}),
+    id: unresolved && !id.startsWith('manual:') ? `manual:${id}` : estimate?.id ?? id,
+    ...(unresolved || approximate ? { coordinatePrecision: 'approximate' as const } : {}),
     label,
     details: normalizedDetails,
     houseNumber,

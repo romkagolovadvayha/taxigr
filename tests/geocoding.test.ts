@@ -15,6 +15,16 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it.each([
+    ['Молодёжная 4 Грахово', 'с. Грахово, ул. Молодежная, 4', 'approximate'],
+    ['Молодёжная 4, д. Каменное', 'д. Каменное, ул. Молодежная, 4', 'precise'],
+  ])('keeps the correct house and locality when typing %s', async (query, label, coordinatePrecision) => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const results = await searchAddresses(query, false, false, true);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ label, houseNumber: '4', coordinatePrecision });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it.each(['Конзовод', 'Конзавод', 'из Конзовода', 'Заречный'])('looks up %s in the local directory', async query => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     const results = await searchAddresses(query);
@@ -367,9 +377,13 @@ describe('local address directory', () => {
 
     expect(babaeva).toHaveLength(1);
     expect(babaeva[0]?.label).toBe('д. Поршур, ул. Бабаева, 32');
-    expect(babaeva[0]?.coordinates.latitude).toBeCloseTo(56.0248498, 6);
+    expect(babaeva[0]).toMatchObject({
+      coordinatePrecision: 'approximate', coordinates: { latitude: 56.02486, longitude: 51.699435 },
+    });
     expect(timofeeva[0]?.label).toBe('д. Поршур, ул. Тимофеева, 1А');
-    expect(timofeeva[0]?.coordinates.longitude).toBeCloseTo(51.7077961, 6);
+    expect(timofeeva[0]).toMatchObject({
+      coordinatePrecision: 'approximate', coordinates: { latitude: 56.027175, longitude: 51.70801 },
+    });
   });
 
   it('scopes unknown settlements to Grahovo district instead of Grahovo village', () => {

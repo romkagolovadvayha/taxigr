@@ -6,6 +6,7 @@ requests, so it does not download the complete multi-gigabyte Russian archive.
 
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import re
@@ -13,11 +14,11 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 
 
-ARCHIVE_DATE = "2026.08.04"
-ARCHIVE_URL = f"https://fias-file.nalog.ru/downloads/{ARCHIVE_DATE}/gar_xml.zip"
+ARCHIVE_DATE = "2026.11.03"
 REGION_CODE = "18"
 OUTPUT = Path(__file__).resolve().parents[1] / "src/data/grahovo-address-directory.ts"
 READ_AHEAD_BYTES = 8 * 1024 * 1024
@@ -77,6 +78,8 @@ class RemoteZipReader(io.RawIOBase):
                 },
             )
             with urllib.request.urlopen(request, timeout=180) as response:
+                if response.status != 206:
+                    raise RuntimeError("GAR archive server did not honor the range request")
                 self.cache = response.read()
         start = self.position - self.cache_start
         data = self.cache[start : start + size]
@@ -171,6 +174,11 @@ def sort_number(value: str) -> tuple:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--date", default=ARCHIVE_DATE, help="GAR publication date (YYYY.MM.DD)")
+    args = parser.parse_args()
+    archive_date = date.fromisoformat(args.date.replace(".", "-"))
+    archive_url = f"https://fias-file.nalog.ru/downloads/{archive_date:%Y.%m.%d}/gar_xml.zip"
     settlement_coordinates, street_coordinates, settlement_order, street_order = existing_coordinates()
     settlement_rank = {key: index for index, key in enumerate(settlement_order)}
     street_rank = {
@@ -178,7 +186,7 @@ def main() -> None:
         for settlement, keys in street_order.items()
     }
 
-    with zipfile.ZipFile(RemoteZipReader(ARCHIVE_URL)) as archive:
+    with zipfile.ZipFile(RemoteZipReader(archive_url)) as archive:
         prefix = f"{REGION_CODE}/"
         address_objects: dict[str, dict[str, str]] = {}
         for row in element_rows(archive, prefix + "AS_ADDR_OBJ_", "OBJECT"):
@@ -330,7 +338,7 @@ def main() -> None:
     counts = defaultdict(int)
     for record in records:
         counts[record["level"]] += 1
-    if counts != {6: 41, 7: 37, 8: 194} or house_count != 4266:
+    if counts[6] < 40 or counts[7] < 35 or counts[8] < 190 or house_count < 4000:
         raise RuntimeError(
             f"Unexpected GAR snapshot counts: levels={dict(counts)}, houses={house_count}"
         )
@@ -338,8 +346,9 @@ def main() -> None:
     lines = [
         "import type { Address } from '@/domain/models';",
         "",
-        "// Generated from the official GAR/FIAS XML full snapshot published 2026-08-04.",
-        "// The snapshot data date is 2026-08-03. Coordinates are approximate OSM centres.",
+        f"// Generated from the official GAR/FIAS XML full snapshot published {archive_date}.",
+        f"// The snapshot data date is {archive_date - timedelta(days=1)}. Coordinates are approximate OSM centres.",
+        f"export const grahovoDirectorySnapshotDate = '{archive_date - timedelta(days=1)}';",
         "type DirectoryNode = readonly [",
         "  label: string,",
         "  level: 6 | 7 | 8,",
@@ -386,6 +395,8 @@ def main() -> None:
             "      id: parentId,",
             "      label,",
             "      details: nodeDetails(level),",
+            "      kind: level === 6 ? 'settlement' : level === 8 ? 'street' : undefined,",
+            "      coordinatePrecision: 'approximate',",
             "      coordinates,",
             "    };",
             "    const houses = (encodedHouses ? encodedHouses.split('|') : []).map((encodedHouse) => {",
@@ -409,6 +420,8 @@ def main() -> None:
             "          id: parentId + ':' + slug(encodedHouse),",
             "          label: `${label}, ${displayedHouse}`,",
             "          houseNumber,",
+            "          kind: 'house',",
+            "          coordinatePrecision: 'approximate',",
             "          details: `Граховский район, Удмуртская Республика · активный адрес из ГАР (${objectType}), точка приблизительная`,",
             "          coordinates,",
             "        };",

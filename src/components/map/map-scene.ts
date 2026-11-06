@@ -6,7 +6,7 @@ import type { Coordinates } from '../../domain/models';
 import { lngLat, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 import type { MapViewportInsets, TaxiMapProps } from './types';
 import { fitRouteLocation } from './route-viewport';
-import { hasApproximateCoordinates } from '../../domain/address-precision';
+import { hasApproximateCoordinates, isDirectoryHouseEstimate } from '../../domain/address-precision';
 
 export { lngLat, mapBearing, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 
@@ -23,18 +23,21 @@ export function taxiMapScene(props: TaxiMapProps) {
   const points: RouteMapPoint[] = [];
   const pickup = props.routeTarget === 'pickup' ? original[original.length - 1] ?? props.pickup?.coordinates
     : original[0] ?? props.pickup?.coordinates;
-  if (props.pickup && !hasApproximateCoordinates(props.pickup) && validMapCoordinate(pickup)) points.push({
+  const approximatePickup = isDirectoryHouseEstimate(props.pickup);
+  if (props.pickup && (!hasApproximateCoordinates(props.pickup) || approximatePickup) && validMapCoordinate(pickup)) points.push({
     id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup),
-    label: props.pickupEtaMinutes ? `Старт · ${props.pickupEtaMinutes} мин` : 'Старт',
+    label: approximatePickup ? 'Подача · примерно' : props.pickupEtaMinutes ? `Старт · ${props.pickupEtaMinutes} мин` : 'Старт',
   });
   const destinations = props.destinations?.length ? props.destinations : props.destination ? [props.destination] : [];
   destinations.forEach((destination, index) => {
     const final = index === destinations.length - 1;
     // A route to pickup must never move destination pins onto the pickup point.
     const coordinates = final && props.routeTarget !== 'pickup' ? original[original.length - 1] ?? destination.coordinates : destination.coordinates;
-    if (!hasApproximateCoordinates(destination) && validMapCoordinate(coordinates)) points.push({
+    const approximate = isDirectoryHouseEstimate(destination);
+    if ((!hasApproximateCoordinates(destination) || approximate) && validMapCoordinate(coordinates)) points.push({
       id: `destination-${index}`, kind: final ? 'destination' : 'stop', coordinates: lngLat(coordinates),
-      label: routeDestinationMapLabel(index, destinations.length, final ? props.destinationArrivalLabel : undefined),
+      label: routeDestinationMapLabel(index, destinations.length, final && !approximate ? props.destinationArrivalLabel : undefined) +
+        (approximate ? ' · примерно' : ''),
     });
   });
   const route: FeatureCollection<LineString> = { type: 'FeatureCollection', features: rendered.length < 2 ? [] : [{

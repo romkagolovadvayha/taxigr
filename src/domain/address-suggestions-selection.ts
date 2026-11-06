@@ -24,5 +24,5 @@ export function mergeAddressSuggestions(primary: Address[], secondary: Address[]
 export function selectUnambiguousAddress(query: string, candidates: Address[], pickup: boolean): Address | null {
   const merged = mergeAddressSuggestions(candidates, []);
   const houses = extractQueryHouseNumber(normalizeBotAddress(query)) ? merged.filter(address => !address.placeId) : [];
-  return chooseBotAddress(query, houses.length ? houses : merged, pickup);
+  return chooseBotAddress(query, houses.length ? houses : merged, pickup, true);
 }
