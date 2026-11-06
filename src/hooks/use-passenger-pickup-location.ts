@@ -1,10 +1,10 @@
-import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
 import { resolvePickupAddress } from '@/api/pickup-address';
 import { useSession } from '@/auth/session-provider';
-import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
+import { requestPickupPosition } from '@/location/pickup-position';
+import { getEmbeddedAppProvider } from '@/mini-apps/runtime';
 import { useRideAddresses } from '@/state/ride-provider';
 
 export function usePassengerPickupLocation() {
@@ -27,32 +27,22 @@ export function usePassengerPickupLocation() {
     setLocationLoading(true);
     setLocationError(null);
     try {
-      const permission = await ensureForegroundLocationPermission();
+      const coordinates = await requestPickupPosition(controller.signal);
       if (controller.signal.aborted) return null;
-      if (!permission.granted) {
-        setLocationError('Разрешите доступ к геопозиции, чтобы определить место подачи');
+      if (typeof coordinates === 'string') {
+        const provider = getEmbeddedAppProvider();
+        setLocationError(coordinates === 'denied' && !provider
+          ? 'Разрешите доступ к геопозиции или укажите адрес вручную.'
+          : 'Геопозиция недоступна. Укажите адрес вручную.');
         return null;
       }
-      const current =
-        (await Location.getLastKnownPositionAsync({
-          maxAge: 60_000,
-          requiredAccuracy: 200,
-        })) ??
-        (await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        }));
-      if (controller.signal.aborted) return null;
-      const coordinates = {
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-      };
       const address = await resolvePickupAddress(coordinates, {
         token,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return null;
       if (!address) {
-        setLocationError('Геопозиция определена, но адрес найти не удалось. Выберите адрес вручную.');
+        setLocationError('Не удалось определить точку подачи. Укажите адрес вручную.');
         return null;
       }
       setPickup(address);

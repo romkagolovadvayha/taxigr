@@ -138,7 +138,7 @@ export function OrderScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
     }
   };
-  const { locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
+  const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const {
     pickup,
     destinations,
@@ -266,6 +266,11 @@ export function OrderScreen() {
         <ScrollView ref={bookingScrollRef} style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
           contentContainerStyle={{ padding: spacing.x4, paddingTop: spacing.x5, paddingBottom: currentRide ? spacing.x4 : spacing.x2 }}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {!currentRide && !!locationError && (
+            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.warningText, marginBottom: spacing.x2 }}>
+              {locationError}
+            </Text>
+          )}
           <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
         </ScrollView>
         {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} /></View>}

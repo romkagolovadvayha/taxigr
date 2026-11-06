@@ -1,10 +1,18 @@
 import { rememberMiniAppLaunch, restoredMiniAppLaunch, type MiniAppProvider } from './runtime';
+import type { Coordinates } from '@/domain/models';
 
 export type MiniAppContact = { phone: string; authDate: string; hash: string };
 export type MiniAppBridge = {
   initData: string;
   ready?: () => void;
   expand?: () => void;
+  isVersionAtLeast?: (version: string) => boolean;
+  LocationManager?: {
+    isInited: boolean;
+    isLocationAvailable: boolean;
+    init: (callback: () => void) => void;
+    getLocation: (callback: (position: Coordinates | null) => void) => void;
+  };
   BackButton?: { show: () => void; hide: () => void; onClick: (callback: () => void) => void; offClick: (callback: () => void) => void };
   requestContact: ((callback: (shared: boolean) => void) => void) | (() => Promise<MiniAppContact>);
 };
@@ -24,7 +32,8 @@ export function loadMiniAppBridge(provider: MiniAppProvider): Promise<MiniAppBri
       rememberMiniAppLaunch(provider, initData);
       bridge.ready?.();
       bridge.expand?.();
-      resolve({ ...bridge, initData, requestContact: bridge.requestContact.bind(bridge), BackButton: bridge.BackButton });
+      resolve({ ...bridge, initData, requestContact: bridge.requestContact.bind(bridge), BackButton: bridge.BackButton,
+        LocationManager: bridge.LocationManager, isVersionAtLeast: bridge.isVersionAtLeast?.bind(bridge) });
     };
     if (read()) { finish(); return; }
     const script = document.createElement('script');

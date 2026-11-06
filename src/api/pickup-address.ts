@@ -18,7 +18,9 @@ export function pickupAddressAtCoordinates(
 }
 
 export async function resolvePickupAddress(coordinates: Coordinates, options: MapAddressOptions): Promise<Address | null> {
-  if (!validMapCoordinate(coordinates) || options.signal?.aborted) return null;
+  if (!options.token || options.signal?.aborted) return null;
+  const mapPoint = pickupAddressAtCoordinates({ label: 'Точка на карте' }, coordinates);
+  if (!mapPoint) return null;
   try {
     const addresses = await searchMapAddresses(coordinates.longitude + ',' + coordinates.latitude, options);
     if (options.signal?.aborted) return null;
@@ -26,6 +28,8 @@ export async function resolvePickupAddress(coordinates: Coordinates, options: Ma
       const pickup = pickupAddressAtCoordinates(address, coordinates);
       if (pickup) return pickup;
     }
-    return null;
-  } catch { return null; }
+  } catch {
+    // A missing street or a failed address lookup does not invalidate the GPS point.
+  }
+  return options.signal?.aborted ? null : mapPoint;
 }

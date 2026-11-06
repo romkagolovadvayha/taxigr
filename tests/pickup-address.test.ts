@@ -35,9 +35,11 @@ describe('pickup address without a map-provider key', () => {
     expect(fetch.mock.calls[0]![1].headers.Authorization).toBeUndefined();
     expect(address?.coordinates).toEqual(coordinates);
   });
-  it('rejects empty, generic and invalid GPS addresses', async () => {
-    mockResponse([]);
-    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
+  it('keeps the exact pickup point when there is no usable address', async () => {
+    mockResponse([{ label: 'Моё местоположение' }]);
+    const address = await resolvePickupAddress(coordinates, { token: 'demo:passenger' });
+    expect(address).toMatchObject({ label: 'Точка на карте', coordinates });
+    expect(isPickupAddressComplete(address)).toBe(true);
     expect(pickupAddressAtCoordinates({ label: 'Моё местоположение' }, coordinates)).toBeNull();
     expect(pickupAddressAtCoordinates({ label: ' ' }, coordinates)).toBeNull();
     expect(pickupAddressAtCoordinates(result, { latitude: NaN, longitude: 52 })).toBeNull();
@@ -49,12 +51,12 @@ describe('pickup address without a map-provider key', () => {
     await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger', signal: abort.signal })).resolves.toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('returns control to manual address selection after server errors', async () => {
+  it('keeps the GPS point after failed or empty address lookups', async () => {
     const fetch = mockResponse();
     fetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({}) });
-    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
-    mockResponse({ unexpected: true });
-    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toBeNull();
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toMatchObject({ coordinates });
+    mockResponse([]);
+    await expect(resolvePickupAddress(coordinates, { token: 'demo:passenger' })).resolves.toMatchObject({ coordinates });
   });
   it('cancels when leaving the screen and limits the request to five seconds', async () => {
     vi.useFakeTimers();
@@ -65,6 +67,6 @@ describe('pickup address without a map-provider key', () => {
     const request = resolvePickupAddress(coordinates, { token: 'demo:passenger', signal: controller.signal });
     controller.abort(); await expect(request).resolves.toBeNull();
     const timeout = resolvePickupAddress(coordinates, { token: 'demo:passenger' });
-    await vi.advanceTimersByTimeAsync(5000); await expect(timeout).resolves.toBeNull();
+    await vi.advanceTimersByTimeAsync(5000); await expect(timeout).resolves.toMatchObject({ coordinates });
   });
 });
