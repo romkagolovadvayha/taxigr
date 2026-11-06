@@ -45,15 +45,23 @@ jobs:
 
           python3 - <<'PY' > "$directory/settings.json"
 
-          import json,os,sys
+          import json,os,shlex,sys
 
           variables=json.loads(os.environ['ACTION_VARIABLES'])
 
           secrets=json.loads(os.environ['ACTION_SECRETS'])
 
+          production_secrets={k.removeprefix('PRODUCTION_'):v for k,v in secrets.items() if k.startswith('PRODUCTION_') and not k.startswith('PRODUCTION_SSH_')}
+
+          # The build host only overrides keys declared in the runtime template.
+
+          for key in ('BOT_AI_API_KEY','BOT_AI_PROXY_URL','BOT_AI_PROXY_SERVER_NAME','BOT_AI_PROXY_USERNAME','BOT_AI_PROXY_PASSWORD'):
+           if key in production_secrets:
+            production_secrets['DEPLOY_ENV']+='\n'+key+'='+shlex.quote(production_secrets[key])+'\n'
+
           json.dump({
            'variables':{k.removeprefix('PRODUCTION_'):v for k,v in variables.items() if k.startswith('PRODUCTION_')},
-           'secrets':{k.removeprefix('PRODUCTION_'):v for k,v in secrets.items() if k.startswith('PRODUCTION_') and not k.startswith('PRODUCTION_SSH_')}
+           'secrets':production_secrets
           },sys.stdout)
 
           PY
