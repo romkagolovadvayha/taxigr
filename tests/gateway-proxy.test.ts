@@ -31,4 +31,19 @@ describe('database-managed Telegram proxy', () => {
     expect(await telegramDispatcher()).toBeUndefined();
     await expect(telegramDispatcher()).rejects.toThrow('database unavailable');
   });
+
+  it('keeps the booking proxy separate from Telegram when either connection changes', () => {
+    const telegram = gatewayDispatcher(settings)!;
+    const telegramClose = vi.spyOn(telegram, 'close');
+    const ai = { ...settings, proxyUrl: 'https://192.0.2.10', proxyUsername: 'booking' };
+    const options = { scope: 'booking-ai' as const, servername: 'proxy.example.com' };
+    const booking = gatewayDispatcher(ai, options)!;
+    expect(booking).not.toBe(telegram);
+    expect(gatewayDispatcher(ai, options)).toBe(booking);
+    const bookingClose = vi.spyOn(booking, 'close');
+    expect(gatewayDispatcher({ ...ai, proxyEnabled: false }, options)).toBeUndefined();
+    expect(bookingClose).toHaveBeenCalled();
+    expect(telegramClose).not.toHaveBeenCalled();
+    expect(gatewayDispatcher(settings)).toBe(telegram);
+  });
 });

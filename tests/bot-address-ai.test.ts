@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const proxy = vi.hoisted(() => ({
   fetch: vi.fn(), dispatcher: vi.fn(), settings: vi.fn(),
-  config: { BOT_AI_API_KEY: 'test-key', BOT_AI_BASE_URL: 'https://api.openai.com/v1', BOT_AI_MODEL: 'gpt-4o-mini', isProduction: true },
+  config: { BOT_AI_API_KEY: 'test-key', BOT_AI_BASE_URL: 'https://api.openai.com/v1', BOT_AI_MODEL: 'gpt-4o-mini',
+    BOT_AI_PROXY_URL: '', BOT_AI_PROXY_SERVER_NAME: '', BOT_AI_PROXY_USERNAME: '', BOT_AI_PROXY_PASSWORD: '', isProduction: true },
 }));
 vi.mock('undici', () => ({ fetch: proxy.fetch }));
 vi.mock('../server/config', () => ({ config: proxy.config }));
@@ -19,6 +20,7 @@ const response = (pickup: unknown, destination: unknown) => new Response(JSON.st
 beforeEach(() => {
   vi.resetAllMocks();
   proxy.config.BOT_AI_API_KEY = 'test-key';
+  proxy.config.BOT_AI_PROXY_URL = '';
   proxy.settings.mockResolvedValue({ proxyEnabled: true });
   proxy.dispatcher.mockReturnValue(agent);
 });
@@ -44,6 +46,19 @@ describe('taxi address interpretation through the configured gateway', () => {
     proxy.dispatcher.mockReturnValue(undefined);
     await expect(interpretBotAddress('Советская 10', 'pickup')).resolves.toBeNull();
     expect(proxy.fetch).not.toHaveBeenCalled();
+  });
+
+  it('passes the dedicated proxy credentials and TLS name without reading Telegram settings', async () => {
+    Object.assign(proxy.config, {
+      BOT_AI_PROXY_URL: 'https://192.0.2.10', BOT_AI_PROXY_SERVER_NAME: 'proxy.example.com',
+      BOT_AI_PROXY_USERNAME: 'booking', BOT_AI_PROXY_PASSWORD: 'test-password',
+    });
+    proxy.fetch.mockResolvedValue(response('Советская 10', null));
+    expect(await interpretBotAddress('Советская 10', 'pickup')).toEqual({ pickup: 'Советская 10', destination: null });
+    expect(proxy.settings).not.toHaveBeenCalled();
+    expect(proxy.dispatcher).toHaveBeenCalledWith({
+      proxyEnabled: true, proxyUrl: 'https://192.0.2.10', proxyUsername: 'booking', proxyPassword: 'test-password',
+    }, { scope: 'booking-ai', servername: 'proxy.example.com' });
   });
 
   it('skips the gateway entirely when the integration is unconfigured', async () => {

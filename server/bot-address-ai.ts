@@ -16,7 +16,17 @@ export async function interpretBotAddress(text: string, field: 'pickup' | 'desti
     .replace(/(?:\b|(?<![\p{L}]))(?:кв\.?|квартира|домофон|подъезд|этаж)\s*\d+[а-я]?/giu, '')
     .slice(0, 520);
   try {
-    const dispatcher = await readGatewaySettings().then(gatewayDispatcher);
+    const dedicated = Boolean(config.BOT_AI_PROXY_URL);
+    const settings = dedicated ? {
+      proxyEnabled: Boolean(config.BOT_AI_PROXY_USERNAME && config.BOT_AI_PROXY_PASSWORD),
+      proxyUrl: config.BOT_AI_PROXY_URL,
+      proxyUsername: config.BOT_AI_PROXY_USERNAME,
+      proxyPassword: config.BOT_AI_PROXY_PASSWORD,
+    } : await readGatewaySettings();
+    const dispatcher = gatewayDispatcher(settings, {
+      scope: 'booking-ai',
+      servername: dedicated ? config.BOT_AI_PROXY_SERVER_NAME || undefined : undefined,
+    });
     if (!dispatcher) return null;
     const model = config.BOT_AI_MODEL;
     const url = new URL(config.BOT_AI_BASE_URL);
