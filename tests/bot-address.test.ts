@@ -70,6 +70,15 @@ describe('bot resolution through the real parsing pipeline', () => {
     vi.mocked(interpretBotAddress).mockResolvedValue({ pickup: 'Советская 11', destination: null });
     expect((await resolveBotAddressOptions('Заберите с непонятного места', true)).address).toBeNull();
   });
+  it('resolves an AI result that places the house number before a numbered street', async () => {
+    const victory = { ...house, id: 'victory', label: 'с. Грахово, ул. 50 лет Победы, 19', houseNumber: '19' };
+    vi.mocked(getAddressDirectory).mockResolvedValue([victory]);
+    vi.mocked(interpretBotAddress).mockResolvedValue({ pickup: 'дом 19 на улице 50 лет Победы', destination: null });
+    const result = await resolveBotAddressOptions('Заберите меня у дома под номером 19 на улице 50 лет Победы', true);
+    expect(interpretBotAddress).toHaveBeenCalledOnce();
+    expect(result.address).toEqual(victory);
+    expect(searchAddresses).not.toHaveBeenCalled();
+  });
   it('shows one result for a cafe and its nearby house at the same address', async () => {
     const roadside = { ...house, label: 'с. Грахово, ул. Дорожная, 13', houseNumber: '13' };
     vi.mocked(getAddressDirectory).mockResolvedValue([roadside]);

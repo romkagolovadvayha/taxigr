@@ -26,6 +26,7 @@ function bookingAddressText(raw: string): string {
     .replace(/(?:,?\s+граховского\s+(?:района|р\s*-\s*на))\s*$/iu, '')
     .replace(/^деревн[ию]\s+/iu, 'д. ')
     .replace(/^санатория\s+/iu, 'санаторий ')
+    .replace(/^(?:дом|д\.)\s*(\d+[а-яa-z]?(?:[/-]\d+[а-яa-z]?)?)\s+(?:на|по)\s+(?:улице|ул\.)\s+(.+)$/iu, '$2, $1')
     .trim();
 }
 
