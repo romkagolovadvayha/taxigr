@@ -3,6 +3,9 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
 import { registerGroupAlertRoutes } from './group-alerts';
+import { registerMaxGroupBooking } from './max-group-booking';
+import { maxGroupOrderKey } from './max-group-booking-flow';
+import { intercitySettlementById } from '../src/data/intercity-settlements';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
 import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor } from '../src/domain/first-order-discount';
@@ -218,7 +221,8 @@ const addressSchema = z.object({
   coordinates: pointSchema,
   coordinatePrecision: z.enum(['approximate', 'precise']).optional(),
 });
-const pickupAddressSchema = addressSchema.refine(isPickupAddressComplete, {
+const pickupAddressSchema = addressSchema.refine(address => isPickupAddressComplete(address) ||
+  (address.kind === 'settlement' && intercitySettlementById.has(address.id)), {
   message: 'Для места подачи укажите дом или место и уточните приблизительную точку на карте',
   path: ['label'],
 });
@@ -752,6 +756,10 @@ async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffC
 }
 
 async function resolveTrustedAddress(address: Address): Promise<Address> {
+  if (address.kind === 'settlement') {
+    const settlement = intercitySettlementById.get(address.id);
+    if (settlement) return settlement;
+  }
   if (!address.placeId) return address;
   const place = await findPlace(address.placeId);
   if (!place?.active) {
@@ -1575,6 +1583,14 @@ export async function registerRoutes(
 ): Promise<RegisteredRouteHandlers> {
   registerAppReleaseRoutes(app);
   registerGroupAlertRoutes(app);
+  registerMaxGroupBooking(app, {
+    local: async () => calculateFareMinor(0, 'economy', 'grahovo', await pricingRules(), new Date()),
+    estimate: async (pickup, destination) => {
+      const trusted = await resolveTrustedAddresses({ pickup, destination });
+      const [route, rules] = await Promise.all([getMultiStopPricedRouteMetrics(trusted.pickup, trusted.destinations), pricingRules()]);
+      return multiStopPrices(trusted.pickup, trusted.destinations, route.pricingSegments, rules, new Date()).economy;
+    },
+  });
   registerMiniAppRoutes(app);
   registerVkBroadcastRoutes(app);
   const lastDriverLocationAcceptedAt = new Map<string, number>();
@@ -1710,7 +1726,7 @@ export async function registerRoutes(
       publish(`user:${item.passengerId}`, 'order:updated', payload);
       publish('admins', 'order:updated', payload);
       publish('drivers', 'order:unavailable', { orderId: item.id });
-      const push = passengerRidePush(payload);
+      const push = row.idempotency_key?.startsWith(maxGroupOrderKey) ? null : passengerRidePush(payload);
       if (push) {
         void notifyUsers([item.passengerId], {
           ...push,
@@ -1718,7 +1734,7 @@ export async function registerRoutes(
           body: 'За отведённое время свободный водитель не найден. Создайте новый заказ.',
         }).catch((error) => app.log.warn({ error }, 'expired order push failed'));
       }
-      notifyMessengers(
+      if (!row.idempotency_key?.startsWith(maxGroupOrderKey)) notifyMessengers(
         notifyUsersInMessengers([item.passengerId], passengerRideNotification(payload, {
           title: 'Поиск водителя завершён',
           body: 'Свободный водитель не найден. Создайте новый заказ, когда будете готовы повторить поиск.',
@@ -3708,6 +3724,9 @@ export async function registerRoutes(
       });
     }
     const manualPricing = quote.pricingMode === 'driver';
+    if (Boolean(quote.maxGroupBooking) !== input.idempotencyKey.startsWith(maxGroupOrderKey)) {
+      throw Object.assign(new Error('Расчёт выдан для другого канала заказа'), { statusCode: 409, code: 'QUOTE_EXPIRED_OR_INVALID' });
+    }
     const submitted = manualPricing
       ? { pickup: input.pickup, destinations: input.destinations ?? [input.destination] }
       : await resolveTrustedAddresses(parse(quoteSchema, input));
@@ -3958,7 +3977,7 @@ export async function registerRoutes(
           ['Комментарий', result.order.comment],
         ],
       });
-      notifyMessengers(
+      if (!quote.maxGroupBooking) notifyMessengers(
         notifyUsersInMessengers([session.id], passengerRideNotification(result.order)),
         'order.created.passenger',
       );
@@ -5292,13 +5311,13 @@ export async function registerRoutes(
         ['Стоимость', formatMoney(payload.priceMinor)],
       ],
     });
-    const acceptedPush = passengerRidePush(payload);
+    const acceptedPush = row.idempotency_key?.startsWith(maxGroupOrderKey) ? null : passengerRidePush(payload);
     if (acceptedPush) {
       void notifyUsers([updated.passengerId], acceptedPush).catch((error) =>
         app.log.warn({ error }, 'push notification failed'),
       );
     }
-    notifyMessengers(
+    if (!row.idempotency_key?.startsWith(maxGroupOrderKey)) notifyMessengers(
       notifyUsersInMessengers([updated.passengerId], passengerRideNotification(payload)),
       'order.accepted.passenger',
     );

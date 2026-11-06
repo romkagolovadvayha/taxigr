@@ -11,6 +11,14 @@ export function isTaxiRequest(text: string): boolean {
   return /(?:^| )(?:кто|(?:нужно|нужна|ищу|ищем|есть) (?:срочно )?такси|такси есть)(?: |$)/u.test(value);
 }
 
+export function isFreshMaxTaxiRequest(text: string, sentAt: number, now = Date.now()): boolean {
+  const value = text.normalize('NFKC').toLowerCase().replace(/ё/gu, 'е').trim();
+  if (sentAt < now - 180_000 || sentAt > now + 30_000) return false;
+  if (/(?:^|[^а-я\d])(?:не (?:надо|нужно|нужна|ищу)|не таксую|отбой|нашли|нашел|нашла|уехали|уехал|уехала|подвезли|подвезу|таксую|вожу)(?=$|[^а-я\d])/u.test(value)) return false;
+  return /^кто[?!. ]*$/u.test(value) ||
+    /(?:^|[^а-я\d])(?:кто\s+(?:таксует|может\s+(?:отвезти|подвезти|забрать))|(?:нужно|нужна|ищу|ищем|есть|можно|вызовите|закажите)\s+(?:срочно\s+)?такси|такси\s+(?:есть|нужно))(?=$|[^а-я\d])/u.test(value);
+}
+
 /** Only an explicit sender identity from the messenger, never a display name/body. */
 export function senderPhone(uri: string | undefined): string | null {
   if (!uri?.startsWith('tel:+')) return null;

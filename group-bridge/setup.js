@@ -25,6 +25,9 @@ async function refresh() {
       if (value[provider].qr) qr.src = value[provider].qr; else qr.removeAttribute('src');
     }
     document.getElementById('password-form').hidden = value.max.state !== 'password_required';
+    document.getElementById('max-account').textContent = value.max.accountId ? `ID аккаунта MAX: ${value.max.accountId}` : '';
+    const maxBookingLabels = { connected: 'Личные ответы включены.', server_unavailable: 'Личные ответы не разрешены сервером для этого подключения.', send_failed: 'Одно из личных сообщений не удалось подтвердить.' };
+    document.getElementById('max-booking-state').textContent = maxBookingLabels[value.maxBooking] || 'Личные ответы выключены.';
     document.getElementById('delivery-state').textContent = `${labels[value.delivery] || value.delivery}. В очереди: ${value.pending}.` + (value.lastDelivery ? ` Передано сервису: ${new Date(value.lastDelivery).toLocaleTimeString('ru')}.` : '');
     document.getElementById('pair-form').hidden = (value.paired && value.delivery !== 'pair_again') || value.delivery === 'server_update_required';
   } catch (error) { document.getElementById('result').textContent = error.message; delay = Math.min(60_000, 15_000 * 2 ** Math.min(failures++, 3)); }

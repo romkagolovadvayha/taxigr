@@ -14,6 +14,7 @@ import { extractHouseNumber } from '../src/domain/address-precision';
 
 export type OrderRow = RowDataPacket & {
   id: string;
+  idempotency_key?: string | null;
   passenger_id: string;
   driver_id: string | null;
   active_driver_id: string | null;
@@ -67,6 +68,7 @@ export type OrderRow = RowDataPacket & {
   driver_avatar_url?: string | null;
   driver_avatar_mime?: string | null;
   driver_updated_at?: Date | string | null;
+  driver_location_at?: Date | string | null;
   driver_rating_count?: number | null;
   rating?: number | null;
   passenger_name?: string | null;
@@ -409,7 +411,7 @@ export const orderSelect = `
     rr_passenger.score AS passenger_score, rr_driver.score AS driver_score,
     v.make AS vehicle_make, v.model AS vehicle_model, v.color AS vehicle_color,
     v.color_hex AS vehicle_color_hex, v.plate,
-    dl.latitude, dl.longitude,
+    dl.latitude, dl.longitude, dl.recorded_at AS driver_location_at,
     pl.latitude AS passenger_latitude, pl.longitude AS passenger_longitude
   FROM orders o
   LEFT JOIN drivers d ON d.id = o.driver_id

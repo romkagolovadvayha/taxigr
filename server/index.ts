@@ -9,6 +9,7 @@ import { config } from './config';
 import { sendCriticalErrorReport } from './critical-telegram';
 import { db } from './db';
 import { deliverGroupAlerts } from './group-alerts';
+import { pruneMaxGroupBookingData } from './max-group-booking';
 import { processVkBroadcasts } from './vk-broadcast-worker';
 import { closeGatewayDispatcher } from './gateway-proxy';
 import { pruneMessengerBookingData } from './messenger-booking';
@@ -146,7 +147,7 @@ const groupAlertTimer = setInterval(() => {
 groupAlertTimer.unref();
 
 const authAbusePruneTimer = setInterval(() => {
-  void pruneAuthAbuseData().then(pruneMessengerBookingData).catch((error) => {
+  void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).catch((error) => {
     app.log.error(error, 'auth abuse data pruning failed');
     reportCritical({
       source: 'server-process',
@@ -156,7 +157,7 @@ const authAbusePruneTimer = setInterval(() => {
   });
 }, 24 * 60 * 60 * 1_000);
 (authAbusePruneTimer as unknown as { unref?: () => void }).unref?.();
-void pruneAuthAbuseData().then(pruneMessengerBookingData).catch((error) => {
+void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).catch((error) => {
   app.log.error(error, 'initial auth abuse data pruning failed');
   reportCritical({
     source: 'server-process',

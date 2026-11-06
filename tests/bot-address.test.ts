@@ -39,6 +39,9 @@ describe('messenger free-text addresses', () => {
     ['из Грахово в Можгу', ['Грахово', 'Можгу']],
     ['Советская 10\nбольница', ['Советская 10', 'больница']],
     ['Советская 10 - больница', ['Советская 10', 'больница']],
+    ['с кизнера нужно забрать и увезти в Мари возжай', ['кизнера', 'Мари возжай']],
+    ['Заберите нас с санатория в Кизнере, а потом отвезите в Мари-Возжай', ['санатория в Кизнере', 'Мари-Возжай']],
+    ['Из посёлка Кизнера надо забрать, увезти до Мари-Возжая', ['посёлка Кизнера', 'Мари-Возжая']],
   ])('splits a route %s', (text, expected) => expect(splitBotRoute(text as string)).toEqual(expected));
   it('preserves an unknown address verbatim for the driver', () => {
     const raw='За старой баней, у зелёного забора';
@@ -142,6 +145,16 @@ describe('bot resolution through the real parsing pipeline', () => {
   });
   it.each(['Можга', 'в можгу', 'я хочу в можгу', 'Можга придорожная 10'])('returns only the city for %s', async query => {
     expect((await resolveBotAddressOptions(query, false)).address).toMatchObject({label:'г. Можга',kind:'settlement'});
+    expect(searchAddresses).not.toHaveBeenCalled();
+  });
+  it('distinguishes the two Kizners and resolves the named district destination', async () => {
+    vi.mocked(getAddressDirectory).mockResolvedValue(grahovoAddressCatalog);
+    const result = await resolveBotAddressOptions('кизнера', true);
+    expect(result.address).toBeNull();
+    expect(result.candidates.map(address => address.label)).toEqual(['п. Кизнер', 'с. Кизнер']);
+    expect((await resolveBotAddressOptions('посёлка Кизнера', true)).address?.label).toBe('п. Кизнер');
+    expect((await resolveBotAddressOptions('села Кизнера', true)).address?.label).toBe('с. Кизнер');
+    expect((await resolveBotAddressOptions('Мари возжай', false)).address?.label).toBe('д. Мари-Возжай');
     expect(searchAddresses).not.toHaveBeenCalled();
   });
 });

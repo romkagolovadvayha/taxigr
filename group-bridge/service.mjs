@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,7 @@ import QRCode from 'qrcode';
 import { TARGETS, selectGroup, makeEvent, phoneUriFromJid } from './core.mjs';
 import { EventQueue } from './queue.mjs';
 import { Backoff, RequestGate, retryAfterMs } from './request-control.mjs';
+import { isFreshMaxTaxiRequest } from '../src/domain/group-alerts.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const home = process.env.TAXIGR_BRIDGE_HOME;
@@ -29,6 +30,11 @@ const queue = new EventQueue(join(home, 'queue.sqlite'));
 const status = { whatsapp: { state: 'connecting' }, max: { state: 'connecting' }, delivery: 'not_paired', lastDelivery: null, received: 0, rejected: 0 };
 let stopping = false, socket, maxProcess, pumping = false, actionInFlight = false;
 let heartbeatAt = 0, needsBind = false, whatsappConnecting = false, whatsappTimer, maxTimer;
+let maxAccountId, bookingPollAt = Infinity, bookingUnavailableUntil = 0;
+const maxSends = new Map();
+const maxId = /^[1-9]\d{0,19}$/u;
+const bookingEnabled = () => config.maxBooking === true && maxId.test(maxAccountId ?? '');
+const bookingKey = (...values) => createHash('sha256').update(JSON.stringify(values)).digest('hex');
 const gate = new RequestGate();
 const whatsappBackoff = new Backoff(), maxBackoff = new Backoff();
 const logger = pino({ level: 'silent' });
@@ -50,6 +56,7 @@ function requestApi(path, body, token = config.token) {
       response.on('error', reject);
       response.on('aborted', () => reject(new Error('API_RESPONSE_INTERRUPTED')));
       response.on('end', () => {
+        if (path === 'max-booking' && [403, 404].includes(response.statusCode)) return resolve({ unavailable: true });
         if (response.statusCode < 200 || response.statusCode >= 300) return reject(Object.assign(new Error('API_ERROR'), { status: response.statusCode, retryAfterMs: retryAfterMs(response.headers['retry-after']) }));
         try { resolve(JSON.parse(result).data); } catch { reject(new Error('INVALID_API_RESPONSE')); }
       });
@@ -76,10 +83,89 @@ function selected(provider, group) {
 }
 function receive(provider, message) {
   const event = makeEvent(message, config.groups[provider], config.since);
-  if (!event) return;
-  try { if (queue.add(event)) status.received++; }
+  try {
+    if (event && queue.add(event)) status.received++;
+    if (provider === 'max' && bookingEnabled() && Date.now() >= bookingUnavailableUntil) {
+      const lead = makeEvent(message, config.groups.max, config.since, Date.now(), isFreshMaxTaxiRequest);
+      if (lead?.senderId) {
+        queue.add({ eventId: bookingKey(maxAccountId, 'start', lead.eventId), sentAt: lead.sentAt,
+          maxBooking: { action: 'start', accountId: maxAccountId, event: lead } });
+      }
+    }
+  }
   catch { status.delivery = 'queue_full'; }
   void pump();
+}
+
+function sendMaxCommand(command) {
+  if (!maxProcess?.stdin.writable) return false;
+  maxProcess.stdin.write(JSON.stringify(command) + '\n');
+  return true;
+}
+function syncMaxWatches() {
+  if (bookingEnabled()) sendMaxCommand({ kind: 'watch', accountId: maxAccountId, senders: queue.maxWatches(maxAccountId) });
+}
+async function sendMaxBooking(accountId, senderId, key, text) {
+  if (!text || accountId !== maxAccountId || !bookingEnabled() || !maxProcess?.stdin.writable) return false;
+  if (!queue.claimMaxReply(key)) return false;
+  const sent = await new Promise(resolve => {
+    const timer = setTimeout(() => complete(false), 13_000);
+    const complete = value => { clearTimeout(timer); maxSends.delete(key); resolve(value); };
+    maxSends.set(key, complete);
+    if (!sendMaxCommand({ kind: 'send', accountId, senderId, key, text })) complete(false);
+  });
+  if (!sent) status.maxBooking = 'send_failed';
+  return sent;
+}
+async function processMaxBooking(payload, replyKey) {
+  if (payload.accountId !== maxAccountId || !bookingEnabled() || Date.now() < bookingUnavailableUntil) return;
+  const result = await api('max-booking', payload);
+  if (result.unavailable) {
+    status.maxBooking = 'server_unavailable';
+    bookingUnavailableUntil = Date.now() + 300_000;
+    bookingPollAt = bookingUnavailableUntil;
+    sendMaxCommand({ kind: 'watch', accountId: payload.accountId, senders: [] });
+    return;
+  }
+  if (payload.accountId !== maxAccountId) return;
+  if (!status.maxBooking || status.maxBooking === 'server_unavailable') status.maxBooking = 'connected';
+  if (payload.action === 'poll') {
+    const watched = new Set(queue.maxWatches(maxAccountId).map(([sender]) => sender));
+    for (const sender of watched) if (!result.watch.includes(sender)) queue.watchMax(maxAccountId, sender, 0);
+    syncMaxWatches();
+    for (const message of result.messages) {
+      if (!watched.has(message.senderId) || payload.accountId !== maxAccountId) continue;
+      await sendMaxBooking(payload.accountId, message.senderId, message.key, message.text);
+      if (payload.accountId !== maxAccountId) return;
+      const { senderId, orderId, driverId } = message;
+      queue.add({ eventId: bookingKey(payload.accountId, 'ack', message.key), sentAt: Date.now(),
+        maxBooking: { action: 'ack', accountId: payload.accountId, senderId, orderId, driverId } });
+    }
+    bookingPollAt = result.waiting && queue.maxWatches(payload.accountId).length ? Date.now() + 15_000 : Infinity;
+  } else if (payload.action !== 'ack') {
+    const senderId = payload.action === 'start' ? payload.event.senderId : payload.senderId;
+    const sent = await sendMaxBooking(payload.accountId, senderId, replyKey, result.text);
+    if (payload.accountId !== maxAccountId) return;
+    if (result.watch === false || (result.watch && (payload.action === 'message' || sent))) {
+      queue.watchMax(payload.accountId, senderId, result.watch ? Date.now() + (result.waiting ? 270 : 15) * 60_000 : 0);
+      syncMaxWatches();
+    }
+    if (result.waiting) bookingPollAt = Math.min(bookingPollAt, Date.now() + 3000);
+  }
+}
+
+function receiveMaxPrivate(message) {
+  const now = Date.now();
+  if (!bookingEnabled() || now < bookingUnavailableUntil || !message.id || !maxId.test(message.senderId) ||
+      !Number.isSafeInteger(message.sentAt) || message.sentAt < now - 180_000 || message.sentAt > now + 30_000 ||
+      typeof message.text !== 'string' || !message.text.trim() || message.text.length > 2000) return;
+  const eventId = bookingKey(maxAccountId, 'message', message.senderId, message.id);
+  try {
+    queue.add({ eventId, sentAt: message.sentAt, maxBooking: {
+      action: 'message', accountId: maxAccountId, senderId: message.senderId, eventId, text: message.text, sentAt: message.sentAt,
+    } });
+    void pump();
+  } catch { status.delivery = 'queue_full'; }
 }
 async function pump() {
   if (stopping || pumping || actionInFlight || !config.token || !gate.ready()) return;
@@ -89,18 +175,23 @@ async function pump() {
       await api('groups/bind', { groups: Object.values(config.groups) });
       needsBind = false;
     } else {
-      const row = queue.pending()[0];
+      const row = queue.pending(bookingEnabled())[0];
       if (row) {
         try {
-          await api('events', JSON.parse(row.payload));
+          const item = JSON.parse(row.payload);
+          if (item.maxBooking) await processMaxBooking(item.maxBooking, row.id);
+          else {
+            await api('events', item);
+            status.lastDelivery = new Date().toISOString();
+          }
           queue.done(row.id);
-          status.lastDelivery = new Date().toISOString();
         } catch (error) {
           if (error.status !== 400 && error.status !== 413) throw error;
           // A permanently invalid payload must not block every later message.
           queue.discard(row.id); status.rejected++;
         }
-      } else if (Date.now() >= heartbeatAt) await api('device');
+      } else if (bookingEnabled() && Date.now() >= bookingPollAt) await processMaxBooking({ action: 'poll', accountId: maxAccountId });
+      else if (Date.now() >= heartbeatAt) await api('device');
       else return;
     }
     status.delivery = 'connected';
@@ -167,15 +258,28 @@ function connectMax() {
     try {
       const event = JSON.parse(line);
       if (event.kind === 'qr') status.max = { state: 'scan_qr', qr: await QRCode.toDataURL(event.value, { width: 320, margin: 2 }) };
-      if (event.kind === 'ready') { openedAt = Date.now(); selected('max', event.group); }
-      if (event.kind === 'status') status.max = { state: event.value, ...(event.error ? { error: event.error } : {}) };
+      if (event.kind === 'ready') {
+        openedAt = Date.now(); selected('max', event.group);
+        maxAccountId = maxId.test(event.accountId ?? '') ? event.accountId : undefined;
+        status.max.accountId = maxAccountId;
+        if (bookingEnabled()) { bookingPollAt = Date.now(); syncMaxWatches(); }
+      }
+      if (event.kind === 'status') {
+        status.max = { state: event.value, ...(event.error ? { error: event.error } : {}) };
+        if (event.value === 'reconnecting') maxAccountId = undefined;
+      }
       if (event.kind === 'message') receive('max', event.message);
+      if (event.kind === 'private') receiveMaxPrivate(event.message);
+      if (event.kind === 'sent') maxSends.get(event.key)?.(event.ok === true);
     } catch { /* Never print private IPC or library payloads. */ }
   });
   maxProcess.stderr.on('data', () => {});
+  maxProcess.stdin.on('error', () => {});
   maxProcess.on('error', () => { status.max = { state: 'start_error' }; });
   maxProcess.on('close', () => {
     maxProcess = undefined;
+    maxAccountId = undefined;
+    for (const complete of maxSends.values()) complete(false);
     if (stopping) return;
     status.max = { state: 'reconnecting' };
     if (openedAt && Date.now() - openedAt >= 60_000) maxBackoff.reset();
@@ -215,7 +319,7 @@ const server = http.createServer(async (request, response) => {
       status.delivery = 'connected';
     } else if (request.url === '/max-password') {
       if (status.max.state !== 'password_required' || typeof body.password !== 'string' || body.password.length > 256) throw new Error('INVALID_PASSWORD');
-      maxProcess.stdin.write(JSON.stringify({ password: body.password }) + '\n');
+      if (!sendMaxCommand({ kind: 'password', password: body.password })) throw new Error('MAX_OFFLINE');
     } else if (request.url === '/retry') {
       if (config.token) {
         await api('device', undefined, { recovery: true });

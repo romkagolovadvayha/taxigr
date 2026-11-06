@@ -11,7 +11,7 @@ import { intercitySettlements } from '../src/data/intercity-settlements';
 import { addressSearchScore } from '../src/domain/address-search';
 import { interpretBotAddress } from './bot-address-ai';
 
-import { normalizeBotAddress, chooseBotAddress, rankBotAddresses } from '../src/domain/free-text-address';
+import { addressWordsMatch, normalizeBotAddress, chooseBotAddress, rankBotAddresses } from '../src/domain/free-text-address';
 export { normalizeBotAddress, splitBotRoute, botAddressScore, chooseBotAddress } from '../src/domain/free-text-address';
 
 const timingPattern = /(?<![\p{L}\d])(?:через\s+(?:полчаса|\d{1,3}\s*(?:минут[ыу]?|мин\.?|час(?:а|ов)?|ч\.?))|(?:к|на|в)\s+\d{1,2}[:.]\d{2}|(?:завтра|послезавтра)(?:\s+(?:к|на|в)\s+\d{1,2}[:.]\d{2})?)(?![\p{L}\d])/iu;
@@ -43,6 +43,37 @@ export function unresolvedBotAddress(raw: string): Address {
 
 export type BotAddressResolution = { address: Address | null; candidates: Address[]; recognized?: Address };
 
+function settlementWords(value: string): string[] {
+  return normalizeBotAddress(value).replace(/^(?:[гдсп]|город|село|деревня|поселок)\s+/u, '')
+    .replace(/-/gu, ' ').split(/\s+/u).filter(Boolean);
+}
+const intercityNames = intercitySettlements.map(address => ({ address, name: settlementWords(address.label) }));
+
+function intercityBotSettlement(input: string): BotAddressResolution | null {
+  const town = /^(?:п\.?|пос[её]л(?:ок|ка|ке))\s+/iu;
+  const village = /^(?:с\.|сел[оае])\s+/iu;
+  const qualifier = town.test(input) ? town : village.test(input) ? village : null;
+  const query = settlementWords(qualifier ? input.replace(qualifier, '') : input);
+  if (!query.length || /автодорог[аиуе]|трасс[ауеы]/iu.test(input)) return null;
+  const matches = intercityNames.flatMap(({ address, name }) => {
+    if (!name.length || name.length > query.length || !name.every((word, index) => addressWordsMatch(query[index]!, word))) return [];
+    // A bare number after the name normally indicates a local street and house.
+    const tail = query.slice(name.length);
+    const exact = name.every((word, index) => query[index] === word);
+    if (tail.length && !qualifier && (!exact || !tail.some(word => /[а-я]{2,}/u.test(word) && !/^(?:ул|улица|дом|пер)$/u.test(word)))) return [];
+    return [{ address, nameLength: name.length, exact }];
+  });
+  const longest = Math.max(0, ...matches.map(match => match.nameLength));
+  const longMatches = matches.filter(match => match.nameLength === longest);
+  const matching = longMatches.some(match => match.exact) ? longMatches.filter(match => match.exact) : longMatches;
+  // A known distinction (for example p. and s. Kizner) takes priority over
+  // untyped settlements from the broader catalogue.
+  const qualified = qualifier ? matching.filter(match => qualifier.test(match.address.label)) : [];
+  const choices = (qualified.length ? qualified : matching).map(match => match.address);
+  if (!choices.length) return null;
+  return choices.length === 1 ? { address: choices[0]!, candidates: [] } : { address: null, candidates: choices.slice(0, 5) };
+}
+
 export async function resolveBotAddressOptions(raw: string, pickup: boolean, selected?: Address): Promise<BotAddressResolution> {
   let input = bookingAddressText(raw);
   let query = normalizeBotAddress(input);
@@ -51,12 +82,20 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
     getAddressDirectory(), listPlaces().catch(() => []), getRememberedAddresses().catch(() => []),
   ]);
   const preciseHouses = directory.filter(address => address.houseNumber && !hasApproximateCoordinates(address));
-  const local = overlayRememberedAddresses([...directory, ...intercitySettlements, ...places.map(place => ({ ...placeToAddress(place),
+  const local = overlayRememberedAddresses([...directory, ...places.map(place => ({ ...placeToAddress(place),
     details: [place.name, ...place.aliases, place.addressLabel].join(' · ') }))], [...remembered, ...preciseHouses]);
   const clean = (address: Address): Address => ({ ...address, details: address.details?.slice(0, 255) });
-  const cities = !pickup ? intercitySettlements.filter(address => addressSearchScore(address, query) > 0) : [];
-  if (!selected && cities.length === 1) return { address: cities[0]!, candidates: [] };
+  if (!selected) {
+    const locality = settlementWords(input).join(' ');
+    const localSettlement = !pickup && directory.find(address => address.kind === 'settlement' &&
+      settlementWords(address.label).join(' ') === locality);
+    if (localSettlement) return { address: clean(localSettlement), candidates: [] };
+  }
   let ranked = selected ? [{ address: selected, score: 10 }] : rankBotAddresses(input, local, pickup, true);
+  if (!ranked.length) {
+    const city = intercityBotSettlement(input);
+    if (city) return city;
+  }
   if (!ranked.length) {
     const field = pickup ? 'pickup' : 'destination';
     const corrected = (await interpretBotAddress(input, field))?.[field];
@@ -64,6 +103,10 @@ export async function resolveBotAddressOptions(raw: string, pickup: boolean, sel
       input = bookingAddressText(corrected);
       query = normalizeBotAddress(input);
       ranked = rankBotAddresses(input, local, pickup, true);
+      if (!ranked.length) {
+        const city = intercityBotSettlement(input);
+        if (city) return city;
+      }
     }
   }
   if (!ranked.length) {

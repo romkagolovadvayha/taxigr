@@ -38,6 +38,8 @@ const schema = z.object({
   MAX_BOT_USERNAME: z.string().regex(/^[A-Za-z0-9_]*$/u).default(''),
   MAX_BOT_TOKEN: z.string().default(''),
   MAX_WEBHOOK_SECRET: z.string().regex(/^[A-Za-z0-9_-]*$/u).default(''),
+  MAX_GROUP_BOOKING_DEVICE_ID: z.uuid().or(z.literal('')).default(''),
+  MAX_GROUP_BOOKING_ACCOUNT_ID: z.string().regex(/^(?:[1-9]\d{0,19})?$/u).default(''),
   TELEGRAM_BOT_USERNAME: z.string().regex(/^[A-Za-z0-9_]*$/u).default(''),
   TELEGRAM_BOT_TOKEN: z.string().default(''),
   TELEGRAM_ADMIN_CHAT_ID: z.string().regex(/^-?\d+$/u).default('-1004215180973'),

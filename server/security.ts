@@ -17,6 +17,7 @@ export type AuthUser = {
 export type OrderQuoteClaims = {
   /** Issued only by the authenticated bot booking handler. */
   pricingMode?: 'fixed' | 'driver';
+  maxGroupBooking?: true;
   passengerId: string;
   pickup: Address;
   destination: Address;

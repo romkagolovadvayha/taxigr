@@ -18,6 +18,7 @@ import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
 import { appUrl } from './messenger-notifications';
 import { config } from './config';
+import { interpretConversationalBotRoute, isConversationalBotRoute } from '../src/domain/free-text-address';
 
 export type BookingMessage = MessengerIdentityInput & {
   eventId: string;
@@ -51,6 +52,15 @@ const freshDraft = (): BookingDraft => ({ id: randomUUID(), flowVersion: 2, stag
 const welcome = (text = 'Откройте заказ такси: выберите адреса на карте, узнайте стоимость и следите за поездкой прямо здесь.'): Reply => ({
   text, buttons: [{ label: 'Заказать такси', miniApp: true }, { label: 'Заказать сообщениями', data: 'b:start' }],
 });
+function bookingPhonePrompt(provider: BookingMessage['provider']): Reply {
+  return provider === 'vk' ? {
+    text: 'Подтвердите номер в приложении такси внутри ВК, чтобы водитель мог связаться с вами. Затем вернитесь в чат и нажмите «Заказать сообщениями».',
+    buttons: [{ label: 'Подтвердить номер', miniApp: true }, { label: 'Заказать сообщениями', data: 'b:start' }],
+  } : {
+    text: 'Поделитесь своим номером кнопкой ниже, чтобы водитель мог связаться с вами.',
+    requestContact: true,
+  };
+}
 const draftButtons = (draft: BookingDraft): NonNullable<Reply['buttons']> => [
   { label: 'Отменить оформление', data: `b:cancel:${draft.id}` },
 ];
@@ -175,6 +185,8 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
     if (!message.eventId || message.eventId.length > 128) return;
     const text = message.text?.trim() ?? '';
     const startRequested = text === 'b:start' || /^(?:заказать(?: такси)?|начать)$/iu.test(text);
+    const routePair = splitBotRoute(text);
+    const explicitRoute = isConversationalBotRoute(text) || (!!routePair && /^(?:нужно\s+)?такси\s+/iu.test(text));
     let account = await firstRow<RowDataPacket & { user_id: string; chat_id: string }>(
       `SELECT user_id, chat_id FROM user_messenger_accounts
        WHERE provider = ? AND external_user_id = ? AND active = TRUE LIMIT 1`,
@@ -191,16 +203,11 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       );
     }
     if (!account) {
-      if (!startRequested && !message.verifiedPhone) {
+      if (!startRequested && !explicitRoute && !message.verifiedPhone) {
         await sendBookingReply(message, welcome());
         return;
       }
-      await sendBookingReply(message, message.provider === 'vk' ? {
-        text: 'Для первого заказа подтвердите номер, войдя через VK: https://taxigr.ru/sign-in . Затем вернитесь сюда и напишите «Такси». Следующие заказы можно оформлять прямо в чате.',
-      } : {
-        text: 'Сначала поделитесь своим номером кнопкой ниже — водитель сможет связаться с вами. Затем я спрошу, откуда вас забрать. Обработка данных: https://taxigr.ru/privacy',
-        requestContact: true,
-      });
+      await sendBookingReply(message, bookingPhonePrompt(message.provider));
       return;
     }
     if (account.chat_id !== message.chatId) return;
@@ -215,7 +222,10 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         [message.verifiedPhone, user.id],
       );
       if (owner || (user.phone && user.phone !== message.verifiedPhone)) {
-        await sendBookingReply(message, { text: 'Этот номер связан с другим профилем. Войдите с ним на https://taxigr.ru/sign-in и привяжите бота в настройках, затем вернитесь сюда.' });
+        await sendBookingReply(message, {
+          text: 'Этот номер связан с другим профилем. Откройте приложение такси и проверьте, какой номер привязан к профилю.',
+          buttons: [{ label: 'Открыть приложение такси', miniApp: true }],
+        });
         return;
       }
       await db.execute('UPDATE users SET phone = ?, phone_verified_at = UTC_TIMESTAMP(3) WHERE id = ? AND (phone IS NULL OR phone = ?)',
@@ -223,13 +233,11 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       user.phone = message.verifiedPhone;
     }
     if (!user.phone) {
-      if (!startRequested) {
+      if (!startRequested && !explicitRoute) {
         await sendBookingReply(message, welcome());
         return;
       }
-      await sendBookingReply(message, message.provider === 'vk'
-        ? { text: 'Подтвердите номер в своём профиле: https://taxigr.ru/sign-in . Затем напишите здесь «Такси».' }
-        : { text: 'Поделитесь своим номером кнопкой ниже, чтобы водитель мог связаться с вами.', requestContact: true });
+      await sendBookingReply(message, bookingPhonePrompt(message.provider));
       return;
     }
     await db.execute(`UPDATE user_messenger_accounts SET bot_contact_available = TRUE, last_seen_at = UTC_TIMESTAMP(3)
@@ -407,7 +415,8 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           return activeOrderReply(order, `Такси вызвано. Ищем водителя.${draft.priceMinor == null ? '\nСтоимость определит водитель и согласует с вами.' : ''}`);
         }
         const priceQuestion = /сколько\s+(?:стоит|будет|возьм[её]те)|во\s+сколько\s+обойд[её]тся|узнать\s+(?:про\s+цену|стоимость)/iu.test(text);
-        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text || (draft.stage === 'idle' && !priceQuestion) || draft.stage === 'done') {
+        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text ||
+            ((draft.stage === 'idle' || draft.stage === 'done') && !priceQuestion && !explicitRoute)) {
           draft = freshDraft();
           return welcome();
         }
@@ -430,7 +439,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         const questionPair = questionAddress?.match(/^(.+?)\s+до\s+(.+)$/iu);
         let pair = priceQuestion
           ? (questionPair ? [questionPair[1]!.trim(), questionPair[2]!.trim()] : null)
-          : splitBotRoute(text);
+          : await interpretConversationalBotRoute(text, field, interpretBotAddress, routePair);
         let addressText = text;
         if (priceQuestion && !pair) {
           if (draft.stage === 'confirm' && !questionAddress) return review(draft);
@@ -463,9 +472,10 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         return quote();
       };
       const response = await process().catch(error => {
-        const message = error instanceof Error ? error.message : 'Не удалось оформить заказ. Попробуйте ещё раз.';
-        if (error?.code === bookingUnavailableCode) return { text: message };
-        const reply = resumeDraft(draft, message);
+        const errorMessage = error instanceof Error ? error.message : 'Не удалось оформить заказ. Попробуйте ещё раз.';
+        if (error?.code === bookingUnavailableCode) return { text: errorMessage };
+        if (error?.code === 'PHONE_VERIFICATION_REQUIRED') return bookingPhonePrompt(message.provider);
+        const reply = resumeDraft(draft, errorMessage);
         if ((draft.stage === 'pickup' || draft.stage === 'destination' || draft.stage === 'choose') && draft.pickupRaw && draft.destinationRaw) {
           reply.buttons = [{ label: 'Повторить расчёт', data: `b:quote:${draft.id}` }, ...(reply.buttons ?? [])];
         }

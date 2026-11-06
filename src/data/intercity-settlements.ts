@@ -16,6 +16,15 @@ const verifiedSettlements: Address[] = [{
   id: 'intercity:kazan', label: 'г. Казань', kind: 'settlement',
   details: 'Республика Татарстан · межгород',
   coordinates: { latitude: 55.7946485, longitude: 49.1115022 },
+}, {
+  // Two distinct localities in the Russian State Catalogue of Geographical Names.
+  id: 'gkgn:0718981', label: 'п. Кизнер', kind: 'settlement',
+  details: 'Удмуртская Республика · межгород',
+  coordinates: { latitude: 56.285, longitude: 51.5133333 },
+}, {
+  id: 'gkgn:0518786', label: 'с. Кизнер', kind: 'settlement',
+  details: 'Удмуртская Республика · межгород',
+  coordinates: { latitude: 56.3116667, longitude: 51.5133333 },
 }];
 
 function localityName(label: string): string {
@@ -44,3 +53,5 @@ export const intercitySettlements: Address[] = [
     }];
   }),
 ];
+
+export const intercitySettlementById = new Map(intercitySettlements.map(address => [address.id, address]));

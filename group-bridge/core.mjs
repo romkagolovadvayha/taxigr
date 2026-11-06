@@ -18,10 +18,10 @@ export function phoneUriFromJid(jid) {
   return match && /^[1-9]/u.test(match[1]) ? `tel:+${match[1]}` : undefined;
 }
 
-export function makeEvent(message, group, since, now = Date.now()) {
+export function makeEvent(message, group, since, now = Date.now(), matches = isTaxiRequest) {
   if (!group || message.groupId !== group.id || message.fromMe || !message.id || typeof message.text !== 'string') return null;
   if (!Number.isSafeInteger(message.sentAt) || message.sentAt < since || message.sentAt < now - 3_600_000 || message.sentAt > now + 60_000) return null;
-  if (!isTaxiRequest(message.text) || !message.text.trim() || message.text.length > 2000) return null;
+  if (!matches(message.text, message.sentAt, now) || !message.text.trim() || message.text.length > 2000) return null;
   return {
     eventId: createHash('sha256').update(JSON.stringify([group.provider, group.id, message.id])).digest('hex'),
     provider: group.provider, groupId: group.id, groupTitle: group.title,

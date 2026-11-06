@@ -17,6 +17,7 @@ vi.mock('../server/max-bot',()=>({sendMaxMessage:mocks.send}));
 vi.mock('../server/vk-bot',()=>({sendVkMessage:mocks.send,vkInlineKeyboard:(rows:unknown)=>rows}));
 vi.mock('../server/messenger-notifications',()=>({appUrl:(path:string)=>`https://taxigr.ru${path}`}));
 import { createMessengerBookingHandler } from '../server/messenger-booking';
+import { interpretBotAddress } from '../server/bot-address-ai';
 import type { FastifyInstance } from 'fastify';
 import { grahovoAddressCatalog } from '../src/data/grahovo-address-catalog';
 
@@ -34,6 +35,7 @@ const start=()=>handle(message('b:start'));
 
 beforeEach(()=>{
   vi.resetAllMocks(); events.clear(); draft=initial(); active=null; expiresAt=new Date(Date.now()+1800000);
+  vi.mocked(interpretBotAddress).mockResolvedValue(null);
   mocks.firstRow.mockImplementation(async(sql:string)=>sql.includes('user_messenger_accounts')?{user_id:'user',chat_id:'42'}:
     sql.includes('SELECT id, status FROM orders')?active:null);
   mocks.user.mockResolvedValue({id:'user',roles:['passenger'],phone:'+79000000000'});
@@ -54,6 +56,26 @@ beforeEach(()=>{
 });
 
 describe('taxi booking in messenger conversations',()=>{
+  it.each(['vk', 'max', 'telegram'] as const)('offers phone verification inside %s', async provider => {
+    mocks.firstRow.mockResolvedValue(null);
+    await handle({ ...message('b:start'), provider });
+    const reply = mocks.send.mock.calls.at(-1)?.[1];
+    expect(JSON.stringify(reply)).not.toContain('taxigr.ru/sign-in');
+    if (provider === 'vk') expect(reply.keyboard[0][0]).toMatchObject({ label: 'Подтвердить номер', url: expect.stringMatching(/^https:\/\/vk\.com\/app/u) });
+    else if (provider === 'max') expect(reply.attachments[0].payload.buttons[0][0]).toMatchObject({ type: 'request_contact' });
+    else expect(reply.reply_markup.keyboard[0][0]).toMatchObject({ request_contact: true });
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it.each(['vk', 'max', 'telegram'] as const)('runs a natural ride request through AI before resolving both endpoints in %s', async provider => {
+    const text = 'с кизнера нужно забрать и увезти в Мари возжай';
+    vi.mocked(interpretBotAddress).mockResolvedValue({ pickup: 'Кизнер', destination: 'Мари-Возжай' });
+    await handle({ ...message(text), provider });
+    expect(interpretBotAddress).toHaveBeenCalledWith(text, 'pickup');
+    expect(mocks.resolve).toHaveBeenCalledWith('Кизнер', true);
+    expect(mocks.resolve).toHaveBeenCalledWith('Мари-Возжай', false);
+    expect(draft.stage).toBe('confirm');
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
   it.each(['max', 'telegram', 'vk'] as const)('preserves apartment and entrance details after %s addresses resolve to mapped houses', async provider => {
     const pickupRaw='Грахово, ул 50 лет победы дом 10 кв 2';
     const destinationRaw='Ул Ачинцева 11 подъезд 3 15 квартира';

@@ -33,12 +33,45 @@ export function normalizeBotAddress(value: string): string {
 
 export function splitBotRoute(value: string): [string, string] | null {
   const text = value.trim().replace(/^(?:пожалуйста\s+)?(?:(?:вызови(?:те)?|закажи(?:те)?|нужно|нужна|можно)\s+)?такси\s*/iu, '');
+  const ride = text.match(/^(.+?)(?:[,;]\s*|\s+)(?:(?:и|а|потом|затем)\s+){0,2}(?:увезти|отвезти|увези(?:те)?|отвези(?:те)?|довезти|довези(?:те)?|поедем|едем)\s+(?:в|на|до)\s+(.+)$/iu);
+  if (ride) {
+    const pickup = ride[1]!.trim()
+      .replace(/^(?:(?:привет|здравствуйте)[,!.]\s*)?(?:(?:нужно|надо|можно)\s+)?(?:забрать|забери(?:те)?)\s+(?:(?:меня|нас)\s+)?/iu, '')
+      .replace(/^(?:из|от|с)\s+/iu, '')
+      .replace(/(?:[,\s]+)(?:(?:нужно|надо|можно)\s+)?(?:забрать|забери(?:те)?)(?:\s+(?:меня|нас))?[, ]*$/iu, '').trim();
+    if (pickup.length >= 2) return [pickup, ride[2]!.trim()];
+  }
   const parts = text.split(/\s*(?:→|->|\n|;|\s[—–-]\s|\s+до\s+|\s+куда:\s*)\s*/iu).filter(Boolean);
   if (parts.length === 2) {
     return [parts[0]!.replace(/^(?:откуда:\s*|(?:из|от|с)\s+)/iu, '').trim(), parts[1]!.trim()];
   }
   const natural = text.match(/^(?:из|от|с)\s+(.+?)\s+(?:в|на)\s+(.+)$/iu);
   return natural ? [natural[1]!.trim(), natural[2]!.trim()] : null;
+}
+
+export function isConversationalBotRoute(text: string): boolean {
+  return /(?:^|[^\p{L}])(?:забрать|забери(?:те)?|увезти|отвезти|увези(?:те)?|отвези(?:те)?|довезти|довези(?:те)?)(?!\p{L})/iu.test(text) &&
+    /\s(?:в|на|до|куда)\s+/iu.test(text);
+}
+
+export async function interpretConversationalBotRoute(
+  text: string,
+  field: 'pickup' | 'destination',
+  interpret: (text: string, field: 'pickup' | 'destination') => Promise<{ pickup?: string | null; destination?: string | null } | null>,
+  fallback = splitBotRoute(text),
+): Promise<[string, string] | null> {
+  if (!isConversationalBotRoute(text)) return fallback;
+  const parsed = await interpret(text, field);
+  if (!parsed?.pickup || !parsed.destination) return fallback;
+  const preserve = (literal: string | undefined, inferred: string) => {
+    if (!literal) return inferred;
+    // Preserve an explicitly supplied settlement type or exact house number.
+    if (/^(?:[псдг]\.|пос[её]л(?:ок|ка|ке)|сел[оае]|деревн[яию]|город[ае]?)\s+/iu.test(literal)) return literal;
+    const house = extractQueryHouseNumber(normalizeBotAddress(literal));
+    if (house && normalizeHouseNumber(extractQueryHouseNumber(normalizeBotAddress(inferred))) !== normalizeHouseNumber(house)) return literal;
+    return inferred;
+  };
+  return [preserve(fallback?.[0], parsed.pickup), preserve(fallback?.[1], parsed.destination)];
 }
 
 function tokens(value: string): string[] {

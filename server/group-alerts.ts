@@ -26,7 +26,7 @@ export const groupEventSchema = z.object({
   senderId: z.string().regex(/^[1-9]\d{0,19}$/u).optional(),
 }).strict().refine(value => !value.senderId || value.provider === 'max');
 type Device = RowDataPacket & { id: string; owner_id: string; groups_json: WatchedGroup[] | string };
-const parseGroups = (value: Device['groups_json']): WatchedGroup[] => groupsSchema.parse(typeof value === 'string' ? JSON.parse(value) : value);
+export const parseGroups = (value: Device['groups_json']): WatchedGroup[] => groupsSchema.parse(typeof value === 'string' ? JSON.parse(value) : value);
 
 async function adminId(request: FastifyRequest): Promise<string> {
   const session = await authenticate(request);
@@ -36,7 +36,7 @@ async function adminId(request: FastifyRequest): Promise<string> {
   return session.id;
 }
 
-async function deviceFor(request: FastifyRequest): Promise<Device> {
+export async function deviceFor(request: FastifyRequest): Promise<Device> {
   const token = request.headers.authorization?.replace(/^Bearer /u, '');
   if (!token || !/^[A-Za-z0-9_-]{43}$/u.test(token)) throw fail(401, 'Подключите устройство заново');
   const device = await firstRow<Device>(`SELECT d.id, d.owner_id, d.groups_json FROM group_alert_devices d
