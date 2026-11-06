@@ -719,7 +719,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     };
   }, [bootstrapReady, demoSession, refresh, token]);
 
-  const requestQuote = useCallback(async () => {
+  const requestQuote = useCallback(async (confirmationMessage?: string) => {
     if (
       !token ||
       !pickup ||
@@ -800,7 +800,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setRouteCoordinates(route.coordinates);
       setRouteSummary(route);
       setQuoteStatus('ready');
-      setError(null);
+      setError(confirmationMessage ?? null);
     } catch (reason) {
       if (controller.signal.aborted || quoteRequestId.current !== requestId) return;
       setQuoteStatus('error');
@@ -1009,7 +1009,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return ride;
       } catch (reason) {
         if (reason instanceof ApiError && reason.code === bookingUnavailableCode) showBookingUnavailable();
-        if (reason instanceof ApiError && reason.code === 'PROMOTION_QUOTE_CHANGED') await requestQuote();
+        if (reason instanceof ApiError && (
+          reason.code === 'QUOTE_EXPIRED_OR_INVALID' || reason.code === 'PROMOTION_QUOTE_CHANGED' ||
+          reason.code === 'QUOTE_ADDRESS_MISMATCH'
+        )) {
+          pendingOrderCreation.current = null;
+          await requestQuote('Расчёт обновлён. Проверьте стоимость и подтвердите заказ.');
+          return null;
+        }
         const uncertainFailure =
           reason instanceof ApiError &&
           (reason.code === 'TIMEOUT' || reason.code === 'NETWORK_ERROR' || reason.status >= 500);

@@ -58,14 +58,17 @@ export async function signSession(user: AuthUser): Promise<string> {
     .sign(jwtKey);
 }
 
+export const orderQuoteLifetimeSeconds = 30 * 60;
+
 export async function signOrderQuote(claims: OrderQuoteClaims): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return new SignJWT({ quote: claims })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(claims.passengerId)
     .setIssuer('taxi-grahovo-api')
     .setAudience('taxi-grahovo-order-quote')
-    .setIssuedAt()
-    .setExpirationTime('5m')
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + orderQuoteLifetimeSeconds)
     .sign(jwtKey);
 }
 

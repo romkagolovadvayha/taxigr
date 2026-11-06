@@ -3,13 +3,15 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent } from '../src/domain/first-order-discount';
+import { bookingUnavailableCode } from '../src/domain/booking-availability';
 import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
-import { resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
+import { botPickupTiming, resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
 import { db, firstRow, withTransaction } from './db';
 import type { MessengerIdentityInput } from './messenger-identity';
 import { findOrCreatePhoneUser, findUserWithRoles, linkMessengerIdentity } from './repositories';
-import { signOrderQuote, signSession } from './security';
+import { orderQuoteLifetimeSeconds, signOrderQuote, signSession } from './security';
+import { interpretBotAddress } from './bot-address-ai';
 import { sendTelegramMessage } from './telegram-bot';
 import { sendMaxMessage } from './max-bot';
 import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
@@ -42,6 +44,7 @@ export type BookingDraft = {
   fareRoundingMinor?: number;
   fareRoundingMode?: FareRoundingMode;
   quotedAt?: number;
+  pickupTiming?: string;
   orderId?: string;
 };
 const freshDraft = (): BookingDraft => ({ id: randomUUID(), flowVersion: 2, stage: 'idle' });
@@ -119,17 +122,26 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
 }
 
 function review(draft: BookingDraft): Reply {
+  const timing = draft.pickupTiming ?? botPickupTiming(`${draft.pickupRaw ?? ''} ${draft.destinationRaw ?? ''}`);
+  const confirmLabel = draft.priceMinor == null ? 'без цены' : `за ${draft.priceMinor / 100} ₽`;
+  const unclearPickup = draft.pickup?.id.startsWith('manual:');
+  const unclearDestination = draft.destination?.id.startsWith('manual:');
+  const compound = unclearPickup ? draft.pickupRaw?.match(/(?:^|\s)(\d+)-(\d+)\s*$/u) : null;
   return {
     text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
-      (draft.priceMinor == null ? 'Адрес не удалось определить точно. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
+      (draft.priceMinor == null ? 'Точную цену не удалось рассчитать. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
+      (compound ? `\nУточните место подачи: ${compound[1]}-${compound[2]} — это номер дома или дом ${compound[1]}, квартира ${compound[2]}?` : '') +
       (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
+      (timing ? `\nВы указали «${timing}». Кнопка ниже начнёт поиск водителя сейчас.` : '') +
       '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
       [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
         .map(document => `https://taxigr.ru${document.path}`).join('\n'),
     buttons: [
-      { label: draft.priceMinor == null ? 'Вызвать без цены' : `Вызвать за ${draft.priceMinor / 100} ₽`, data: `b:confirm:${draft.id}` },
+      { label: `Вызвать${timing ? ' сейчас' : ''} ${confirmLabel}`, data: `b:confirm:${draft.id}` },
+      ...(unclearPickup ? [{ label: 'Уточнить место подачи', data: `b:edit-pickup:${draft.id}` }] : []),
+      ...(unclearDestination ? [{ label: 'Уточнить назначение', data: `b:edit-destination:${draft.id}` }] : []),
       { label: 'Изменить адреса', data: `b:restart:${draft.id}` },
       ...draftButtons(draft),
     ],
@@ -146,6 +158,16 @@ function addressChoice(draft: BookingDraft): Reply {
       label: `${index + 1}. ${address.label}`.slice(0, 40), data: `b:pick:${draft.id}:${index}`,
     })), ...draftButtons(draft)],
   };
+}
+
+function resumeDraft(draft: BookingDraft, prefix = ''): Reply {
+  let reply: Reply;
+  if (draft.stage === 'confirm') reply = review(draft);
+  else if (draft.stage === 'choose' && draft.choice) reply = addressChoice(draft);
+  else if (draft.stage === 'pickup') reply = { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
+  else if (draft.stage === 'destination') reply = { text: 'Куда поедем? Напишите адрес или название места.', buttons: draftButtons(draft) };
+  else reply = welcome();
+  return { ...reply, text: prefix ? `${prefix}\n\n${reply.text}` : reply.text };
 }
 
 export function createMessengerBookingHandler(app: FastifyInstance) {
@@ -231,7 +253,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
     }
     const reply = await withTransaction(async connection => {
       await connection.execute(`INSERT INTO messenger_booking_drafts
-        (provider, external_user_id, chat_id, draft_json, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 30 MINUTE))
+        (provider, external_user_id, chat_id, draft_json, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 2 HOUR))
         ON DUPLICATE KEY UPDATE external_user_id = VALUES(external_user_id)`,
       [message.provider, message.externalUserId, message.chatId, JSON.stringify(freshDraft())]);
       const [rows] = await connection.query<(RowDataPacket & { draft_json: unknown; expires_at: Date })[]>(
@@ -244,7 +266,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       let draft = rows[0] && new Date(rows[0].expires_at).getTime() > Date.now() ? readJson<BookingDraft>(rows[0].draft_json) : freshDraft();
       // Old drafts could start from an arbitrary message without an explicit booking request.
       if (draft.flowVersion !== 2) draft = freshDraft();
-      const quote = async (): Promise<Reply> => {
+      const calculateQuote = async (draft: BookingDraft): Promise<Reply> => {
         draft.id = randomUUID();
         draft.quoteToken = undefined;
         draft.quotedAt = undefined;
@@ -305,8 +327,18 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.stage = 'confirm';
         return review(draft);
       };
+      const quote = async (): Promise<Reply> => {
+        const next = { ...draft };
+        const reply = await calculateQuote(next);
+        draft = next;
+        return reply;
+      };
+      const refreshQuote = async (prefix: string): Promise<Reply> => {
+        const updated = await quote();
+        return { ...updated, text: `${prefix}\n\n${updated.text}` };
+      };
       const process = async (): Promise<Reply> => {
-        const action = text.match(/^b:(confirm|restart|cancel):(.+)$/u);
+        const action = text.match(/^b:(confirm|restart|cancel|edit-pickup|edit-destination|quote):(.+)$/u);
         // Drivers can set the negotiated amount from any of the three bots.
         const fare = text.match(/^цена\s+(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:₽|руб(?:лей)?)?$/iu);
         if (fare && user.roles.includes('driver')) {
@@ -331,40 +363,51 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           };
           return activeOrderReply(active, cancelRequested ? 'Поездка уже началась, отменить её в боте нельзя.' : undefined);
         }
-        if (action && action[2] !== draft.id) return welcome('Эта кнопка устарела. Нажмите «Заказать такси», чтобы начать заново.');
+        if (action && action[2] !== draft.id) return resumeDraft(draft, 'Эта кнопка устарела. Продолжите с шага ниже.');
         if (cancelRequested) {
           draft = freshDraft();
           return welcome('Оформление отменено. Активного заказа нет.');
         }
         if (startRequested || message.verifiedPhone || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
           draft = { ...freshDraft(), stage: 'pickup' };
-          return { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
+          return resumeDraft(draft);
         }
+        if (draft.stage === 'confirm' && (action?.[1] === 'edit-pickup' || action?.[1] === 'edit-destination')) {
+          const editingPickup = action[1] === 'edit-pickup';
+          draft = { ...draft, id: randomUUID(), stage: editingPickup ? 'pickup' : 'destination', quoteToken: undefined };
+          if (editingPickup) { draft.pickupRaw = undefined; draft.selectedPickup = undefined; }
+          else { draft.destinationRaw = undefined; draft.selectedDestination = undefined; }
+          return resumeDraft(draft);
+        }
+        if (action?.[1] === 'quote' && draft.pickupRaw && draft.destinationRaw && draft.stage !== 'done') return quote();
         if (draft.stage === 'confirm' && draft.priceMinor != null &&
             (draft.fareRoundingMinor !== (draft.originalPriceMinor === undefined ? fareRoundingMinor : discountedFareRoundingMinor) ||
              draft.fareRoundingMode !== fareRoundingMode ||
              (draft.originalPriceMinor !== undefined && draft.discountPercent !== firstLocalOrderDiscountPercent))) {
-          const updated = await quote();
-          return { ...updated, text: 'Условия расчёта изменились. Проверьте новую стоимость.\n\n' + updated.text };
+          return refreshQuote('Условия расчёта изменились. Проверьте новую стоимость.');
         }
         if (draft.stage === 'done' && (action?.[1] === 'confirm' || /^(?:вызвать|да|подтверждаю)$/iu.test(text))) {
           return welcome(`Этот заказ уже закрыт: https://taxigr.ru/orders/${draft.orderId}`);
         }
-        if (draft.stage === 'confirm' && (action?.[1] === 'confirm' || /^(?:вызвать(?: такси)?|вызвать без цены|да|подтверждаю)$/iu.test(text))) {
-          if (!draft.quotedAt || Date.now() - draft.quotedAt > 240_000) {
-            const updated = await quote();
-            return { ...updated, text: 'Расчёт обновлён.\n\n' + updated.text };
+        if (draft.stage === 'confirm' && (action?.[1] === 'confirm' || /^(?:вызвать(?: такси| сейчас)?(?: без цены)?|да|подтверждаю)$/iu.test(text))) {
+          if (!draft.quotedAt || Date.now() - draft.quotedAt >= (orderQuoteLifetimeSeconds - 5) * 1000) {
+            return refreshQuote('Расчёт обновлён.');
           }
           const order = await call<RideOrder>('/v1/orders', {
             pickup: draft.pickup, destination: draft.destination, quoteToken: draft.quoteToken,
             tariff: 'economy', paymentMethod: 'cash', deviceId: `messenger:${message.provider}:${message.externalUserId}`,
             idempotencyKey: `bot:${draft.id}`, legalAcceptance: currentInitialLegalAcceptance(),
-            comment: `Из ${message.provider}. Со слов пассажира: ${draft.pickupRaw} → ${draft.destinationRaw}`.slice(0, 500),
+            comment: `Из ${message.provider}. Со слов пассажира: ${draft.pickupRaw} → ${draft.destinationRaw}${draft.pickupTiming ? `. Пожелание по времени: ${draft.pickupTiming}` : ''}`.slice(0, 500),
+          }).catch(error => {
+            if (['QUOTE_EXPIRED_OR_INVALID', 'PROMOTION_QUOTE_CHANGED', 'QUOTE_ADDRESS_MISMATCH'].includes(error?.code)) return null;
+            throw error;
           });
+          if (!order) return refreshQuote('Расчёт обновлён. Проверьте стоимость и подтвердите заказ.');
           draft.stage = 'done'; draft.orderId = order.id;
           return activeOrderReply(order, `Такси вызвано. Ищем водителя.${draft.priceMinor == null ? '\nСтоимость определит водитель и согласует с вами.' : ''}`);
         }
-        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text || draft.stage === 'idle' || draft.stage === 'done') {
+        const priceQuestion = /сколько\s+(?:стоит|будет|возьм[её]те)|во\s+сколько\s+обойд[её]тся|узнать\s+(?:про\s+цену|стоимость)/iu.test(text);
+        if (/^(?:\/start(?:@[\w]+)?|\/taxi|такси)$/iu.test(text) || !text || (draft.stage === 'idle' && !priceQuestion) || draft.stage === 'done') {
           draft = freshDraft();
           return welcome();
         }
@@ -376,29 +419,59 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           else draft.selectedDestination = selected;
           return quote();
         }
-        if (text.startsWith('b:')) return draft.stage === 'choose' && draft.choice
-          ? addressChoice(draft) : welcome('Эта кнопка устарела. Начните оформление заново.');
-        const pair = splitBotRoute(text);
-        if (pair?.some(part => part.length < 2 || part.length > 255) || (!pair && (text.length < 2 || text.length > 255))) {
+        if (text.startsWith('b:')) return resumeDraft(draft, 'Эта кнопка устарела.');
+        const timing = botPickupTiming(text);
+        if (timing && text.replace(timing, '').replace(/[^\p{L}\p{N}]+/gu, '').length < 2) {
+          draft.pickupTiming = timing;
+          return resumeDraft(draft, 'Записали пожелание по времени. Подтверждение начнёт поиск машины сразу.');
+        }
+        const field = draft.choice?.field ?? (draft.stage === 'destination' ? 'destination' : 'pickup');
+        const questionAddress = priceQuestion ? text.match(/(?:поездк[аиуы]\s+|(?:стоит|обойд[её]тся)\s+)(?:с|из|от)\s+(.+)/iu)?.[1] : undefined;
+        const questionPair = questionAddress?.match(/^(.+?)\s+до\s+(.+)$/iu);
+        let pair = priceQuestion
+          ? (questionPair ? [questionPair[1]!.trim(), questionPair[2]!.trim()] : null)
+          : splitBotRoute(text);
+        let addressText = text;
+        if (priceQuestion && !pair) {
+          if (draft.stage === 'confirm' && !questionAddress) return review(draft);
+          const understood = await interpretBotAddress(text, field);
+          if (understood?.pickup && understood.destination) pair = [understood.pickup, understood.destination];
+          else addressText = (field === 'pickup' ? questionAddress : undefined) ?? understood?.[field] ?? '';
+          if (!pair && !addressText) return resumeDraft(draft, 'Для расчёта напишите адрес подачи и место назначения.');
+        }
+        if (pair?.some(part => part.length < 2 || part.length > 255) || (!pair && (addressText.length < 2 || addressText.length > 255))) {
           return { text: 'Напишите каждый адрес длиной от 2 до 255 символов.' };
         }
         if (pair) {
-          draft = { ...freshDraft(), pickupRaw: pair[0], destinationRaw: pair[1] };
+          draft = { ...freshDraft(), stage: 'destination', pickupRaw: pair[0], destinationRaw: pair[1], pickupTiming: timing ?? draft.pickupTiming };
         } else if (draft.stage === 'choose' && draft.choice) {
-          if (draft.choice.field === 'pickup') { draft.pickupRaw = text; draft.selectedPickup = undefined; }
-          else { draft.destinationRaw = text; draft.selectedDestination = undefined; }
-        } else if (draft.stage === 'pickup') {
-          draft = { ...freshDraft(), stage: 'destination', pickupRaw: text };
-          return { text: `Место подачи: ${text}\nКуда поедем? Напишите адрес или название места.`, buttons: draftButtons(draft) };
+          if (draft.choice.field === 'pickup') { draft.pickupRaw = addressText; draft.selectedPickup = undefined; }
+          else { draft.destinationRaw = addressText; draft.selectedDestination = undefined; }
+        } else if (draft.stage === 'pickup' || draft.stage === 'idle') {
+          if (draft.destinationRaw) {
+            draft.pickupRaw = addressText;
+            draft.selectedPickup = undefined;
+            return quote();
+          }
+          draft = { ...freshDraft(), stage: 'destination', pickupRaw: addressText, pickupTiming: draft.pickupTiming };
+          return resumeDraft(draft, `Место подачи: ${addressText}`);
         } else if (draft.stage === 'destination') {
-          draft.destinationRaw = text;
+          draft.destinationRaw = addressText;
         } else {
           return { ...review(draft), text: 'Для исправления нажмите «Изменить адреса».\n\n' + review(draft).text };
         }
         return quote();
       };
-      const response = await process().catch(error => ({ text: error instanceof Error ? error.message : 'Не удалось оформить заказ. Попробуйте ещё раз.' }));
-      await connection.execute(`UPDATE messenger_booking_drafts SET draft_json = ?, expires_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 30 MINUTE)
+      const response = await process().catch(error => {
+        const message = error instanceof Error ? error.message : 'Не удалось оформить заказ. Попробуйте ещё раз.';
+        if (error?.code === bookingUnavailableCode) return { text: message };
+        const reply = resumeDraft(draft, message);
+        if ((draft.stage === 'pickup' || draft.stage === 'destination' || draft.stage === 'choose') && draft.pickupRaw && draft.destinationRaw) {
+          reply.buttons = [{ label: 'Повторить расчёт', data: `b:quote:${draft.id}` }, ...(reply.buttons ?? [])];
+        }
+        return reply;
+      });
+      await connection.execute(`UPDATE messenger_booking_drafts SET draft_json = ?, expires_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 2 HOUR)
         WHERE provider = ? AND external_user_id = ?`, [JSON.stringify(draft), message.provider, message.externalUserId]);
       await connection.execute(`INSERT INTO messenger_booking_events (provider, external_user_id, event_id, response_json) VALUES (?, ?, ?, ?)`,
         [message.provider, message.externalUserId, message.eventId, JSON.stringify(response)]);

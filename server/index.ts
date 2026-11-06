@@ -247,7 +247,8 @@ app.setErrorHandler((error, request, reply) => {
     error: {
       code,
       message:
-        statusCode >= 500 && config.isProduction ? 'Сервис временно недоступен' : normalized.message,
+        statusCode >= 500 && config.isProduction && code !== 'SMS_SEND_FAILED' && code !== 'GEOCODER_ERROR'
+          ? 'Сервис временно недоступен' : normalized.message,
       ...('details' in normalized ? { details: normalized.details } : {}),
     },
   });

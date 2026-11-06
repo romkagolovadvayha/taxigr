@@ -3014,7 +3014,7 @@ export async function registerRoutes(
               { error: error instanceof Error ? error.message : 'unknown' },
               'phone authentication SMS failed',
             );
-            throw Object.assign(new Error('Не удалось отправить SMS. Попробуйте позднее'), {
+            throw Object.assign(new Error('Не удалось отправить SMS. Попробуйте позже или выберите вход через MAX, VK или Telegram.'), {
               statusCode: 502,
               code: 'SMS_SEND_FAILED',
             });

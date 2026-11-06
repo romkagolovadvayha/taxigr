@@ -281,6 +281,7 @@ export function AddressSearchScreen() {
   const [selectedStreet, setSelectedStreet] = useState<Address | null>(null);
   const [pendingAddress, setPendingAddress] = useState<Address | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<Coordinates | null>(null);
+  const [savedPointAlternative, setSavedPointAlternative] = useState<Address | null>(null);
   const [pointMapError, setPointMapError] = useState<string | null>(null);
   const [pointMapCenter, setPointMapCenter] = useState<{
     address: Address;
@@ -411,6 +412,9 @@ export function AddressSearchScreen() {
   const pendingCenter = pointMapCenter?.address === pendingAddress
     ? pointMapCenter.coordinates
     : pendingAddress?.coordinates;
+  const usingSavedPoint = !!savedPointAlternative &&
+    selectedPoint?.latitude === savedPointAlternative.coordinates.latitude &&
+    selectedPoint?.longitude === savedPointAlternative.coordinates.longitude;
 
   const cancelSearch = useCallback(() => {
     searchRequestId.current += 1;
@@ -469,6 +473,10 @@ export function AddressSearchScreen() {
   const runRemoteSearch = useCallback((selectAfterSearch = false) => {
     const normalized = query.trim();
     if (normalized.length < 2 || !token) return;
+    if (normalized.length > 180) {
+      setSearchError('Сократите запрос до населённого пункта, улицы и номера дома');
+      return;
+    }
     lastSearchQuery.current = `${token}:${normalized}`;
     setEdited(true);
     const requestId = ++searchRequestId.current;
@@ -496,8 +504,9 @@ export function AddressSearchScreen() {
       .catch((reason: unknown) => {
         if (requestId !== searchRequestId.current) return;
         if (reason instanceof ApiError && reason.code === 'REQUEST_ABORTED') return;
-        setRemoteResults([]);
-        setSearchError(reason instanceof Error ? reason.message : 'Не удалось найти адрес');
+        setSearchError(reason instanceof ApiError && reason.code === 'GEOCODER_ERROR'
+          ? 'Внешний поиск адресов временно недоступен'
+          : reason instanceof Error ? reason.message : 'Не удалось найти адрес');
       })
       .finally(() => {
         if (requestId === searchRequestId.current) {
@@ -541,6 +550,7 @@ export function AddressSearchScreen() {
       setResolvingHouse(true);
       pointInteraction.current = false;
       setPendingAddress(address);
+      setSavedPointAlternative(null);
       setPointMapCenter(null);
       setSelectedPoint(null);
       setPointMapError(null);
@@ -578,6 +588,10 @@ export function AddressSearchScreen() {
 
   const saveSelectedPoint = async () => {
     if (!pendingAddress || !selectedPoint || pointSaveInFlight.current) return;
+    if (savedPointAlternative && usingSavedPoint) {
+      applyAddress(savedPointAlternative);
+      return;
+    }
     pointSaveInFlight.current = true;
     setSavingPoint(true);
     setSavePointError(null);
@@ -585,7 +599,18 @@ export function AddressSearchScreen() {
       const saved = await rememberAddressPoint(pendingAddress, selectedPoint, token);
       if (mounted.current) await selectAddress(saved);
     } catch (error) {
-      if (mounted.current) setSavePointError(error instanceof Error ? error.message : 'Не удалось сохранить адрес. Повторите попытку.');
+      if (!mounted.current) return;
+      const saved = error instanceof ApiError && ['ADDRESS_POINT_CONFLICT', 'ADDRESS_POINT_KNOWN'].includes(error.code ?? '')
+        ? (error.details as { savedAddress?: Address } | undefined)?.savedAddress : undefined;
+      if (saved?.coordinates) {
+        pointInteraction.current = true;
+        setSavedPointAlternative(saved);
+        setSelectedPoint(saved.coordinates);
+        setPointMapCenter({ address: pendingAddress, coordinates: saved.coordinates });
+        setSavePointError('Для этого дома уже есть точка. Проверьте её на карте и подтвердите.');
+      } else {
+        setSavePointError(error instanceof Error ? error.message : 'Не удалось сохранить адрес. Повторите попытку.');
+      }
     } finally {
       pointSaveInFlight.current = false;
       if (mounted.current) setSavingPoint(false);
@@ -630,7 +655,8 @@ export function AddressSearchScreen() {
         {pointMapError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pointMapError}</Text>}
         {savePointError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{savePointError}</Text>}
         <AppButton disabled={!selectedPoint || Boolean(pointMapError)} loading={savingPoint} onPress={() => { void saveSelectedPoint(); }}>
-          {savingPoint ? 'Сохраняем адрес…' : pendingAddress.placeId ? 'Подтвердить точку' : 'Подтвердить и запомнить'}
+          {savingPoint ? 'Сохраняем адрес…' : usingSavedPoint ? 'Подтвердить сохранённую точку'
+            : pendingAddress.placeId ? 'Подтвердить точку' : 'Подтвердить и запомнить'}
         </AppButton>
       </Screen>
     );

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { decodeJwt } from 'jose';
 import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -17,7 +18,7 @@ const databaseUrl = process.env.MYSQL_URL ?? '';
 const pickup = { id: 'qa-pickup', label: 'с. Грахово, ул. Ачинцева, 5', houseNumber: '5', coordinates: { latitude: 56.0477, longitude: 51.9586 } };
 const destination = { id: 'qa-destination', label: 'с. Грахово, ул. Колпакова, 1Б', houseNumber: '1Б', coordinates: { latitude: 56.04576, longitude: 51.96165 } };
 type Actor = { id: string; token: string; driverId?: string; deviceId: string };
-type Result<T = RideOrder> = { status: number; data?: T; error?: { code?: string; message?: string } };
+type Result<T = RideOrder> = { status: number; data?: T; error?: { code?: string; message?: string; details?: unknown } };
 let connection: Connection;
 let originalBookingEnabled = 0;
 const passengers: Actor[] = [];
@@ -130,6 +131,31 @@ describe.skipIf(!enabled)('concurrent orders against an isolated API database', 
     await connection.query('DELETE FROM users WHERE id IN (?)', [[...passengers, ...drivers].map((actor) => actor.id)]);
     await connection.end();
   });
+
+  it('returns a thirty minute signed fare that can create an order', async () => {
+    const actor = passengers[0]!;
+    const token = await quote(actor);
+    const claims = decodeJwt(token);
+    expect(claims.exp! - claims.iat!).toBe(30 * 60);
+    expect((await submit(actor, token)).status).toBe(201);
+  }, 30_000);
+
+  it('returns the stored map point when a competing selection conflicts', async () => {
+    const actor = passengers[0]!;
+    const address = { ...pickup, id: 'gar:qa-competing-point', label: 'с. Грахово, ул. Проверочная, 9876',
+      houseNumber: '9876', kind: 'house', coordinatePrecision: 'approximate' };
+    const save = (coordinates: typeof pickup.coordinates) => api<typeof pickup>('/v1/addresses/points', actor, { address, coordinates });
+    const created = await save(pickup.coordinates);
+    expect(created.status).toBe(200);
+    try {
+      const conflict = await save({ ...pickup.coordinates, latitude: pickup.coordinates.latitude + 0.002 });
+      expect(conflict.status).toBe(409);
+      expect(conflict.error).toMatchObject({ code: 'ADDRESS_POINT_CONFLICT', details: { savedAddress: created.data } });
+      expect((await save(pickup.coordinates)).data).toEqual(created.data);
+    } finally {
+      await connection.execute('DELETE FROM remembered_address_points WHERE created_by = ? AND JSON_UNQUOTE(JSON_EXTRACT(address_json, \'$.id\')) = ?', [actor.id, created.data!.id]);
+    }
+  }, 30_000);
 
   it('returns the same order for 16 simultaneous retries of one create request', async () => {
     const actor = passengers[0]!;

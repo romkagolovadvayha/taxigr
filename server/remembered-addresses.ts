@@ -29,7 +29,9 @@ export async function rememberAddressPoint(userId: string, input: Address, coord
   const canonical = directory.find(address => houseAddressKey(address) === identity);
   const address = canonical ?? input;
   if (!hasApproximateCoordinates(address)) {
-    invalid('Расположение этого дома уже известно. Выберите его в поиске.', 'ADDRESS_POINT_KNOWN', 409);
+    throw Object.assign(new Error('Расположение этого дома уже известно. Проверьте сохранённую точку.'), {
+      code: 'ADDRESS_POINT_KNOWN', statusCode: 409, details: { savedAddress: address },
+    });
   }
   if (distanceBetweenCoordinates(address.coordinates, coordinates) > 15_000) {
     invalid('Точка слишком далеко от выбранного адреса. Проверьте населённый пункт.');
@@ -47,7 +49,9 @@ export async function rememberAddressPoint(userId: string, input: Address, coord
       'SELECT address_json FROM remembered_address_points WHERE address_key = ? FOR UPDATE', [key]);
     const saved = fromRow(rows[0]!);
     if (distanceBetweenCoordinates(saved.coordinates, coordinates) > 80) {
-      invalid('Для этого дома уже сохранена другая точка. Вернитесь к поиску и проверьте адрес.', 'ADDRESS_POINT_CONFLICT', 409);
+      throw Object.assign(new Error('Для этого дома уже сохранена другая точка. Проверьте её на карте.'), {
+        code: 'ADDRESS_POINT_CONFLICT', statusCode: 409, details: { savedAddress: saved },
+      });
     }
     return saved;
   });

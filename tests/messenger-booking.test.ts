@@ -3,7 +3,11 @@ import type { BookingDraft, BookingMessage } from '../server/messenger-booking';
 const mocks=vi.hoisted(()=>({firstRow:vi.fn(),execute:vi.fn(),query:vi.fn(),user:vi.fn(),send:vi.fn(),resolve:vi.fn(),options:vi.fn(),inject:vi.fn(),signQuote:vi.fn(),link:vi.fn(),phone:vi.fn()}));
 vi.mock('../server/db',()=>({db:{execute:mocks.execute},firstRow:mocks.firstRow,withTransaction:(fn:(c:unknown)=>unknown)=>fn({query:mocks.query,execute:mocks.execute})}));
 vi.mock('../server/repositories',()=>({findUserWithRoles:mocks.user,findOrCreatePhoneUser:mocks.phone,linkMessengerIdentity:mocks.link}));
-vi.mock('../server/security',()=>({signSession:async()=> 'test-session',signOrderQuote:mocks.signQuote}));
+vi.mock('../server/security', async original => ({
+  ...await original<typeof import('../server/security')>(),
+  signSession: async () => 'test-session', signOrderQuote: mocks.signQuote,
+}));
+vi.mock('../server/bot-address-ai', () => ({ interpretBotAddress: vi.fn().mockResolvedValue(null) }));
 vi.mock('../server/bot-address',async original=>({...await original<typeof import('../server/bot-address')>(),resolveBotAddress:mocks.resolve,resolveBotAddressOptions:mocks.options}));
 vi.mock('../server/address-directory',()=>({getAddressDirectory:vi.fn()}));
 vi.mock('../server/geocoding',()=>({searchAddresses:vi.fn()}));
@@ -225,11 +229,69 @@ describe('taxi booking in messenger conversations',()=>{
   it('refreshes an expired quote and rejects the older card after refresh',async()=>{
     await start();
     await handle(message('у клуба → у дома'));
-    draft.quotedAt=Date.now()-300000;
+    draft.quotedAt=Date.now()-31*60_000;
     const stale=`b:confirm:${draft.id}`;
     await handle(message(stale,'c1'));
     expect(replyText()).toContain('Расчёт обновлён');expect(mocks.inject).not.toHaveBeenCalled();
     await handle(message(stale,'c2'));expect(replyText()).toContain('устарела');expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('can confirm a quote after 20 minutes without losing the draft', async () => {
+    await start();
+    await handle(message('у клуба → у дома'));
+    draft.quotedAt = Date.now() - 20 * 60_000;
+    await handle(message(`b:confirm:${draft.id}`));
+    expect(mocks.inject.mock.calls[0]?.[0].url).toBe('/v1/orders');
+    expect(replyText()).toContain('Такси вызвано');
+  });
+  it('refreshes an old five-minute token rejected by the API and waits for confirmation', async () => {
+    await start();
+    await handle(message('у клуба → у дома'));
+    draft.quotedAt = Date.now() - 6 * 60_000;
+    const old = draft.id;
+    mocks.inject.mockResolvedValueOnce({ statusCode: 409, json: () => ({ error: { code: 'QUOTE_EXPIRED_OR_INVALID' } }) });
+    await handle(message(`b:confirm:${old}`));
+    expect(replyText()).toContain('Расчёт обновлён');
+    expect(draft.id).not.toBe(old);
+    expect(draft.stage).toBe('confirm');
+    expect(mocks.inject).toHaveBeenCalledTimes(1);
+    await handle(message(`b:confirm:${draft.id}`));
+    expect(replyText()).toContain('Такси вызвано');
+  });
+  it.each(['max', 'vk', 'telegram'] as const)('extracts an explicit price question in %s without booking automatically', async provider => {
+    await handle({ ...message('Здравствуйте, во сколько обойдётся поездка с санатория в Кизнере до деревни Мишкино?'), provider });
+    expect(draft.pickupRaw).toBe('санатория в Кизнере');
+    expect(draft.destinationRaw).toBe('деревни Мишкино?');
+    expect(replyText()).toContain('Проверьте заказ');
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('retains the source of a two-message price inquiry', async () => {
+    await start();
+    await handle(message('Здравствуйте, мне бы хотелось узнать про цену , во сколько обойдётся поездка с санатория в Кизнере'));
+    expect(draft.pickupRaw).toBe('санатория в Кизнере');
+    await handle(message('деревни Мишкино Граховского р-на.'));
+    expect(draft.destinationRaw).toContain('Мишкино');
+    expect(draft.stage).toBe('confirm');
+  });
+  it('asks for a destination after a time-only note and makes immediate dispatch explicit', async () => {
+    await start();
+    await handle(message('Лебедевская 3'));
+    await handle(message('через 30 минут'));
+    expect(draft.stage).toBe('destination');
+    expect(draft.pickupTiming).toBe('через 30 минут');
+    await handle(message('Заречная 4'));
+    expect(replyText()).toContain('начнёт поиск водителя сейчас');
+    expect(replyButtons()).toContainEqual({ text: 'Вызвать сейчас без цены', callback_data: `b:confirm:${draft.id}` });
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it('resumes the current step when a passenger presses a replaced button', async () => {
+    await start();
+    const old = draft.id;
+    await handle(message('Лебедевская 3'));
+    await handle(message(`b:cancel:${old}`));
+    expect(replyText()).toContain('устарела');
+    expect(replyText()).toContain('Куда поедем');
+    expect(draft.pickupRaw).toBe('Лебедевская 3');
+    expect(replyButtons()).toContainEqual({ text: 'Отменить оформление', callback_data: `b:cancel:${draft.id}` });
   });
   it('keeps the draft on failed order creation and retries with the same idempotency key',async()=>{
     await start();

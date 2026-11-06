@@ -5,8 +5,11 @@ vi.mock('../server/address-directory', () => ({ getAddressDirectory: vi.fn().moc
 vi.mock('../server/geocoding', () => ({ searchAddresses: vi.fn().mockResolvedValue([]) }));
 vi.mock('../server/places', () => ({ listPlaces: vi.fn().mockResolvedValue([]), placeToAddress: vi.fn() }));
 vi.mock('../server/remembered-addresses', () => ({ getRememberedAddresses: vi.fn().mockResolvedValue([]) }));
+vi.mock('../server/bot-address-ai', () => ({ interpretBotAddress: vi.fn().mockResolvedValue(null) }));
 import { getAddressDirectory } from '../server/address-directory';
 import { searchAddresses } from '../server/geocoding';
+import { interpretBotAddress } from '../server/bot-address-ai';
+import { listPlaces, placeToAddress } from '../server/places';
 import { botAddressScore, chooseBotAddress, normalizeBotAddress, splitBotRoute, unresolvedBotAddress, resolveBotAddressOptions } from '../server/bot-address';
 
 const house: Address = { id: 'house', label: 'с. Грахово, ул. Советская, 10', houseNumber: '10', kind: 'house',
@@ -47,7 +50,43 @@ describe('messenger free-text addresses', () => {
 });
 
 describe('bot resolution through the real parsing pipeline', () => {
-  beforeEach(() => { vi.mocked(getAddressDirectory).mockResolvedValue([house]); vi.mocked(searchAddresses).mockReset().mockResolvedValue([]); });
+  beforeEach(() => {
+    vi.mocked(getAddressDirectory).mockResolvedValue([house]);
+    vi.mocked(searchAddresses).mockReset().mockResolvedValue([]);
+    vi.mocked(interpretBotAddress).mockReset().mockResolvedValue(null);
+    vi.mocked(listPlaces).mockReset().mockResolvedValue([]);
+  });
+  it('removes a time request before looking up a house', async () => {
+    const lebed = { ...house, id: 'test-lebed', label: 'с. Заречный, ул. Лебедевская, 3', houseNumber: '3' };
+    vi.mocked(getAddressDirectory).mockResolvedValue([lebed]);
+    expect((await resolveBotAddressOptions('Лебедевская 3. Через 30 минут', true)).address?.id).toBe(lebed.id);
+    expect(interpretBotAddress).not.toHaveBeenCalled();
+    expect(searchAddresses).not.toHaveBeenCalled();
+  });
+  it('verifies the AI correction in the directory before accepting it', async () => {
+    vi.mocked(interpretBotAddress).mockResolvedValue({ pickup: 'Советская 10', destination: null });
+    expect((await resolveBotAddressOptions('Заберите с десятого дома на Советской, пожалуйста', true)).address).toEqual(house);
+    expect(interpretBotAddress).toHaveBeenCalledOnce();
+    vi.mocked(interpretBotAddress).mockResolvedValue({ pickup: 'Советская 11', destination: null });
+    expect((await resolveBotAddressOptions('Заберите с непонятного места', true)).address).toBeNull();
+  });
+  it('shows one result for a cafe and its nearby house at the same address', async () => {
+    const roadside = { ...house, label: 'с. Грахово, ул. Дорожная, 13', houseNumber: '13' };
+    vi.mocked(getAddressDirectory).mockResolvedValue([roadside]);
+    vi.mocked(listPlaces).mockResolvedValue([{
+      id: 'maximum', name: 'Караоке-кафе «Максимум»', addressLabel: 'ул. Дорожная, 13', houseNumber: '13', aliases: [],
+      category: 'food', coordinates: roadside.coordinates, socialLinks: [], photoUrls: [],
+      schedule: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+      active: true, createdAt: '', updatedAt: '',
+    }]);
+    vi.mocked(placeToAddress).mockReturnValue({
+      ...roadside, id: 'place:maximum', placeId: 'maximum', label: `Караоке-кафе «Максимум», ${roadside.label}`,
+      coordinates: { ...roadside.coordinates, latitude: roadside.coordinates.latitude + 0.0003 },
+    });
+    const result = await resolveBotAddressOptions('Дорожная 13', false);
+    expect(result.candidates).toEqual([]);
+    expect(result.address?.houseNumber).toBe('13');
+  });
   it.each([
     ['Грахово, ул 50 лет победы дом 10 кв 2', 'с. Грахово, ул. 50 лет Победы, 10'],
     ['Ул Ачинцева 11 подъезд 3 15 квартира', 'с. Грахово, ул. Ачинцева, 11'],

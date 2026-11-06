@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { db } from '../server/db';
 import {
   buildNominatimQueries,
   filterExactHouseResults,
@@ -25,6 +26,21 @@ describe('local address directory', () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     await expect(searchAddresses('Несуществующийтест', false, false, true)).resolves.toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('uses a previously verified cached match when the external service is down', async () => {
+    const prior = { id: 'osm:remembered', label: 'Тестово', kind: 'settlement', coordinates: { latitude: 56.1, longitude: 52 } };
+    const query = vi.mocked(db.query);
+    query.mockImplementation(async (sql, params) => [
+      String(sql).includes('geocoding_cache') && Array.isArray(params) && params[1] === 30
+        ? [{ response_json: JSON.stringify([prior]) }] : [],
+      [],
+    ] as never);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unavailable', { status: 503 })));
+    try {
+      expect(await searchAddresses('Тестовокэшбезсервиса')).toEqual([prior]);
+    } finally {
+      query.mockImplementation(async () => [[]] as never);
+    }
   });
   it('shares one upstream lookup between simultaneous identical searches', async () => {
     const fetch = vi.fn(async () => new Response('[]')); vi.stubGlobal('fetch', fetch);

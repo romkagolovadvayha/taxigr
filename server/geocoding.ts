@@ -285,12 +285,12 @@ export function streetGeocoderQuery(query: string): string {
     .trim();
 }
 
-async function readPersistentCache(key: string): Promise<GeocodedAddress[] | null> {
+async function readPersistentCache(key: string, expiredDays = 0): Promise<GeocodedAddress[] | null> {
   try {
     const [rows] = await db.query<(RowDataPacket & { response_json: string })[]>(
       `SELECT response_json FROM geocoding_cache
-       WHERE cache_key = ? AND expires_at > UTC_TIMESTAMP(3) LIMIT 1`,
-      [key],
+       WHERE cache_key = ? AND expires_at > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? DAY) LIMIT 1`,
+      [key, expiredDays],
     );
     if (!rows[0]) return null;
     return JSON.parse(rows[0].response_json) as GeocodedAddress[];
@@ -528,6 +528,8 @@ export async function searchAddresses(query: string, streetOnly = false, resolve
     return mergeLocalAndExternalResults(query, resolveHouse && results.length ? [] : local, results);
   } catch (error) {
     if (local.length) return prioritizeGrahovoDistrict(local);
+    const lastKnown = await readPersistentCache(key, 30);
+    if (lastKnown?.length) return prioritizeGrahovoDistrict(lastKnown);
     throw error;
   }
 }

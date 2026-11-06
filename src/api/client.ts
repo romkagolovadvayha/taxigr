@@ -32,6 +32,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -165,7 +166,7 @@ async function requestOnce<T>(
 
     const payload = (await response.json().catch(() => ({}))) as {
       data?: T;
-      error?: { message?: string; code?: string };
+      error?: { message?: string; code?: string; details?: unknown };
     };
 
     if (!response.ok) {
@@ -175,6 +176,7 @@ async function requestOnce<T>(
           : `Ошибка сервера (${response.status})`),
         response.status,
         payload.error?.code,
+        payload.error?.details,
       );
     }
 
