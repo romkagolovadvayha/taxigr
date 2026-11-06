@@ -31,9 +31,12 @@ export function usePassengerPickupLocation() {
       if (controller.signal.aborted) return null;
       if (typeof coordinates === 'string') {
         const provider = getEmbeddedAppProvider();
-        setLocationError(coordinates === 'denied' && !provider
-          ? 'Разрешите доступ к геопозиции или укажите адрес вручную.'
-          : 'Геопозиция недоступна. Укажите адрес вручную.');
+        const vkOnIos = provider === 'vk' && /iPhone|iPad|iPod/u.test(navigator.userAgent);
+        setLocationError(coordinates === 'denied' && vkOnIos
+          ? 'Проверьте доступ для VK в настройках iPhone → «Конфиденциальность и безопасность» → «Службы геолокации» или укажите адрес вручную.'
+          : coordinates === 'denied' && !provider
+            ? 'Разрешите доступ к геопозиции или укажите адрес вручную.'
+            : 'Геопозиция недоступна. Укажите адрес вручную.');
         return null;
       }
       const address = await resolvePickupAddress(coordinates, {

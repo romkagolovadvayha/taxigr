@@ -38,12 +38,15 @@ export function confirmLocationDisclosure(purpose: LocationPurpose): Promise<boo
   });
 }
 
-export function ensureLocationConsent(purpose: LocationPurpose): Promise<boolean> {
+export function ensureLocationConsent(
+  purpose: LocationPurpose,
+  confirm = () => confirmLocationDisclosure(purpose),
+): Promise<boolean> {
   const existing = pending.get(purpose);
   if (existing) return existing;
   const request = (async () => {
     if (purpose !== 'sharing' && await readLocationConsent(purpose)) return true;
-    if (!await confirmLocationDisclosure(purpose)) return false;
+    if (!await confirm()) return false;
     if (purpose !== 'sharing') await writeLocationConsent(purpose);
     return true;
   })().finally(() => pending.delete(purpose));

@@ -1,10 +1,11 @@
 import vkBridge from '@vkontakte/vk-bridge';
 
-import { validMapCoordinate } from '@/domain/map-coordinates';
-import { loadMiniAppBridge } from '@/mini-apps/bridge';
-import { getEmbeddedAppProvider } from '@/mini-apps/runtime';
+import { validMapCoordinate } from '../domain/map-coordinates';
+import { loadMiniAppBridge } from '../mini-apps/bridge';
+import { getEmbeddedAppProvider } from '../mini-apps/runtime';
 import { ensureLocationConsent } from './location-disclosure';
 import type { PickupPosition } from './pickup-position';
+import { confirmVkPickupConsent } from './vk-pickup-consent.web';
 
 function bounded<T>(signal: AbortSignal, timeout: number, start: (finish: (result: T) => void) => void) {
   return new Promise<T | 'unavailable'>((resolve) => {
@@ -39,17 +40,26 @@ async function telegramPosition(signal: AbortSignal): Promise<PickupPosition | n
 async function vkPosition(signal: AbortSignal): Promise<PickupPosition | null> {
   const method = 'VKWebAppGetGeodata';
   if (!vkBridge.isEmbedded()) return null;
-  const supported = await bounded<boolean>(signal, 3_000, finish => {
-    void vkBridge.supportsAsync(method).then(finish, () => finish(false));
-  });
-  if (supported !== true) return null;
-  return bounded<PickupPosition>(signal, 20_000, finish => {
+  // Web hosts may omit SetSupportedHandlers even when they handle GetGeodata.
+  // In a native VK WebView the SDK can check the installed handler directly.
+  if (vkBridge.isWebView() && !await vkBridge.supportsAsync(method)) return null;
+  const position = await bounded<PickupPosition>(signal, 20_000, finish => {
     void vkBridge.send(method).then(result => {
-      finish(result.available ? { latitude: result.lat, longitude: result.long } : 'denied');
+      if (Number(result?.available) !== 1 || !('lat' in result)) { finish('unavailable'); return; }
+      const latitude = vkCoordinate(result.lat);
+      const longitude = vkCoordinate(result.long);
+      const coordinates = { latitude, longitude };
+      finish(validMapCoordinate(coordinates) ? coordinates : 'unavailable');
     }, error => {
-      finish(error?.error_type === 'client_error' && error.error_data?.error_code === 4 ? 'denied' : 'unavailable');
+      finish(error?.error_type === 'client_error' && Number(error.error_data?.error_code) === 4 ? 'denied' : 'unavailable');
     });
   });
+  return position === 'unavailable' ? null : position;
+}
+
+function vkCoordinate(value: unknown): number {
+  if (typeof value === 'number') return value;
+  return typeof value === 'string' && value.trim() ? Number(value) : NaN;
 }
 
 function browserPosition(signal: AbortSignal): Promise<PickupPosition> {
@@ -65,10 +75,11 @@ function browserPosition(signal: AbortSignal): Promise<PickupPosition> {
 }
 
 export async function requestPickupPosition(signal: AbortSignal): Promise<PickupPosition> {
-  if (!await ensureLocationConsent('pickup')) return 'denied';
+  const provider = getEmbeddedAppProvider();
+  const consent = await ensureLocationConsent('pickup', provider === 'vk' ? () => confirmVkPickupConsent(signal) : undefined);
+  if (!consent) return provider === 'vk' ? 'unavailable' : 'denied';
   if (signal.aborted) return 'unavailable';
 
-  const provider = getEmbeddedAppProvider();
   const embedded = provider === 'telegram' ? await telegramPosition(signal) :
     provider === 'vk' ? await vkPosition(signal) : null;
   const position = embedded ?? await browserPosition(signal);
