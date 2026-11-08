@@ -19,7 +19,7 @@ import {
   isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { useSession } from '@/auth/session-provider';
-import { defaultFirstOrderPromotionSettings, discountedFareRoundingMinor, renderPromotionMessage } from '@/domain/first-order-discount';
+import { getOrderPromotionText } from '@/domain/first-order-discount';
 import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
 import { radius, spacing, typography } from '@/theme/tokens';
@@ -48,6 +48,7 @@ export function OrderConfirmationScreen() {
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
+  const promotionText = selected ? getOrderPromotionText(selected) : '';
   const addressesAreBookable =
     isPickupAddressBookable(pickup) &&
     destinations.length > 0 &&
@@ -208,12 +209,8 @@ export function OrderConfirmationScreen() {
                 loading={quotePending}
                 estimateAvailable={routeReady}
               />
-              {!quotePending && routeReady && (selected.discountPercent ?? 0) > 0 && (
-                <Text selectable style={{ ...typography.caption, color: colors.ink }}>
-                  {selected.promotionText ?? renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, discountPercent: selected.discountPercent! })}
-                  {selected.promotionText === '' ? '' : ' '}
-                  {selected.originalPriceMinor! / 100} ₽ → {selected.priceMinor / 100} ₽. Цена округлена до ближайших {discountedFareRoundingMinor / 100} ₽.
-                </Text>
+              {!quotePending && routeReady && !!promotionText && (
+                <Text selectable testID="order-promotion-message" style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
               )}
               {selectedTariff === 'child' && (
                 <View

@@ -9,6 +9,8 @@ import {
   defaultFirstOrderPromotionSettings,
   firstOrderPromotionCode,
   renderPromotionMessage,
+  getTariffPromotionText,
+  getOrderPromotionText,
 } from '../src/domain/first-order-discount';
 import type { RideOrder } from '../src/domain/models';
 import { calculateWaitingChargeMinor } from '../src/domain/pricing';
@@ -88,5 +90,21 @@ describe('first local order discount', () => {
   ])('allows moving, repeating and omitting the tag in %j', (messageTemplate, expected) => {
     expect(renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, messageTemplate })).toBe(expected);
     expect(firstOrderPriceMinor(100_000)).toBe(70_000);
+  });
+  it('uses the default tariff caption only when an older server omits the field', () => {
+    expect(getTariffPromotionText({ discountPercent: 20 })).toBe('Первый заказ −20%');
+    expect(getTariffPromotionText({ discountPercent: 20, tariffPromotionText: 'Ваша акция 20%' })).toBe('Ваша акция 20%');
+  });
+  it.each(['', '   ', '\n'])('hides both promotion messages when their explicit values are %j', text => {
+    expect(getTariffPromotionText({ discountPercent: 30, tariffPromotionText: text })).toBe('');
+    expect(getOrderPromotionText({ discountPercent: 30, promotionText: text })).toBe('');
+  });
+  it('keeps the tariff caption independent of the message below it', () => {
+    const tariff = { discountPercent: 30, tariffPromotionText: '', promotionText: 'Скидка уже учтена' };
+    expect(getTariffPromotionText(tariff)).toBe('');
+    expect(getOrderPromotionText(tariff)).toBe('Скидка уже учтена');
+    expect(getOrderPromotionText({ discountPercent: 20 })).toContain('20%');
+    expect(getOrderPromotionText({ discountPercent: 0, promotionText: 'Акция' })).toBe('');
+    expect(getTariffPromotionText({ tariffPromotionText: 'Акция' })).toBe('');
   });
 });

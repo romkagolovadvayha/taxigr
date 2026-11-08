@@ -5,7 +5,8 @@ import type { AdminDriverDetail, RideOrder, Tariff } from '../src/domain/models'
 import { confirmAddressPoint } from '../src/domain/route-stops';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
 import { signSession } from '../server/security';
-import type { FirstOrderPromotionSettings } from '../src/domain/first-order-discount';
+import { defaultFirstOrderPromotionSettings, type FirstOrderPromotionSettings } from '../src/domain/first-order-discount';
+import type { PromotionSettingsUpdate } from '../server/promotion-settings';
 import type { PricingRules } from '../src/domain/pricing';
 import type { GatewaySettingsView } from '../src/domain/gateway';
 import type { OperatorDetails } from '../src/domain/operator-details';
@@ -27,7 +28,7 @@ async function api<T>(path: string, token: string, method = 'GET', body?: unknow
   return { status: response.status, ...await response.json() as { data: T; error?: unknown } };
 }
 const settingsPath = '/v1/admin/promotion-settings';
-const save = (settings: FirstOrderPromotionSettings) => api<FirstOrderPromotionSettings>(settingsPath, adminToken, 'PUT', settings);
+const save = (settings: PromotionSettingsUpdate) => api<FirstOrderPromotionSettings>(settingsPath, adminToken, 'PUT', settings);
 const quote = () => api<{ tariffs: Tariff[]; quoteToken: string }>('/v1/quotes', passengerToken, 'POST', { pickup, destination });
 
 describe.runIf(enabled)('promotion settings persisted through the real API and database', () => {
@@ -78,7 +79,7 @@ describe.runIf(enabled)('promotion settings persisted through the real API and d
   });
   it('saves templates with repeated, moved, absent and empty tags and uses the actual percentage', async () => {
     for (const [template, rendered] of [['Ваша скидка {discount}% — {discount}% сегодня', 'Ваша скидка 20% — 20% сегодня'], ['Первый заказ по акции', 'Первый заказ по акции'], ['', '']]) {
-      const next = { discountPercent: 20, messageTemplate: template! };
+      const next = { ...defaultFirstOrderPromotionSettings, discountPercent: 20, messageTemplate: template! };
       expect((await save(next)).status).toBe(200);
       expect((await api<FirstOrderPromotionSettings>(settingsPath, adminToken)).data).toEqual(next);
       const result = await quote();
@@ -86,12 +87,29 @@ describe.runIf(enabled)('promotion settings persisted through the real API and d
       for (const tariff of result.data.tariffs) {
         expect(tariff.discountPercent).toBe(20);
         expect(tariff.promotionText).toBe(rendered);
+        expect(tariff.tariffPromotionText).toBe('Первый заказ −20%');
         expect(tariff.priceMinor).toBe(Math.round(tariff.originalPriceMinor! * 0.8 / 1000) * 1000);
       }
     }
     const [rows] = await connection.query<mysql.RowDataPacket[]>("SELECT after_json FROM audit_logs WHERE actor_user_id = ? AND action = 'promotion_settings.update' ORDER BY id DESC LIMIT 1", [adminId]);
     const audit = rows[0]!.after_json;
-    expect(typeof audit === 'string' ? JSON.parse(audit) : audit).toEqual({ discountPercent: 20, messageTemplate: '' });
+    expect(typeof audit === 'string' ? JSON.parse(audit) : audit).toEqual({ ...defaultFirstOrderPromotionSettings, discountPercent: 20, messageTemplate: '' });
+  });
+  it('persists both messages independently and keeps an empty caption on saves from older clients', async () => {
+    for (const [tariffMessageTemplate, expected] of [['Ваша выгода {discount}%', 'Ваша выгода 20%'], ['', ''], ['   ', '']]) {
+      const next = { discountPercent: 20, messageTemplate: 'Скидка {discount}% уже учтена', tariffMessageTemplate: tariffMessageTemplate! };
+      expect((await save(next)).status).toBe(200);
+      expect((await api<FirstOrderPromotionSettings>(settingsPath, adminToken)).data).toEqual(next);
+      const result = await quote();
+      expect(result.status).toBe(200);
+      expect(result.data.tariffs.every(tariff => tariff.tariffPromotionText === expected && tariff.promotionText === 'Скидка 20% уже учтена')).toBe(true);
+    }
+    await save({ discountPercent: 20, messageTemplate: '', tariffMessageTemplate: '' });
+    const legacy = await save({ discountPercent: 25, messageTemplate: 'Из старой админки' });
+    expect(legacy.data.tariffMessageTemplate).toBe('');
+    expect((await api<FirstOrderPromotionSettings>(settingsPath, adminToken)).data.tariffMessageTemplate).toBe('');
+    const final = await quote();
+    expect(final.data.tariffs[0]).toMatchObject({ discountPercent: 25, tariffPromotionText: '', promotionText: 'Из старой админки' });
   });
   it('persists operator details and proxy settings through fresh reads', async () => {
     const operatorPath = '/v1/admin/operator-details';

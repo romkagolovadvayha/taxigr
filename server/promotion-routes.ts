@@ -22,7 +22,7 @@ export function registerPromotionRoutes(app: FastifyInstance, authenticateAdmin:
   app.put('/v1/admin/promotion-settings', async request => {
     const session = await authorize(request);
     const parsed = promotionSettingsSchema.safeParse(request.body);
-    if (!parsed.success) throw Object.assign(new Error('Укажите целый процент от 0 до 100 и текст длиной до 600 символов.'), {
+    if (!parsed.success) throw Object.assign(new Error('Укажите целый процент от 0 до 100, текст акции до 600 символов и текст на кнопках до 160 символов.'), {
       statusCode: 400, code: 'VALIDATION_ERROR',
     });
     return { data: await savePromotionSettings(parsed.data, session.id, request.ip) };

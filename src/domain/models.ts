@@ -86,6 +86,7 @@ export type Tariff = {
   originalPriceMinor?: number;
   discountPercent?: number;
   promotionText?: string;
+  tariffPromotionText?: string;
 };
 
 export type RouteSummary = {

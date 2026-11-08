@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { MoneyValue } from '@/components/ui/money-value';
 import { SkeletonBlock } from '@/components/ui/skeleton-block';
 import type { Tariff, TariffCode } from '@/domain/models';
+import { getTariffPromotionText } from '@/domain/first-order-discount';
 import { useThemeColors } from '@/theme/theme-provider';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 
@@ -29,6 +30,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
 } & Pick<Props, 'onSelect' | 'compact' | 'showIllustrations' | 'loading' | 'estimateAvailable'>) {
   const colors = useThemeColors();
   const inline = compact && showIllustrations;
+  const promotionText = getTariffPromotionText(tariff);
   const progress = useSharedValue(active ? 1 : 0);
   useEffect(() => { progress.value = withTiming(active ? 1 : 0, timing); }, [active, progress]);
   const imageStyle = useAnimatedStyle(() => ({
@@ -66,8 +68,8 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
               : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}
-        {!loading && estimateAvailable && (tariff.discountPercent ?? 0) > 0 && (
-          <Text selectable style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>Первый заказ −{tariff.discountPercent}%</Text>
+        {!loading && estimateAvailable && !!promotionText && (
+          <Text selectable testID={`tariff-promotion-${tariff.code}`} style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>{promotionText}</Text>
         )}
         {!compact && !loading && estimateAvailable && tariff.originalPriceMinor !== undefined && (
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textDecorationLine: 'line-through' }}>{tariff.originalPriceMinor / 100} ₽</Text>

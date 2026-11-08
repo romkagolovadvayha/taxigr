@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(firstRow).mockResolvedValue({ user_id: 'admin-id' } as never);
   vi.mocked(readPromotionSettings).mockResolvedValue(defaultFirstOrderPromotionSettings);
-  vi.mocked(savePromotionSettings).mockImplementation(async input => input);
+  vi.mocked(savePromotionSettings).mockImplementation(async input => ({ ...defaultFirstOrderPromotionSettings, ...input }));
 });
 afterAll(() => app.close());
 
@@ -51,12 +51,12 @@ describe('superadmin promotion settings', () => {
     const payload = { discountPercent: 20, messageTemplate };
     const response = await app.inject({ method: 'PUT', url: '/v1/admin/promotion-settings', headers, payload });
     expect(response.statusCode).toBe(200);
-    expect(response.json().data).toEqual(payload);
+    expect(response.json().data).toEqual({ ...defaultFirstOrderPromotionSettings, ...payload });
     expect(savePromotionSettings).toHaveBeenCalledWith(payload, 'admin-id', expect.any(String));
   });
   it.each([
     { discountPercent: -1 }, { discountPercent: 101 }, { discountPercent: 20.5 }, { discountPercent: '20' },
-    { messageTemplate: 'a'.repeat(601) }, { displayDiscountPercent: 40 },
+    { messageTemplate: 'a'.repeat(601) }, { tariffMessageTemplate: 'a'.repeat(161) }, { tariffMessageTemplate: null }, { displayDiscountPercent: 40 },
   ])('rejects invalid settings without saving %j', async invalid => {
     expect((await app.inject({ method: 'PUT', url: '/v1/admin/promotion-settings', headers,
       payload: { ...defaultFirstOrderPromotionSettings, ...invalid } })).statusCode).toBe(400);
@@ -68,5 +68,12 @@ describe('superadmin promotion settings', () => {
     const request = { method: 'PUT' as const, url: '/v1/admin/promotion-settings', headers, payload };
     expect((await app.inject(request)).statusCode).toBe(500);
     expect((await app.inject(request)).json().data).toEqual(payload);
+  });
+  it.each(['Первый заказ −{discount}%', 'Акция', '', '   '])('allows an editable or empty tariff caption %j', async tariffMessageTemplate => {
+    const payload = { ...defaultFirstOrderPromotionSettings, tariffMessageTemplate };
+    const response = await app.inject({ method: 'PUT', url: '/v1/admin/promotion-settings', headers, payload });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.tariffMessageTemplate).toBe(tariffMessageTemplate);
+    expect(savePromotionSettings).toHaveBeenCalledWith(payload, 'admin-id', expect.any(String));
   });
 });

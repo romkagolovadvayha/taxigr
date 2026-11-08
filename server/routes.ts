@@ -3630,7 +3630,12 @@ export async function registerRoutes(
       destinations.length,
     ).map((tariff) => ({
       ...tariff,
-      ...(discountEligible ? { originalPriceMinor: originalPrices[tariff.code], discountPercent: promotionSettings.discountPercent, promotionText: renderPromotionMessage(promotionSettings) } : {}),
+      ...(discountEligible ? {
+        originalPriceMinor: originalPrices[tariff.code],
+        discountPercent: promotionSettings.discountPercent,
+        promotionText: renderPromotionMessage(promotionSettings),
+        tariffPromotionText: renderPromotionMessage(promotionSettings, promotionSettings.tariffMessageTemplate),
+      } : {}),
     }));
     const quoteToken = await signOrderQuote({
       passengerId: session.id,

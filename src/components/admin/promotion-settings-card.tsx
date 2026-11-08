@@ -7,7 +7,7 @@ import { AppButton } from '@/components/ui/app-button';
 import { SurfaceCard } from '@/components/ui/surface-card';
 import {
   defaultFirstOrderPromotionSettings, discountPercentTag, promotionMessageMaxLength,
-  renderPromotionMessage, type FirstOrderPromotionSettings,
+  renderPromotionMessage, tariffPromotionMessageMaxLength, type FirstOrderPromotionSettings,
 } from '@/domain/first-order-discount';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
@@ -25,9 +25,10 @@ export function PromotionSettingsCard({ token, demo }: { token: string | null; d
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const apply = useCallback((next: FirstOrderPromotionSettings) => {
-    setPercentText(String(next.discountPercent));
-    setSettings(next);
-    setBaseline(next);
+    const normalized = { ...defaultFirstOrderPromotionSettings, ...next };
+    setPercentText(String(normalized.discountPercent));
+    setSettings(normalized);
+    setBaseline(normalized);
     setFormVersion(current => current + 1);
   }, []);
   const load = useCallback((signal?: AbortSignal) => {
@@ -47,7 +48,7 @@ export function PromotionSettingsCard({ token, demo }: { token: string | null; d
     return () => controller.abort();
   }, [load]);
   const validPercent = /^\d{1,3}$/u.test(percentText) && Number(percentText) <= 100;
-  const dirty = percentText !== String(baseline.discountPercent) || settings.messageTemplate !== baseline.messageTemplate;
+  const dirty = percentText !== String(baseline.discountPercent) || settings.messageTemplate !== baseline.messageTemplate || settings.tariffMessageTemplate !== baseline.tariffMessageTemplate;
   const changed = () => setSaved(false);
   const save = async () => {
     if (!validPercent || busy || !loaded) return;
@@ -89,8 +90,8 @@ export function PromotionSettingsCard({ token, demo }: { token: string | null; d
       {!validPercent && <Text accessibilityRole="alert" style={{ color: colors.danger }}>Введите целый процент от 0 до 100.</Text>}
     </View>
     <View style={{ gap: spacing.x2 }}>
-      <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Текст акции</Text>
-      <Host matchContents={{ vertical: true }} style={{ width: '100%' }} accessibilityLabel="Текст акции">
+      <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Сообщение под тарифами</Text>
+      <Host matchContents={{ vertical: true }} style={{ width: '100%' }} accessibilityLabel="Сообщение под тарифами">
         <TextInput key={`template:${formVersion}`} defaultValue={settings.messageTemplate} testID="promotion-message-template" multiline numberOfLines={4}
           maxLength={promotionMessageMaxLength} editable={loaded && !busy} style={{ ...inputStyle, width: '100%' }}
           textStyle={{ fontSize: 16, fontFamily: 'Arial', color: colors.ink }} onChangeText={value => {
@@ -100,13 +101,32 @@ export function PromotionSettingsCard({ token, demo }: { token: string | null; d
       </Host>
       <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
         Тег {discountPercentTag} подставляет фактический процент без знака %. Пример: «Ваша скидка {discountPercentTag}%».
-        {' '}Тег можно перемещать, повторять или удалять. Пустой текст скрывает сообщение, сама скидка сохраняется.
+        {' '}Тег можно перемещать, повторять или удалять. Пустой текст полностью скрывает сообщение под тарифами, сама скидка сохраняется.
+      </Text>
+    </View>
+    <View style={{ gap: spacing.x2 }}>
+      <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Текст на кнопках тарифов</Text>
+      <Host matchContents={{ vertical: true }} style={{ width: '100%' }} accessibilityLabel="Текст на кнопках тарифов">
+        <TextInput key={`tariff-template:${formVersion}`} defaultValue={settings.tariffMessageTemplate}
+          testID="promotion-tariff-template" multiline numberOfLines={2} maxLength={tariffPromotionMessageMaxLength}
+          editable={loaded && !busy} style={{ ...inputStyle, width: '100%' }}
+          textStyle={{ fontSize: 16, fontFamily: 'Arial', color: colors.ink }} onChangeText={value => {
+            setSettings(current => ({ ...current, tariffMessageTemplate: value }));
+            changed();
+          }} />
+      </Host>
+      <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
+        Тег {discountPercentTag} подставляет процент скидки. Пустое поле убирает надпись с кнопок «Эконом» и «Детский».
       </Text>
     </View>
     {loaded && validPercent && <View style={{ gap: spacing.x2 }}>
-      <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Предпросмотр</Text>
+      <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Под тарифами</Text>
       <Text selectable testID="promotion-message-preview" style={{ ...typography.body, color: colors.inkSecondary }}>
         {settings.discountPercent === 0 ? 'Скидка отключена, сообщение не показывается.' : renderPromotionMessage(settings) || 'Сообщение скрыто.'}
+      </Text>
+      <Text style={{ ...typography.bodyStrong, color: colors.ink }}>На кнопках тарифов</Text>
+      <Text selectable testID="promotion-tariff-preview" style={{ ...typography.body, color: colors.inkSecondary }}>
+        {settings.discountPercent === 0 ? 'Скидка отключена, надпись не показывается.' : renderPromotionMessage(settings, settings.tariffMessageTemplate) || 'Надпись скрыта.'}
       </Text>
     </View>}
     {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
