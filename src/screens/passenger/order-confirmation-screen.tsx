@@ -19,7 +19,7 @@ import {
   isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { useSession } from '@/auth/session-provider';
-import { discountedFareRoundingMinor } from '@/domain/first-order-discount';
+import { defaultFirstOrderPromotionSettings, discountedFareRoundingMinor, renderPromotionMessage } from '@/domain/first-order-discount';
 import { currentInitialLegalAcceptance, legalDocuments } from '@/legal/documents';
 import { goBackOrReplace } from '@/navigation/back';
 import { radius, spacing, typography } from '@/theme/tokens';
@@ -210,7 +210,9 @@ export function OrderConfirmationScreen() {
               />
               {!quotePending && routeReady && (selected.discountPercent ?? 0) > 0 && (
                 <Text selectable style={{ ...typography.caption, color: colors.ink }}>
-                  Скидка {selected.discountPercent}% на первый заказ по Грахово и району уже учтена: {selected.originalPriceMinor! / 100} ₽ → {selected.priceMinor / 100} ₽. Цена округлена до ближайших {discountedFareRoundingMinor / 100} ₽. На межгород акция не действует.
+                  {selected.promotionText ?? renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, discountPercent: selected.discountPercent! })}
+                  {selected.promotionText === '' ? '' : ' '}
+                  {selected.originalPriceMinor! / 100} ₽ → {selected.priceMinor / 100} ₽. Цена округлена до ближайших {discountedFareRoundingMinor / 100} ₽.
                 </Text>
               )}
               {selectedTariff === 'child' && (

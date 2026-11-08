@@ -238,15 +238,17 @@ describe('taxi booking in messenger conversations',()=>{
       priceMinor,originalPriceMinor:22000,discountPercent,fareRoundingMinor:1000,fareRoundingMode:'nearest',
       quoteToken:'old-discount',quotedAt:Date.now()};
     mocks.resolve.mockImplementation(async (raw: string) => ({id:raw,label:raw,houseNumber:'10',coordinates:{latitude:56,longitude:52}}));
+    mocks.inject.mockResolvedValueOnce({statusCode:409,json:()=>({error:{code:'PROMOTION_QUOTE_CHANGED',message:'Условия скидки изменились'}})});
     mocks.inject.mockResolvedValueOnce({statusCode:200,json:()=>({data:{quoteToken:'discount-30',tariffs:[{
       code:'economy',priceMinor:15000,originalPriceMinor:22000,discountPercent:30,
     }]}})});
     await handle(message(`b:confirm:${draft.id}`));
-    expect(replyText()).toContain('Условия расчёта изменились');
+    expect(replyText()).toContain('Расчёт обновлён');
     expect(replyText()).toContain('Скидка 30%');
     expect(draft.priceMinor).toBe(15000);
-    expect(mocks.inject).toHaveBeenCalledTimes(1);
-    expect(mocks.inject.mock.calls[0]![0].url).toBe('/v1/quotes');
+    expect(mocks.inject).toHaveBeenCalledTimes(2);
+    expect(mocks.inject.mock.calls[0]![0].url).toBe('/v1/orders');
+    expect(mocks.inject.mock.calls[1]![0].url).toBe('/v1/quotes');
     expect(draft.stage).toBe('confirm');
   });
   it('refreshes an expired quote and rejects the older card after refresh',async()=>{

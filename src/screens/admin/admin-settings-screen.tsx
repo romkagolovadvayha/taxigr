@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
@@ -6,6 +6,7 @@ import { useSession } from '@/auth/session-provider';
 import { GatewaySettingsCard } from '@/components/admin/gateway-settings-card';
 import { OperatorSettingsCard } from '@/components/admin/operator-settings-card';
 import { BookingSettingsCard } from '@/components/admin/booking-settings-card';
+import { PromotionSettingsCard } from '@/components/admin/promotion-settings-card';
 import { GroupAlertsCard } from '@/components/admin/group-alerts-card';
 import { AppButton } from '@/components/ui/app-button';
 import { StatusChip } from '@/components/ui/status-chip';
@@ -41,7 +42,7 @@ type EditableKey =
 
 export function AdminSettingsScreen() {
   const colors = useThemeColors();
-  const { token, signOut } = useSession();
+  const { user, token, signOut } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [rules, setRules] = useState<PricingRules>(defaultPricingRules);
   const [dispatchSettings, setDispatchSettings] = useState<DriverDispatchSettings>(
@@ -50,28 +51,30 @@ export function AdminSettingsScreen() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedToken, setLoadedToken] = useState<string | null>(null);
+  const loaded = demo || (!!token && loadedToken === token);
 
-  useEffect(() => {
+  const loadSettings = useCallback((signal?: AbortSignal) => {
     if (demo || !token) return;
-    const controller = new AbortController();
-    void Promise.all([
-      apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal: controller.signal }),
-      apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', {
-        token,
-        signal: controller.signal,
-      }),
-    ])
-      .then(([nextRules, nextDispatchSettings]) => {
+    return Promise.all([
+        apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal }),
+        apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', { token, signal }),
+      ]).then(([nextRules, nextDispatchSettings]) => {
+      if (!signal?.aborted) {
         setRules({ ...nextRules, ...intercityTimeRates(nextRules) });
         setDispatchSettings(nextDispatchSettings);
-      })
-      .catch((reason: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(reason instanceof Error ? reason.message : 'Не удалось загрузить настройки');
-        }
-      });
-    return () => controller.abort();
+        setLoadedToken(token);
+        setError(null);
+      }
+    }).catch((reason: unknown) => {
+      if (!signal?.aborted) setError(reason instanceof Error ? reason.message : 'Не удалось загрузить настройки');
+    });
   }, [demo, token]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadSettings(controller.signal);
+    return () => controller.abort();
+  }, [loadSettings]);
 
   const changeRubles = (key: EditableKey, value: string) => {
     const rubles = Number(value.replace(/[^\d]/g, '')) || 0;
@@ -86,10 +89,12 @@ export function AdminSettingsScreen() {
   };
 
   const save = async () => {
-    if (demo || !token) {
+    if (busy || !loaded) return;
+    if (demo) {
       setSaved(true);
       return;
     }
+    if (!token) return;
     setBusy(true);
     try {
       const [updatedRules, updatedDispatchSettings] = await Promise.all([
@@ -138,6 +143,7 @@ export function AdminSettingsScreen() {
       >
         <TextInput
           value={value}
+          editable={loaded && !busy}
           accessibilityLabel={accessibilityLabel}
           onChangeText={onChangeText}
           keyboardType="number-pad"
@@ -161,7 +167,10 @@ export function AdminSettingsScreen() {
         </Text>
       </View>
       {!!error && <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text>}
+      {!loaded && !error && <Text style={{ ...typography.body, color: colors.inkSecondary }}>Загружаем тарифы и правила…</Text>}
+      {!loaded && !!error && <AppButton variant="secondary" fullWidth={false} onPress={() => void loadSettings()}>Повторить загрузку тарифов</AppButton>}
       <BookingSettingsCard key={`booking:${token}`} token={token} demo={demo} />
+      {user?.roles.includes('admin') && <PromotionSettingsCard key={`promotion:${token}`} token={token} demo={demo} />}
       <GroupAlertsCard key={`group-alerts:${token}`} token={token} demo={demo} />
       <OperatorSettingsCard key={token} token={token} demo={demo} />
       <GatewaySettingsCard token={token} demo={demo} />
@@ -429,8 +438,8 @@ export function AdminSettingsScreen() {
           лимита каждая начатая минута добавляется к итоговой стоимости.
         </Text>
       </SurfaceCard>
-      {saved && <StatusChip label="Настройки сохранены" tone="success" />}
-      <AppButton fullWidth={false} loading={busy} style={{ minWidth: 220 }} onPress={() => void save()}>
+      {saved && <StatusChip label={demo ? 'Демо: настройки не отправлены на сервер' : 'Настройки сохранены'} tone="success" />}
+      <AppButton fullWidth={false} disabled={!loaded || busy} loading={busy} style={{ minWidth: 220 }} onPress={() => void save()}>
         Сохранить изменения
       </AppButton>
       <AppButton

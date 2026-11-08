@@ -9,8 +9,10 @@ import { intercitySettlementById } from '../src/data/intercity-settlements';
 import { grahovoDirectoryHousesById } from '../src/data/grahovo-address-catalog';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
-import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent, firstLocalOrderPromotion, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor } from '../src/domain/first-order-discount';
+import { discountedFareRoundingMinor, firstOrderPromotionCode, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
+import { readPromotionSettings } from './promotion-settings';
+import { registerPromotionRoutes } from './promotion-routes';
 import { isCrawlerImageError } from '../src/errors/web-error-classifier';
 
 import {
@@ -3592,12 +3594,14 @@ export async function registerRoutes(
     const input = parse(quoteSchema, request.body);
     const { pickup, destination, destinations } = await resolveTrustedAddresses(input);
     const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
-    const [pricedRoute, rules, etaMinutes, discountEligible] = await Promise.all([
+    const [pricedRoute, rules, etaMinutes, eligible, promotionSettings] = await Promise.all([
       getMultiStopPricedRouteMetrics(pickup, destinations),
       pricingRules(),
       estimateTariffEtaMinutes(pickup),
       firstLocalOrderEligible(session.id, pricingScope),
+      readPromotionSettings(),
     ]);
+    const discountEligible = eligible && promotionSettings.discountPercent > 0;
     const { tripRoute: route, pricingSegments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
     const pricedAt = new Date();
     const originalPrices = multiStopPrices(
@@ -3608,10 +3612,13 @@ export async function registerRoutes(
       pricedAt,
     );
     const prices = discountEligible
-      ? { economy: firstOrderPriceMinor(originalPrices.economy), child: firstOrderPriceMinor(originalPrices.child) }
+      ? {
+          economy: firstOrderPriceMinor(originalPrices.economy, discountedFareRoundingMinor, fareRoundingMode, promotionSettings.discountPercent),
+          child: firstOrderPriceMinor(originalPrices.child, discountedFareRoundingMinor, fareRoundingMode, promotionSettings.discountPercent),
+        }
       : originalPrices;
     const quoteRoundingMinor = discountEligible ? discountedFareRoundingMinor : fareRoundingMinor;
-    const promotion = discountEligible ? { code: firstLocalOrderPromotion, originalPrices } : undefined;
+    const promotion = discountEligible ? { code: firstOrderPromotionCode(promotionSettings.discountPercent), originalPrices } : undefined;
     const tariffs = quoteTariffs(
       pricingDistanceMeters,
       rules,
@@ -3623,7 +3630,7 @@ export async function registerRoutes(
       destinations.length,
     ).map((tariff) => ({
       ...tariff,
-      ...(discountEligible ? { originalPriceMinor: originalPrices[tariff.code], discountPercent: firstLocalOrderDiscountPercent } : {}),
+      ...(discountEligible ? { originalPriceMinor: originalPrices[tariff.code], discountPercent: promotionSettings.discountPercent, promotionText: renderPromotionMessage(promotionSettings) } : {}),
     }));
     const quoteToken = await signOrderQuote({
       passengerId: session.id,
@@ -3862,10 +3869,11 @@ export async function registerRoutes(
           code: 'ACTIVE_ORDER_EXISTS',
         });
       }
-      const discountEligible = !manualPricing && await firstLocalOrderEligible(session.id, pricingScope, connection);
+      const promotionSettings = await readPromotionSettings(connection);
+      const discountEligible = !manualPricing && promotionSettings.discountPercent > 0 && await firstLocalOrderEligible(session.id, pricingScope, connection);
       if (Boolean(quote.promotion) !== discountEligible || (quote.promotion &&
-          (quote.promotion.code !== firstLocalOrderPromotion ||
-           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff], quote.fareRoundingMinor ?? 1_000, quote.fareRoundingMode ?? 'up') !== price))) {
+          (quote.promotion.code !== firstOrderPromotionCode(promotionSettings.discountPercent) ||
+           firstOrderPriceMinor(quote.promotion.originalPrices[input.tariff], quote.fareRoundingMinor ?? 1_000, quote.fareRoundingMode ?? 'up', promotionSettings.discountPercent) !== price))) {
         throw Object.assign(new Error('Условия скидки изменились. Обновите расчёт и подтвердите новую стоимость'), {
           statusCode: 409, code: 'PROMOTION_QUOTE_CHANGED',
         });
@@ -3919,10 +3927,10 @@ export async function registerRoutes(
           commission,
           rules.serviceCommissionBps,
           rules.waitingFreeMinutes,
-          manualPricing ? 0 : discountEligible ? firstOrderRateMinor(rules.waitingPerMinuteMinor) : rules.waitingPerMinuteMinor,
+          manualPricing ? 0 : discountEligible ? firstOrderRateMinor(rules.waitingPerMinuteMinor, promotionSettings.discountPercent) : rules.waitingPerMinuteMinor,
           rules.searchPriceIncreaseIntervalMinutes,
           manualPricing ? 0 : roundFareMinor(
-            discountEligible ? firstOrderRateMinor(rules.searchPriceIncreaseStepMinor) : rules.searchPriceIncreaseStepMinor,
+            discountEligible ? firstOrderRateMinor(rules.searchPriceIncreaseStepMinor, promotionSettings.discountPercent) : rules.searchPriceIncreaseStepMinor,
             quote.fareRoundingMinor ?? (discountEligible ? 1_000 : 1),
             quote.fareRoundingMode ?? 'up',
           ),
@@ -6578,11 +6586,6 @@ export async function registerRoutes(
     const changed = await updateAdminDriverProfile(id, input, session.id, request.ip);
     publish('admins', 'driver:updated', { id });
     publish(`user:${changed.userId}`, 'profile:updated', { id: changed.userId });
-    notifyMessengers(notifyDriversInMessengers([id], {
-      icon: 'ℹ️', title: 'Данные водителя обновлены',
-      body: 'Администратор изменил данные вашего профиля. Проверьте их в кабинете водителя.',
-      action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
-    }), 'driver.profile-updated');
     return { data: changed };
   });
 
@@ -6675,41 +6678,6 @@ export async function registerRoutes(
       return current;
     });
     await audit(session.id, 'driver.update', 'driver', id, before, input, request.ip);
-    if (
-      input.status !== undefined ||
-      Object.prototype.hasOwnProperty.call(input, 'commissionBps') ||
-      input.priorities !== undefined
-    ) {
-      notifyMessengers(
-        notifyDriversInMessengers([id], {
-          icon: input.status === 'suspended' ? '⛔' : 'ℹ️',
-          title: input.status === 'suspended'
-            ? 'Доступ водителя приостановлен'
-            : 'Настройки водителя изменены',
-          body: input.status === 'suspended'
-            ? 'Администратор временно приостановил доступ к заказам.'
-            : 'Администратор обновил настройки вашего профиля водителя.',
-          details: [
-            ['Статус', input.status
-              ? { online: 'на линии', offline: 'не на линии', suspended: 'приостановлен' }[input.status]
-              : null],
-            ['Комиссия', Object.prototype.hasOwnProperty.call(input, 'commissionBps')
-              ? input.commissionBps == null
-                ? 'по тарифу сервиса'
-                : `${input.commissionBps / 100}%`
-              : null],
-            ['Приоритет', input.priorities
-              ? driverPriorityScopes
-                  .filter((scope) => input.priorities?.[scope])
-                  .map((scope) => ({ grahovo: 'Грахово', district: 'район', intercity: 'межгород' })[scope])
-                  .join(', ') || 'не назначен'
-              : null],
-          ],
-          action: { label: 'Открыть профиль', url: appUrl('/driver/profile') },
-        }),
-        'driver.admin-updated',
-      );
-    }
     return { data: { id, ...input } };
   });
 
@@ -6943,6 +6911,7 @@ export async function registerRoutes(
   registerGatewayRoutes(app, (request) => auth(request, 'admin'));
   registerOperatorRoutes(app, (request) => auth(request, 'admin'));
   registerBookingRoutes(app, (request) => auth(request, 'admin'));
+  registerPromotionRoutes(app, (request) => auth(request, 'admin'));
 
   app.get('/v1/admin/driver-dispatch-settings', async (request) => {
     await auth(request, 'admin');

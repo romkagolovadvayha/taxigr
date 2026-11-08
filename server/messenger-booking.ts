@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
-import { discountedFareRoundingMinor, firstLocalOrderDiscountPercent } from '../src/domain/first-order-discount';
+import { defaultFirstOrderPromotionSettings, discountedFareRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
 import { isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { bookingUnavailableCode } from '../src/domain/booking-availability';
 import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
@@ -43,6 +43,7 @@ export type BookingDraft = {
   priceMinor?: number;
   originalPriceMinor?: number;
   discountPercent?: number;
+  promotionText?: string;
   fareRoundingMinor?: number;
   fareRoundingMode?: FareRoundingMode;
   quotedAt?: number;
@@ -145,7 +146,7 @@ function review(draft: BookingDraft): Reply {
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
       (approximate ? '\nТочка на карте приблизительная. Водитель получит полный адрес.' : '') +
       (compound ? `\nУточните место подачи: ${compound[1]}-${compound[2]} — это номер дома или дом ${compound[1]}, квартира ${compound[2]}?` : '') +
-      (draft.originalPriceMinor === undefined ? '' : `\nСкидка ${draft.discountPercent}% на первый заказ по району: ${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
+      (draft.originalPriceMinor === undefined ? '' : `\n${draft.promotionText ?? renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, discountPercent: draft.discountPercent ?? defaultFirstOrderPromotionSettings.discountPercent })}\n${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
       (timing ? `\nВы указали «${timing}». Кнопка ниже начнёт поиск водителя сейчас.` : '') +
       '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
@@ -284,6 +285,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         draft.priceMinor = undefined;
         draft.originalPriceMinor = undefined;
         draft.discountPercent = undefined;
+        draft.promotionText = undefined;
         draft.fareRoundingMinor = undefined;
         draft.fareRoundingMode = undefined;
         const [pickupResult, destinationResult] = await Promise.all([
@@ -315,6 +317,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
               draft.priceMinor = economy.priceMinor;
               draft.originalPriceMinor = economy.originalPriceMinor;
               draft.discountPercent = economy.discountPercent;
+              draft.promotionText = economy.promotionText;
               draft.fareRoundingMinor = result.fareRoundingMinor ??
                 (economy.originalPriceMinor === undefined ? fareRoundingMinor : discountedFareRoundingMinor);
               draft.fareRoundingMode = result.fareRoundingMode ?? fareRoundingMode;
@@ -393,8 +396,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         if (action?.[1] === 'quote' && draft.pickupRaw && draft.destinationRaw && draft.stage !== 'done') return quote();
         if (draft.stage === 'confirm' && draft.priceMinor != null &&
             (draft.fareRoundingMinor !== (draft.originalPriceMinor === undefined ? fareRoundingMinor : discountedFareRoundingMinor) ||
-             draft.fareRoundingMode !== fareRoundingMode ||
-             (draft.originalPriceMinor !== undefined && draft.discountPercent !== firstLocalOrderDiscountPercent))) {
+             draft.fareRoundingMode !== fareRoundingMode)) {
           return refreshQuote('Условия расчёта изменились. Проверьте новую стоимость.');
         }
         if (draft.stage === 'done' && (action?.[1] === 'confirm' || /^(?:вызвать|да|подтверждаю)$/iu.test(text))) {

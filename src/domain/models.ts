@@ -85,6 +85,7 @@ export type Tariff = {
   priceMinor: number;
   originalPriceMinor?: number;
   discountPercent?: number;
+  promotionText?: string;
 };
 
 export type RouteSummary = {
@@ -123,7 +124,7 @@ export type RideOrder = {
   basePriceMinor?: number;
   fareRoundingMinor?: number;
   fareRoundingMode?: import('./pricing').FareRoundingMode;
-  promotionCode?: 'first-local-order-50' | 'first-local-order-20' | 'first-local-order-30';
+  promotionCode?: `first-local-order-${number}`;
   originalPriceMinor?: number;
   searchPriceIncreaseMinor?: number;
   searchPriceIncreaseIntervalMinutes?: number;

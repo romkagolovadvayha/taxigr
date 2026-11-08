@@ -6,6 +6,9 @@ import {
   firstOrderPriceMinor,
   firstOrderRateMinor,
   isLocalPromotionScope,
+  defaultFirstOrderPromotionSettings,
+  firstOrderPromotionCode,
+  renderPromotionMessage,
 } from '../src/domain/first-order-discount';
 import type { RideOrder } from '../src/domain/models';
 import { calculateWaitingChargeMinor } from '../src/domain/pricing';
@@ -59,7 +62,7 @@ describe('first local order discount', () => {
       waitingSeconds: 241,
       waitingFreeMinutes: 3,
       waitingPerMinuteMinor: 320,
-    } as RideOrder;
+    } as unknown as RideOrder;
     expect(rideLivePriceMinor(ride)).toBe(16_000);
     expect(rideLivePriceMinor({...ride,waitingSeconds:181,fareRoundingMinor:1_000,fareRoundingMode:'nearest'})).toBe(15_000);
     expect(rideLivePriceMinor({...ride,waitingSeconds:181,fareRoundingMinor:1_000})).toBe(16_000);
@@ -67,5 +70,23 @@ describe('first local order discount', () => {
     expect(rideLivePriceMinor({ ...ride, promotionCode: 'first-local-order-30', waitingPerMinuteMinor: 280 })).toBe(16_000);
     expect(rideLivePriceMinor({ ...ride, promotionCode: 'first-local-order-50', waitingPerMinuteMinor: 200 })).toBe(15_400);
     expect(rideLivePriceMinor({ ...ride, promotionCode: undefined, waitingPerMinuteMinor: 400 })).toBe(15_800);
+  });
+
+  it.each([20, 30, 45, 100])('uses the configured %i percent for price, rate and message', percent => {
+    expect(firstOrderPriceMinor(100_000, 1_000, 'nearest', percent)).toBe((100 - percent) * 1_000);
+    expect(firstOrderRateMinor(400, percent)).toBe((100 - percent) * 4);
+    expect(renderPromotionMessage({ discountPercent: percent, messageTemplate: 'Скидка {discount}%' })).toBe(`Скидка ${percent}%`);
+    expect(firstOrderPromotionCode(percent)).toBe(`first-local-order-${percent}`);
+  });
+
+  it.each([
+    ['{discount}% сегодня, завтра тоже {discount}%', '30% сегодня, завтра тоже 30%'],
+    ['Сегодня {discount}% на поездку', 'Сегодня 30% на поездку'],
+    ['Акция на первый заказ', 'Акция на первый заказ'],
+    ['', ''],
+    ['   ', ''],
+  ])('allows moving, repeating and omitting the tag in %j', (messageTemplate, expected) => {
+    expect(renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, messageTemplate })).toBe(expected);
+    expect(firstOrderPriceMinor(100_000)).toBe(70_000);
   });
 });
