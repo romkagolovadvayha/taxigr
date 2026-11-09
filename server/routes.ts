@@ -50,7 +50,7 @@ import {
   maximumAssignedDriverOrders,
   selectDriverOrderQueue,
 } from '../src/domain/driver-order-queue';
-import { searchPriceIncreaseSlotAt } from '../src/domain/search-price-increase';
+import { searchPriceIncreaseChoices, searchPriceIncreaseSlotAt } from '../src/domain/search-price-increase';
 import {
   canDriverReceivePriorityOrder,
   defaultDriverDispatchSettings,
@@ -4444,6 +4444,9 @@ export async function registerRoutes(
   app.post('/v1/orders/:id/search-price-increase', async (request) => {
     const session = await auth(request, 'passenger');
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const { choice } = parse(z.object({
+      choice: z.object({ expectedPriceMinor: z.number().int().positive(), increaseMinor: z.number().int().positive() }).strict().optional(),
+    }).strict(), request.body ?? {});
     const result = await withTransaction(async (connection) => {
       const [rows] = await connection.query<OrderRow[]>(
         'SELECT * FROM orders WHERE id = ? FOR UPDATE',
@@ -4463,32 +4466,54 @@ export async function registerRoutes(
         });
       }
       if (row.pricing_mode === 'driver') throw Object.assign(new Error('Стоимость этого заказа определяет водитель'), { statusCode: 409 });
-      if (row.status !== 'searching' || row.driver_id || row.scheduled_at) {
+      if (row.status !== 'searching' || row.driver_id || (!choice && row.scheduled_at)) {
         throw Object.assign(new Error('Водитель уже найден или поиск завершён'), {
           statusCode: 409,
           code: 'PRICE_INCREASE_NOT_AVAILABLE',
         });
       }
+      const now = Date.now();
+      if (row.scheduled_at ? new Date(row.scheduled_at).getTime() <= now
+        : now - new Date(row.created_at).getTime() >= config.ORDER_SEARCH_TTL_MINUTES * 60_000) {
+        throw Object.assign(new Error('Время поиска по этому заказу истекло'), {
+          statusCode: 409,
+          code: 'ORDER_SEARCH_EXPIRED',
+        });
+      }
       const intervalMinutes = Number(row.search_price_increase_interval_minutes);
       const offerSlot = searchPriceIncreaseSlotAt(
         row.created_at,
-        Date.now(),
+        now,
         intervalMinutes,
       );
-      if (offerSlot < 1) {
+      if (!choice && offerSlot < 1) {
         throw Object.assign(new Error(`Повысить стоимость можно через ${intervalMinutes} мин поиска`), {
           statusCode: 409,
           code: 'PRICE_INCREASE_TOO_EARLY',
         });
       }
-      if (offerSlot <= Number(row.search_price_increase_last_slot)) {
+      const currentPriceMinor = Number(row.price_minor);
+      const previousIncreaseMinor = Number(row.search_price_increase_minor);
+      const lastSlot = Number(row.search_price_increase_last_slot);
+      if (choice && (choice.expectedPriceMinor !== currentPriceMinor ||
+        !searchPriceIncreaseChoices(currentPriceMinor).includes(choice.increaseMinor))) {
+        throw Object.assign(new Error('Проверьте текущую цену и выберите сумму повышения заново'), {
+          statusCode: 409,
+          code: 'PRICE_INCREASE_CHOICE_CHANGED',
+        });
+      }
+      const firstManualIncrease = choice && lastSlot === 0 && previousIncreaseMinor === 0;
+      if (!firstManualIncrease && offerSlot <= lastSlot) {
+        if (choice) throw Object.assign(new Error('Стоимость уже повышалась. Попробуйте позже'), {
+          statusCode: 409,
+          code: 'PRICE_INCREASE_NOT_AVAILABLE',
+        });
         return { changed: false, increaseMinor: 0 };
       }
 
-      const increaseMinor = Number(row.search_price_increase_step_minor);
-      const searchPriceIncreaseMinor =
-        Number(row.search_price_increase_minor) + increaseMinor;
-      const priceMinor = Number(row.price_minor) + increaseMinor;
+      const increaseMinor = choice?.increaseMinor ?? Number(row.search_price_increase_step_minor);
+      const searchPriceIncreaseMinor = previousIncreaseMinor + increaseMinor;
+      const priceMinor = currentPriceMinor + increaseMinor;
       const commissionMinor = calculateCommissionMinor(
         priceMinor,
         Number(row.commission_bps),
@@ -4535,7 +4560,7 @@ export async function registerRoutes(
         ],
       });
       if (payload.status === 'searching' && !payload.driverId) {
-        const eligibleDriverIds = await eligibleDriverIdsForOrder(id, 'available');
+        const eligibleDriverIds = await eligibleDriverIdsForOrder(id, payload.scheduledAt ? 'all' : 'available');
         sendOrderToDrivers(payload, eligibleDriverIds, { priceIncreased: true });
       }
     }

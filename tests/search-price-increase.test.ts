@@ -5,6 +5,7 @@ import {
   canOfferSearchPriceIncrease,
   isSearchPriceIncreaseDelayElapsed,
   searchPriceIncreaseAvailableAt,
+  searchPriceIncreaseChoices,
   searchPriceIncreaseOfferSlot,
   SEARCH_PRICE_INCREASE_DELAY_MS,
   SEARCH_PRICE_INCREASE_MINOR,
@@ -23,6 +24,23 @@ function ride(overrides: Partial<RideOrder> = {}) {
 }
 
 describe('search price increase', () => {
+  it('rounds each increase up to fifty rubles and groups identical amounts', () => {
+    expect(searchPriceIncreaseChoices(100_000)).toEqual([5_000, 10_000, 15_000, 20_000]);
+    expect(searchPriceIncreaseChoices(100_001)).toEqual([10_000, 15_000, 20_000, 25_000]);
+    expect(searchPriceIncreaseChoices(15_000)).toEqual([5_000]);
+    expect(searchPriceIncreaseChoices(0)).toEqual([]);
+  });
+
+  it('permits the first manual increase immediately for an unassigned fixed-price ride', () => {
+    const now = Date.parse(createdAt);
+    expect(searchPriceIncreaseOfferSlot(ride(), now, 'manual')).toBe(0);
+    expect(searchPriceIncreaseOfferSlot(ride({ scheduledAt: '2026-08-25T08:00:00.000Z' }), now, 'manual')).toBe(0);
+    expect(searchPriceIncreaseOfferSlot(ride({ pricingMode: 'driver' }), now, 'manual')).toBeNull();
+    expect(searchPriceIncreaseOfferSlot(ride({ driverId: 'driver-1' }), now, 'manual')).toBeNull();
+    expect(searchPriceIncreaseOfferSlot(ride({ searchPriceIncreaseMinor: 5_000 }), now, 'manual')).toBeNull();
+    expect(searchPriceIncreaseOfferSlot(ride({ searchPriceIncreaseMinor: 5_000 }), eligibleAt, 'manual')).toBe(1);
+  });
+
   it('becomes available exactly after four minutes', () => {
     expect(isSearchPriceIncreaseDelayElapsed(createdAt, eligibleAt - 1)).toBe(false);
     expect(isSearchPriceIncreaseDelayElapsed(createdAt, eligibleAt)).toBe(true);

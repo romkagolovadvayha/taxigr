@@ -2,6 +2,14 @@ import type { RideOrder } from './models';
 
 export const SEARCH_PRICE_INCREASE_DELAY_MS = 4 * 60 * 1_000;
 export const SEARCH_PRICE_INCREASE_MINOR = 3_000;
+const choiceRoundingMinor = 5_000;
+
+export function searchPriceIncreaseChoices(priceMinor: number): number[] {
+  if (priceMinor <= 0) return [];
+  return [...new Set([5, 10, 15, 20].map(percent =>
+    Math.ceil(priceMinor * percent / (100 * choiceRoundingMinor)) * choiceRoundingMinor,
+  ))];
+}
 
 function intervalMilliseconds(intervalMinutes = 4): number {
   const normalizedMinutes =
@@ -44,20 +52,25 @@ export function searchPriceIncreaseOfferSlot(
     | 'createdAt'
     | 'driverId'
     | 'searchPriceIncreaseIntervalMinutes'
+    | 'searchPriceIncreaseMinor'
     | 'searchPriceIncreaseLastSlot'
     | 'status'
     | 'pricingMode'
     | 'scheduledAt'
   >,
   now = Date.now(),
+  mode: 'automatic' | 'manual' = 'automatic',
 ): number | null {
-  if (ride.status !== 'searching' || ride.driverId || ride.pricingMode === 'driver' || ride.scheduledAt) return null;
+  if (ride.status !== 'searching' || ride.driverId || ride.pricingMode === 'driver' ||
+    (mode === 'automatic' && ride.scheduledAt)) return null;
   const slot = searchPriceIncreaseSlotAt(
     ride.createdAt,
     now,
     ride.searchPriceIncreaseIntervalMinutes,
   );
-  return slot > (ride.searchPriceIncreaseLastSlot ?? 0) ? slot : null;
+  const lastSlot = ride.searchPriceIncreaseLastSlot ?? 0;
+  const firstManualIncrease = mode === 'manual' && lastSlot === 0 && !ride.searchPriceIncreaseMinor;
+  return firstManualIncrease || slot > lastSlot ? slot : null;
 }
 
 export function canOfferSearchPriceIncrease(

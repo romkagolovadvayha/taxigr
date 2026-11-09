@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { SessionProvider, useSession } from '@/auth/session-provider';
 import { VkCommunityPromptHost } from '@/components/auth/vk-community-prompt';
-import { SearchPriceIncreaseModalHost } from '@/components/passenger/search-price-increase-card';
+import { PassengerRideDialogs } from '@/components/passenger/passenger-ride-dialogs';
 import { CriticalErrorMonitor } from '@/errors/critical-error-monitor';
 import { RideFeedbackProvider } from '@/feedback/ride-feedback-provider';
 import { FeedbackPreferencesProvider } from '@/preferences/feedback-preferences-provider';
@@ -37,8 +37,7 @@ function SessionScopedRideProviders({ children }: { children: ReactNode }) {
       <RideFeedbackProvider>
         <PostBootstrapServices />
         <PassengerLocationPublisher />
-        <SearchPriceIncreaseModalHost />
-        {children}
+        <PassengerRideDialogs>{children}</PassengerRideDialogs>
       </RideFeedbackProvider>
     </RideProvider>
   );

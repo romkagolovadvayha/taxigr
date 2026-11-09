@@ -49,7 +49,6 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
     bookingFare,
     scheduledAt,
     currentRide,
-    cancelRide,
     rateRide,
     resetRide,
     quoteStatus,
@@ -92,7 +91,6 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
         <ActiveRidePanel
           ride={currentRide}
           pickupEtaMinutes={pickupEtaMinutes}
-          onCancel={cancelRide}
           onReset={resetRide}
           onRate={rateRide}
           busy={busy}

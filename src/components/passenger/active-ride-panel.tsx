@@ -1,9 +1,9 @@
 import { ridePriceLabel } from '@/domain/ride-price';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
+import { useRequestRideCancellation } from '@/components/passenger/passenger-ride-dialogs';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
@@ -11,7 +11,6 @@ import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { formatScheduledPickup, isReservedRide } from '@/domain/scheduled-ride';
-import { AppModal } from '@/components/ui/app-modal';
 import { UserAvatar } from '@/components/user-avatar';
 import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
@@ -23,7 +22,6 @@ import { useScreenClock } from '@/hooks/use-screen-clock';
 type Props = {
   ride: RideOrder;
   pickupEtaMinutes?: number | null;
-  onCancel: () => Promise<boolean>;
   onReset: () => void;
   onRate: (score: number) => Promise<void>;
   busy?: boolean;
@@ -86,14 +84,13 @@ function rideHeadline(ride: RideOrder, pickupEtaMinutes?: number | null): string
 export function ActiveRidePanel({
   ride,
   pickupEtaMinutes,
-  onCancel,
   onReset,
   onRate,
   busy = false,
   error,
 }: Props) {
   const colors = useThemeColors();
-  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const requestRideCancellation = useRequestRideCancellation();
   const terminal = ride.status === 'completed' || ride.status === 'cancelled';
   const cancellable = !terminal && ride.status !== 'in_progress';
   const driver = ride.driver;
@@ -210,7 +207,7 @@ export function ActiveRidePanel({
               compact
               fullWidth={false}
               loading={busy}
-              onPress={() => setCancelConfirmVisible(true)}
+              onPress={() => requestRideCancellation(ride.id)}
               style={{ flex: 1 }}
             >
               Отменить
@@ -222,44 +219,12 @@ export function ActiveRidePanel({
         </View>
       )}
 
-      {!!error && !cancelConfirmVisible && (
+      {!!error && (
         <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
         </Text>
       )}
 
-      <AppModal
-        visible={cancelConfirmVisible}
-        title="Отменить заказ?"
-        description={
-          ride.driverId
-            ? 'Водитель уже назначен. Частые отмены могут временно ограничить создание новых заказов.'
-            : 'Поиск водителя будет остановлен. Частые отмены могут временно ограничить создание новых заказов.'
-        }
-        onClose={() => { if (!busy) setCancelConfirmVisible(false); }}
-      >
-        {!!error && (
-          <Text accessibilityRole="alert" selectable style={{ ...typography.body, color: colors.danger }}>
-            {error}
-          </Text>
-        )}
-        <AppButton
-          variant="danger"
-          loading={busy}
-          onPress={async () => {
-            if (await onCancel()) setCancelConfirmVisible(false);
-          }}
-        >
-          Да, отменить заказ
-        </AppButton>
-        <AppButton
-          variant="secondary"
-          disabled={busy}
-          onPress={() => setCancelConfirmVisible(false)}
-        >
-          Продолжить поездку
-        </AppButton>
-      </AppModal>
     </View>
   );
 }

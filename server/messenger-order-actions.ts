@@ -2,9 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 
 import type { RideOrder } from '../src/domain/models';
+import { rideCancellationWarning } from '../src/domain/ride-state';
 import {
   searchPriceIncreaseAvailableAt,
   searchPriceIncreaseOfferSlot,
+  SEARCH_PRICE_INCREASE_MINOR,
 } from '../src/domain/search-price-increase';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMoney } from './admin-telegram';
@@ -236,7 +238,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
         syncExistingOrderMessages: false,
         icon: '⚠️',
         title: 'Отменить заказ?',
-        body: 'После отмены поиск или поездка будут остановлены.',
+        body: rideCancellationWarning(ride.status === 'searching' && !ride.driverId),
         details: [['💳 Стоимость', ridePriceLabel(ride)]],
         buttons: [
           [{
@@ -274,7 +276,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
           alert: true,
         };
       }
-      const increaseMinor = ride.searchPriceIncreaseStepMinor ?? 3_000;
+      const increaseMinor = ride.searchPriceIncreaseStepMinor ?? SEARCH_PRICE_INCREASE_MINOR;
       await notifyMessengerAccount(request.provider, request.externalUserId, {
         orderId: ride.id,
         audience,

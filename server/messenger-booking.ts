@@ -5,6 +5,7 @@ import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { defaultFirstOrderPromotionSettings, discountedFareRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
 import { isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { bookingUnavailableCode } from '../src/domain/booking-availability';
+import { rideCancellationWarning } from '../src/domain/ride-state';
 import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
 import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
 import { botPickupTiming, resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
@@ -369,7 +370,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           (action?.[1] === 'cancel' && action[2] === draft.id);
         if (active) {
           if (cancelRequested && canCancel(active)) return {
-            text: 'Отменить заказ? После подтверждения поиск или подача такси будут остановлены.',
+            text: `Отменить заказ?\n\n${rideCancellationWarning(active.status === 'searching')}`,
             buttons: [
               { label: 'Да, отменить', data: rideMessengerActionData(active.id, 'cancel-confirm') },
               { label: 'Не отменять', data: rideMessengerActionData(active.id, 'refresh') },

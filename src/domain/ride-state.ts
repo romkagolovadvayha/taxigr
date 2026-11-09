@@ -31,6 +31,12 @@ export function canTransitionRide(from: RideStatus, to: RideStatus): boolean {
   return transitions[from]?.includes(to) ?? false;
 }
 
+export function rideCancellationWarning(searching: boolean): string {
+  return searching
+    ? 'Подождите ещё немного. Возможно, водители заняты. За частые отмены заказы временно блокируются.'
+    : 'Не отменяйте заказ по просьбе водителя. Несколько отмен могут привести к временной блокировке заказов.';
+}
+
 /** A lost HTTP response is successful only when the server confirms this step or a later one. */
 export function driverTransitionConfirmed(requested: RideStatus, observed: RideStatus): boolean {
   const progression: readonly RideStatus[] = ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress', 'completed'];

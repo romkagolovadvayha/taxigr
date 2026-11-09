@@ -56,8 +56,8 @@ import { canTransitionRide, driverTransitionConfirmed } from '@/domain/ride-stat
 import { isReservedRide } from '@/domain/scheduled-ride';
 import { normalizeRouteStops, replaceRouteStop } from '@/domain/route-stops';
 import {
+  searchPriceIncreaseChoices,
   searchPriceIncreaseOfferSlot,
-  SEARCH_PRICE_INCREASE_MINOR,
 } from '@/domain/search-price-increase';
 import { activeWaitingSeconds } from '@/domain/waiting';
 import { getInstallationId } from '@/storage/device-id';
@@ -110,7 +110,7 @@ type RideContextValue = {
     legalAcceptance?: InitialLegalAcceptance,
   ) => Promise<RideOrder | null>;
   createDriverOffer: () => Promise<RideOrder | null>;
-  confirmSearchPriceIncrease: () => Promise<void>;
+  confirmSearchPriceIncrease: (expectedPriceMinor: number, increaseMinor: number) => Promise<boolean>;
   transitionRide: (status: RideStatus) => Promise<void>;
   transitionDriverRide: (status: RideStatus) => Promise<boolean>;
   completeDriverStop: () => Promise<void>;
@@ -1246,14 +1246,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [applyDriverOrder, demoSession, driverRide, refresh, token]);
 
-  const confirmSearchPriceIncrease = useCallback(async () => {
+  const priceIncreaseInFlight = useRef(false);
+  const confirmSearchPriceIncrease = useCallback(async (expectedPriceMinor: number, increaseMinor: number) => {
     const current = currentRide;
-    if (!current) return;
-    const offerSlot = searchPriceIncreaseOfferSlot(current);
-    if (offerSlot == null) return;
+    if (!current || priceIncreaseInFlight.current) return false;
+    const offerSlot = searchPriceIncreaseOfferSlot(current, Date.now(), 'manual');
+    if (offerSlot == null) return false;
+    if (current.priceMinor !== expectedPriceMinor || !searchPriceIncreaseChoices(current.priceMinor).includes(increaseMinor)) {
+      setError('Проверьте текущую цену и выберите сумму повышения заново');
+      return false;
+    }
+    setError(null);
     if (demoSession) {
-      const increaseMinor =
-        current.searchPriceIncreaseStepMinor ?? SEARCH_PRICE_INCREASE_MINOR;
       const priceMinor = current.priceMinor + increaseMinor;
       applyPassengerOrder({
         ...current,
@@ -1264,17 +1268,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
         serviceCommissionMinor: calculateCommissionMinor(priceMinor),
         updatedAt: new Date().toISOString(),
       });
-      return;
+      return true;
     }
-    if (!token) return;
+    if (!token) return false;
+    priceIncreaseInFlight.current = true;
     setBusy(true);
-    setError(null);
     try {
       const ride = await apiRequest<RideOrder>(
         `/v1/orders/${current.id}/search-price-increase`,
-        { method: 'POST', token },
+        { method: 'POST', token, body: JSON.stringify({ choice: { expectedPriceMinor, increaseMinor } }) },
       );
       applyPassengerOrder(ride);
+      return true;
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -1282,7 +1287,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
           : 'Не удалось подтвердить повышение стоимости',
       );
       await refresh();
+      return false;
     } finally {
+      priceIncreaseInFlight.current = false;
       setBusy(false);
     }
   }, [applyPassengerOrder, currentRide, demoSession, refresh, token]);

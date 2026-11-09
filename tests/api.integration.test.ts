@@ -1492,6 +1492,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     const created = await createOrder(passengerToken);
     expect(created.status).toBe(201);
     const originalPrice = created.data!.priceMinor;
+    const step = created.data!.searchPriceIncreaseStepMinor!;
+    expect(step).toBeGreaterThan(0);
 
     const tooEarly = await api<RideOrder>(
       `/v1/orders/${created.data!.id}/search-price-increase`,
@@ -1519,8 +1521,8 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(confirmed.status).toBe(200);
-    expect(confirmed.data?.searchPriceIncreaseMinor).toBe(1_500);
-    expect(confirmed.data?.priceMinor).toBe(originalPrice + 1_500);
+    expect(confirmed.data?.searchPriceIncreaseMinor).toBe(step);
+    expect(confirmed.data?.priceMinor).toBe(originalPrice + step);
     expect(confirmed.data?.createdAt).toBe(beforeIncrease.data?.createdAt);
 
     const repeated = await api<RideOrder>(
@@ -1528,7 +1530,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(repeated.status).toBe(200);
-    expect(repeated.data?.priceMinor).toBe(originalPrice + 1_500);
+    expect(repeated.data?.priceMinor).toBe(originalPrice + step);
 
     await connection.execute(
       'UPDATE orders SET created_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 8 MINUTE) WHERE id = ?',
@@ -1539,9 +1541,31 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       { method: 'POST', token: passengerToken },
     );
     expect(secondInterval.status).toBe(200);
-    expect(secondInterval.data?.searchPriceIncreaseMinor).toBe(3_000);
-    expect(secondInterval.data?.priceMinor).toBe(originalPrice + 3_000);
+    expect(secondInterval.data?.searchPriceIncreaseMinor).toBe(step * 2);
+    expect(secondInterval.data?.priceMinor).toBe(originalPrice + step * 2);
     expect(secondInterval.data?.searchPriceIncreaseLastSlot).toBe(2);
+  });
+
+  it('applies only a quoted rounded increase when the passenger confirms it', async () => {
+    const created = await createOrder(passengerToken);
+    expect(created.status).toBe(201);
+    const order = created.data!;
+    const endpoint = `/v1/orders/${order.id}/search-price-increase`;
+    const increaseMinor = Math.ceil(order.priceMinor * 0.05 / 5_000) * 5_000;
+    const change = (expectedPriceMinor: number, amount: number) => api<RideOrder>(endpoint, {
+      method: 'POST', token: passengerToken, body: { choice: { expectedPriceMinor, increaseMinor: amount } },
+    });
+
+    expect((await change(order.priceMinor, increaseMinor - 1)).status).toBe(409);
+    const [first, second] = await Promise.all([
+      change(order.priceMinor, increaseMinor), change(order.priceMinor, increaseMinor),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    expect((first.data ?? second.data)?.priceMinor).toBe(order.priceMinor + increaseMinor);
+    expect((await change(order.priceMinor + increaseMinor, increaseMinor)).status).toBe(409);
+    const saved = await api<RideOrder>(`/v1/orders/${order.id}`, { token: passengerToken });
+    expect(saved.data?.searchPriceIncreaseMinor).toBe(increaseMinor);
+    expect(saved.data?.priceMinor).toBe(order.priceMinor + increaseMinor);
   });
 
   it('allows exactly one driver to win an acceptance race', async () => {

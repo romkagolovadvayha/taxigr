@@ -98,7 +98,7 @@ export function driverOrderAvailablePush(
   scheduledAt?: string,
 ): PushMessage {
   if (scheduledAt) return {
-    title: 'Новый предзаказ',
+    title: priceIncreased ? 'Стоимость предзаказа повышена' : 'Новый предзаказ',
     body: `Подача ${formatScheduledPickup(scheduledAt)}. ${tariff === 'child' ? 'Поездка с ребёнком. ' : ''}Откройте «Предзаказы» в приложении.`,
     data: { orderId, role: 'driver' },
     sound: 'new_order.wav',
