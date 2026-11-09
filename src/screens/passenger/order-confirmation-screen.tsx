@@ -172,10 +172,10 @@ export function OrderConfirmationScreen() {
             maxLength={500}
             multiline
             style={{
+              // Keep the body size so iOS Safari doesn't zoom when the field gains focus.
               ...typography.body,
-              fontSize: 15,
               color: colors.ink,
-              height: dense ? 44 : 52,
+              height: dense ? 64 : 88,
               textAlignVertical: 'top',
               borderWidth: 1,
               borderColor: colors.border,

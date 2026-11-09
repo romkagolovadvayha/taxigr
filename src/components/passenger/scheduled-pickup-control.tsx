@@ -17,6 +17,7 @@ function grahovoWallTime(timestamp: number) {
 }
 
 const bookingSizing = componentSizing.booking;
+const asapLabel = 'Как можно скорее';
 
 export function ScheduledPickupControl({ disabled, dense }: { disabled?: boolean; dense?: boolean }) {
   const colors = useThemeColors();
@@ -27,7 +28,7 @@ export function ScheduledPickupControl({ disabled, dense }: { disabled?: boolean
   const [validation, setValidation] = useState(false);
   const now = useScreenClock(30_000, step === 'time');
   const { min, max } = preorderBounds(now);
-  const label = scheduledAt ? formatScheduledPickup(scheduledAt) : 'Заказать сейчас';
+  const label = scheduledAt ? formatScheduledPickup(scheduledAt) : asapLabel;
   const openTime = () => {
     const earliest = preorderBounds(Date.now()).min;
     const initial = scheduledAt ? Math.max(Date.parse(scheduledAt), earliest) : earliest + 30 * 60_000;
@@ -75,7 +76,7 @@ export function ScheduledPickupControl({ disabled, dense }: { disabled?: boolean
         <AppButton compact onPress={confirm}>Установить время</AppButton>
       </View> : <View style={{ gap: spacing.x2 }}>
         <AppButton compact variant={scheduledAt ? 'secondary' : 'primary'}
-          onPress={() => { selectScheduledAt(undefined); setStep(null); }}>Заказать сейчас</AppButton>
+          onPress={() => { selectScheduledAt(undefined); setStep(null); }}>{asapLabel}</AppButton>
         <AppButton compact variant={scheduledAt ? 'primary' : 'secondary'} onPress={openTime}>Заказать ко времени</AppButton>
       </View>}
     </AppModal>
