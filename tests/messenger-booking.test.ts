@@ -56,6 +56,17 @@ beforeEach(()=>{
 });
 
 describe('taxi booking in messenger conversations',()=>{
+  it('starts from a yes and remembers the destination when it is given first', async () => {
+    await handle(message('Да'));
+    expect(replyText()).toBe('Откуда вас забрать?');
+    await handle(message('Да, в Можгу'));
+    expect(draft.destinationRaw).toBe('Можгу');
+    expect(replyText()).toBe('Откуда вас забрать?');
+    await handle(message('У старой бани'));
+    expect(replyText()).toContain('У старой бани → Можгу');
+    expect(draft.stage).toBe('confirm');
+    expect(mocks.inject).not.toHaveBeenCalled();
+  });
   it.each(['vk', 'max', 'telegram'] as const)('offers phone verification inside %s', async provider => {
     mocks.firstRow.mockResolvedValue(null);
     await handle({ ...message('b:start'), provider });
@@ -152,7 +163,7 @@ describe('taxi booking in messenger conversations',()=>{
   });
   it('asks pickup and destination, then offers an honest unpriced order',async()=>{
     await handle(message('/start')); expect(replyButtons()).toContainEqual({text:'Заказать сообщениями',callback_data:'b:start'});
-    await start(); expect(replyText()).toContain('откуда вас забрать');
+    await start(); expect(replyText()).toContain('Откуда вас забрать?');
     await handle(message('у старого клуба')); expect(replyText()).toContain('Куда');
     await handle(message('до зелёного дома'));
     expect(replyText()).toContain('Стоимость определит водитель');
@@ -402,6 +413,6 @@ describe('taxi booking in messenger conversations',()=>{
   it('asks pickup after a verified contact instead of interpreting the contact as an address',async()=>{
     await handle({...message('Контакт'),verifiedPhone:'+79000000000'});
     expect(draft.stage).toBe('pickup');expect(draft.pickupRaw).toBeUndefined();
-    expect(replyText()).toContain('откуда вас забрать');
+    expect(replyText()).toContain('Откуда вас забрать?');
   });
 });

@@ -2,18 +2,20 @@ import type { Map as LibreMap, Marker, MapLibreEvent } from 'maplibre-gl';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { Asset } from 'expo-asset';
 
 import { grahovoCenter } from '@/data/service-area';
 import { useForegroundScreen } from '@/hooks/use-foreground-screen';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
-import { driverMarkerPngMarkup } from './driver-marker';
+import { DRIVER_MARKER_HEIGHT, DRIVER_MARKER_WIDTH, driverMarkerKey } from './driver-marker';
+import { driverMarkerAssets } from './driver-marker-assets';
 import { MapLoadingOverlay } from './map-loading-overlay';
 import { loadMapLibre } from './maplibre-loader.web';
 import { watchBaseMapReady } from './map-readiness.web';
 import { watchMapRecovery } from './map-recovery.web';
 import { createRouteLayerSync } from './route-layer-sync';
-import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
+import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SELECTION_ZOOM, mapBearing, ROUTE_CALLOUT_GAP, ROUTE_CALLOUT_HEIGHT, ROUTE_CALLOUT_SIDE_PADDING, ROUTE_PIN_SIZE, ROUTE_PIN_STEM_HEIGHT, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
 import { taxiMapStyle } from './map-style';
 import type { TaxiMapProps } from './types';
 import { useMapScene } from './use-map-scene';
@@ -43,10 +45,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const driverPositionTarget = useRef('');
   const passengerTarget = useRef('');
   const followTarget = useRef('');
-  const insetStyle = useRef('');
   const [syncRoute] = useState(createRouteLayerSync);
-  const fitted = useRef('');
-  const fittedCoordinates = useRef<ReturnType<typeof useMapScene>['fitCoordinates'] | null>(null);
+  const fitted = useRef<{ layout: string; coordinates: typeof scene.fitCoordinates; target: string } | null>(null);
   const selectionKey = useRef('');
   const movingSelection = useRef(false);
   const followRef = useRef(true);
@@ -72,7 +72,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       let marker = pointsRef.current.get(point.id);
       const searching = Boolean(props.searching && point.kind === 'pickup');
       const editable = !!props.onRoutePointEdit;
-      const value = JSON.stringify([point, searching, editable, colors.brand, colors.ink, colors.surface, colors.brandInk]);
+      const value = JSON.stringify([point, searching, editable, colors.brand, colors.brandInk, colors.ink, colors.inkSecondary, colors.surface, colors.surfaceSecondary]);
       if (marker && pointValues.current.get(point.id) === value) return;
       pointValues.current.set(point.id, value);
       if (!marker) {
@@ -86,14 +86,28 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
             edit();
           }
         });
-        const label = document.createElement('div');
-        Object.assign(label.style, { whiteSpace: 'nowrap', padding: '5px 9px', marginBottom: '3px', borderRadius: '16px',
-          fontFamily: 'Manrope, system-ui, sans-serif', fontSize: '12px', fontWeight: '700', lineHeight: '18px',
-          boxShadow: '0 2px 7px rgba(0,0,0,.14)' });
+        const callout = document.createElement('div');
+        Object.assign(callout.style, { height: `${ROUTE_CALLOUT_HEIGHT}px`, display: 'flex', alignItems: 'center', gap: `${ROUTE_CALLOUT_GAP}px`,
+          padding: `0 ${ROUTE_CALLOUT_SIDE_PADDING}px`, borderRadius: '14px', fontFamily: 'Manrope, system-ui, sans-serif',
+          lineHeight: '14px', boxShadow: '0 2px 8px rgba(0,0,0,.16)', zIndex: '1' });
+        const badge = document.createElement('div');
+        Object.assign(badge.style, { width: '26px', height: '26px', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', borderRadius: '9px', fontSize: '14px', fontWeight: '700' });
+        const text = document.createElement('div');
+        const title = document.createElement('div');
+        Object.assign(title.style, { maxWidth: '125px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' });
+        const action = document.createElement('div');
+        Object.assign(action.style, { fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap' });
+        action.textContent = 'Изменить ›';
+        text.append(title, action);
+        callout.append(badge, text);
+        const stem = document.createElement('div');
+        Object.assign(stem.style, { width: '2px', height: `${ROUTE_PIN_STEM_HEIGHT}px`, opacity: '0.6' });
         const dot = document.createElement('div');
-        Object.assign(dot.style, { position: 'relative', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid', boxSizing: 'border-box' });
-        element.append(label, dot);
-        marker = new api.Marker({ element, anchor: 'bottom', offset: [0, 6] }).setLngLat(point.coordinates).addTo(map);
+        Object.assign(dot.style, { position: 'relative', width: `${ROUTE_PIN_SIZE}px`, height: `${ROUTE_PIN_SIZE}px`,
+          borderRadius: '50%', border: '3px solid', boxSizing: 'border-box' });
+        element.append(callout, stem, dot);
+        marker = new api.Marker({ element, anchor: 'bottom', offset: [0, ROUTE_PIN_SIZE / 2] }).setLngLat(point.coordinates).addTo(map);
         pointsRef.current.set(point.id, marker);
       }
       const element = marker.getElement();
@@ -102,13 +116,23 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       element.tabIndex = editable ? 0 : -1;
       element.style.pointerEvents = editable ? 'auto' : 'none';
       element.style.cursor = editable ? 'pointer' : '';
-      const label = element.children[0] as HTMLDivElement, dot = element.children[1] as HTMLDivElement;
-      label.textContent = `${point.badge} · ${point.label}${editable ? ' ›' : ''}`;
-      label.style.background = point.kind === 'pickup' ? colors.brand : colors.surface;
-      label.style.color = point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      const callout = element.children[0] as HTMLDivElement;
+      const stem = element.children[1] as HTMLDivElement;
+      const dot = element.children[2] as HTMLDivElement;
+      const badge = callout.children[0] as HTMLDivElement;
+      const text = callout.children[1] as HTMLDivElement;
+      const title = text.children[0] as HTMLDivElement;
+      const action = text.children[1] as HTMLDivElement;
+      callout.style.background = colors.surface;
+      callout.style.color = colors.ink;
+      badge.textContent = point.badge;
+      badge.style.background = point.kind === 'pickup' ? colors.brand : colors.surfaceSecondary;
+      badge.style.color = point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      title.textContent = point.label;
+      action.style.display = editable ? 'block' : 'none';
+      stem.style.background = colors.inkSecondary;
       dot.style.background = colors.surface;
-      dot.style.borderColor = colors.ink;
-      label.style.zIndex = '1';
+      dot.style.borderColor = colors.inkSecondary;
       dot.style.setProperty('--pickup-radar-color', colors.brand);
       if (searching && !dot.firstChild) {
         const radar = document.createElement('div');
@@ -126,17 +150,30 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       if (currentPosition.lng !== point.coordinates[0] || currentPosition.lat !== point.coordinates[1]) marker.setLngLat(point.coordinates);
     };
     scene.points.forEach(updatePoint);
-    const nextDriverTarget = validMapCoordinate(props.driver) ? JSON.stringify([props.driver.latitude, props.driver.longitude, mapBearing(props.driverHeading)]) : '';
+    const driverIcon = driverMarkerKey(props.driverColorHex);
+    const nextDriverTarget = validMapCoordinate(props.driver) ? JSON.stringify([props.driver.latitude, props.driver.longitude, mapBearing(props.driverHeading), driverIcon]) : '';
     if (validMapCoordinate(props.driver) && nextDriverTarget !== driverTarget.current) {
       driverTarget.current = nextDriverTarget;
       const destination = lngLat(props.driver);
       if (!driverRef.current) {
         const element = document.createElement('div');
         element.setAttribute('role', 'img'); element.setAttribute('aria-label', 'Водитель');
-        element.innerHTML = driverMarkerPngMarkup();
+        const image = document.createElement('img');
+        image.width = DRIVER_MARKER_WIDTH;
+        image.height = DRIVER_MARKER_HEIGHT;
+        image.alt = '';
+        image.draggable = false;
+        image.style.display = 'block';
+        element.append(image);
         driverRef.current = new api.Marker({ element, rotationAlignment: 'map', pitchAlignment: 'viewport' }).setLngLat(destination).addTo(map);
       }
       const marker = driverRef.current;
+      const element = marker.getElement();
+      if (element.dataset.vehicleIcon !== driverIcon) {
+        const image = element.firstElementChild as HTMLImageElement;
+        image.src = Asset.fromModule(driverMarkerAssets[driverIcon]!).uri;
+        element.dataset.vehicleIcon = driverIcon;
+      }
       const heading = mapBearing(props.driverHeading);
       if (marker.getRotation() !== heading) marker.setRotation(heading);
       const positionTarget = JSON.stringify(destination);
@@ -169,13 +206,9 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     if (!width || !height) return;
     // Keep the viewport stable when the user places the first selection pin.
     const padding = taxiMapPadding(width, height, props.viewportInsets, !props.selectionCenter && scene.points.length > 0);
-    const nextInsetStyle = `${props.viewportInsets?.bottom ?? 0}:${props.viewportInsets?.top ?? 0}`;
-    if (nextInsetStyle !== insetStyle.current) {
-      insetStyle.current = nextInsetStyle;
-      host.style.setProperty('--taxi-map-attribution-bottom', String((props.viewportInsets?.bottom ?? 0) + 4) + 'px');
-    }
     if (validMapCoordinate(props.selectionCenter)) {
       followTarget.current = '';
+      fitted.current = null;
       const key = JSON.stringify([props.selectionCenter, padding]);
       if (selectionKey.current !== key) {
         selectionKey.current = key;
@@ -183,22 +216,25 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       }
       return;
     }
+    selectionKey.current = '';
     if (props.followDriver && followRef.current && validMapCoordinate(props.driver)) {
       const nextFollowTarget = JSON.stringify([props.driver.latitude, props.driver.longitude,
         props.navigationMode ? mapBearing(props.driverHeading) : 0, props.followZoom, props.navigationMode, padding, props.followRequestId]);
       if (nextFollowTarget === followTarget.current) return;
       followTarget.current = nextFollowTarget;
-      fitted.current = '';
+      fitted.current = null;
       map.easeTo({ center: lngLat(props.driver), zoom: props.followZoom ?? (props.navigationMode ? 16.5 : 15),
         pitch: props.navigationMode ? 40 : 25, bearing: props.navigationMode ? mapBearing(props.driverHeading) : 0,
         padding, duration: reduceMotion ? 0 : motion.duration.tracking, easing: t => t });
     } else if (!props.followDriver) {
-      const key = JSON.stringify([width, height, padding, props.followRequestId]);
-      if (key === fitted.current && fittedCoordinates.current === scene.fitCoordinates) return;
+      const layout = JSON.stringify([width, height, padding, props.followRequestId]);
+      const previous = fitted.current;
+      if (previous?.layout === layout && previous.coordinates === scene.fitCoordinates) return;
       const location = taxiMapFit(scene.fitCoordinates, width, height, padding);
       if (location) {
-        fitted.current = key;
-        fittedCoordinates.current = scene.fitCoordinates;
+        const target = JSON.stringify(location);
+        fitted.current = { layout, coordinates: scene.fitCoordinates, target };
+        if (previous?.layout === layout && previous.target === target) return;
         map.easeTo({ ...location, pitch: 0, bearing: 0, padding, duration: reduceMotion ? 0 : motion.duration.tracking });
       }
     }
@@ -229,11 +265,11 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       const selection = current.props.selectionCenter;
       const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme, current.offline),
         center: lngLat(validMapCoordinate(selection) ? selection : grahovoCenter),
-        zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, pitch: selection ? 0 : 25, minZoom: 5, maxZoom: MAP_MAX_ZOOM,
-        attributionControl: false, locale: { 'AttributionControl.ToggleAttribution': 'Источники карты' },
+        zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, minZoom: MAP_MIN_ZOOM, maxZoom: MAP_MAX_ZOOM,
+        scrollZoom: selection ? { around: 'center' } : true, touchZoomRotate: selection ? { around: 'center' } : true,
+        attributionControl: false,
         canvasContextAttributes: { antialias: true }, renderWorldCopies: false });
       mapRef.current = map;
-      map.addControl(new api.AttributionControl({ compact: false }), 'bottom-right');
       map.getCanvas().setAttribute('aria-label', 'Карта поездки');
       map.getCanvas().addEventListener('webglcontextlost', contextLost);
       const markReady = () => {
@@ -243,7 +279,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       };
       map.on('style.load', () => {
         if (!active) return;
-        styleLoaded.current = true; fitted.current = ''; setInitialized(true); sync();
+        styleLoaded.current = true; setInitialized(true); sync();
         if (latest.current.offline) map.once('render', markReady);
       });
       stopWatchingReadiness = watchBaseMapReady(map, markReady);
@@ -276,7 +312,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         const point = { latitude: lat, longitude: lng };
         if (latest.current.props.selectionCenter && validMapCoordinate(point)) latest.current.props.onCoordinateSelect?.(point);
       });
-      observer = new ResizeObserver(() => { map.resize(); fitted.current = ''; sync(); });
+      observer = new ResizeObserver(() => { map.resize(); sync(); });
       observer.observe(container.current);
     }).catch((reason: unknown) => {
       if (!active) return;
@@ -290,7 +326,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       driverRef.current?.remove(); passengerRef.current?.remove();
       driverRef.current = null; passengerRef.current = null;
       driverTarget.current = ''; driverPositionTarget.current = ''; passengerTarget.current = '';
-      followTarget.current = ''; insetStyle.current = ''; selectionKey.current = ''; fitted.current = '';
+      followTarget.current = ''; selectionKey.current = ''; fitted.current = null;
       cachedPointValues.clear(); styleLoaded.current = false;
       pointMarkers.forEach(marker => marker.remove()); pointMarkers.clear();
       mapRef.current?.getCanvas().removeEventListener('webglcontextlost', contextLost);
@@ -307,14 +343,13 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   }, [colors, colorScheme, offline]);
 
   useEffect(() => { followRef.current = true; followTarget.current = ''; }, [props.followDriver, props.followRequestId]);
-  useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.passenger,
+  useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.driverColorHex, props.passenger,
     props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, props.searching, props.onRoutePointEdit, sync]);
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
     <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />
     {offline && ready && <div style={{ position: 'absolute', top: 8 + (props.viewportInsets?.top ?? 0), left: 8, padding: 4,
       fontFamily: 'Manrope, system-ui, sans-serif', fontSize: 11, color: colors.inkSecondary, background: colors.surface }}>Карта района офлайн</div>}
-    <style>{'[data-taxi-map="maplibre"] .maplibregl-ctrl-bottom-right{bottom:var(--taxi-map-attribution-bottom,4px)}[data-taxi-map="maplibre"] .maplibregl-ctrl-attrib{font-size:9px;line-height:14px}'}</style>
     <style>{`
       .taxi-pickup-radar{position:absolute;left:50%;top:50%;width:160px;height:160px;transform:translate(-50%,-50%);pointer-events:none}
       .taxi-pickup-radar span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--pickup-radar-color);background:var(--pickup-radar-color);box-sizing:border-box;animation:taxi-pickup-pulse 2400ms linear infinite}

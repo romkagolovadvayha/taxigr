@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 
 import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandMark } from '@/components/brand-mark';
+import { OPEN_MAP_TILES_URL, OPEN_STREET_MAP_COPYRIGHT_URL } from '@/components/map/map-style';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
@@ -88,6 +89,16 @@ export function LegalHubScreen() {
           </View>
         </View>
       ))}
+
+      <View style={{ gap: spacing.x2 }}>
+        <Text {...webHeadingLevel(2)} accessibilityRole="header" style={{ ...typography.sectionTitle, color: colors.ink }}>
+          Источники карты
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x3 }}>
+          <Link href={OPEN_MAP_TILES_URL} style={{ ...typography.body, color: colors.infoText }}>© OpenMapTiles</Link>
+          <Link href={OPEN_STREET_MAP_COPYRIGHT_URL} style={{ ...typography.body, color: colors.infoText }}>© OpenStreetMap</Link>
+        </View>
+      </View>
 
       <View style={{ gap: spacing.x3 }}>
         <Text {...webHeadingLevel(2)} accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>

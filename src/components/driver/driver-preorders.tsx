@@ -47,7 +47,7 @@ export function DriverPreorders({ online, activeTrip, view, onViewChange }: {
   onViewChange: (view: DriverPreorderView) => void;
 }) {
   const colors = useThemeColors();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const { token } = useSession();
   const { driverPreorders, refresh } = useRide();
   const selected = view === 'list' ? null : view;
@@ -101,7 +101,8 @@ export function DriverPreorders({ online, activeTrip, view, onViewChange }: {
   };
 
   return <>
-    <AppButton compact fullWidth={false} variant="secondary" style={{ minHeight: 44, paddingHorizontal: spacing.x2 }} icon={<AppIcon name="clock" size={16} />}
+    <AppButton compact fullWidth={false} variant="secondary" style={{ minHeight: 44, paddingHorizontal: width < 360 ? spacing.x1 : spacing.x2 }}
+      icon={<AppIcon name="clock" size={16} />}
       accessibilityLabel={count ? `Предзаказы · ${count}` : 'Предзаказы'}
       badge={count ? <Text style={{ ...typography.micro, position: 'absolute', top: -4, right: -4, paddingHorizontal: spacing.x1,
         backgroundColor: colors.brand, color: colors.brandInk, borderRadius: radius.pill }}>{count}</Text> : undefined}

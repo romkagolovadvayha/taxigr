@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isTaxiRequest, normalizeGroupTitle } from '../src/domain/group-alerts.ts';
+import { isFreshMaxTaxiRequest, isTaxiRequest, normalizeGroupTitle } from '../src/domain/group-alerts.ts';
 
 export const TARGETS = [
   { provider: 'whatsapp', title: 'Грахово такси' },
@@ -12,10 +12,32 @@ export function selectGroup(groups, target, pinnedId) {
   return found.length === 1 ? found[0] : null;
 }
 
+export function watchedGroups(config) {
+  const max = config.maxGroups?.length ? config.maxGroups : [config.groups.max].filter(Boolean);
+  return [config.groups.whatsapp, ...max].filter(Boolean);
+}
+
 export function phoneUriFromJid(jid) {
   // An opaque WhatsApp LID must never be treated as a telephone number.
   const match = /^(\d{8,15})(?::\d+)?@s\.whatsapp\.net$/u.exec(jid || '');
   return match && /^[1-9]/u.test(match[1]) ? `tel:+${match[1]}` : undefined;
+}
+
+export function whatsappReplyTarget(...participants) {
+  for (const participant of participants) {
+    const phone = phoneUriFromJid(participant);
+    if (phone) return `${phone.slice(5)}@s.whatsapp.net`;
+  }
+  for (const participant of participants) {
+    const lid = typeof participant === 'string' && /^([1-9]\d{1,19})(?::\d+)?@lid$/u.exec(participant);
+    if (lid) return `${lid[1]}@lid`;
+  }
+  return undefined;
+}
+
+export function isGroupBookingRequest(text, sentAt, now, allowShortRequest) {
+  return isFreshMaxTaxiRequest(text, sentAt, now) &&
+    (allowShortRequest || !/^кто[?!. ]*$/u.test(normalizeGroupTitle(text)));
 }
 
 export function makeEvent(message, group, since, now = Date.now(), matches = isTaxiRequest) {

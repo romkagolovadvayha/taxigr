@@ -1,6 +1,6 @@
 import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Text, View, useWindowDimensions } from 'react-native';
 
 import { AppButton } from '@/components/ui/app-button';
 import { spacing, typography } from '@/theme/tokens';
@@ -17,6 +17,7 @@ export type ScheduledPickupFieldsProps = {
 
 export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChange, onTimeChange }: ScheduledPickupFieldsProps) {
   const colors = useThemeColors();
+  const { width, height } = useWindowDimensions();
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
 
   if (Platform.OS === 'ios') {
@@ -38,7 +39,8 @@ export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChan
       <AppButton compact fullWidth={false} variant="secondary" style={{ flex: 1 }}
         accessibilityLabel="Выбрать время подачи" onPress={() => setPicker('time')}>{time}</AppButton>
     </View>
-    {picker === 'date' && <DateTimePicker mode="date" value={new Date(`${date}T00:00:00Z`)}
+    {picker === 'date' && <DateTimePicker mode="date" display={width < 360 || height < 560 ? 'spinner' : 'default'}
+      value={new Date(`${date}T00:00:00Z`)}
       minimumDate={new Date(`${minDate}T00:00:00Z`)} maximumDate={new Date(`${maxDate}T00:00:00Z`)}
       onDismiss={() => setPicker(null)} positiveButton={{ label: 'Выбрать' }} negativeButton={{ label: 'Отмена' }}
       onValueChange={(_, next) => { onDateChange(next.toISOString().slice(0, 10)); setPicker(null); }} />}

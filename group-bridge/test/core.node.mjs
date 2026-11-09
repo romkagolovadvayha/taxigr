@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeEvent, selectGroup, phoneUriFromJid } from '../core.mjs';
+import { makeEvent, selectGroup, phoneUriFromJid, whatsappReplyTarget, isGroupBookingRequest } from '../core.mjs';
 import { EventQueue } from '../queue.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +18,26 @@ test('opaque LID and message telephone are not attributed to sender', () => {
   assert.equal(phoneUriFromJid('12345678900@lid'), undefined);
   assert.equal(makeEvent({ ...message, senderJid: '12345678900@lid', text: 'Кто? +79990000000' }, group, now - 1000, now).senderUri, undefined);
   assert.equal(phoneUriFromJid('79990000000:3@s.whatsapp.net'), 'tel:+79990000000');
+});
+test('private WhatsApp replies use the participant address and never a group address', () => {
+  assert.equal(whatsappReplyTarget('12345678900:2@lid', '79990000000:3@s.whatsapp.net'), '79990000000@s.whatsapp.net');
+  assert.equal(whatsappReplyTarget('12345678900:2@lid'), '12345678900@lid');
+  assert.equal(whatsappReplyTarget('79990000000@g.us', '+79990000000'), undefined);
+});
+test('general groups only get replies to explicit ride requests', () => {
+  assert.equal(isGroupBookingRequest('Кто?', now, now, true), true);
+  assert.equal(isGroupBookingRequest('Кто?', now, now, false), false);
+  assert.equal(isGroupBookingRequest('Кто таксует?', now, now, false), true);
+  assert.equal(isGroupBookingRequest('Нашли такси, отбой', now, now, false), false);
+  assert.equal(isGroupBookingRequest('Нужно такси', now - 180_001, now, false), false);
+});
+test('a WhatsApp recipient can receive at most one reply in 15 minutes', () => {
+  const queue = new EventQueue(':memory:');
+  try {
+    assert.equal(queue.claimWhatsAppReply('recipient', now), true);
+    assert.equal(queue.claimWhatsAppReply('recipient', now + 899_999), false);
+    assert.equal(queue.claimWhatsAppReply('recipient', now + 900_000), true);
+  } finally { queue.close(); }
 });
 test('duplicate titles fail closed, pinned ID survives a rename', () => {
   assert.equal(selectGroup([group, { ...group, id: 'other@g.us' }], group.title), null);

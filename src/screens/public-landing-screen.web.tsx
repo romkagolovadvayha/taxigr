@@ -690,6 +690,7 @@ export function PublicLandingScreen() {
           машин и дорожной обстановки. На иллюстрациях показан пример заказа, а
           не предложение поездки по указанной цене.
         </p>
+        <p>Используются карты <a href="https://openfreemap.org/" style={{ textDecoration: "underline" }}>OpenFreeMap</a>.</p>
         {(operator.legalName || operator.inn) && (
           <div className="lp-footer-operator" aria-label="Реквизиты оператора">
             {operator.legalName && <span>{operator.legalName}</span>}

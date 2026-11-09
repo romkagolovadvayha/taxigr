@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -8,15 +9,16 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: async (key: string) => { storage.delete(key); },
 }));
 vi.mock('../server/config', () => ({config: {PUBLIC_URL: 'https://taxigr.ru', MAX_BOT_TOKEN: 'test-max', MAX_BOT_USERNAME: 'taxi_test_bot', TELEGRAM_BOT_TOKEN: 'test-telegram'}}));
-vi.mock('undici', () => ({fetch: fetchTelegram}));
 vi.mock('../server/gateway-proxy', () => ({telegramDispatcher: async () => undefined}));
 
 import { savePendingMessengerLogin, readPendingMessengerLogin, clearPendingMessengerLogin } from '../src/storage/messenger-login-storage';
 import { parseMessengerReturn, nativeMessengerReturnUrl, resumeMessengerLogin } from '../src/auth/messenger-return';
 import { messengerAuthReturnUrl } from '../server/messenger-auth-return';
-import { sendTelegramConfirmation } from '../server/telegram-bot';
 import { sendMaxConfirmation } from '../server/max-bot';
 import { vkCallbackHtml } from '../server/vk-auth';
+
+vi.doMock(createRequire(new URL('../server/telegram-bot.ts', import.meta.url)).resolve('undici'), () => ({fetch: fetchTelegram}));
+const { sendTelegramConfirmation } = await import('../server/telegram-bot');
 
 const id = '123e4567-e89b-12d3-a456-426614174000';
 const challenge = {challengeId: id, exchangeToken: 'device-only-exchange-secret', expiresInSeconds: 300};

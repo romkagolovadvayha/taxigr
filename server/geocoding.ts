@@ -3,13 +3,14 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getAddressDirectory } from './address-directory';
 import { getRememberedAddresses } from './remembered-addresses';
 import { overlayRememberedAddresses } from '../src/domain/remembered-address';
-import { hasApproximateCoordinates, normalizeHouseNumber, parseQueryHouse } from '../src/domain/address-precision';
+import { extractHouseNumber, hasApproximateCoordinates, normalizeHouseNumber, parseQueryHouse } from '../src/domain/address-precision';
 import { addressSearchScore, createAddressSearchScorer } from '../src/domain/address-search';
 import { buildStreetSuggestions } from '../src/domain/address-suggestions';
 import { normalizeBotAddress, addressQueryVariants, hasZarechnyAlias } from '../src/domain/free-text-address';
 import { intercitySettlements } from '../src/data/intercity-settlements';
 import { searchIntercitySettlements } from '../src/domain/intercity-search';
 import { isGrahovoDistrictAddress } from '../src/domain/pricing';
+import { distanceBetweenCoordinates } from '../src/domain/navigation';
 import type { AddressKind } from '../src/domain/models';
 import { config } from './config';
 import { db } from './db';
@@ -471,15 +472,31 @@ async function requestNominatim(query: string, signal: AbortSignal): Promise<Geo
 }
 
 export async function searchAddresses(query: string, streetOnly = false, resolveHouse = false, localOnly = false): Promise<GeocodedAddress[]> {
+  const coordinates = coordinateQuery(query);
   const districtAlias = hasZarechnyAlias(query);
   const variants = addressQueryVariants(query).map(normalizeBotAddress);
   const knownCity = searchIntercitySettlements(query);
-  query = coordinateQuery(query) ? query : normalizeBotAddress(query);
+  query = coordinates ? query : normalizeBotAddress(query);
   // Street anchors in GAR are approximate. Point selection needs an actual
   // street from OSM when available, bypassing the local-address shortcut.
   const [catalog, remembered] = streetOnly ? [[], []] : await Promise.all([getAddressDirectory(), getRememberedAddresses()]);
   const directory = streetOnly ? [] : overlayRememberedAddresses([...localAddresses, ...catalog], remembered);
-  const local = deduplicateAddresses(variants.flatMap(variant => localMatches(variant, directory)));
+  if (coordinates && !streetOnly) {
+    let nearest: GeocodedAddress | undefined;
+    let nearestDistance = Infinity;
+    for (const address of directory) {
+      if (address.kind === 'street' || address.kind === 'settlement' || hasApproximateCoordinates(address)) continue;
+      const distance = distanceBetweenCoordinates(coordinates, address.coordinates);
+      if (!(distance <= 50 && distance < nearestDistance)) continue;
+      const houseNumber = extractHouseNumber(address);
+      if (!houseNumber) continue;
+      nearest = { ...address, houseNumber };
+      nearestDistance = distance;
+    }
+    if (nearest) return [nearest];
+    if (localOnly) return [];
+  }
+  const local = coordinates ? [] : deduplicateAddresses(variants.flatMap(variant => localMatches(variant, directory)));
   const exactCities = knownCity.filter(address => normalizeNamedPlace(address.label) === normalizeNamedPlace(query));
   const exactDistrictSettlement = local.some(address => address.kind === 'settlement' &&
     normalizeNamedPlace(address.label) === normalizeNamedPlace(query));

@@ -38,6 +38,13 @@ const paymentLabels: Record<RideOrder['paymentMethod'], string> = {
   direct: 'Напрямую водителю',
 };
 
+function AddressDetails({ details, color }: { details?: string; color: string }) {
+  const text = details
+    ?.replace(/(?:^|[·,])\s*(?:точка приблизительная|приблизительная точка)(?:\s*\([^)]*\))?\.?\s*(?=[·,]|$)/giu, '')
+    .trim().replace(/^[·,]\s*/u, '');
+  return text ? <Text selectable style={{ ...typography.caption, color }}>{text}</Text> : null;
+}
+
 function DetailRows({ rows }: { rows: [string, string][] }) {
   const colors = useThemeColors();
   return (
@@ -218,11 +225,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
                 <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                   {order.pickup.label}
                 </Text>
-                {!!order.pickup.details && (
-                  <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-                    {order.pickup.details}
-                  </Text>
-                )}
+                <AddressDetails details={order.pickup.details} color={colors.inkSecondary} />
               </View>
               {destinations.map((destination, index) => (
                 <View key={`${destination.id}-${index}`} style={{ borderTopWidth: 1, borderColor: colors.border, paddingTop: spacing.x3 }}>
@@ -232,11 +235,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
                   <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                     {destination.label}
                   </Text>
-                  {!!destination.details && (
-                    <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-                      {destination.details}
-                    </Text>
-                  )}
+                  <AddressDetails details={destination.details} color={colors.inkSecondary} />
                 </View>
               ))}
             </View>

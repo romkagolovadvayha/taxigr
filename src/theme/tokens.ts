@@ -86,7 +86,7 @@ export const lightColors: ColorPalette = {
   info: '#9B750A',
   infoSoft: '#FFF3CB',
   infoText: '#725714',
-  route: '#C49413',
+  route: '#00A85A',
   mapFallback: '#ECE7D9',
   vehicleGlass: '#AFC7D8',
   vehicleGlassHighlight: '#EAF6FC',
@@ -133,7 +133,7 @@ export const darkColors: ColorPalette = {
   info: '#F7D46A',
   infoSoft: '#40351C',
   infoText: '#FFE7A0',
-  route: '#F7D46A',
+  route: '#35D37D',
   mapFallback: '#302D24',
   vehicleGlass: '#7895A8',
   vehicleGlassHighlight: '#C6D9E4',
@@ -267,6 +267,14 @@ export const layout = {
 } as const;
 
 export const componentSizing = {
+  booking: {
+    rowHeight: 54,
+    compactRowHeight: 48,
+    iconSize: 20,
+    iconColumn: 24,
+    actionHeight: 56,
+    compactActionHeight: 48,
+  },
   addressFieldAction: {
     touchTarget: 44,
     rowTopInset: 2,

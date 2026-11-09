@@ -15,6 +15,22 @@ afterEach(() => {
 });
 
 describe('local address directory', () => {
+  it.each(['51.9606594,56.0452594', '51.9607594,56.0452594'])(
+    'finds the nearest verified house for a map point at %s', async (query) => {
+      const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+      const results = await searchAddresses(query, false, false, true);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({ label: 'с. Грахово, ул. Колпакова, 10', houseNumber: '10' });
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns no house for a map point beyond the local lookup radius', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    await expect(searchAddresses('51.8,56.18', false, false, true)).resolves.toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['Молодёжная 4 Грахово', 'с. Грахово, ул. Молодежная, 4', 'approximate'],
     ['Молодёжная 4, д. Каменное', 'д. Каменное, ул. Молодежная, 4', 'precise'],

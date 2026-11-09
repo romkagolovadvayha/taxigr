@@ -42,7 +42,7 @@ describe('MAX group booking', () => {
     expect(await f.say('Да')).toContain('Откуда забрать');
     expect(await f.say('Совецкая 10')).toContain('Куда едем');
     expect(await f.say('Можгу')).toContain('г. Можга. 950 ₽');
-    expect(await f.say('да?')).toContain('Подходит?');
+    expect(await f.say('да?')).toContain('Вызвать?');
     expect(f.deps.submit).not.toHaveBeenCalled();
     expect(await f.say('Да, давайте')).toBeNull();
     expect(await f.say('Где машина?')).toBeNull();
@@ -58,16 +58,24 @@ describe('MAX group booking', () => {
   });
   it('asks for a specific address or a numbered choice', async () => {
     const f = fixture();
-    expect(await f.say('где-то там')).toContain('Не разобрал');
+    expect(await f.say('где-то там')).toBe('Где вас искать? Можно написать ориентир.');
     expect(await f.say('Советская')).toContain('2. с. Грахово, Советская, 12');
     expect(await f.say('9')).toContain('номер из списка');
     expect(await f.say('2')).toContain('Куда едем');
     expect(await f.say('Можгу')).toContain('Советская, 12');
   });
+  it.each(['Да, в Можгу', 'Сколько будет до Можгу?'])('remembers a destination from %s and only asks for pickup', async text => {
+    const f = fixture();
+    expect(await f.say(text)).toBe('Откуда забрать?');
+    expect(f.draft.raw).toEqual({ destination: 'Можгу' });
+    expect(f.deps.quote).not.toHaveBeenCalled();
+    expect(await f.say('Советская 10')).toContain('950 ₽');
+    expect(f.deps.submit).not.toHaveBeenCalled();
+  });
   it('does not turn a future time or decline into consent', async () => {
     const f = fixture();
     await f.say('Советская 10 → Можгу');
-    expect(await f.say('Завтра')).toContain('ближайшую подачу');
+    expect(await f.say('Завтра')).toBe('В чате можно заказать только на сейчас.');
     expect(await f.say('нет, спасибо')).toBe('Хорошо, отменили.');
     expect(await f.say('да')).toBeNull();
     expect(f.deps.submit).not.toHaveBeenCalled();
@@ -76,7 +84,7 @@ describe('MAX group booking', () => {
     const f = fixture();
     await f.say('Советская 10 → Можгу');
     f.deps.submit.mockRejectedValueOnce({ code: 'QUOTE_EXPIRED_OR_INVALID' });
-    expect(await f.say('да')).toContain('Подходит?');
+    expect(await f.say('да')).toContain('Вызвать?');
     expect(f.draft.stage).toBe('confirm');
     expect(await f.say('да')).toBeNull();
     expect(await f.say('отбой')).toBe('Хорошо, отменили.');

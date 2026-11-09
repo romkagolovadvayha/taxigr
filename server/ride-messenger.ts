@@ -1,5 +1,4 @@
 import type { RideOrder } from '../src/domain/models';
-import { isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { driverNavigationAddress, navigationPagePath } from '../src/domain/external-navigation';
 import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
@@ -227,7 +226,7 @@ function driverTargetLocation(ride: RideOrder): MessengerLocation[] {
   if (ride.driverQueuePosition === 2) return [];
   if (['searching', 'accepted', 'driver_arriving'].includes(ride.status)) {
     return [{
-      title: isDirectoryHouseEstimate(ride.pickup) ? 'Место подачи · примерно' : 'Место подачи',
+      title: 'Место подачи',
       address: ride.pickup.label,
       latitude: ride.pickup.coordinates.latitude,
       longitude: ride.pickup.coordinates.longitude,
@@ -235,7 +234,7 @@ function driverTargetLocation(ride: RideOrder): MessengerLocation[] {
   }
   if (['driver_waiting', 'in_progress'].includes(ride.status)) {
     return [{
-      title: isDirectoryHouseEstimate(ride.destination) ? 'Место назначения · примерно' : 'Место назначения',
+      title: 'Место назначения',
       address: ride.destination.label,
       latitude: ride.destination.coordinates.latitude,
       longitude: ride.destination.coordinates.longitude,
@@ -326,8 +325,6 @@ export function driverRideNotification(
     ['👤 Пассажир', assigned ? ride.passenger?.name : null],
     ['📞 Телефон', assigned ? ride.passenger?.phone : null],
     ['💳 Стоимость', ridePriceLabel(ride)],
-    ['📍 Адрес', [ride.pickup, ...(ride.destinations ?? [ride.destination])].some(isDirectoryHouseEstimate)
-      ? 'Для части маршрута указана приблизительная точка. Сверьтесь с адресом.' : null],
     ['Уточнение', isRidePricePending(ride) ? 'Согласуйте стоимость с пассажиром, затем отправьте «Цена 350» (свою сумму в рублях).' : null],
     ['🧾 Комиссия', ride.status === 'completed'
       ? formatMoney(ride.serviceCommissionMinor)

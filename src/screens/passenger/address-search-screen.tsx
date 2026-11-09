@@ -14,6 +14,9 @@ import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { TaxiMap } from '@/components/map/taxi-map';
+import { MapCredits } from '@/components/map/map-credits';
+import { ROUTE_CALLOUT_HEIGHT, ROUTE_PIN_STEM_HEIGHT } from '@/components/map/map-scene';
+import { RoutePointCallout } from '@/components/map/route-point-callout';
 import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
@@ -137,7 +140,7 @@ function AddressResult({
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
   const displayLines = formatAddressSuggestionLines(address);
-  const needsMapPoint = hasHouseNumber(address) && hasApproximateCoordinates(address);
+  const needsMapPoint = hasHouseNumber(address) && hasApproximateCoordinates(address) && !isDirectoryHouseEstimate(address);
   const precise = hasHouseNumber(address) || Boolean(place) || directSelectionAllowed;
   const refinement = !precise && !history;
   const result = (
@@ -203,9 +206,7 @@ function AddressResult({
         )}
         {needsMapPoint && (
           <Text style={{ ...typography.caption, color: colors.warningText }}>
-            {isDirectoryHouseEstimate(address)
-              ? address.details?.includes('архивный адрес') ? 'Архивный адрес · приблизительная точка' : 'Приблизительная точка на карте'
-              : 'Укажите точку дома на карте'}
+            Укажите точку дома на карте
           </Text>
         )}
         {address.id.startsWith('saved-') && (
@@ -298,7 +299,7 @@ export function AddressSearchScreen() {
     : destinationIndex != null ? destinations[Number(destinationIndex)] : destinations[destinations.length - 1];
   const stopNumber = destinationIndex != null && Number(destinationIndex) < destinations.length - 1
     ? Number(destinationIndex) + 1 : null;
-  const pointBadge = field === 'pickup' ? 'А' : stopNumber ?? 'Б';
+  const pointBadge = field === 'pickup' ? 'А' : String(stopNumber ?? 'Б');
   const initialPoint = mapEdit === '1' ? currentAddress ?? null : null;
   const initialQueryValue = Array.isArray(initialQuery) ? initialQuery[0] ?? '' : initialQuery ?? '';
   const [query, setQuery] = useState(initialQueryValue);
@@ -625,30 +626,30 @@ export function AddressSearchScreen() {
         applyAddress(pendingAddress);
         return;
       }
-      if (distance > 350) {
-        pointSaveInFlight.current = true;
-        setSavingPoint(true);
-        setSavePointError(null);
-        try {
-          const resolved = await resolvePickupAddress(selectedPoint, { token });
-          if (!mounted.current) return;
-          if (!resolved || resolved.label === 'Точка на карте') {
-            setSavePointError('Рядом с меткой не найден адрес. Уточните его в поиске.');
-            return;
-          }
+      const needsNewAddress = distance > 350;
+      pointSaveInFlight.current = true;
+      setSavingPoint(true);
+      setSavePointError(null);
+      try {
+        const resolved = await resolvePickupAddress(selectedPoint, { token, localOnly: !needsNewAddress });
+        if (!mounted.current) return;
+        if (resolved && resolved.label !== 'Точка на карте' && (needsNewAddress || hasHouseNumber(resolved))) {
           applyAddress({ ...resolved, details: resolved.details?.replace('Точка определена по геопозиции устройства', 'Точка выбрана на карте') });
-        } finally {
-          pointSaveInFlight.current = false;
-          if (mounted.current) setSavingPoint(false);
+          return;
         }
-        return;
+        if (needsNewAddress) {
+          setSavePointError('Рядом с меткой не найден адрес. Уточните его в поиске.');
+          return;
+        }
+        const address = confirmAddressPoint(pendingAddress, selectedPoint);
+        if (pendingAddress.placeId || pendingAddress.id.startsWith('location:')) {
+          // A catalog ID would make the server snap the point back to the original place.
+          applyAddress({ ...address, placeId: undefined, kind: 'place', id: address.id.replace('map:', 'location:') });
+        } else applyAddress(address);
+      } finally {
+        pointSaveInFlight.current = false;
+        if (mounted.current) setSavingPoint(false);
       }
-      const address = confirmAddressPoint(pendingAddress, selectedPoint);
-      if (pendingAddress.placeId || pendingAddress.id.startsWith('location:')) {
-        // A moved point is a waypoint for this order. A catalog ID would make
-        // the server snap it back to the original place.
-        applyAddress({ ...address, placeId: undefined, kind: 'place', id: address.id.replace('map:', 'location:') });
-      } else applyAddress(address);
       return;
     }
     if (savedPointAlternative && usingSavedPoint) {
@@ -750,17 +751,18 @@ export function AddressSearchScreen() {
             <ActivityIndicator color={colors.infoText} />
             <Text style={{ ...typography.body, color: colors.inkSecondary }}>Находим улицу на карте…</Text>
           </View>}
-          {pointMapReady && <View pointerEvents="none" style={{ position: 'absolute', left: '50%', top: '50%',
-            alignItems: 'center', transform: [{ translateX: -18 }, { translateY: -35 }] }}>
-            <Text style={{ ...typography.bodyStrong, textAlign: 'center', textAlignVertical: 'center', width: 36, height: 30,
-              paddingTop: Platform.OS === 'web' ? 4 : 0, borderRadius: radius.md, overflow: 'hidden', color: colors.brandInk,
-              backgroundColor: colors.brand }}>{pointBadge}</Text>
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.surface, borderColor: colors.ink, borderWidth: 2 }} />
+          {pointMapReady && <View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+            alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ transform: [{ translateY: -(ROUTE_CALLOUT_HEIGHT + ROUTE_PIN_STEM_HEIGHT) / 2 }] }}>
+              <RoutePointCallout badge={pointBadge} pickup={field === 'pickup'}
+                title={field === 'pickup' ? 'Место подачи' : stopNumber ? `Остановка ${stopNumber}` : 'Место назначения'} />
+            </View>
           </View>}
           <View style={{ position: 'absolute', bottom: 24, right: 12 }}>
             <IconButton icon="recenter" label="Использовать моё местоположение" disabled={centeringPoint || savingPoint}
               onPress={() => { void centerOnLocation(); }} />
           </View>
+          {pendingCenter && <MapCredits />}
         </View>
         {!!(pointMapError || savePointError) && <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>{pointMapError ?? savePointError}</Text>}
         <AppButton compact disabled={!pointMapReady || !selectedPoint || Boolean(pointMapError)} loading={savingPoint} onPress={() => { void saveSelectedPoint(); }}>

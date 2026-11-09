@@ -5,19 +5,47 @@ import { Text, TextInput, View } from 'react-native';
 import { apiRequest } from '@/api/client';
 import { AppButton } from '@/components/ui/app-button';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import type { GroupAlertProvider, WatchedGroup } from '@/domain/group-alerts';
 import { useThemeColors } from '@/theme/theme-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 
-type Device = { id: string; name: string; paired: boolean; lastSeenAt: string | null; revokedAt: string | null };
+type Device = {
+  id: string;
+  name: string;
+  paired: boolean;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+  watchedGroups?: WatchedGroup[] | string | null;
+};
 type State = { devices: Device[]; channels: string[] };
 const channelLabels: Record<string, string> = { max: 'MAX', telegram: 'Telegram', vk: 'VK' };
+const providers = ['max', 'whatsapp'] as const;
+const providerLabels: Record<GroupAlertProvider, string> = { max: 'MAX', whatsapp: 'WhatsApp' };
+
+function deviceGroups(value: Device['watchedGroups']): WatchedGroup[] | undefined {
+  try {
+    const groups: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+    if (Array.isArray(groups)) {
+      return groups.filter(group => providers.includes(group?.provider) && typeof group?.title === 'string');
+    }
+  } catch { /* Older responses can omit valid group data. */ }
+}
+
+function groupTitles(groups: WatchedGroup[], provider: GroupAlertProvider) {
+  return groups.filter(group => group.provider === provider).map(group => group.title);
+}
+
 export function GroupAlertsCard({ token, demo }: { token: string | null; demo: boolean }) {
   const colors = useThemeColors();
   const query = useQuery({ queryKey: ['admin-group-alerts', token], enabled: !!token && !demo,
     queryFn: ({ signal }) => apiRequest<State>('/v1/admin/group-alerts/devices', { token: token!, signal, cache: 'no-store' }),
   });
-  const [maxGroups, setMaxGroups] = useState('Такси 🚖 Грахово');
-  const [whatsappGroups, setWhatsappGroups] = useState('Грахово такси');
+  const activeDevice = query.data?.devices.find(device => device.paired && !device.revokedAt);
+  const activeGroups = deviceGroups(activeDevice?.watchedGroups);
+  const [maxDraft, setMaxGroups] = useState<string | null>(null);
+  const [whatsappDraft, setWhatsappGroups] = useState<string | null>(null);
+  const maxGroups = maxDraft ?? (activeGroups ? groupTitles(activeGroups, 'max').join('\n') : 'Такси 🚖 Грахово');
+  const whatsappGroups = whatsappDraft ?? (activeGroups ? groupTitles(activeGroups, 'whatsapp').join('\n') : 'Грахово такси');
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +56,7 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
     finally { setBusy(false); }
   };
   const create = () => perform(async () => {
-    const groups = (['max', 'whatsapp'] as const).flatMap(provider =>
+    const groups = providers.flatMap(provider =>
       (provider === 'max' ? maxGroups : whatsappGroups).split('\n').map(title => title.trim()).filter(Boolean).map(title => ({ provider, title })));
     if (!groups.length) throw new Error('Укажите хотя бы одну группу');
     const result = await apiRequest<{ code: string; expiresAt: string }>('/v1/admin/group-alerts/devices', {
@@ -46,6 +74,7 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
     {demo ? <Text>Подключение доступно после входа администратора.</Text> : query.data ? <>
       <Text style={{ color: colors.inkSecondary }}>Подтвердите вход в WhatsApp и MAX в окне «Заявки из групп» на компьютере, затем введите там код подключения.</Text>
       <Text style={{ color: colors.inkSecondary }}>Ваши боты: {query.data.channels.map(channel => channelLabels[channel] ?? channel).join(', ') || 'не подключены'}</Text>
+      <Text style={{ color: colors.inkSecondary }}>Эти поля используются при получении нового кода подключения.</Text>
       <Text style={{ color: colors.ink }}>Группы MAX — каждое название с новой строки</Text>
       <TextInput accessibilityLabel="Названия групп MAX" value={maxGroups} onChangeText={setMaxGroups} multiline
         maxLength={3000} editable={!busy} style={inputStyle} />
@@ -61,6 +90,10 @@ export function GroupAlertsCard({ token, demo }: { token: string | null; demo: b
       {!query.data.devices.length && <Text style={{ color: colors.inkSecondary }}>Источник сообщений ещё не подключён.</Text>}
       {query.data.devices.map(device => <View key={device.id} style={{ gap: spacing.x1 }}>
         <Text style={{ color: colors.ink }}>{device.name}: {device.revokedAt ? 'отключён' : device.paired ? 'подключён' : 'ожидает ввода кода'}</Text>
+        {device.paired && !device.revokedAt && providers.map(provider => {
+          const names = groupTitles(deviceGroups(device.watchedGroups) ?? [], provider);
+          return names.length ? <Text key={provider} style={{ color: colors.inkSecondary }}>{providerLabels[provider]}: {names.join(', ')}</Text> : null;
+        })}
         {!!device.lastSeenAt && <Text style={{ color: colors.inkSecondary }}>Последнее сообщение: {new Date(device.lastSeenAt).toLocaleString('ru-RU')}</Text>}
         {!device.revokedAt && <AppButton variant="secondary" disabled={busy} onPress={() => void perform(async () => {
           await apiRequest(`/v1/admin/group-alerts/devices/${device.id}`, { method: 'DELETE', token: token! });

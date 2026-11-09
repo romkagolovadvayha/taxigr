@@ -213,7 +213,7 @@ function RootNavigator() {
           />
           <Stack.Screen
             name="order-confirmation"
-            options={{
+            options={Platform.OS === 'android' ? { presentation: 'card' } : {
               presentation: 'formSheet',
               sheetAllowedDetents: [0.72, 1],
               sheetInitialDetentIndex: 'last',

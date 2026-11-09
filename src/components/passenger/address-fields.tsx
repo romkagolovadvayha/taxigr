@@ -14,11 +14,11 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon, type AppIconName } from '@/components/ui/app-icon';
 import {
   isDestinationAddressBookable,
-  isDirectoryHouseEstimate,
   isPickupAddressBookable,
 } from '@/domain/address-precision';
 import type { Address } from '@/domain/models';
 import {
+  formatMultiStopRouteAddresses,
   formatRoutePointCount,
   routeDestinationTitle,
 } from '@/domain/route-label';
@@ -32,12 +32,14 @@ type Props = {
   onUseLocation?: () => void;
   locationLoading?: boolean;
   compact?: boolean;
+  dense?: boolean;
   reducedActions?: boolean;
   hideAddDestination?: boolean;
   validationAttempt?: number;
 };
 
 const addressActionSizing = componentSizing.addressFieldAction;
+const bookingSizing = componentSizing.booking;
 
 function AddressActionVisual({
   icon,
@@ -79,7 +81,9 @@ function AddressRow({
   kind,
   label,
   address,
+  displayLabel,
   compact,
+  dense,
   onUseLocation,
   locationLoading,
   destinations,
@@ -90,7 +94,9 @@ function AddressRow({
   kind: 'pickup' | 'destination';
   label: string;
   address: Address | null;
+  displayLabel?: string;
   compact: boolean;
+  dense: boolean;
   onUseLocation?: () => void;
   locationLoading?: boolean;
   destinations?: Address[];
@@ -113,7 +119,6 @@ function AddressRow({
           : !isDestinationAddressBookable(address)
       );
   const invalid = validationAttempt > 0 && (!address || !!needsAddressDetails);
-  const approximate = isDirectoryHouseEstimate(address) || routeDestinations.some(isDirectoryHouseEstimate);
   const shake = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
@@ -159,7 +164,7 @@ function AddressRow({
           });
         }}
         style={({ pressed }) => ({
-          minHeight: compact ? 50 : 64,
+          minHeight: compact ? dense ? bookingSizing.compactRowHeight : bookingSizing.rowHeight : 64,
           flexDirection: 'row',
           alignItems: expandedDestinations ? 'flex-start' : 'center',
           gap: spacing.x3,
@@ -168,7 +173,12 @@ function AddressRow({
           opacity: pressed ? 0.68 : 1,
         })}
       >
-        {!expandedDestinations && (
+        {compact ? (
+          <View style={{ width: bookingSizing.iconColumn, alignItems: 'center' }}>
+            <AppIcon name={kind === 'pickup' ? 'location' : 'flag'} size={bookingSizing.iconSize}
+              color={invalid ? colors.danger : colors.ink} />
+          </View>
+        ) : !expandedDestinations && (
           <View
             style={{
               width: 10,
@@ -182,11 +192,11 @@ function AddressRow({
           />
         )}
         <View style={{ flex: 1 }}>
-          <Text selectable style={{ ...typography.micro, fontSize: 11, color: invalid ? colors.dangerText : colors.inkSecondary }}>
+          {!compact && <Text selectable style={{ ...typography.micro, fontSize: 11, color: invalid ? colors.dangerText : colors.inkSecondary }}>
             {multipleDestinations
               ? `Маршрут · ${formatRoutePointCount(routeDestinations.length)}`
               : label}
-          </Text>
+          </Text>}
           {expandedDestinations ? (
             <View style={{ gap: spacing.x2, marginTop: spacing.x2 }}>
               {routeDestinations.map((item, index) => {
@@ -241,14 +251,18 @@ function AddressRow({
             <Text
               selectable
               numberOfLines={1}
-              style={{ ...typography.bodyStrong, fontSize: compact ? 15 : 16, color: invalid ? colors.dangerText : colors.ink }}
+              style={{ ...typography.body, fontSize: dense ? 15 : 16,
+                color: invalid ? colors.dangerText : address ? colors.ink : colors.inkSecondary }}
             >
-              {address?.label ??
+              {displayLabel ?? address?.label ??
                 (kind === 'pickup'
                   ? locationLoading
                     ? 'Определяем местоположение…'
-                    : 'Где вы?'
-                  : 'Куда поедем?')}
+                    : 'Откуда'
+                  : 'Куда')}
+              {compact && multipleDestinations && <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+                {` · ${formatRoutePointCount(routeDestinations.length)}`}
+              </Text>}
             </Text>
           )}
           {(invalid || needsAddressDetails) && (
@@ -256,12 +270,9 @@ function AddressRow({
               {address ? 'Уточните адрес' : kind === 'pickup' ? 'Укажите, откуда вас забрать' : 'Укажите, куда поедем'}
             </Text>
           )}
-          {approximate && !invalid && !needsAddressDetails && (
-            <Text selectable style={{ ...typography.micro, color: colors.warningText }}>Приблизительная точка</Text>
-          )}
         </View>
         {!compactLocationAction && !addDestinationAction ? (
-          <Text style={{ ...typography.sectionTitle, color: colors.inkMuted, alignSelf: 'center' }}>›</Text>
+          <AppIcon name="chevron" size={16} color={colors.inkMuted} />
         ) : null}
       </AnimatedPressable>
       {addDestinationAction && (
@@ -333,18 +344,24 @@ export function AddressFields({
   onUseLocation,
   locationLoading,
   compact = false,
+  dense = false,
   reducedActions = false,
   hideAddDestination = false,
   validationAttempt = 0,
 }: Props) {
   const colors = useThemeColors();
+  const routeLabels = compact && pickup && destination
+    ? formatMultiStopRouteAddresses(pickup, destinations?.length ? destinations : [destination])
+    : undefined;
   return (
     <View>
       <AddressRow
         kind="pickup"
         label="Откуда"
         address={pickup}
+        displayLabel={routeLabels?.pickup}
         compact={compact}
+        dense={dense}
         onUseLocation={onUseLocation}
         locationLoading={locationLoading}
         reducedActions={reducedActions}
@@ -373,13 +390,15 @@ export function AddressFields({
           </Text>
         </AnimatedPressable>
       )}
-      <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 30 }} />
+      <View style={{ height: 1, backgroundColor: colors.border, marginLeft: compact ? bookingSizing.iconColumn + spacing.x3 : 30 }} />
       <AddressRow
         kind="destination"
         label="Куда"
         address={destination}
+        displayLabel={routeLabels?.destinations[routeLabels.destinations.length - 1]}
         destinations={destinations}
         compact={compact}
+        dense={dense}
         onAddDestination={
           !hideAddDestination && (destinations?.length ?? 0) < 5
             ? () => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })

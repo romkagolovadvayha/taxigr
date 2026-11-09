@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapBearing, taxiMapFit, taxiMapPadding, taxiMapScene, validMapCoordinate } from '../src/components/map/map-scene';
+import { MAP_DEFAULT_ZOOM, MAP_SELECTION_ZOOM, mapBearing, taxiMapFit, taxiMapPadding, taxiMapScene, validMapCoordinate } from '../src/components/map/map-scene';
 import { fitRouteLocation } from '../src/components/map/route-viewport';
 import type { Address } from '../src/domain/models';
 
@@ -39,7 +39,7 @@ describe('MapLibre route scene', () => {
       pickup: { ...pickup, id: 'gar:street:4', kind: 'house', houseNumber: '4', coordinatePrecision: 'approximate' },
       destination: { ...destination, id: 'manual:unknown', coordinatePrecision: 'approximate', coordinates: { latitude: 0, longitude: 0 } },
     });
-    expect(scene.points).toMatchObject([{ kind: 'pickup', coordinates: [51.9586, 56.0477], label: 'Подача · примерно' }]);
+    expect(scene.points).toMatchObject([{ kind: 'pickup', coordinates: [51.9586, 56.0477], label: 'Место подачи' }]);
   });
   it('rejects corrupt geometry and does not mutate the original route', () => {
     const input = [...route, { latitude: NaN, longitude: 52 }];
@@ -56,7 +56,20 @@ describe('MapLibre route scene', () => {
 describe('MapLibre camera', () => {
   it('centers a single selected address even outside Grahovo', () => {
     const point = { latitude: 56.8605, longitude: 53.1977 };
-    expect(taxiMapFit([point], 390, 844, taxiMapPadding(390, 844))).toEqual({ center: [53.1977, 56.8605], zoom: 15.5 });
+    expect(taxiMapFit([point], 390, 844, taxiMapPadding(390, 844))).toEqual({ center: [53.1977, 56.8605], zoom: 16.5 });
+  });
+  it('uses an address scale for a single point and a wider scale for the route', () => {
+    const padding = taxiMapPadding(390, 500, undefined, true);
+    const from = pickup.coordinates;
+    const nearby = { ...from, latitude: from.latitude + 0.0001 };
+    const faraway = { latitude: 56.85, longitude: 53.2 };
+    const single = taxiMapFit([from], 390, 500, padding)!;
+    const short = taxiMapFit([from, nearby], 390, 500, padding)!;
+    const long = taxiMapFit([from, faraway], 390, 500, padding)!;
+    expect(taxiMapFit([], 390, 500, padding)?.zoom).toBe(MAP_DEFAULT_ZOOM);
+    expect(single.zoom).toBeLessThan(MAP_SELECTION_ZOOM);
+    expect(short.zoom).toBeLessThan(single.zoom);
+    expect(long.zoom).toBeLessThan(short.zoom);
   });
   it('fits with 512-pixel tiles, preserving the same ground extent as the old map', () => {
     const padding = taxiMapPadding(390, 844, { bottom: 360, top: 82 }, true);
@@ -70,6 +83,11 @@ describe('MapLibre camera', () => {
     expect(padding.top + padding.bottom).toBeLessThanOrEqual(56.00001);
     expect(padding.left + padding.right).toBeLessThanOrEqual(256);
     expect(taxiMapFit(route, 320, 120, padding)?.zoom).toBeGreaterThan(5);
+  });
+  it('allows a long route to zoom below 5 in a small map', () => {
+    const padding = taxiMapPadding(320, 180, { top: 44, bottom: 60 }, true);
+    const moscow = { latitude: 55.7558, longitude: 37.6173 };
+    expect(taxiMapFit([pickup.coordinates, moscow], 320, 180, padding)?.zoom).toBeLessThan(5);
   });
   it('ignores invalid insets and waits for an actual layout', () => {
     expect(taxiMapPadding(390, 844, { top: NaN, bottom: -50 })).toEqual({ top: 18, right: 18, bottom: 18, left: 18 });

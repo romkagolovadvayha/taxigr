@@ -22,9 +22,9 @@ export function routeDestinationMapLabel(
   arrivalLabel?: string | null,
 ): string {
   if (index === count - 1) {
-    return arrivalLabel ?? (count > 1 ? `${index + 1} · Финиш` : 'Финиш');
+    return arrivalLabel ?? 'Место назначения';
   }
-  return String(index + 1);
+  return `Остановка ${index + 1}`;
 }
 
 export function formatRoutePointCount(count: number): string {

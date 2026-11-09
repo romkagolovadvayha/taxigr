@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { ScheduledPickupFields } from '@/components/passenger/scheduled-pickup-fields';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
@@ -9,13 +10,15 @@ import { formatScheduledPickup, preorderBounds, preorderMaxLeadDays, preorderMin
 import { useScreenClock } from '@/hooks/use-screen-clock';
 import { useRide } from '@/state/ride-provider';
 import { useThemeColors } from '@/theme/theme-provider';
-import { spacing, typography } from '@/theme/tokens';
+import { componentSizing, spacing, typography } from '@/theme/tokens';
 
 function grahovoWallTime(timestamp: number) {
   return new Date(timestamp + 4 * 3_600_000).toISOString();
 }
 
-export function ScheduledPickupControl({ disabled }: { disabled?: boolean }) {
+const bookingSizing = componentSizing.booking;
+
+export function ScheduledPickupControl({ disabled, dense }: { disabled?: boolean; dense?: boolean }) {
   const colors = useThemeColors();
   const { scheduledAt, selectScheduledAt } = useRide();
   const [step, setStep] = useState<'mode' | 'time' | null>(null);
@@ -46,12 +49,22 @@ export function ScheduledPickupControl({ disabled }: { disabled?: boolean }) {
   };
 
   return <>
-    <AppButton compact variant="secondary" disabled={disabled} style={{ minHeight: 44 }}
-      accessibilityLabel={`Время подачи: ${label}`} accessibilityState={{ expanded: step !== null }}
-      icon={<AppIcon name="clock" size={18} />} onPress={() => setStep('mode')}>
-      {`${label} ▾`}
-    </AppButton>
-    <AppModal visible={step !== null} title={step === 'time' ? 'Выберите время подачи' : 'Когда подать машину?'}
+    <View style={{ height: 1, backgroundColor: colors.border, marginLeft: bookingSizing.iconColumn + spacing.x3 }} />
+    <AnimatedPressable feedback="subtle" accessibilityRole="button" disabled={disabled}
+      accessibilityLabel={`Время подачи: ${label}`} accessibilityState={{ expanded: step !== null, disabled }}
+      onPress={() => setStep('mode')}
+      style={({ pressed }) => ({ minHeight: dense ? bookingSizing.compactRowHeight : bookingSizing.rowHeight,
+        flexDirection: 'row', alignItems: 'center', gap: spacing.x3,
+        opacity: disabled ? 0.55 : pressed ? 0.68 : 1 })}>
+      <View style={{ width: bookingSizing.iconColumn, alignItems: 'center' }}>
+        <AppIcon name="clock" size={bookingSizing.iconSize} color={colors.ink} />
+      </View>
+      <Text numberOfLines={1} style={{ ...typography.body, flex: 1, fontSize: dense ? 15 : 16, color: colors.ink }}>
+        {scheduledAt ? formatScheduledPickup(scheduledAt, true) : label}
+      </Text>
+      <AppIcon name="chevron" size={16} color={colors.inkMuted} />
+    </AnimatedPressable>
+    <AppModal compact={dense} visible={step !== null} title={step === 'time' ? 'Выберите время подачи' : 'Когда подать машину?'}
       onClose={() => setStep(null)}>
       {step === 'time' ? <View style={{ gap: spacing.x3 }}>
         <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>

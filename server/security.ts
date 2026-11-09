@@ -62,6 +62,15 @@ export async function signSession(user: AuthUser): Promise<string> {
 
 export const orderQuoteLifetimeSeconds = 30 * 60;
 
+export function driverPricedBotQuote(passengerId: string, pickup: Address, destination: Address): OrderQuoteClaims {
+  return {
+    passengerId, pricingMode: 'driver', pickup, destination, destinations: [destination], pricingScope: 'grahovo',
+    route: { distanceMeters: 0, durationSeconds: 0, source: 'estimate' },
+    pricingDistanceMeters: 0, driverApproachDistanceMeters: 0,
+    prices: { economy: 0, child: 0 }, pricedAt: new Date().toISOString(),
+  };
+}
+
 export async function signOrderQuote(claims: OrderQuoteClaims): Promise<string> {
   const issuedAt = Math.floor(Date.now() / 1000);
   return new SignJWT({ quote: claims })

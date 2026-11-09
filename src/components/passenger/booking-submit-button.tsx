@@ -2,7 +2,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { formatMoney } from '@/utils/format';
-import { radius, spacing, typography } from '@/theme/tokens';
+import { componentSizing, radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 import { useBookingAvailability, useBookingAvailabilityPolling } from '@/providers/booking-availability-provider';
 
@@ -68,12 +68,12 @@ export function BookingSubmitButton({
         void checkBooking().then((allowed) => { if (allowed) onPress(); });
       }}
       style={({ pressed }) => ({
-        minHeight: compact ? 48 : 56,
+        minHeight: compact ? componentSizing.booking.compactActionHeight : componentSizing.booking.actionHeight,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: spacing.x4,
         paddingVertical: compact ? spacing.x2 : spacing.x3,
-        borderRadius: radius.md,
+        borderRadius: radius.lg,
         borderCurve: 'continuous',
         backgroundColor: colors.brand,
         opacity: loading ? 0.78 : disabled ? 0.42 : pressed ? 0.88 : 1,
@@ -91,7 +91,7 @@ export function BookingSubmitButton({
         {loading && <ActivityIndicator size="small" color={colors.brandInk} />}
         <Text style={{
           ...typography.bodyStrong,
-          fontSize: 16,
+          fontSize: compact ? 16 : 17,
           lineHeight: 22,
           textAlign: 'center',
           flexShrink: 1,

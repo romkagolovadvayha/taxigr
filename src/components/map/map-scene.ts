@@ -1,5 +1,6 @@
 import type { FeatureCollection, LineString } from 'geojson';
 
+import { grahovoCenter } from '../../data/service-area';
 import { routeDestinationMapLabel } from '../../domain/route-label';
 import { remainingRouteCoordinates } from '../../domain/route-tracking';
 import type { Coordinates } from '../../domain/models';
@@ -11,9 +12,17 @@ import { hasApproximateCoordinates, isDirectoryHouseEstimate } from '../../domai
 export { lngLat, mapBearing, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 
 export type RouteMapPoint = { id: string; kind: 'pickup' | 'stop' | 'destination'; coordinates: LngLat; label: string; badge: string; destinationIndex: number | null };
-export const MAP_SELECTION_ZOOM = 18;
+export const MAP_SELECTION_ZOOM = 17;
 export const MAP_DEFAULT_ZOOM = 14;
+export const MAP_MIN_ZOOM = 2;
 export const MAP_MAX_ZOOM = 19;
+export const ROUTE_CALLOUT_HEIGHT = 40;
+export const ROUTE_CALLOUT_GAP = 3;
+export const ROUTE_CALLOUT_SIDE_PADDING = 4;
+export const ROUTE_PIN_STEM_HEIGHT = 6;
+export const ROUTE_PIN_SIZE = 12;
+const MAP_ADDRESS_ZOOM = 16.5;
+const MAP_ROUTE_MAX_ZOOM = 16;
 
 export function taxiMapScene(props: TaxiMapProps) {
   // Never bridge corrupt geometry with a made-up straight route.
@@ -26,7 +35,7 @@ export function taxiMapScene(props: TaxiMapProps) {
   const approximatePickup = isDirectoryHouseEstimate(props.pickup);
   if (props.pickup && (!hasApproximateCoordinates(props.pickup) || approximatePickup) && validMapCoordinate(pickup)) points.push({
     id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup), badge: 'А', destinationIndex: null,
-    label: approximatePickup ? 'Подача · примерно' : props.pickupEtaMinutes ? `Старт · ${props.pickupEtaMinutes} мин` : 'Старт',
+    label: !approximatePickup && props.pickupEtaMinutes ? `Подача ${props.pickupEtaMinutes} мин` : 'Место подачи',
   });
   const destinations = props.destinations?.length ? props.destinations : props.destination ? [props.destination] : [];
   destinations.forEach((destination, index) => {
@@ -37,8 +46,7 @@ export function taxiMapScene(props: TaxiMapProps) {
     if ((!hasApproximateCoordinates(destination) || approximate) && validMapCoordinate(coordinates)) points.push({
       id: `destination-${index}`, kind: final ? 'destination' : 'stop', coordinates: lngLat(coordinates),
       badge: final ? 'Б' : String(index + 1), destinationIndex: index,
-      label: routeDestinationMapLabel(index, destinations.length, final && !approximate ? props.destinationArrivalLabel : undefined) +
-        (approximate ? ' · примерно' : ''),
+      label: routeDestinationMapLabel(index, destinations.length, final && !approximate ? props.destinationArrivalLabel : undefined),
     });
   });
   const route: FeatureCollection<LineString> = { type: 'FeatureCollection', features: rendered.length < 2 ? [] : [{
@@ -50,7 +58,8 @@ export function taxiMapScene(props: TaxiMapProps) {
 
 export function taxiMapPadding(width: number, height: number, insets?: MapViewportInsets, callouts = false) {
   const safe = (value?: number) => Number.isFinite(value) ? Math.max(0, value!) : 0;
-  let top = safe(insets?.top) + 18, bottom = safe(insets?.bottom) + 18;
+  let top = safe(insets?.top) + (callouts ? ROUTE_CALLOUT_HEIGHT + ROUTE_PIN_STEM_HEIGHT + ROUTE_PIN_SIZE / 2 : 18);
+  let bottom = safe(insets?.bottom) + 18;
   let left = safe(insets?.left) + (callouts ? 86 : 18), right = safe(insets?.right) + (callouts ? 86 : 18);
   const xScale = Math.min(1, Math.max(0, width - 64) / Math.max(1, left + right));
   const yScale = Math.min(1, Math.max(0, height - 64) / Math.max(1, top + bottom));
@@ -59,9 +68,11 @@ export function taxiMapPadding(width: number, height: number, insets?: MapViewpo
 }
 
 export function taxiMapFit(coordinates: Coordinates[], width: number, height: number, padding: ReturnType<typeof taxiMapPadding>) {
-  if (coordinates.length === 1 && validMapCoordinate(coordinates[0]) && width > 0 && height > 0) {
-    return { center: lngLat(coordinates[0]), zoom: 15.5 };
+  if (width <= 0 || height <= 0) return null;
+  if (!coordinates.length) return { center: lngLat(grahovoCenter), zoom: MAP_DEFAULT_ZOOM };
+  if (coordinates.length === 1 && validMapCoordinate(coordinates[0])) {
+    return { center: lngLat(coordinates[0]), zoom: MAP_ADDRESS_ZOOM };
   }
   return fitRouteLocation(coordinates, width, height,
-    [padding.top, padding.right, padding.bottom, padding.left], 5, 17, 512);
+    [padding.top, padding.right, padding.bottom, padding.left], MAP_MIN_ZOOM, MAP_ROUTE_MAX_ZOOM, 512);
 }

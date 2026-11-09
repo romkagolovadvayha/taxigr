@@ -112,7 +112,7 @@ export function ActiveRidePanel({
           </Text>
           {ride.status === 'searching' && !ride.scheduledAt && <SearchElapsedBadge startedAt={ride.createdAt} />}
         </View>
-        {!!ride.scheduledAt && <Text selectable testID="passenger-scheduled-time" numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.danger }}>
+        {!terminal && !!ride.scheduledAt && <Text selectable testID="passenger-scheduled-time" numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.danger }}>
           Подача {formatScheduledPickup(ride.scheduledAt)}
         </Text>}
       </Animated.View>

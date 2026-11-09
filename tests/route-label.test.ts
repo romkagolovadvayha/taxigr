@@ -68,9 +68,9 @@ describe('route labels', () => {
   it('distinguishes intermediate stops from the finish', () => {
     expect(routeDestinationTitle(0, 3)).toBe('ОСТАНОВКА 1');
     expect(routeDestinationTitle(2, 3)).toBe('ФИНИШ');
-    expect(routeDestinationMapLabel(0, 3)).toBe('1');
-    expect(routeDestinationMapLabel(2, 3)).toBe('3 · Финиш');
-    expect(routeDestinationMapLabel(0, 1)).toBe('Финиш');
+    expect(routeDestinationMapLabel(0, 3)).toBe('Остановка 1');
+    expect(routeDestinationMapLabel(2, 3)).toBe('Место назначения');
+    expect(routeDestinationMapLabel(0, 1)).toBe('Место назначения');
     expect(formatRoutePointCount(2)).toBe('2 точки');
     expect(formatRoutePointCount(5)).toBe('5 точек');
   });

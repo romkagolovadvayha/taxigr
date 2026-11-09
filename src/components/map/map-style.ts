@@ -6,6 +6,9 @@ import type { ColorPalette } from '@/theme/tokens';
 export const MAP_TILES_URL = process.env.EXPO_PUBLIC_MAP_TILES_URL || 'https://tiles.openfreemap.org/planet';
 export const MAP_GLYPHS_URL = process.env.EXPO_PUBLIC_MAP_GLYPHS_URL || 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 export const MAP_FONT = 'Noto Sans Regular';
+export const OPEN_MAP_TILES_URL = 'https://openmaptiles.org/';
+export const OPEN_STREET_MAP_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+const mapAttribution = `© <a href="${OPEN_MAP_TILES_URL}">OpenMapTiles</a> · © <a href="${OPEN_STREET_MAP_COPYRIGHT_URL}">OpenStreetMap</a>`;
 const name: ExpressionSpecification = ['coalesce', ['get', 'name:ru'], ['get', 'name'], ''];
 
 export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', offline = false): StyleSpecification {
@@ -19,8 +22,7 @@ export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', off
     const district = require('../../data/grahovo-offline-map.json') as GeoJSON.FeatureCollection;
     return {
       version: 8,
-      sources: { district: { type: 'geojson', data: district,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · OpenMapTiles · OpenFreeMap' } },
+      sources: { district: { type: 'geojson', data: district, attribution: mapAttribution } },
       layers: [
         { id: 'background', type: 'background', paint: { 'background-color': colors.mapFallback } },
         { id: 'district-water', type: 'fill', source: 'district', filter: ['==', ['get', 'kind'], 'water'],
@@ -72,7 +74,6 @@ export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', off
         'text-offset': [0, .8], 'text-anchor': 'top', 'text-max-width': 9 }, paint: labels },
   ];
   return { version: 8, name: 'Такси Грахово', glyphs: MAP_GLYPHS_URL,
-    sources: { openmaptiles: { type: 'vector', url: MAP_TILES_URL,
-      attribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' } },
+    sources: { openmaptiles: { type: 'vector', url: MAP_TILES_URL, attribution: mapAttribution } },
     light: { anchor: 'viewport', color: '#FFFFFF', intensity: .3, position: [1.5, 210, 45] }, layers };
 }

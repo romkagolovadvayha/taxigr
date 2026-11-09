@@ -1615,7 +1615,6 @@ export async function registerRoutes(
   registerAppReleaseRoutes(app);
   registerGroupAlertRoutes(app);
   registerMaxGroupBooking(app, {
-    local: async () => calculateFareMinor(0, 'economy', 'grahovo', await pricingRules(), new Date()),
     estimate: async (pickup, destination) => {
       const trusted = await resolveTrustedAddresses({ pickup, destination });
       const [route, rules] = await Promise.all([getMultiStopPricedRouteMetrics(trusted.pickup, trusted.destinations), pricingRules()]);

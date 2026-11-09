@@ -25,6 +25,8 @@ async function refresh() {
       if (value[provider].qr) qr.src = value[provider].qr; else qr.removeAttribute('src');
     }
     document.getElementById('password-form').hidden = value.max.state !== 'password_required';
+    const maxGroupList = value.max.groups ?? (value.groups ?? []).filter(group => group.provider === 'max').map(group => group.title);
+    document.getElementById('max-group-list').textContent = maxGroupList.join(', ') || 'Такси 🚖 Грахово';
     document.getElementById('max-account').textContent = value.max.accountId ? `ID аккаунта MAX: ${value.max.accountId}` : '';
     const maxBookingLabels = { connected: 'Личные ответы включены.', server_unavailable: 'Личные ответы не разрешены сервером для этого подключения.', send_failed: 'Одно из личных сообщений не удалось подтвердить.' };
     document.getElementById('max-booking-state').textContent = maxBookingLabels[value.maxBooking] || 'Личные ответы выключены.';

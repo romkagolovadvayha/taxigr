@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const proxy = vi.hoisted(() => ({
@@ -5,12 +6,12 @@ const proxy = vi.hoisted(() => ({
   config: { BOT_AI_API_KEY: 'test-key', BOT_AI_BASE_URL: 'https://api.openai.com/v1', BOT_AI_MODEL: 'gpt-4o-mini',
     BOT_AI_PROXY_URL: '', BOT_AI_PROXY_SERVER_NAME: '', BOT_AI_PROXY_USERNAME: '', BOT_AI_PROXY_PASSWORD: '', isProduction: true },
 }));
-vi.mock('undici', () => ({ fetch: proxy.fetch }));
 vi.mock('../server/config', () => ({ config: proxy.config }));
 vi.mock('../server/gateway-proxy', () => ({ gatewayDispatcher: proxy.dispatcher }));
 vi.mock('../server/gateway-settings', () => ({ readGatewaySettings: proxy.settings }));
 
-import { interpretBotAddress } from '../server/bot-address-ai';
+vi.doMock(createRequire(new URL('../server/bot-address-ai.ts', import.meta.url)).resolve('undici'), () => ({ fetch: proxy.fetch }));
+const { interpretBotAddress } = await import('../server/bot-address-ai');
 
 const agent = { name: 'test gateway' };
 const response = (pickup: unknown, destination: unknown) => new Response(JSON.stringify({

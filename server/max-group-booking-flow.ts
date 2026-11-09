@@ -1,9 +1,9 @@
 import type { Address, RideOrder } from '../src/domain/models';
 import { estimatePickupEtaMinutes } from '../src/domain/pickup-eta';
-import { interpretConversationalBotRoute } from '../src/domain/free-text-address';
+import { explicitBotAddress, interpretConversationalBotRoute } from '../src/domain/free-text-address';
 
 type Field = 'pickup' | 'destination';
-export type GroupQuote = { pickup: Address; destination: Address; priceMinor: number; token: string };
+export type GroupQuote = { pickup: Address; destination: Address; priceMinor: number | null; token: string };
 export type GroupBookingDraft = {
   id: string;
   stage: 'pickup' | 'destination' | 'choice' | 'verify' | 'confirm' | 'waiting' | 'closed';
@@ -21,7 +21,7 @@ type Dependencies = {
   resolve: (raw: string, field: Field) => Promise<{ address: Address | null; candidates: Address[] }>;
   interpretRoute: (raw: string, field: Field) => Promise<{ pickup?: string | null; destination?: string | null } | null>;
   pickupTiming: (text: string) => string | undefined;
-  quote: (pickup: Address, destination: Address) => Promise<{ quote: GroupQuote; passengerId: string } | { estimateMinor: number }>;
+  quote: (pickup: Address, destination: Address) => Promise<{ quote: GroupQuote; passengerId: string } | { estimateMinor: number | null }>;
   submit: (draft: GroupBookingDraft) => Promise<string>;
   cancel: (draft: GroupBookingDraft) => Promise<void>;
   verificationText: string;
@@ -31,14 +31,15 @@ const words = (text: string) => text.normalize('NFKC').toLowerCase().replace(/ё
 const plain = (text: string) => words(text).replace(/[.!?]+$/u, '').trim();
 const optOut = /^(?:больше не пиши(?:те)?(?: мне)?|не пиши(?:те)?(?: мне)?|отстань(?:те)?)$/iu;
 const decline = /^(?:нет(?:[,\s]+спасибо)?|не надо|не нужно|уже (?:нашли|наш[её]л|нашла|уехали|уехал|уехала)|отмена|отбой|отмени(?:те)?(?: (?:такси|поездку|заказ))?|отменить(?: (?:такси|поездку|заказ))?)$/iu;
-const confirm = /^(?:да|да[,\s]+давай(?:те)?|да[,\s]+можно|давай(?:те)?|подходит|соглас[её]н|согласна|согласны|подтверждаю|ок(?:ей)?|поехали|закажи(?:те)?|вызывай(?:те)?)$/iu;
+const confirm = /^(?:да|да[,\s]+давай(?:те)?|да[,\s]+можно|давай(?:те)?|подходит|соглас[её]н|согласна|согласны|подтверждаю|ок(?:ей)?|поехали|закажи(?:те)?|вызывай(?:те)?|вызвать)$/iu;
 
 export function maxGroupDriverMessage(order: RideOrder, onApproach: boolean, freshLocation: boolean): string | null {
   const driver = order.driver;
   if (!driver?.phone || !driver.vehicle.plate) return null;
   const car = [driver.vehicle.color, driver.vehicle.make, driver.vehicle.model, driver.vehicle.plate].filter(Boolean).join(' ');
   const eta = estimatePickupEtaMinutes({
-    driver: onApproach && freshLocation ? driver.coordinates : null, pickup: order.pickup.coordinates, status: order.status,
+    driver: onApproach && freshLocation && !order.pickup.id.startsWith('manual:') ? driver.coordinates : null,
+    pickup: order.pickup.coordinates, status: order.status,
   });
   const time = eta === 0 ? 'Машина уже на месте.' : eta != null ? `Будет примерно через ${eta} мин.` :
     onApproach ? 'Время подачи можно уточнить у водителя.' : 'Водитель освободится после текущей поездки.';
@@ -46,10 +47,11 @@ export function maxGroupDriverMessage(order: RideOrder, onApproach: boolean, fre
 }
 
 function addressPrompt(field: Field) {
-  return field === 'pickup' ? 'Откуда забрать? Напишите адрес или ориентир.' : 'Куда едем? Напишите адрес или название места.';
+  return field === 'pickup' ? 'Откуда забрать?' : 'Куда едем?';
 }
 function confirmation(quote: GroupQuote) {
-  return `${quote.pickup.label} → ${quote.destination.label}. ${quote.priceMinor / 100} ₽, наличными. Подходит?`;
+  const price = quote.priceMinor === null ? 'Цену согласует водитель.' : `${quote.priceMinor / 100} ₽, наличными.`;
+  return `${quote.pickup.label} → ${quote.destination.label}. ${price} Вызвать?`;
 }
 
 export async function advanceMaxGroupBooking(draft: GroupBookingDraft, input: string, deps: Dependencies, sentAt = Date.now()): Promise<string | null> {
@@ -67,8 +69,8 @@ export async function advanceMaxGroupBooking(draft: GroupBookingDraft, input: st
     return 'Хорошо, отменили.';
   }
   if (draft.stage === 'waiting') return null;
-  if (text.length > 520) return 'Напишите адреса покороче, пожалуйста.';
-  if (deps.pickupTiming(text)) return 'Здесь можно договориться на ближайшую подачу. Если нужно сейчас, напишите откуда и куда.';
+  if (text.length > 520) return 'Напишите адрес покороче.';
+  if (deps.pickupTiming(text)) return 'В чате можно заказать только на сейчас.';
   const priceRoute = async () => {
     const resolved: Partial<Record<Field, Address>> = { ...draft.selected };
     const fields = ['pickup', 'destination'] as const;
@@ -92,18 +94,19 @@ export async function advanceMaxGroupBooking(draft: GroupBookingDraft, input: st
         return `${field === 'pickup' ? 'Откуда' : 'Куда'} именно?\n${result.candidates.map((option, index) => `${index + 1}. ${option.label}`).join('\n')}`;
       }
       draft.stage = field;
-      return `Не разобрал адрес. ${addressPrompt(field)}`;
+      return field === 'pickup' ? 'Где вас искать? Можно написать ориентир.' : 'Куда едем? Можно написать ориентир.';
     }
     if (resolved.pickup!.id === resolved.destination!.id ||
         resolved.pickup!.label.toLowerCase() === resolved.destination!.label.toLowerCase()) {
       draft.stage = 'destination';
       draft.selected = { pickup: resolved.pickup };
-      return 'Подача и место назначения совпадают. Куда едем?';
+      return 'Адреса совпадают. Куда едем?';
     }
     const priced = await deps.quote(resolved.pickup!, resolved.destination!);
     if ('estimateMinor' in priced) {
       draft.stage = 'verify';
-      return `${resolved.pickup!.label} → ${resolved.destination!.label}. Обычная цена ${priced.estimateMinor / 100} ₽. ${deps.verificationText}`;
+      const price = priced.estimateMinor === null ? 'Цену согласует водитель.' : `Около ${priced.estimateMinor / 100} ₽.`;
+      return `${resolved.pickup!.label} → ${resolved.destination!.label}. ${price} ${deps.verificationText}`;
     }
     draft.stage = 'confirm';
     draft.quote = priced.quote;
@@ -143,27 +146,35 @@ export async function advanceMaxGroupBooking(draft: GroupBookingDraft, input: st
     return priceRoute();
   }
   const field = draft.choice?.field ?? (draft.stage === 'destination' ? 'destination' : 'pickup');
-  if (confirm.test(normalized) || /^(?:привет|здравствуй(?:те)?|спасибо|еще актуально|актуально)$/iu.test(normalized)) {
+  const acknowledgement = confirm.test(normalized) || /^(?:да[,\s]+)?(?:еще\s+)?актуально$/iu.test(normalized);
+  if (acknowledgement || /^(?:привет|здравствуй(?:те)?|спасибо|сколько(?: стоит| будет)?|(?:вы\s+)?(?:сейчас\s+)?таксуете|(?:еще\s+)?есть машина|можно такси)$/iu.test(normalized)) {
     if (draft.stage === 'verify') return deps.verificationText;
     if (draft.stage === 'confirm' && draft.quote) return confirmation(draft.quote);
+    if (acknowledgement && draft.raw.pickup && draft.raw.destination) return priceRoute();
     return addressPrompt(field);
   }
-  const correction = /^(?:откуда|подача|забрать)\s*[:—-]\s*(.+)$/iu.exec(text) ??
-    /^(?:куда|назначение|отвезти)\s*[:—-]\s*(.+)$/iu.exec(text);
-  const pair = correction ? null : await interpretConversationalBotRoute(text, field, deps.interpretRoute);
+  const correction = explicitBotAddress(text);
+  const pair = await interpretConversationalBotRoute(text, field, deps.interpretRoute);
   if (pair?.every(value => value.length >= 2 && value.length <= 255)) {
     draft.raw = { pickup: pair[0], destination: pair[1] };
     draft.selected = {};
     draft.choice = undefined;
+    draft.stage = 'destination';
+    draft.quote = undefined;
+    draft.quotedAt = undefined;
     return priceRoute();
   }
   if ((draft.stage === 'confirm' || draft.stage === 'verify') && !correction) {
     if (/сколько|цен[ау]|стоимост/iu.test(text) && draft.stage === 'confirm' && draft.quote) return confirmation(draft.quote);
-    return 'Если адрес изменился, напишите «Откуда: адрес» или «Куда: адрес».';
+    return 'Что поменялось? Напишите «Откуда: …» или «Куда: …».';
   }
-  const value = correction?.[1]?.trim() ?? text;
+  if (!correction && /^сколько\s/iu.test(normalized)) return addressPrompt(field);
+  const value = correction?.text ?? text;
   if (value.length < 2 || value.length > 255) return addressPrompt(field);
-  const side = correction ? /^(?:куда|назначение|отвезти)/iu.test(correction[0]) ? 'destination' : 'pickup' : field;
+  const side = correction?.field ?? field;
+  draft.stage = side;
+  draft.quote = undefined;
+  draft.quotedAt = undefined;
   draft.raw[side] = value;
   draft.selected = { ...draft.selected, [side]: undefined };
   draft.choice = undefined;

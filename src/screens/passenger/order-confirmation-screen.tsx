@@ -29,8 +29,8 @@ import { useThemeColors } from '@/theme/theme-provider';
 export function OrderConfirmationScreen() {
   const colors = useThemeColors();
   const { height } = useResponsiveLayout();
-  const dense = height < 560;
-  const gap = dense ? spacing.x1 : spacing.x2;
+  const dense = height < 600;
+  const gap = dense ? spacing.x2 : spacing.x3;
   const insets = useSafeAreaInsets();
   const {
     pickup,
@@ -49,6 +49,9 @@ export function OrderConfirmationScreen() {
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const { initialLegalConsentRequired } = useSession();
   const [comment, setComment] = useState('');
+  const [editingComment, setEditingComment] = useState(false);
+  const [availableHeight, setAvailableHeight] = useState(height);
+  const compactEditing = editingComment && availableHeight < 420;
   const [promotionVisible, setPromotionVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
@@ -94,8 +97,11 @@ export function OrderConfirmationScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+      onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}
     >
-      <Screen scroll={false} style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, paddingHorizontal: spacing.x4, paddingVertical: gap, gap }}>
+      <Screen scroll={false} style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560,
+        paddingHorizontal: spacing.x4, paddingTop: Math.max(insets.top, gap), paddingBottom: gap, gap }}>
+        {!compactEditing && <>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <IconButton icon="back" size={44} label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
           <View style={{ flex: 1 }}>
@@ -109,20 +115,23 @@ export function OrderConfirmationScreen() {
           )}
         </View>
 
-        <View style={{ gap: spacing.x2 }}>
+        <View>
           <AddressFields
             pickup={pickup}
             destinations={destinations}
             destination={destination}
             compact
+            dense={dense}
             hideAddDestination
             onUseLocation={() => void selectCurrentLocation()}
             locationLoading={locationLoading}
           />
+          <ScheduledPickupControl disabled={busy} dense={dense} />
         </View>
+        </>}
 
         <View style={{ gap }}>
-          <View accessibilityRole="radiogroup" accessibilityLabel="Способ оплаты" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x1 }}>
+          {!compactEditing && <View accessibilityRole="radiogroup" accessibilityLabel="Способ оплаты" style={{ flexDirection: 'row', gap: spacing.x2 }}>
             {([
               ['cash', 'Наличными'],
               ['transfer', 'Переводом'],
@@ -137,6 +146,8 @@ export function OrderConfirmationScreen() {
                   onPress={() => setSelectedPaymentMethod(method)}
                   style={{
                     minHeight: 44,
+                    flex: 1,
+                    alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: spacing.x3,
                     borderRadius: radius.md,
@@ -145,34 +156,37 @@ export function OrderConfirmationScreen() {
                     backgroundColor: selectedMethod ? colors.brandSoft : colors.surface,
                   }}
                 >
-                  <Text style={{ ...typography.caption, color: colors.ink }}>{label}</Text>
+                  <Text style={{ ...typography.body, fontSize: 15, color: colors.ink }}>{label}</Text>
                 </AnimatedPressable>
               );
             })}
-          </View>
+          </View>}
           <TextInput
             accessibilityLabel="Комментарий водителю"
             placeholder="Комментарий водителю"
             placeholderTextColor={colors.inkMuted}
             value={comment}
             onChangeText={setComment}
+            onFocus={() => setEditingComment(true)}
+            onBlur={() => setEditingComment(false)}
             maxLength={500}
             multiline
             style={{
-              ...typography.caption,
+              ...typography.body,
+              fontSize: 15,
               color: colors.ink,
-              height: 48,
+              height: dense ? 44 : 52,
               textAlignVertical: 'top',
               borderWidth: 1,
               borderColor: colors.border,
               borderRadius: radius.md,
               paddingHorizontal: spacing.x3,
-              paddingVertical: spacing.x1,
+              paddingVertical: spacing.x2,
             }}
           />
         </View>
 
-        {!!routeGuidance && (
+        {!compactEditing && !!routeGuidance && (
           <View
             accessibilityRole="alert"
             style={{
@@ -189,17 +203,16 @@ export function OrderConfirmationScreen() {
           </View>
         )}
 
-        {routeReady && !scheduledAt && (
+        {!compactEditing && routeReady && !scheduledAt && (
           <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Подача около {bookingFare.etaMinutes} мин</Text>
         )}
-        {routeReady && !!promotionText && (
+        {!compactEditing && routeReady && !!promotionText && (
           <Text selectable testID="order-promotion-message" numberOfLines={dense ? 1 : 2}
             onPress={() => setPromotionVisible(true)} style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
         )}
-        <ScheduledPickupControl disabled={busy} />
       </Screen>
-      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: spacing.x4,
-        paddingTop: gap, paddingBottom: Math.max(dense ? spacing.x2 : spacing.x4, insets.bottom), backgroundColor: colors.surface }}>
+      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: spacing.x4,
+        paddingTop: gap, paddingBottom: insets.bottom + (dense ? spacing.x2 : spacing.x4), backgroundColor: colors.surface }}>
           <BookingSubmitButton
               checkAvailability={false}
               compact={dense}

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandMark } from '@/components/brand-mark';
 import { useSession } from '@/auth/session-provider';
 import { getDemoPassengerProgression } from '@/domain/demo-flow';
 import {
@@ -14,9 +13,11 @@ import {
 import { estimatePickupEtaMinutes } from '@/domain/pickup-eta';
 import { isReservedRide } from '@/domain/scheduled-ride';
 import { TaxiMap } from '@/components/map/taxi-map';
+import { MapCredits } from '@/components/map/map-credits';
 import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
+import { FarePeriodIndicator } from '@/components/passenger/fare-period-indicator';
 import { ScheduledPickupControl } from '@/components/passenger/scheduled-pickup-control';
 import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -28,20 +29,20 @@ import { usePassengerDriverTracking } from '@/hooks/use-passenger-driver-trackin
 import { useScreenClock } from '@/hooks/use-screen-clock';
 import { useFeedbackPreferences } from '@/preferences/feedback-preferences-provider';
 import { useRide } from '@/state/ride-provider';
-import { spacing, typography } from '@/theme/tokens';
+import { radius, shadows, spacing, typography } from '@/theme/tokens';
 import { formatEstimatedArrivalTime } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
 
-const mapInsets = { top: 44, bottom: 60, left: 28, right: 28 };
+const mapHeaderButtonSize = 44;
 
-function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt, onInvalidRoute }: {
+function BookingPanel({ pickupEtaMinutes, section = 'content', dense, validationAttempt, onInvalidRoute }: {
   pickupEtaMinutes?: number | null;
   section?: 'content' | 'action';
+  dense: boolean;
   validationAttempt: number;
   onInvalidRoute: () => void;
 }) {
   const colors = useThemeColors();
-  const { height } = useResponsiveLayout();
   const {
     pickup,
     destinations,
@@ -67,10 +68,10 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   if (section === 'action') {
     if (currentRide) return null;
     return <BookingSubmitButton
-      compact={height < 560}
+      compact={dense}
       priceMinor={bookingFare.priceMinor}
       etaMinutes={bookingFare.etaMinutes}
-      label={scheduledAt ? 'Заказать ко времени' : 'Заказать такси'}
+      label={scheduledAt ? 'Заказать ко времени' : 'Заказать'}
       accessibilityLabel={scheduledAt && quoteReady
         ? `Перейти к подтверждению предзаказа за ${bookingFare.priceMinor / 100} рублей`
         : undefined}
@@ -102,15 +103,18 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
 
   return (
     <View style={{ gap: spacing.x2 }}>
-      <AddressFields
-        pickup={pickup}
-        destinations={destinations}
-        destination={destination}
-        validationAttempt={validationAttempt}
-        compact
-        hideAddDestination
-      />
-      <ScheduledPickupControl disabled={busy} />
+      <View>
+        <AddressFields
+          pickup={pickup}
+          destinations={destinations}
+          destination={destination}
+          validationAttempt={validationAttempt}
+          compact
+          dense={dense}
+          hideAddDestination
+        />
+        <ScheduledPickupControl disabled={busy} dense={dense} />
+      </View>
       {!!error && (
         <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
@@ -123,7 +127,11 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
 export function OrderScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { isPhone, isDesktop } = useResponsiveLayout();
+  const headerTop = insets.top + spacing.x3;
+  const { height, isPhone, isDesktop } = useResponsiveLayout();
+  const dense = height < 600;
+  const sheetOverlap = isPhone ? spacing.x4 : 0;
+  const mapInsets = useMemo(() => ({ top: headerTop + mapHeaderButtonSize, bottom: 60 + sheetOverlap }), [headerTop, sheetOverlap]);
   const { vibrationEnabled } = useFeedbackPreferences();
   const [validationAttempt, setValidationAttempt] = useState(0);
   const handleInvalidRoute = () => {
@@ -197,7 +205,7 @@ export function OrderScreen() {
         destination &&
         quoteStatus === 'ready' &&
         routeSummary
-          ? `прибытие в ${formatEstimatedArrivalTime(
+          ? `Прибытие в ${formatEstimatedArrivalTime(
               arrivalClock,
               bookingFare.etaMinutes,
               routeSummary.durationSeconds,
@@ -206,6 +214,7 @@ export function OrderScreen() {
       }
       driver={driverIsFinishingPreviousRide ? null : trackedDriver.coordinates}
       driverHeading={trackedDriver.heading}
+      driverColorHex={currentRide?.driver?.vehicle.colorHex}
       followDriver={followDriver}
       followZoom={rideInProgress ? 17 : 16}
       trimCompletedRoute={rideInProgress || routeCompleted}
@@ -214,61 +223,53 @@ export function OrderScreen() {
   );
 
   return (
-    <PassengerWorkspace>
-      <View
-        testID="passenger-header"
-        style={{
-          backgroundColor: colors.surface,
-          paddingTop: insets.top + spacing.x3,
-          paddingBottom: spacing.x3,
-          paddingLeft: Math.max(insets.left, spacing.x5),
-          paddingRight: Math.max(insets.right, spacing.x5),
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: spacing.x3,
-        }}
-      >
-        <View style={{ flex: 1, gap: 3 }}>
-          {currentRide ? <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Ваша поездка</Text> : <BrandMark size={32} />}
-          <Text numberOfLines={1} style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
-            {currentRide ? currentRide.destination.label : 'Такси рядом · Грахово'}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-          {!isDesktop && <IconButton icon="orders" size={44} label="Мои поездки" onPress={() => router.push('/orders')} />}
-          <AnimatedPressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={() => router.push('/profile')}
-            style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
-            <UserAvatar
-              name={user?.name ?? 'Профиль'}
-              avatarUrl={user?.avatarUrl}
-              size={44}
-              tone="brand"
-              accessible={false}
-            />
-          </AnimatedPressable>
-        </View>
-      </View>
+    <PassengerWorkspace showNavigationBrand={false}>
       <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row-reverse' }}>
         <View testID="passenger-map-region" style={{ flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
           {map}
-          {!currentRide && <View style={{ position: 'absolute', bottom: 24, right: 16 }}>
+          <View testID="passenger-header" pointerEvents="box-none" style={{ position: 'absolute', top: headerTop,
+            left: Math.max(insets.left, spacing.x4), right: Math.max(insets.right, spacing.x4), zIndex: 1,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x3 }}>
+            {currentRide ? <View pointerEvents="none" style={{ flexShrink: 1, borderRadius: radius.md,
+              backgroundColor: colors.surface, paddingHorizontal: spacing.x3, paddingVertical: spacing.x1 }}>
+              <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Ваша поездка</Text>
+              <Text numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.destination.label}</Text>
+            </View> : <FarePeriodIndicator scheduledAt={scheduledAt} />}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+              {!isDesktop && <IconButton icon="orders" size={mapHeaderButtonSize} label="Мои поездки" onPress={() => router.push('/orders')} />}
+              <AnimatedPressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={() => router.push('/profile')}
+                style={{ width: mapHeaderButtonSize, height: mapHeaderButtonSize, borderRadius: radius.pill,
+                  alignItems: 'center', justifyContent: 'center' }}>
+                <UserAvatar name={user?.name ?? 'Профиль'} avatarUrl={user?.avatarUrl} size={mapHeaderButtonSize} tone="brand" accessible={false} />
+              </AnimatedPressable>
+            </View>
+          </View>
+          {!currentRide && <View style={{ position: 'absolute', bottom: sheetOverlap + spacing.x6, right: spacing.x4 }}>
             <IconButton icon="recenter" label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
               disabled={locationLoading} size={44} onPress={() => void selectCurrentLocation()} />
           </View>}
+          <MapCredits bottom={sheetOverlap + spacing.x1} />
         </View>
         <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 0, flexBasis: isPhone ? 'auto' : 0,
-          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, backgroundColor: colors.surface }}
+          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, backgroundColor: colors.surface,
+          marginTop: -sheetOverlap, borderTopLeftRadius: isPhone ? radius.sheet : 0,
+          borderTopRightRadius: isPhone ? radius.sheet : 0, borderCurve: 'continuous',
+          ...(isPhone ? shadows.subtle : undefined) }}
         >
-        <View style={{ padding: spacing.x3, paddingBottom: currentRide ? spacing.x3 : spacing.x2 }}>
+        <View style={{ paddingHorizontal: spacing.x4, paddingTop: currentRide ? spacing.x4 : spacing.x1,
+          paddingBottom: currentRide ? spacing.x4 : 0 }}>
           {!currentRide && !!locationError && (
             <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.warningText, marginBottom: spacing.x2 }}>
               {locationError}
             </Text>
           )}
-          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
+          <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} dense={dense}
+            validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
         </View>
-        {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} /></View>}
+        {!currentRide && <View style={{ paddingHorizontal: spacing.x4, paddingTop: spacing.x2,
+          paddingBottom: dense ? spacing.x2 : spacing.x4 }}>
+          <BookingPanel section="action" dense={dense} validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
+        </View>}
         </View>
       </View>
     </PassengerWorkspace>

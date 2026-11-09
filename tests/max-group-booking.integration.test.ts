@@ -74,16 +74,17 @@ describe.skipIf(process.env.RUN_GROUP_ALERT_INTEGRATION !== '1')('MAX personal b
       expect((await ask({ action: 'start', event: lead })).json().data).toEqual({});
     }
     expect((await ask(message('да'))).json().data).toEqual({});
-    expect((await ask({ action: 'start', event: event(unlinked) })).json().data.text).toMatch(/По селу сейчас \d+ ₽/u);
-    const guest = await addressQuote('Ачинцева 5 → Можга', unlinked);
+    expect((await ask({ action: 'start', event: event(unlinked, 'Ищу такси в Можгу') })).json().data.text).toBe('Здравствуйте, таксую');
+    expect((await ask(message('Да', unlinked))).json().data.text).toBe('Откуда забрать?');
+    const guest = await addressQuote('Ачинцева 5', unlinked);
     expect(guest.statusCode, guest.body).toBe(200);
-    expect(guest.json().data.text).toMatch(/г\. Можга.*Обычная цена.*подтвердите номер/u);
+    expect(guest.json().data.text).toMatch(/г\. Можга.*Около \d+ ₽.*Подтвердите номер/u);
     const spoken = await ask(message('с кизнера нужно забрать и увезти в Мари возжай', unlinked));
     expect(spoken.statusCode, spoken.body).toBe(200);
     expect(spoken.json().data.text).toMatch(/п\. Кизнер\n2\. с\. Кизнер/u);
     const selected = await ask(message('1', unlinked));
     expect(selected.statusCode, selected.body).toBe(200);
-    expect(selected.json().data.text).toMatch(/п\. Кизнер → д\. Мари-Возжай.*Обычная цена/u);
+    expect(selected.json().data.text).toMatch(/п\. Кизнер → д\. Мари-Возжай.*Около \d+ ₽/u);
     const [orders] = await db.query<RowDataPacket[]>('SELECT id FROM orders WHERE passenger_id = ?', [passenger]);
     expect(orders).toHaveLength(0);
   });
@@ -91,12 +92,12 @@ describe.skipIf(process.env.RUN_GROUP_ALERT_INTEGRATION !== '1')('MAX personal b
     const lead = { action: 'start', event: event() };
     const intro = await ask(lead);
     expect(intro.statusCode, intro.body).toBe(200);
-    expect(intro.json().data.text).toMatch(/По селу сейчас \d+ ₽/u);
+    expect(intro.json().data.text).toBe('Здравствуйте, таксую');
     expect((await ask(lead)).json().data).toEqual(intro.json().data);
     expect((await ask({ action: 'start', event: event() })).json().data).toEqual({});
     const quote = await addressQuote('Ачинцева 5 → Колпакова 1Б', senderId);
     expect(quote.statusCode, quote.body).toBe(200);
-    expect(quote.json().data.text).toMatch(/Ачинцева.*Колпакова.*\d+ ₽.*Подходит/u);
+    expect(quote.json().data.text).toMatch(/Ачинцева.*Колпакова.*\d+ ₽.*Вызвать/u);
     const yes = message('да, давайте');
     const confirmed = await Promise.all([ask(yes), ask(yes)]);
     expect(confirmed.map(item => item.json().data)).toEqual([{ text: null, watch: true, waiting: true }, { text: null, watch: true, waiting: true }]);
@@ -113,5 +114,19 @@ describe.skipIf(process.env.RUN_GROUP_ALERT_INTEGRATION !== '1')('MAX personal b
     expect(details.text).toMatch(/через \d+ мин.*Lada Granta QA1118.*\+79090001232/u);
     expect((await ask({ action: 'ack', senderId, orderId: details.orderId, driverId })).statusCode).toBe(200);
     expect((await ask({ action: 'poll' })).json().data.messages).toEqual([]);
+  });
+  it('keeps a spoken landmark in a confirmed driver-priced order', async () => {
+    expect((await ask(message('отбой'))).json().data.text).toBe('Хорошо, отменили.');
+    await db.execute('UPDATE max_group_booking_sessions SET expires_at = UTC_TIMESTAMP(3) WHERE sender_id = ?', [senderId]);
+    expect((await ask({ action: 'start', event: event() })).json().data.text).toBe('Здравствуйте, таксую');
+    const quote = await addressQuote('У зелёного забора за старой баней → Можгу', senderId);
+    expect(quote.statusCode, quote.body).toBe(200);
+    expect(quote.json().data.text).toMatch(/У зелёного забора за старой баней → г\. Можга\. Цену согласует водитель\. Вызвать\?/u);
+    const confirmed = await ask(message('Вызвать'));
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json().data.waiting).toBe(true);
+    const [rides] = await db.query<RowDataPacket[]>("SELECT pricing_mode, comment FROM orders WHERE passenger_id = ? AND status = 'searching'", [passenger]);
+    expect(rides).toHaveLength(1);
+    expect(rides[0]).toMatchObject({ pricing_mode: 'driver', comment: expect.stringContaining('У зелёного забора за старой баней') });
   });
 });

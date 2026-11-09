@@ -39,7 +39,9 @@ export function normalizeBotAddress(value: string): string {
 }
 
 export function splitBotRoute(value: string): [string, string] | null {
-  const text = value.trim().replace(/^(?:пожалуйста\s+)?(?:(?:вызови(?:те)?|закажи(?:те)?|нужно|нужна|можно)\s+)?такси\s*/iu, '');
+  const text = value.trim().replace(/^(?:пожалуйста\s+)?(?:(?:вызови(?:те)?|закажи(?:те)?|нужно|нужна|можно|ищу|ищем)\s+)?такси\s*/iu, '')
+    .replace(/^сколько\s+(?:стоит|будет|возьм[её]те)\s+(?:поездка\s+)?(?=(?:с|от|из)\s)/iu, '');
+  if (/^сколько\s/iu.test(text)) return null;
   const ride = text.match(/^(.+?)(?:[,;]\s*|\s+)(?:(?:и|а|потом|затем)\s+){0,2}(?:увезти|отвезти|увези(?:те)?|отвези(?:те)?|довезти|довези(?:те)?|поедем|едем)\s+(?:в|на|до)\s+(.+)$/iu);
   if (ride) {
     const pickup = ride[1]!.trim()
@@ -54,6 +56,21 @@ export function splitBotRoute(value: string): [string, string] | null {
   }
   const natural = text.match(/^(?:из|от|с)\s+(.+?)\s+(?:в|на)\s+(.+)$/iu);
   return natural ? [natural[1]!.trim(), natural[2]!.trim()] : null;
+}
+
+export function explicitBotAddress(value: string): { field: 'pickup' | 'destination'; text: string } | null {
+  const text = value.trim()
+    .replace(/^(?:здравствуй(?:те)?|привет|добрый (?:день|вечер)|доброе утро)[,!.\s]+/iu, '')
+    .replace(/^да[,!\s]+/iu, '')
+    .replace(/^(?:(?:ищу|ищем|нужно|нужна|хочу|можно)\s+)?такси\s+/iu, '')
+    .replace(/^сколько(?:\s+(?:стоит|будет|возьм[её]те))?\s+/iu, '')
+    .replace(/[.!?]+$/u, '').trim();
+  const pickup = text.match(/^(?:(?:откуда|подача|забрать)\s*[:—-]\s*|(?:(?:можно|нужно|надо)\s+)?(?:забери(?:те)?|забрать)\s+(?:(?:меня|нас)\s+)?(?:(?:с|из|от)\s+)?|я\s+(?:на|в|у)\s+|(?:из|от|с)\s+)(.+)$/iu);
+  const destination = pickup ? null : text.match(/^(?:(?:куда|назначение|отвезти)\s*[:—-]\s*|(?:(?:нам|мне)\s+)?(?:(?:надо|нужно|хочу)\s+)?(?:(?:поедем|поехать|едем|ехать|отвезти|отвези(?:те)?|довезти)\s+)?(?:в|до)\s+|(?:поедем|едем|поехать|отвезти)\s+на\s+)(.+)$/iu);
+  const address = (pickup?.[1] ?? destination?.[1])?.trim();
+  return address && address.length >= 2 && address.length <= 255
+    ? { field: pickup ? 'pickup' : 'destination', text: address }
+    : null;
 }
 
 export function isConversationalBotRoute(text: string): boolean {

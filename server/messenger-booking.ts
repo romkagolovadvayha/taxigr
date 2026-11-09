@@ -3,16 +3,15 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
 import { defaultFirstOrderPromotionSettings, discountedFareRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
-import { isDirectoryHouseEstimate } from '../src/domain/address-precision';
 import { bookingUnavailableCode } from '../src/domain/booking-availability';
 import { rideCancellationWarning } from '../src/domain/ride-state';
 import { fareRoundingMinor, fareRoundingMode, type FareRoundingMode } from '../src/domain/pricing';
-import { currentInitialLegalAcceptance, legalDocuments } from '../src/legal/documents';
+import { currentInitialLegalAcceptance } from '../src/legal/documents';
 import { botPickupTiming, resolveBotAddressOptions, splitBotRoute, unresolvedBotAddress } from './bot-address';
 import { db, firstRow, withTransaction } from './db';
 import type { MessengerIdentityInput } from './messenger-identity';
 import { findOrCreatePhoneUser, findUserWithRoles, linkMessengerIdentity } from './repositories';
-import { orderQuoteLifetimeSeconds, signOrderQuote, signSession } from './security';
+import { driverPricedBotQuote, orderQuoteLifetimeSeconds, signOrderQuote, signSession } from './security';
 import { interpretBotAddress } from './bot-address-ai';
 import { sendTelegramMessage } from './telegram-bot';
 import { sendMaxMessage } from './max-bot';
@@ -20,7 +19,7 @@ import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
 import { appUrl } from './messenger-notifications';
 import { config } from './config';
-import { interpretConversationalBotRoute, isConversationalBotRoute } from '../src/domain/free-text-address';
+import { explicitBotAddress, interpretConversationalBotRoute, isConversationalBotRoute } from '../src/domain/free-text-address';
 
 export type BookingMessage = MessengerIdentityInput & {
   eventId: string;
@@ -52,15 +51,15 @@ export type BookingDraft = {
   orderId?: string;
 };
 const freshDraft = (): BookingDraft => ({ id: randomUUID(), flowVersion: 2, stage: 'idle' });
-const welcome = (text = 'Откройте заказ такси: выберите адреса на карте, узнайте стоимость и следите за поездкой прямо здесь.'): Reply => ({
+const welcome = (text = 'Здравствуйте! Такси нужно?'): Reply => ({
   text, buttons: [{ label: 'Заказать такси', miniApp: true }, { label: 'Заказать сообщениями', data: 'b:start' }],
 });
 function bookingPhonePrompt(provider: BookingMessage['provider']): Reply {
   return provider === 'vk' ? {
-    text: 'Подтвердите номер в приложении такси внутри ВК, чтобы водитель мог связаться с вами. Затем вернитесь в чат и нажмите «Заказать сообщениями».',
+    text: 'Подтвердите номер в ВК, затем нажмите «Заказать сообщениями».',
     buttons: [{ label: 'Подтвердить номер', miniApp: true }, { label: 'Заказать сообщениями', data: 'b:start' }],
   } : {
-    text: 'Поделитесь своим номером кнопкой ниже, чтобы водитель мог связаться с вами.',
+    text: 'Отправьте номер кнопкой ниже, чтобы водитель мог позвонить.',
     requestContact: true,
   };
 }
@@ -139,20 +138,16 @@ function review(draft: BookingDraft): Reply {
   const confirmLabel = draft.priceMinor == null ? 'без цены' : `за ${draft.priceMinor / 100} ₽`;
   const unclearPickup = draft.pickup?.id.startsWith('manual:');
   const unclearDestination = draft.destination?.id.startsWith('manual:');
-  const approximate = isDirectoryHouseEstimate(draft.pickup) || isDirectoryHouseEstimate(draft.destination);
   const compound = unclearPickup ? draft.pickupRaw?.match(/(?:^|\s)(\d+)-(\d+)\s*$/u) : null;
   return {
-    text: `Проверьте заказ:\nОткуда: ${draft.pickup?.label}\nКуда: ${draft.destination?.label}\n` +
-      (draft.priceMinor == null ? 'Точную цену не удалось рассчитать. Стоимость определит водитель и согласует с вами. Ему передадим ваши адреса как написаны.' :
+    text: `Проверьте заказ:\n${draft.pickup?.label} → ${draft.destination?.label}\n` +
+      (draft.priceMinor == null ? 'Стоимость определит водитель и согласует с вами.' :
         `Стоимость: ${draft.priceMinor / 100} ₽.`) +
-      (approximate ? '\nТочка на карте приблизительная. Водитель получит полный адрес.' : '') +
       (compound ? `\nУточните место подачи: ${compound[1]}-${compound[2]} — это номер дома или дом ${compound[1]}, квартира ${compound[2]}?` : '') +
       (draft.originalPriceMinor === undefined ? '' : `\n${draft.promotionText ?? renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, discountPercent: draft.discountPercent ?? defaultFirstOrderPromotionSettings.discountPercent })}\n${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
       (timing ? `\nВы указали «${timing}». Кнопка ниже начнёт поиск водителя сейчас.` : '') +
-      '\nОплата наличными водителю.\n\n' +
-      'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
-      [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
-        .map(document => `https://taxigr.ru${document.path}`).join('\n'),
+      '\nОплата наличными.\n' +
+      'При вызове такси вы принимаете условия и даёте согласие на обработку данных: https://taxigr.ru/legal',
     buttons: [
       { label: `Вызвать${timing ? ' сейчас' : ''} ${confirmLabel}`, data: `b:confirm:${draft.id}` },
       ...(unclearPickup ? [{ label: 'Уточнить место подачи', data: `b:edit-pickup:${draft.id}` }] : []),
@@ -166,9 +161,9 @@ function review(draft: BookingDraft): Reply {
 function addressChoice(draft: BookingDraft): Reply {
   const choice = draft.choice!;
   return {
-    text: `Нашлось несколько похожих адресов. ${choice.field === 'pickup' ? 'Откуда вас забрать?' : 'Куда поедем?'}\n` +
+    text: `${choice.field === 'pickup' ? 'Откуда забрать?' : 'Куда поедем?'}\n` +
       choice.candidates.map((address, index) => `${index + 1}. ${address.label}`).join('\n') +
-      '\nВыберите кнопку или напишите адрес точнее, указав населённый пункт.',
+      '\nВыберите адрес или уточните его.',
     buttons: [...choice.candidates.map((address, index) => ({
       label: `${index + 1}. ${address.label}`.slice(0, 40), data: `b:pick:${draft.id}:${index}`,
     })), ...draftButtons(draft)],
@@ -179,8 +174,8 @@ function resumeDraft(draft: BookingDraft, prefix = ''): Reply {
   let reply: Reply;
   if (draft.stage === 'confirm') reply = review(draft);
   else if (draft.stage === 'choose' && draft.choice) reply = addressChoice(draft);
-  else if (draft.stage === 'pickup') reply = { text: 'Введите, откуда вас забрать: адрес или название места.', buttons: draftButtons(draft) };
-  else if (draft.stage === 'destination') reply = { text: 'Куда поедем? Напишите адрес или название места.', buttons: draftButtons(draft) };
+  else if (draft.stage === 'pickup') reply = { text: 'Откуда вас забрать?', buttons: draftButtons(draft) };
+  else if (draft.stage === 'destination') reply = { text: 'Куда поедем?', buttons: draftButtons(draft) };
   else reply = welcome();
   return { ...reply, text: prefix ? `${prefix}\n\n${reply.text}` : reply.text };
 }
@@ -190,8 +185,10 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
     if (!message.eventId || message.eventId.length > 128) return;
     const text = message.text?.trim() ?? '';
     const startRequested = text === 'b:start' || /^(?:заказать(?: такси)?|начать)$/iu.test(text);
+    const yesToRide = /^(?:да(?:[,\s]+(?:нужно|актуально))?|актуально)[.!?]*$/iu.test(text);
     const routePair = splitBotRoute(text);
-    const explicitRoute = isConversationalBotRoute(text) || (!!routePair && /^(?:нужно\s+)?такси\s+/iu.test(text));
+    const explicitPart = explicitBotAddress(text);
+    const explicitRoute = !!explicitPart || isConversationalBotRoute(text) || (!!routePair && /^(?:нужно\s+)?такси\s+/iu.test(text));
     let account = await firstRow<RowDataPacket & { user_id: string; chat_id: string }>(
       `SELECT user_id, chat_id FROM user_messenger_accounts
        WHERE provider = ? AND external_user_id = ? AND active = TRUE LIMIT 1`,
@@ -208,7 +205,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       );
     }
     if (!account) {
-      if (!startRequested && !explicitRoute && !message.verifiedPhone) {
+      if (!startRequested && !explicitRoute && !yesToRide && !message.verifiedPhone) {
         await sendBookingReply(message, welcome());
         return;
       }
@@ -238,7 +235,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       user.phone = message.verifiedPhone;
     }
     if (!user.phone) {
-      if (!startRequested && !explicitRoute) {
+      if (!startRequested && !explicitRoute && !yesToRide) {
         await sendBookingReply(message, welcome());
         return;
       }
@@ -330,13 +327,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           }
         }
         if (draft.priceMinor == null) {
-          draft.quoteToken = await signOrderQuote({
-            passengerId: user.id, pricingMode: 'driver', pickup: draft.pickup, destination: draft.destination,
-            destinations: [draft.destination], pricingScope: 'grahovo',
-            route: { distanceMeters: 0, durationSeconds: 0, source: 'estimate' },
-            pricingDistanceMeters: 0, driverApproachDistanceMeters: 0,
-            prices: { economy: 0, child: 0 }, pricedAt: new Date().toISOString(),
-          });
+          draft.quoteToken = await signOrderQuote(driverPricedBotQuote(user.id, draft.pickup, draft.destination));
         }
         draft.quotedAt = Date.now();
         draft.stage = 'confirm';
@@ -383,7 +374,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           draft = freshDraft();
           return welcome('Оформление отменено. Активного заказа нет.');
         }
-        if (startRequested || message.verifiedPhone || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
+        if (startRequested || message.verifiedPhone || (draft.stage === 'idle' && yesToRide) || /^изменить адреса$/iu.test(text) || action?.[1] === 'restart') {
           draft = { ...freshDraft(), stage: 'pickup' };
           return resumeDraft(draft);
         }
@@ -435,6 +426,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           return quote();
         }
         if (text.startsWith('b:')) return resumeDraft(draft, 'Эта кнопка устарела.');
+        if (/^(?:здравствуй(?:те)?|привет|да|да[,\s]+актуально|актуально|спасибо)[.!?]*$/iu.test(text)) return resumeDraft(draft);
         const timing = botPickupTiming(text);
         if (timing && text.replace(timing, '').replace(/[^\p{L}\p{N}]+/gu, '').length < 2) {
           draft.pickupTiming = timing;
@@ -447,7 +439,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
           ? (questionPair ? [questionPair[1]!.trim(), questionPair[2]!.trim()] : null)
           : await interpretConversationalBotRoute(text, field, interpretBotAddress, routePair);
         let addressText = text;
-        if (priceQuestion && !pair) {
+        if (priceQuestion && !pair && !explicitPart) {
           if (draft.stage === 'confirm' && !questionAddress) return review(draft);
           const understood = await interpretBotAddress(text, field);
           if (understood?.pickup && understood.destination) pair = [understood.pickup, understood.destination];
@@ -459,6 +451,15 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
         }
         if (pair) {
           draft = { ...freshDraft(), stage: 'destination', pickupRaw: pair[0], destinationRaw: pair[1], pickupTiming: timing ?? draft.pickupTiming };
+        } else if (explicitPart) {
+          if (draft.stage === 'done') draft = freshDraft();
+          if (explicitPart.field === 'pickup') { draft.pickupRaw = explicitPart.text; draft.selectedPickup = undefined; }
+          else { draft.destinationRaw = explicitPart.text; draft.selectedDestination = undefined; }
+          draft.choice = undefined;
+          draft.quoteToken = undefined;
+          draft.stage = draft.pickupRaw ? 'destination' : 'pickup';
+          if (draft.pickupRaw && draft.destinationRaw) return quote();
+          return resumeDraft(draft);
         } else if (draft.stage === 'choose' && draft.choice) {
           if (draft.choice.field === 'pickup') { draft.pickupRaw = addressText; draft.selectedPickup = undefined; }
           else { draft.destinationRaw = addressText; draft.selectedDestination = undefined; }
@@ -469,7 +470,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
             return quote();
           }
           draft = { ...freshDraft(), stage: 'destination', pickupRaw: addressText, pickupTiming: draft.pickupTiming };
-          return resumeDraft(draft, `Место подачи: ${addressText}`);
+          return resumeDraft(draft);
         } else if (draft.stage === 'destination') {
           draft.destinationRaw = addressText;
         } else {

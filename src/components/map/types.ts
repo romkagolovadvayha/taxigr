@@ -18,6 +18,7 @@ export type TaxiMapProps = {
   destinationArrivalLabel?: string | null;
   driver?: Coordinates | null;
   driverHeading?: number | null;
+  driverColorHex?: string | null;
   passenger?: Coordinates | null;
   followDriver?: boolean;
   followZoom?: number;

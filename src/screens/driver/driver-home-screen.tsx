@@ -6,6 +6,7 @@ import { AppState, Text, TextInput, View } from 'react-native';
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
+import { MapCredits } from '@/components/map/map-credits';
 import { ShiftSummary } from '@/components/driver/shift-summary';
 import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
 import { DriverPreorderOffer, DriverPreorders, type DriverPreorderView } from '@/components/driver/driver-preorders';
@@ -41,7 +42,7 @@ import { useDriverLocation } from '@/hooks/use-driver-location';
 import { useDriverNavigation } from '@/hooks/use-driver-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useRide } from '@/state/ride-provider';
-import { radius, spacing, typography } from '@/theme/tokens';
+import { componentSizing, radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 import { UserAvatar } from '@/components/user-avatar';
 
@@ -61,6 +62,11 @@ function DriverOrderCard({
   const colors = useThemeColors();
   const { isPhone, height } = useResponsiveLayout();
   const compactTrip = isPhone && height < 650;
+  const actionStyle = {
+    minHeight: compactTrip ? componentSizing.booking.compactActionHeight : componentSizing.booking.actionHeight,
+    paddingHorizontal: spacing.x3,
+    borderRadius: radius.lg,
+  };
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
@@ -176,9 +182,8 @@ function DriverOrderCard({
         <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
           <AppButton variant="quiet" compact fullWidth={false} style={{ flex: 1 }} disabled={busy} onPress={resetRide}>Пропустить</AppButton>
           <AppButton
-            compact
             fullWidth={false}
-            style={{ flex: 1.6 }}
+            style={{ ...actionStyle, flex: 1.6, minWidth: 0 }}
             loading={busy}
             disabled={busy}
             onPress={() => void transitionRide('accepted')}
@@ -582,11 +587,10 @@ function DriverOrderCard({
               Отменить
             </AppButton>
             <AppButton
-              compact
               fullWidth={false}
               loading={busy}
               disabled={busy}
-              style={{ flex: 2, minWidth: 0 }}
+              style={{ ...actionStyle, flex: 2, minWidth: 0 }}
               onPress={() => void transitionRide('in_progress')}
             >
               Начать поездку
@@ -595,7 +599,7 @@ function DriverOrderCard({
         </View>
       ) : currentRide.status === 'in_progress' ? (
         <AppButton
-          compact
+          style={actionStyle}
           loading={busy}
           disabled={busy}
           onPress={() => {
@@ -619,11 +623,10 @@ function DriverOrderCard({
             Отменить
           </AppButton>
           <AppButton
-            compact
             fullWidth={false}
             loading={busy}
             disabled={busy}
-            style={{ flex: 2, minWidth: 0 }}
+            style={{ ...actionStyle, flex: 2, minWidth: 0 }}
             onPress={() => void transitionRide(nextStatus)}
           >
             {driverTransitionLabel[currentRide.status] ?? 'Продолжить'}
@@ -683,6 +686,7 @@ export function DriverHomeScreen() {
   const { token, user } = useSession();
   const demo = token?.startsWith('demo:') ?? false;
   const [online, setOnline] = useState<boolean | null>(demo ? true : null);
+  const [vehicleColorHex, setVehicleColorHex] = useState<string | null>(null);
   const statusRequestRef = useRef(0);
   const statusChangeInFlight = useRef(false);
   const [changingStatus, setChangingStatus] = useState(false);
@@ -737,9 +741,10 @@ export function DriverHomeScreen() {
       return;
     }
     try {
-      const profile = await apiRequest<{ status: string }>('/v1/driver/profile', { token });
+      const profile = await apiRequest<{ status: string; colorHex: string | null }>('/v1/driver/profile', { token });
       if (statusRequestRef.current !== requestId) return;
       setOnline(profile.status === 'online' || profile.status === 'busy');
+      setVehicleColorHex(profile.colorHex);
       setStatusError(null);
     } catch (reason) {
       if (statusRequestRef.current !== requestId) return;
@@ -833,7 +838,7 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    paddingHorizontal: spacing.x3,
+    paddingHorizontal: spacing.x4,
     paddingVertical: preorderOffer && handlingOrder && height < 600 ? spacing.x1 : spacing.x3,
     gap: preorderOffer ? spacing.x1 : handlingOrder ? spacing.x2 : spacing.x5,
   } as const;
@@ -845,6 +850,7 @@ export function DriverHomeScreen() {
     routeTarget={navigation.targetKind}
     driver={mapDriverCoordinates}
     driverHeading={mapDriverHeading}
+    driverColorHex={currentRide?.driver?.vehicle.colorHex ?? vehicleColorHex}
     passenger={currentRide?.passengerCoordinates}
     followDriver={navigation.active || !currentRide}
     navigationMode={navigation.active}
@@ -853,10 +859,10 @@ export function DriverHomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
-      <View style={{ paddingHorizontal: spacing.x3, paddingVertical: spacing.x2, backgroundColor: activeTrip ? colors.surface : colors.canvas,
+      <View style={{ paddingHorizontal: spacing.x4, paddingVertical: spacing.x2, backgroundColor: activeTrip ? colors.surface : colors.canvas,
         flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text accessibilityRole="header" numberOfLines={2} style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink }}>
+          <Text accessibilityRole="header" numberOfLines={activeTrip ? 2 : 1} style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink }}>
             {activeTrip ? 'Текущая поездка' : isPhone ? 'Заказы' : `Хорошего дня, ${user?.name.split(' ')[0] || 'водитель'}`}
           </Text>
           {!activeTrip && <Text numberOfLines={1} style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
@@ -872,6 +878,7 @@ export function DriverHomeScreen() {
       <View testID="driver-ride-workspace" style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row' }}>
         {!compactMap && (activeTrip || mapVisible || !isPhone) && <View style={{ flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
           {map}
+          <MapCredits />
         </View>}
         <View style={{ flexShrink: 0, width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
           {!handlingOrder && <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />}
@@ -879,7 +886,10 @@ export function DriverHomeScreen() {
         </View>
       </View>
       <AppModal visible={compactMap && mapVisible} title="Карта заказа" onClose={() => setMapVisible(false)}>
-        <View style={{ height: Math.min(360, height * 0.56), overflow: 'hidden' }}>{map}</View>
+        <View style={{ height: Math.min(360, height * 0.56), overflow: 'hidden' }}>
+          {map}
+          <MapCredits />
+        </View>
       </AppModal>
     </View>
   );

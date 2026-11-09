@@ -20,7 +20,7 @@ export type NavItem = {
 
 type Props = {
   items: NavItem[];
-  title: string;
+  title?: string;
 };
 
 export function RoleNavigation({ items, title }: Props) {
@@ -135,10 +135,10 @@ export function RoleNavigation({ items, title }: Props) {
         gap: spacing.x8,
       }}
     >
-      <View style={{ gap: spacing.x2 }}>
+      {title && <View style={{ gap: spacing.x2 }}>
         <BrandMark size={44} />
         <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{title}</Text>
-      </View>
+      </View>}
       <View style={{ gap: spacing.x2 }}>
         {items.map((item) => {
           const active = isNavItemActive(pathname, item.href);

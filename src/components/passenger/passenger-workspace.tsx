@@ -12,14 +12,14 @@ const items: NavItem[] = [
   { href: '/profile', label: 'Профиль', icon: 'profile' },
 ];
 
-export function PassengerWorkspace({ children }: { children: ReactNode }) {
+export function PassengerWorkspace({ children, showNavigationBrand = true }: { children: ReactNode; showNavigationBrand?: boolean }) {
   const colors = useThemeColors();
   const { isDesktop } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column', backgroundColor: colors.surface,
       paddingBottom: isDesktop ? 0 : insets.bottom }}>
-      {isDesktop && <RoleNavigation items={items} title="Такси рядом · Грахово" />}
+      {isDesktop && <RoleNavigation items={items} title={showNavigationBrand ? 'Такси рядом · Грахово' : undefined} />}
       <View style={{ flex: 1, minHeight: 0, minWidth: 0 }}>{children}</View>
     </View>
   );

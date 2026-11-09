@@ -4,8 +4,9 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
 import type { RideOrder, Address } from '../src/domain/models';
 import { isFreshMaxTaxiRequest } from '../src/domain/group-alerts';
+import { explicitBotAddress, splitBotRoute } from '../src/domain/free-text-address';
 import { advanceMaxGroupBooking, maxGroupDriverMessage, maxGroupOrderKey, type GroupBookingDraft } from './max-group-booking-flow';
-import { botPickupTiming, resolveBotAddressOptions } from './bot-address';
+import { botPickupTiming, resolveBotAddressOptions, unresolvedBotAddress } from './bot-address';
 import { interpretBotAddress } from './bot-address-ai';
 import { readBookingSettings } from './booking-settings';
 import { config } from './config';
@@ -13,7 +14,7 @@ import { firstRow, db, withTransaction } from './db';
 import { deviceFor, groupEventSchema, parseGroups } from './group-alerts';
 import { hasCurrentInitialConsents } from './legal';
 import { orderSelect, presentOrder, type OrderRow } from './presenters';
-import { sha256, signOrderQuote, signSession, verifyOrderQuote } from './security';
+import { driverPricedBotQuote, sha256, signOrderQuote, signSession, verifyOrderQuote } from './security';
 
 const maxId = z.string().regex(/^[1-9]\d{0,19}$/u);
 const eventKey = z.string().regex(/^[a-f0-9]{64}$/u);
@@ -25,18 +26,27 @@ const actionSchema = z.discriminatedUnion('action', [
 ]);
 type SessionRow = RowDataPacket & { id: string; sender_id: string; draft_json: GroupBookingDraft | string; expires_at: Date };
 const json = (value: SessionRow['draft_json']): GroupBookingDraft => typeof value === 'string' ? JSON.parse(value) : value;
-const freshDraft = (): GroupBookingDraft => ({ id: randomUUID(), stage: 'pickup', raw: {} });
+function freshDraft(text = ''): GroupBookingDraft {
+  const intent = text.replace(/^кто\s+таксует[?!.,\s]+/iu, '').trim();
+  const routeText = botPickupTiming(intent) ? '' : intent;
+  const pair = splitBotRoute(routeText);
+  const part = pair ? null : explicitBotAddress(routeText);
+  const raw = pair?.every(value => value.length >= 2 && value.length <= 255)
+    ? { pickup: pair[0], destination: pair[1] }
+    : part ? { [part.field]: part.text } : {};
+  return { id: randomUUID(), stage: raw.pickup && !raw.destination ? 'destination' : 'pickup', raw };
+}
 const fail = (statusCode: number, message: string) => Object.assign(new Error(message), { statusCode });
+const unpricedRouteCodes = ['ROUTE_UNAVAILABLE', 'ROUTE_NOT_FOUND', 'ADDRESS_COORDINATES_REQUIRED', 'INVALID_ADDRESS'];
 const phoneLink = () => config.MAX_BOT_USERNAME
-  ? `Откройте приложение такси в MAX https://max.ru/${config.MAX_BOT_USERNAME}, подтвердите номер и примите условия. Потом напишите сюда «готово».`
-  : 'Откройте приложение «Такси Грахово» в MAX, подтвердите номер и примите условия. Потом напишите сюда «готово».';
+  ? `Подтвердите номер и примите условия в MAX: https://max.ru/${config.MAX_BOT_USERNAME}. Затем напишите «готово».`
+  : 'Подтвердите номер и примите условия в «Такси Грахово» в MAX. Затем напишите «готово».';
 
 export async function pruneMaxGroupBookingData() {
   await db.execute('DELETE FROM max_group_booking_sessions WHERE expires_at < DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 DAY)');
 }
 
 export function registerMaxGroupBooking(app: FastifyInstance, prices: {
-  local: () => Promise<number>;
   estimate: (pickup: Address, destination: Address) => Promise<number>;
 }) {
   async function passenger(senderId: string) {
@@ -149,21 +159,33 @@ export function registerMaxGroupBooking(app: FastifyInstance, prices: {
         'SELECT reply_text FROM max_group_booking_receipts WHERE session_id = ? AND event_key = ?', [row.id, key]);
       if (receipts[0]) return expired ? {} : { text: receipts[0].reply_text, watch: existing.stage !== 'closed', waiting: existing.stage === 'waiting' };
       if (start ? !expired : expired || existing.stage === 'closed') return {};
-      const draft = start ? freshDraft() : existing;
+      const draft = start ? freshDraft(input.event.text) : existing;
       const text = start
-        ? `Привет! Такси Грахово. По селу сейчас ${(await prices.local()) / 100} ₽. Если ещё актуально, откуда забрать и куда едем?`
+        ? 'Здравствуйте, таксую'
         : await advanceMaxGroupBooking(draft, input.text, {
-          resolve: (raw, field) => resolveBotAddressOptions(raw, field === 'pickup'),
+          resolve: async (raw, field) => {
+            const result = await resolveBotAddressOptions(raw, field === 'pickup');
+            if (result.address || result.candidates.length || /^(?:где[- ]то там|тут|здесь|сюда|туда|рядом|домой|к нам|ко мне|там же)[.!?]*$/iu.test(raw)) return result;
+            return { address: unresolvedBotAddress(raw), candidates: [] };
+          },
           interpretRoute: interpretBotAddress, pickupTiming: botPickupTiming, verificationText: phoneLink(),
           quote: async (pickup, destination) => {
             const user = await passenger(senderId);
-            if (!user || !await hasCurrentInitialConsents(connection, user.id)) {
-              return { estimateMinor: await prices.estimate(pickup, destination) };
+            const verified = user && await hasCurrentInitialConsents(connection, user.id) ? user : null;
+            if (![pickup, destination].some(address => address.id.startsWith('manual:'))) {
+              try {
+                if (!verified) return { estimateMinor: await prices.estimate(pickup, destination) };
+                const data = await call<{ quoteToken: string }>(verified.id, '/v1/quotes', { pickup, destination });
+                const claims = await verifyOrderQuote(data.quoteToken, verified.id);
+                return { passengerId: verified.id, quote: { pickup: claims.pickup, destination: claims.destination, priceMinor: claims.prices.economy,
+                  token: await signOrderQuote({ ...claims, maxGroupBooking: true }) } };
+              } catch (error) {
+                if (!unpricedRouteCodes.includes(String((error as { code?: string }).code))) throw error;
+              }
             }
-            const data = await call<{ quoteToken: string }>(user.id, '/v1/quotes', { pickup, destination });
-            const claims = await verifyOrderQuote(data.quoteToken, user.id);
-            return { passengerId: user.id, quote: { pickup: claims.pickup, destination: claims.destination, priceMinor: claims.prices.economy,
-              token: await signOrderQuote({ ...claims, maxGroupBooking: true }) } };
+            if (!verified) return { estimateMinor: null };
+            const token = await signOrderQuote({ ...driverPricedBotQuote(verified.id, pickup, destination), maxGroupBooking: true });
+            return { passengerId: verified.id, quote: { pickup, destination, priceMinor: null, token } };
           },
           submit: async current => {
             const user = await passenger(senderId);
@@ -172,7 +194,7 @@ export function registerMaxGroupBooking(app: FastifyInstance, prices: {
             const ride = await call<RideOrder>(user.id, '/v1/orders', {
               pickup: quoted.pickup, destination: quoted.destination, quoteToken: quoted.token, tariff: 'economy', paymentMethod: 'cash',
               idempotencyKey: maxGroupOrderKey + current.id, deviceId: `messenger:max:${senderId}`,
-              comment: 'Договорились в личных сообщениях MAX.',
+              comment: `Из MAX. Со слов пассажира: ${current.raw.pickup} → ${current.raw.destination}`.slice(0, 500),
             });
             return ride.id;
           },
@@ -181,10 +203,6 @@ export function registerMaxGroupBooking(app: FastifyInstance, prices: {
             await call(current.passengerId, `/v1/orders/${current.orderId}/cancel`, {});
           },
         }, time).catch(error => {
-          if (['ROUTE_UNAVAILABLE', 'ROUTE_NOT_FOUND', 'ADDRESS_COORDINATES_REQUIRED', 'INVALID_ADDRESS'].includes(error?.code)) {
-            draft.stage = 'destination';
-            return 'Не получилось посчитать цену. Уточните, пожалуйста, куда едем.';
-          }
           if (error?.statusCode === 409 || error?.statusCode === 403) return 'Сейчас поездку оформить не получилось.';
           throw error;
         });

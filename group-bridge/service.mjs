@@ -10,10 +10,9 @@ import { networkInterfaces } from 'node:os';
 import makeWASocket, { DisconnectReason, useMultiFileAuthState, normalizeMessageContent } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import { TARGETS, selectGroup, makeEvent, phoneUriFromJid } from './core.mjs';
+import { TARGETS, selectGroup, makeEvent, phoneUriFromJid, watchedGroups, whatsappReplyTarget, isGroupBookingRequest } from './core.mjs';
 import { EventQueue } from './queue.mjs';
 import { Backoff, RequestGate, retryAfterMs } from './request-control.mjs';
-import { isFreshMaxTaxiRequest } from '../src/domain/group-alerts.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const home = process.env.TAXIGR_BRIDGE_HOME;
@@ -35,6 +34,10 @@ const maxSends = new Map();
 const maxId = /^[1-9]\d{0,19}$/u;
 const bookingEnabled = () => config.maxBooking === true && maxId.test(maxAccountId ?? '');
 const bookingKey = (...values) => createHash('sha256').update(JSON.stringify(values)).digest('hex');
+const whatsappRepliesEnabled = () => config.whatsappReplies === true && status.whatsapp.state === 'connected' &&
+  Boolean(config.token) && !needsBind && status.delivery === 'connected' &&
+  config.whatsappReplyAccount === bookingKey('whatsapp-account', whatsappReplyTarget(socket?.user?.id));
+const repliesSince = () => Math.max(config.since, config.repliesSince ?? 0);
 const gate = new RequestGate();
 const whatsappBackoff = new Backoff(), maxBackoff = new Backoff();
 const logger = pino({ level: 'silent' });
@@ -82,11 +85,13 @@ function selected(provider, group) {
   status[provider] = { state: 'connected', group: group.title };
 }
 function receive(provider, message) {
-  const event = makeEvent(message, config.groups[provider], config.since);
+  const group = watchedGroups(config).find(item => item.provider === provider && item.id === message.groupId);
+  const event = makeEvent(message, group, config.since);
   try {
     if (event && queue.add(event)) status.received++;
     if (provider === 'max' && bookingEnabled() && Date.now() >= bookingUnavailableUntil) {
-      const lead = makeEvent(message, config.groups.max, config.since, Date.now(), isFreshMaxTaxiRequest);
+      const lead = makeEvent(message, group, repliesSince(), Date.now(),
+        (text, sentAt, now) => isGroupBookingRequest(text, sentAt, now, group?.id === config.groups.max?.id));
       if (lead?.senderId) {
         queue.add({ eventId: bookingKey(maxAccountId, 'start', lead.eventId), sentAt: lead.sentAt,
           maxBooking: { action: 'start', accountId: maxAccountId, event: lead } });
@@ -97,6 +102,23 @@ function receive(provider, message) {
   void pump();
 }
 
+async function replyToWhatsAppRequest(current, message, recipient) {
+  if (!recipient || stopping || socket !== current || !whatsappRepliesEnabled()) return;
+  if ([current.user?.id, current.user?.lid].some(id => whatsappReplyTarget(id) === recipient)) return;
+  const lead = makeEvent(message, config.groups.whatsapp, repliesSince(), Date.now(),
+    (text, sentAt, now) => isGroupBookingRequest(text, sentAt, now, true));
+  if (!lead) return;
+  try {
+    if (!queue.claimWhatsAppReply(bookingKey('whatsapp-recipient', recipient))) return;
+    await current.sendMessage(recipient, {
+      text: 'Здравствуйте, таксую. Заказ: https://taxigr.ru',
+    });
+    status.whatsappReplyState = 'sent';
+  } catch {
+    status.whatsappReplyState = 'send_failed';
+  }
+}
+
 function sendMaxCommand(command) {
   if (!maxProcess?.stdin.writable) return false;
   maxProcess.stdin.write(JSON.stringify(command) + '\n');
@@ -105,15 +127,19 @@ function sendMaxCommand(command) {
 function syncMaxWatches() {
   if (bookingEnabled()) sendMaxCommand({ kind: 'watch', accountId: maxAccountId, senders: queue.maxWatches(maxAccountId) });
 }
-async function sendMaxBooking(accountId, senderId, key, text) {
+async function sendMaxBooking(accountId, senderId, key, text, sentAt) {
   if (!text || accountId !== maxAccountId || !bookingEnabled() || !maxProcess?.stdin.writable) return false;
   if (!queue.claimMaxReply(key)) return false;
   const sent = await new Promise(resolve => {
-    const timer = setTimeout(() => complete(false), 13_000);
+    const timer = setTimeout(() => complete(false), 21_000);
     const complete = value => { clearTimeout(timer); maxSends.delete(key); resolve(value); };
     maxSends.set(key, complete);
-    if (!sendMaxCommand({ kind: 'send', accountId, senderId, key, text })) complete(false);
+    if (!sendMaxCommand({ kind: 'send', accountId, senderId, key, text, sentAt })) complete(false);
   });
+  if (sent === 'paused') {
+    queue.releaseMaxReply(key);
+    return sent;
+  }
   if (!sent) status.maxBooking = 'send_failed';
   return sent;
 }
@@ -135,8 +161,9 @@ async function processMaxBooking(payload, replyKey) {
     syncMaxWatches();
     for (const message of result.messages) {
       if (!watched.has(message.senderId) || payload.accountId !== maxAccountId) continue;
-      await sendMaxBooking(payload.accountId, message.senderId, message.key, message.text);
+      const sent = await sendMaxBooking(payload.accountId, message.senderId, message.key, message.text);
       if (payload.accountId !== maxAccountId) return;
+      if (sent === 'paused') continue;
       const { senderId, orderId, driverId } = message;
       queue.add({ eventId: bookingKey(payload.accountId, 'ack', message.key), sentAt: Date.now(),
         maxBooking: { action: 'ack', accountId: payload.accountId, senderId, orderId, driverId } });
@@ -144,12 +171,12 @@ async function processMaxBooking(payload, replyKey) {
     bookingPollAt = result.waiting && queue.maxWatches(payload.accountId).length ? Date.now() + 15_000 : Infinity;
   } else if (payload.action !== 'ack') {
     const senderId = payload.action === 'start' ? payload.event.senderId : payload.senderId;
-    const sent = await sendMaxBooking(payload.accountId, senderId, replyKey, result.text);
-    if (payload.accountId !== maxAccountId) return;
-    if (result.watch === false || (result.watch && (payload.action === 'message' || sent))) {
+    if (result.watch !== undefined) {
       queue.watchMax(payload.accountId, senderId, result.watch ? Date.now() + (result.waiting ? 270 : 15) * 60_000 : 0);
       syncMaxWatches();
     }
+    await sendMaxBooking(payload.accountId, senderId, replyKey, result.text, payload.action === 'start' ? payload.event.sentAt : payload.sentAt);
+    if (payload.accountId !== maxAccountId) return;
     if (result.waiting) bookingPollAt = Math.min(bookingPollAt, Date.now() + 3000);
   }
 }
@@ -171,8 +198,9 @@ async function pump() {
   if (stopping || pumping || actionInFlight || !config.token || !gate.ready()) return;
   pumping = true;
   try {
-    if (needsBind && config.groups.max && config.groups.whatsapp) {
-      await api('groups/bind', { groups: Object.values(config.groups) });
+    const groups = watchedGroups(config);
+    if (needsBind && config.groups.max && config.groups.whatsapp && groups.every(group => group.id)) {
+      await api('groups/bind', { groups });
       needsBind = false;
     } else {
       const row = queue.pending(bookingEnabled())[0];
@@ -241,8 +269,10 @@ async function connectWhatsApp() {
         const message = normalizeMessageContent(item.message);
         const text = message?.conversation ?? message?.extendedTextMessage?.text ?? '';
         const jid = [item.key.participantAlt, item.key.participant].find(value => phoneUriFromJid(value));
-        receive('whatsapp', { id: item.key.id, groupId: item.key.remoteJid, fromMe: item.key.fromMe,
-          text, sentAt: Number(item.messageTimestamp) * 1000, senderName: item.pushName, senderJid: jid });
+        const incoming = { id: item.key.id, groupId: item.key.remoteJid, fromMe: item.key.fromMe,
+          text, sentAt: Number(item.messageTimestamp) * 1000, senderName: item.pushName, senderJid: jid };
+        receive('whatsapp', incoming);
+        void replyToWhatsAppRequest(current, incoming, whatsappReplyTarget(item.key.participantAlt, item.key.participant));
       }
     });
   } catch { status.whatsapp = { state: 'reconnecting' }; retryWhatsApp(); }
@@ -259,7 +289,10 @@ function connectMax() {
       const event = JSON.parse(line);
       if (event.kind === 'qr') status.max = { state: 'scan_qr', qr: await QRCode.toDataURL(event.value, { width: 320, margin: 2 }) };
       if (event.kind === 'ready') {
-        openedAt = Date.now(); selected('max', event.group);
+        openedAt = Date.now();
+        config.maxGroups = event.groups;
+        selected('max', event.groups[0]);
+        status.max.groups = event.groups.map(group => group.title);
         maxAccountId = maxId.test(event.accountId ?? '') ? event.accountId : undefined;
         status.max.accountId = maxAccountId;
         if (bookingEnabled()) { bookingPollAt = Date.now(); syncMaxWatches(); }
@@ -270,7 +303,7 @@ function connectMax() {
       }
       if (event.kind === 'message') receive('max', event.message);
       if (event.kind === 'private') receiveMaxPrivate(event.message);
-      if (event.kind === 'sent') maxSends.get(event.key)?.(event.ok === true);
+      if (event.kind === 'sent') maxSends.get(event.key)?.(event.paused === true ? 'paused' : event.ok === true);
     } catch { /* Never print private IPC or library payloads. */ }
   });
   maxProcess.stderr.on('data', () => {});
@@ -300,7 +333,7 @@ const server = http.createServer(async (request, response) => {
   if (key.length !== secret.length || !timingSafeEqual(key, Buffer.from(secret))) { response.writeHead(401).end(); return; }
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   if (request.url === '/status' && request.method === 'GET') {
-    response.end(JSON.stringify({ ...status, paired: !!config.token, groups: Object.values(config.groups), pending: queue.pendingCount(), apiRequests: gate.requests, retryAt: gate.nextAt > Date.now() ? gate.nextAt : null })); return;
+    response.end(JSON.stringify({ ...status, whatsappReplies: whatsappRepliesEnabled(), paired: !!config.token, groups: watchedGroups(config), pending: queue.pendingCount(), apiRequests: gate.requests, retryAt: gate.nextAt > Date.now() ? gate.nextAt : null })); return;
   }
   if (actionInFlight) { response.writeHead(429).end(JSON.stringify({ error: 'REQUEST_PAUSED' })); return; }
   actionInFlight = true;
