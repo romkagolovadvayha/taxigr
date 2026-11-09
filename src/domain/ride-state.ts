@@ -31,6 +31,10 @@ export function canTransitionRide(from: RideStatus, to: RideStatus): boolean {
   return transitions[from]?.includes(to) ?? false;
 }
 
+export function canControlRideWaiting(status: RideStatus): boolean {
+  return status === 'driver_waiting' || status === 'in_progress';
+}
+
 export function rideCancellationWarning(searching: boolean): string {
   return searching
     ? 'Подождите ещё немного. Возможно, водители заняты. За частые отмены заказы временно блокируются.'

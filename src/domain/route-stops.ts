@@ -1,6 +1,18 @@
 import type { Address, Coordinates } from './models';
 import { distanceBetweenCoordinates } from './navigation';
 
+export const maxRideDestinations = 5;
+export type DriverRoutePointKind = 'stop' | 'destination';
+
+export function addRideRoutePoint(pickup: Address, destinations: readonly Address[], address: Address, kind: DriverRoutePointKind): Address[] | null {
+  if (!destinations.length || destinations.length >= maxRideDestinations) return null;
+  const insertAt = kind === 'stop' ? destinations.length - 1 : destinations.length;
+  const previous = destinations[insertAt - 1] ?? pickup;
+  const next = destinations[insertAt];
+  if (sameRouteStop(previous, address) || (next && sameRouteStop(next, address))) return null;
+  return [...destinations.slice(0, insertAt), address, ...destinations.slice(insertAt)];
+}
+
 /** A stale editor index must not silently discard a selected destination. */
 export function replaceRouteStop(destinations: readonly Address[], index: number, address: Address): Address[] {
   if (!Number.isInteger(index) || index < 0) return [...destinations];

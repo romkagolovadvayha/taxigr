@@ -30,6 +30,12 @@ describe('MapLibre route scene', () => {
     expect(scene.points.map(p => p.kind)).toEqual(['pickup', 'stop', 'destination']);
     expect(scene.points[2]?.label).toContain('14:30');
   });
+  it('uses only a real pickup ETA, without changing the destination or intermediate badges', () => {
+    const props = { pickup, destinations: [{ id: 'stop', label: 'Остановка', coordinates: midway }, destination] };
+    expect(taxiMapScene({ ...props, pickupEtaMinutes: 4 }).points.map(point => [point.etaMinutes, point.badge]))
+      .toEqual([[4, undefined], [undefined, '1'], [undefined, undefined]]);
+    expect(taxiMapScene(props).points[0]?.etaMinutes).toBeUndefined();
+  });
   it('does not draw a straight line when the road service returns no geometry', () => {
     const scene = taxiMapScene({ pickup, destination });
     expect(scene.route.features).toEqual([]); expect(scene.fitCoordinates).toHaveLength(2);

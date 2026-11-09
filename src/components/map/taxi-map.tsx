@@ -14,7 +14,7 @@ import { MapLoadingOverlay } from './map-loading-overlay';
 import { PickupRadar } from './pickup-radar';
 import { RoutePointCallout } from './route-point-callout';
 import { configureNativeMapCache } from './map-cache.native';
-import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SELECTION_ZOOM, mapBearing, ROUTE_PIN_SIZE, taxiMapFit, taxiMapPadding, validMapCoordinate } from './map-scene';
+import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SELECTION_ZOOM, mapBearing, ROUTE_PIN_SIZE, routePointAccessibilityLabel, taxiMapFit, taxiMapPadding, validMapCoordinate } from './map-scene';
 import { taxiMapStyle } from './map-style';
 import type { TaxiMapProps } from './types';
 import { useMapScene } from './use-map-scene';
@@ -180,8 +180,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         onPress={props.onRoutePointEdit ? () => props.onRoutePointEdit?.(point.destinationIndex) : undefined}>
         <View collapsable={false} pointerEvents="none"
           style={{ alignItems: 'center' }} accessibilityRole={props.onRoutePointEdit ? 'button' : 'image'}
-          accessibilityLabel={props.onRoutePointEdit ? `Изменить точку ${point.badge} · ${point.label}` : point.label}>
-          <RoutePointCallout badge={point.badge} title={point.label} pickup={point.kind === 'pickup'} editable={!!props.onRoutePointEdit} />
+          accessibilityLabel={routePointAccessibilityLabel(point, !!props.onRoutePointEdit)}>
+          <RoutePointCallout point={point} editable={!!props.onRoutePointEdit} />
         </View>
       </Marker>)}
     </MapLibreMap>

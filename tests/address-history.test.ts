@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDestinationHistory } from '../src/domain/address-history';
+import { buildDestinationHistory, buildRideAddressHistory } from '../src/domain/address-history';
 import type { Address, RideOrder } from '../src/domain/models';
 
 const pickup: Address = {
@@ -74,4 +74,19 @@ describe('destination history', () => {
     expect(history.items[0]?.tripCount).toBe(2);
     expect(history.items[0]?.address.label).toBe('Советская улица, 10');
   });
+});
+
+it('suggests pickups and visited points without suggesting unvisited or another passenger’s addresses', () => {
+  const alternatePickup = { ...pickup, id: 'alt-pickup', label: 'Место отменённой подачи' };
+  const unseen = { ...latest, id: 'unseen', label: 'Непосещённый адрес' };
+  const other = { ...order('other', unseen, '2026-07-31T08:00:00.000Z'), passengerId: 'other' };
+  const history = buildRideAddressHistory([
+    { ...order('active', unseen, '2026-07-30T08:00:00.000Z', 'in_progress'), destinations: [frequent, unseen], nextDestinationIndex: 1 },
+    order('done', latest, '2026-07-29T08:00:00.000Z'),
+    { ...order('cancel', unseen, '2026-07-28T08:00:00.000Z', 'cancelled'), pickup: alternatePickup },
+    other,
+  ], 'passenger');
+  expect(history.map(item => item.address.id)).toEqual(['pickup', 'frequent', 'latest', 'alt-pickup']);
+  expect(history[0]?.tripCount).toBe(2);
+  expect(history.find(item => item.address.id === 'latest')?.isLastDestination).toBe(true);
 });

@@ -1,5 +1,6 @@
 import { ridePriceLabel } from '@/domain/ride-price';
 import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
@@ -92,6 +93,18 @@ export function ActiveRidePanel({
   const colors = useThemeColors();
   const requestRideCancellation = useRequestRideCancellation();
   const terminal = ride.status === 'completed' || ride.status === 'cancelled';
+  const routeKey = JSON.stringify((ride.destinations ?? [ride.destination]).map(point => [point.label, point.coordinates]));
+  const previousRoute = useRef({ id: ride.id, key: routeKey });
+  const [routeNotice, setRouteNotice] = useState(false);
+  useEffect(() => {
+    const previous = previousRoute.current;
+    previousRoute.current = { id: ride.id, key: routeKey };
+    if (previous.id !== ride.id) setRouteNotice(false);
+    if (previous.id !== ride.id || previous.key === routeKey) return;
+    setRouteNotice(true);
+    const timer = setTimeout(() => setRouteNotice(false), 12_000);
+    return () => clearTimeout(timer);
+  }, [ride.id, routeKey]);
   const cancellable = !terminal && ride.status !== 'in_progress';
   const driver = ride.driver;
   const showEta = pickupEtaMinutes != null && ride.driverQueuePosition !== 2 && !isReservedRide(ride) &&
@@ -182,6 +195,8 @@ export function ActiveRidePanel({
       )}
 
       {!terminal && <WaitingBreakdown ride={ride} compact />}
+      {!terminal && routeNotice && <Text accessibilityLiveRegion="polite" numberOfLines={1}
+        style={{ ...typography.caption, color: colors.inkSecondary }}>Водитель изменил маршрут · {ridePriceLabel(ride)}</Text>}
 
       {ride.status === 'completed' && driver ? (
         <RideRatingCard

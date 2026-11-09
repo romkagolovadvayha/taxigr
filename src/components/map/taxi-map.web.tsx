@@ -15,13 +15,39 @@ import { loadMapLibre } from './maplibre-loader.web';
 import { watchBaseMapReady } from './map-readiness.web';
 import { watchMapRecovery } from './map-recovery.web';
 import { createRouteLayerSync } from './route-layer-sync';
-import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SELECTION_ZOOM, mapBearing, ROUTE_CALLOUT_GAP, ROUTE_CALLOUT_HEIGHT, ROUTE_CALLOUT_SIDE_PADDING, ROUTE_PIN_SIZE, ROUTE_PIN_STEM_HEIGHT, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
+import { lngLat, MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, MAP_SELECTION_ZOOM, mapBearing, ROUTE_CALLOUT_GAP, ROUTE_CALLOUT_HEIGHT, ROUTE_CALLOUT_SIDE_PADDING, ROUTE_PIN_SIZE, ROUTE_PIN_STEM_HEIGHT, routePointAccessibilityLabel, taxiMapFit, taxiMapPadding, validMapCoordinate, type RouteMapPoint } from './map-scene';
 import { taxiMapStyle } from './map-style';
 import type { TaxiMapProps } from './types';
 import { useMapScene } from './use-map-scene';
 
 type MapApi = typeof import('maplibre-gl');
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+function renderRouteBadge(badge: HTMLDivElement, point: RouteMapPoint) {
+  if (point.etaMinutes) {
+    const minutes = document.createElement('span');
+    minutes.textContent = String(point.etaMinutes);
+    const unit = document.createElement('span');
+    unit.textContent = 'мин';
+    Object.assign(unit.style, { fontSize: '9px', fontWeight: '400', lineHeight: '10px' });
+    badge.replaceChildren(minutes, unit);
+  } else if (point.kind === 'stop') {
+    badge.textContent = point.badge ?? '';
+  } else {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '18'); svg.setAttribute('height', '18');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', point.kind === 'destination' ? 'M6 21V4M7 5h10l-2 3 2 3H7' :
+      'M12 22s7-5.3 7-12a7 7 0 10-14 0c0 6.7 7 12 7 12z M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5');
+    path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2'); path.setAttribute('stroke-linejoin', 'round'); path.setAttribute('stroke-linecap', 'round');
+    svg.append(path);
+    badge.replaceChildren(svg);
+  }
+}
 
 const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry: () => void; recover: () => void }) {
   // Imperative map updates must follow each committed route/position change.
@@ -91,13 +117,13 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
           padding: `0 ${ROUTE_CALLOUT_SIDE_PADDING}px`, borderRadius: '14px', fontFamily: 'Manrope, system-ui, sans-serif',
           lineHeight: '14px', boxShadow: '0 2px 8px rgba(0,0,0,.16)', zIndex: '1' });
         const badge = document.createElement('div');
-        Object.assign(badge.style, { width: '26px', height: '26px', display: 'flex', alignItems: 'center',
+        Object.assign(badge.style, { width: '30px', height: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', borderRadius: '9px', fontSize: '14px', fontWeight: '700' });
         const text = document.createElement('div');
         const title = document.createElement('div');
         Object.assign(title.style, { maxWidth: '125px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' });
         const action = document.createElement('div');
-        Object.assign(action.style, { fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap' });
+        Object.assign(action.style, { fontSize: '10px', lineHeight: '12px', whiteSpace: 'nowrap' });
         action.textContent = 'Изменить ›';
         text.append(title, action);
         callout.append(badge, text);
@@ -112,7 +138,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       }
       const element = marker.getElement();
       element.setAttribute('role', editable ? 'button' : 'img');
-      element.setAttribute('aria-label', `${editable ? 'Изменить точку ' + point.badge + ' · ' : ''}${point.label}${searching ? ' · Ищем водителя' : ''}`);
+      element.setAttribute('aria-label', `${routePointAccessibilityLabel(point, editable)}${searching ? ' · Ищем водителя' : ''}`);
       element.tabIndex = editable ? 0 : -1;
       element.style.pointerEvents = editable ? 'auto' : 'none';
       element.style.cursor = editable ? 'pointer' : '';
@@ -125,10 +151,11 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       const action = text.children[1] as HTMLDivElement;
       callout.style.background = colors.surface;
       callout.style.color = colors.ink;
-      badge.textContent = point.badge;
+      renderRouteBadge(badge, point);
       badge.style.background = point.kind === 'pickup' ? colors.brand : colors.surfaceSecondary;
       badge.style.color = point.kind === 'pickup' ? colors.brandInk : colors.ink;
       title.textContent = point.label;
+      action.style.color = colors.inkSecondary;
       action.style.display = editable ? 'block' : 'none';
       stem.style.background = colors.inkSecondary;
       dot.style.background = colors.surface;

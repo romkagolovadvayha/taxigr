@@ -4,6 +4,7 @@ type DestinationHistoryOrder = Pick<
   RideOrder,
   'passengerId' | 'status' | 'destination' | 'updatedAt'
 >;
+type RideAddressHistoryOrder = DestinationHistoryOrder & Pick<RideOrder, 'pickup' | 'destinations' | 'nextDestinationIndex'>;
 
 export type DestinationHistoryItem = {
   address: Address;
@@ -27,6 +28,28 @@ function destinationKey(address: Address): string {
 function timestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function buildRideAddressHistory(orders: readonly RideAddressHistoryOrder[], passengerId: string): DestinationHistoryItem[] {
+  const recent = orders.filter(order => order.passengerId === passengerId && order.status !== 'draft')
+    .sort((left, right) => timestamp(right.updatedAt) - timestamp(left.updatedAt));
+  const lastDestination = recent.find(order => order.status === 'completed')?.destination;
+  const items = new Map<string, DestinationHistoryItem>();
+  for (const order of recent) {
+    const stops = order.destinations ?? [order.destination];
+    const visited = order.status === 'completed' ? stops : stops.slice(0, order.nextDestinationIndex ?? 0);
+    const used = new Set<string>();
+    for (const address of [order.pickup, ...visited]) {
+      const key = `${destinationKey(address)}:${address.label.trim().toLocaleLowerCase('ru')}`;
+      if (used.has(key)) continue;
+      used.add(key);
+      const existing = items.get(key);
+      if (existing) existing.tripCount += 1;
+      else items.set(key, { address, tripCount: 1, lastUsedAt: order.updatedAt,
+        isLastDestination: !!lastDestination && destinationKey(lastDestination) === destinationKey(address) && lastDestination.label === address.label });
+    }
+  }
+  return [...items.values()].sort((left, right) => right.tripCount - left.tripCount || timestamp(right.lastUsedAt) - timestamp(left.lastUsedAt));
 }
 
 export function buildDestinationHistory(

@@ -1,5 +1,4 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
@@ -37,6 +36,7 @@ import {
   hasApproximateCoordinates,
   isDestinationAddressBookable,
   isDirectoryHouseEstimate,
+  isPickupAddressBookable,
   queryHasHouseNumber,
 } from '@/domain/address-precision';
 import { formatAddressSuggestionLines } from '@/domain/address-suggestion-display';
@@ -126,7 +126,6 @@ function AddressResult({
   manual = false,
   now,
   onPress,
-  onRefinePoint,
 }: {
   address: Address;
   directSelectionAllowed?: boolean;
@@ -134,27 +133,26 @@ function AddressResult({
   manual?: boolean;
   now: Date;
   onPress: () => void;
-  onRefinePoint?: () => void;
 }) {
   const colors = useThemeColors();
   const place = address.place;
   const placeStatus = place ? getPlaceOpenStatus(place.schedule, now) : null;
   const displayLines = formatAddressSuggestionLines(address);
   const needsMapPoint = hasHouseNumber(address) && hasApproximateCoordinates(address) && !isDirectoryHouseEstimate(address);
-  const precise = hasHouseNumber(address) || Boolean(place) || directSelectionAllowed;
+  const precise = hasHouseNumber(address) || Boolean(place || address.placeId) || directSelectionAllowed;
   const refinement = !precise && !history;
-  const result = (
+  return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${address.label}${history ? `, ${historyMeta(history)}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => ({
-        flex: onRefinePoint ? 1 : undefined,
-        minHeight: place ? 104 : 72,
+        minHeight: 60,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.x4,
-        padding: spacing.x4,
+        paddingHorizontal: spacing.x4,
+        paddingVertical: spacing.x2,
         borderRadius: radius.lg,
         backgroundColor: manual ? colors.warningSoft : precise || refinement ? colors.surface : colors.warningSoft,
         borderWidth: 1,
@@ -162,37 +160,6 @@ function AddressResult({
         opacity: pressed ? 0.72 : 1,
       })}
     >
-      <View
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: radius.md,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.surfaceSecondary,
-        }}
-      >
-        {place?.photoUrls[0] ? (
-          <Image
-            source={{ uri: place.photoUrls[0] }}
-            contentFit="cover"
-            accessibilityLabel={`Фото: ${place.name}`}
-            style={{ width: 42, height: 42, borderRadius: radius.md }}
-          />
-        ) : (
-          <AppIcon
-            name={history?.isLastDestination ? 'clock' : 'location'}
-            color={
-              precise || refinement
-                ? history?.isLastDestination
-                  ? colors.ink
-                  : colors.inkSecondary
-                : colors.warningText
-            }
-            size={21}
-          />
-        )}
-      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ ...typography.bodyStrong, color: colors.ink }}>
           {displayLines.primary}
@@ -212,14 +179,10 @@ function AddressResult({
         {address.id.startsWith('saved-') && (
           <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Точка запомнена</Text>
         )}
-        {!!place?.description && (
-          <Text style={{ ...typography.caption, color: colors.inkMuted }}>
-            {place.description}
-          </Text>
-        )}
-        {!!placeStatus && (
-          <View style={{ marginTop: spacing.x2 }}>
+        {placeStatus && placeStatus.kind !== 'unknown' && (
+          <View style={{ marginTop: spacing.x1 }}>
             <StatusChip
+              compact
               label={placeStatus.label}
               tone={placeStatus.kind === 'open' ? 'success' : placeStatus.kind === 'closed' ? 'neutral' : 'warning'}
             />
@@ -264,17 +227,11 @@ function AddressResult({
         >
           {historyMeta(history)}
         </Text>
-      ) : (
+      ) : !place && !address.placeId ? (
         <AppIcon name="chevron" color={colors.inkMuted} size={20} />
-      )}
+      ) : null}
     </Pressable>
   );
-  return onRefinePoint ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-      {result}
-      <IconButton icon="location" label={`Уточнить на карте: ${address.label}`} onPress={onRefinePoint} />
-    </View>
-  ) : result;
 }
 
 export function AddressSearchScreen() {
@@ -294,12 +251,11 @@ export function AddressSearchScreen() {
     mapEdit?: string;
   }>();
   const { pickup, destinations, setPickup, setDestination, setDestinationAt, addDestination,
-    destinationHistory: storedDestinationHistory } = useRideAddresses();
+    destinationHistory: storedDestinationHistory, addressHistory: storedAddressHistory, firstRideSuggestions } = useRideAddresses();
   const currentAddress = append === '1' ? null : field === 'pickup' ? pickup
     : destinationIndex != null ? destinations[Number(destinationIndex)] : destinations[destinations.length - 1];
   const stopNumber = destinationIndex != null && Number(destinationIndex) < destinations.length - 1
     ? Number(destinationIndex) + 1 : null;
-  const pointBadge = field === 'pickup' ? 'А' : String(stopNumber ?? 'Б');
   const initialPoint = mapEdit === '1' ? currentAddress ?? null : null;
   const initialQueryValue = Array.isArray(initialQuery) ? initialQuery[0] ?? '' : initialQuery ?? '';
   const [query, setQuery] = useState(initialQueryValue);
@@ -342,10 +298,15 @@ export function AddressSearchScreen() {
     ? overlayRememberedAddresses(localAddressDirectory, rememberedAddresses)
     : localAddressDirectory, [rememberedAddresses]);
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
-  const destinationHistory = useMemo(() => storedDestinationHistory.flatMap(item => {
-    const address = searchableAddress(item.address);
-    return address ? [{ ...item, address }] : [];
-  }), [storedDestinationHistory]);
+  const addressHistory = useMemo(() => {
+    const history = new Map<string, DestinationHistoryItem>();
+    for (const item of [...storedAddressHistory, ...storedDestinationHistory]) {
+      const usable = field === 'pickup' ? isPickupAddressBookable(item.address) : isDestinationAddressBookable(item.address);
+      if (usable && !history.has(addressKey(item.address))) history.set(addressKey(item.address), item);
+    }
+    return [...history.values()];
+  }, [field, storedAddressHistory, storedDestinationHistory]);
+  const showFirstRideAddresses = storedDestinationHistory.length === 0 && firstRideSuggestions.length > 0;
 
   useFocusEffect(
     useCallback(() => {
@@ -368,21 +329,15 @@ export function AddressSearchScreen() {
     return local.length && (selectedStreet || queryHasHouseNumber(normalizedQuery))
       ? local : mergeAddresses(local, searchIntercitySettlements(normalizedQuery));
   }, [addressDirectory, normalizedQuery, selectedStreet]);
-  const matchingHistory = useMemo(
-    () =>
-      field === 'destination'
-        ? destinationHistory.filter((item) => matchesAddress(item.address, normalizedQuery))
-        : [],
-    [destinationHistory, field, normalizedQuery],
-  );
+  const matchingHistory = useMemo(() => addressHistory.filter(item => matchesAddress(item.address, normalizedQuery)),
+    [addressHistory, normalizedQuery]);
   const historyByKey = useMemo(
-    () => new Map(destinationHistory.map((item) => [addressKey(item.address), item])),
-    [destinationHistory],
+    () => new Map(addressHistory.map((item) => [addressKey(item.address), item])),
+    [addressHistory],
   );
   const demoSession = token?.startsWith('demo:') ?? false;
   const canSearchRemote = query.trim().length >= 2 && !!token;
-  const showPersonalSuggestions =
-    field === 'destination' && destinationHistory.length > 0 && (!edited || !normalizedQuery);
+  const showPersonalSuggestions = (addressHistory.length > 0 || showFirstRideAddresses) && (!edited || !normalizedQuery);
   const showHouseSuggestions =
     !!selectedStreet || queryHasHouseNumber(query);
   const results = useMemo(() => {
@@ -390,14 +345,15 @@ export function AddressSearchScreen() {
       mergeAddresses(localResults, canSearchRemote && edited ? remoteResults : []), rememberedAddresses,
     ).flatMap(address => { const searchable = searchableAddress(address); return searchable ? [searchable] : []; });
     const baseResults = filterRequestedHouse(normalizedQuery ? rankAddressSearchResults(overlaidResults, normalizedQuery) : overlaidResults, query);
-    return mergeAddresses(
-      overlayRememberedAddresses(matchingHistory.map((item) => item.address), rememberedAddresses)
-        .filter(address => matchesAddress(address, normalizedQuery)),
-      baseResults,
-    ).filter(address => (!selectedStreet || hasHouseNumber(address)) &&
-      (Boolean(address.place) || showHouseSuggestions || !hasHouseNumber(address)));
-  }, [localResults, canSearchRemote, edited, remoteResults, rememberedAddresses, normalizedQuery, query, matchingHistory, selectedStreet, showHouseSuggestions]);
-  const hasPlaceResults = results.some((address) => Boolean(address.place));
+    const preferred = filterRequestedHouse(overlayRememberedAddresses([
+      ...matchingHistory.map(item => item.address),
+      ...(showFirstRideAddresses && !selectedStreet ? firstRideSuggestions.filter(address => matchesAddress(address, normalizedQuery)) : []),
+    ], rememberedAddresses).filter(address => !selectedStreet || hasHouseNumber(address)), query);
+    return mergeAddresses(preferred, baseResults.filter(address => (!selectedStreet || hasHouseNumber(address)) &&
+      (Boolean(address.place || address.placeId) || showHouseSuggestions || !hasHouseNumber(address))));
+  }, [localResults, canSearchRemote, edited, remoteResults, rememberedAddresses, normalizedQuery, query, matchingHistory,
+    selectedStreet, showFirstRideAddresses, showHouseSuggestions, firstRideSuggestions]);
+  const hasPlaceResults = results.some((address) => Boolean(address.place || address.placeId));
   const clock = useScreenClock(30_000, hasPlaceResults && !pendingAddress);
   const now = useMemo(() => new Date(clock), [clock]);
   const hasCompleteDestinationResult =
@@ -754,8 +710,8 @@ export function AddressSearchScreen() {
           {pointMapReady && <View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
             alignItems: 'center', justifyContent: 'center' }}>
             <View style={{ transform: [{ translateY: -(ROUTE_CALLOUT_HEIGHT + ROUTE_PIN_STEM_HEIGHT) / 2 }] }}>
-              <RoutePointCallout badge={pointBadge} pickup={field === 'pickup'}
-                title={field === 'pickup' ? 'Место подачи' : stopNumber ? `Остановка ${stopNumber}` : 'Место назначения'} />
+              <RoutePointCallout point={{ kind: field === 'pickup' ? 'pickup' : stopNumber ? 'stop' : 'destination',
+                badge: stopNumber?.toString(), label: field === 'pickup' ? 'Место подачи' : stopNumber ? `Остановка ${stopNumber}` : 'Место назначения' }} />
             </View>
           </View>}
           <View style={{ position: 'absolute', bottom: 24, right: 12 }}>
@@ -873,7 +829,6 @@ export function AddressSearchScreen() {
           history={historyByKey.get(addressKey(address))}
           now={now}
           onPress={() => selectAddress(address)}
-          onRefinePoint={isDirectoryHouseEstimate(address) ? () => openPointEditor(address) : undefined}
         />}
         ListHeaderComponent={<View style={{ gap: spacing.x2 }}>
       {field === 'pickup' && !query.trim() && (
@@ -969,10 +924,10 @@ export function AddressSearchScreen() {
       )}
       {showPersonalSuggestions ? (
         <View style={{ gap: spacing.x6 }}>
-          <View style={{ gap: spacing.x3 }}>
+          {addressHistory.length > 0 && <View style={{ gap: spacing.x3 }}>
             <SectionTitle>Ваши адреса</SectionTitle>
             <View style={{ gap: spacing.x2 }}>
-              {destinationHistory.slice(0, 5).map((item) => (
+              {addressHistory.slice(0, 5).map((item) => (
                 <AddressResult
                   key={addressKey(item.address)}
                   address={item.address}
@@ -980,11 +935,15 @@ export function AddressSearchScreen() {
                   history={item}
                   now={now}
                   onPress={() => selectAddress(item.address)}
-                  onRefinePoint={isDirectoryHouseEstimate(item.address) ? () => openPointEditor(item.address) : undefined}
                 />
               ))}
             </View>
-          </View>
+          </View>}
+          {showFirstRideAddresses && <View style={{ gap: spacing.x2 }}>
+            <SectionTitle>Частые места</SectionTitle>
+            {firstRideSuggestions.filter(address => !historyByKey.has(addressKey(address))).map(address =>
+              <AddressResult key={address.id} address={address} now={now} onPress={() => selectAddress(address)} />)}
+          </View>}
           <View style={{ gap: spacing.x3 }}>
             <SectionTitle>Улицы Грахово</SectionTitle>
             <View style={{ gap: spacing.x2 }}>

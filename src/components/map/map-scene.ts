@@ -11,7 +11,7 @@ import { hasApproximateCoordinates, isDirectoryHouseEstimate } from '../../domai
 
 export { lngLat, mapBearing, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 
-export type RouteMapPoint = { id: string; kind: 'pickup' | 'stop' | 'destination'; coordinates: LngLat; label: string; badge: string; destinationIndex: number | null };
+export type RouteMapPoint = { id: string; kind: 'pickup' | 'stop' | 'destination'; coordinates: LngLat; label: string; badge?: string; etaMinutes?: number; destinationIndex: number | null };
 export const MAP_SELECTION_ZOOM = 17;
 export const MAP_DEFAULT_ZOOM = 14;
 export const MAP_MIN_ZOOM = 2;
@@ -34,8 +34,10 @@ export function taxiMapScene(props: TaxiMapProps) {
     : original[0] ?? props.pickup?.coordinates;
   const approximatePickup = isDirectoryHouseEstimate(props.pickup);
   if (props.pickup && (!hasApproximateCoordinates(props.pickup) || approximatePickup) && validMapCoordinate(pickup)) points.push({
-    id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup), badge: 'А', destinationIndex: null,
-    label: !approximatePickup && props.pickupEtaMinutes ? `Подача ${props.pickupEtaMinutes} мин` : 'Место подачи',
+    id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup), destinationIndex: null,
+    label: 'Место подачи',
+    etaMinutes: !approximatePickup && Number.isFinite(props.pickupEtaMinutes) && props.pickupEtaMinutes! > 0
+      ? Math.ceil(props.pickupEtaMinutes!) : undefined,
   });
   const destinations = props.destinations?.length ? props.destinations : props.destination ? [props.destination] : [];
   destinations.forEach((destination, index) => {
@@ -45,7 +47,7 @@ export function taxiMapScene(props: TaxiMapProps) {
     const approximate = isDirectoryHouseEstimate(destination);
     if ((!hasApproximateCoordinates(destination) || approximate) && validMapCoordinate(coordinates)) points.push({
       id: `destination-${index}`, kind: final ? 'destination' : 'stop', coordinates: lngLat(coordinates),
-      badge: final ? 'Б' : String(index + 1), destinationIndex: index,
+      badge: final ? undefined : String(index + 1), destinationIndex: index,
       label: routeDestinationMapLabel(index, destinations.length, final && !approximate ? props.destinationArrivalLabel : undefined),
     });
   });
@@ -54,6 +56,10 @@ export function taxiMapScene(props: TaxiMapProps) {
   }] };
   const fitCoordinates = original.length >= 2 ? original : points.map(p => ({ longitude: p.coordinates[0], latitude: p.coordinates[1] }));
   return { points, route, fitCoordinates };
+}
+
+export function routePointAccessibilityLabel(point: RouteMapPoint, editable: boolean) {
+  return [editable ? 'Изменить' : '', point.label, point.etaMinutes ? `· ${point.etaMinutes} мин` : ''].filter(Boolean).join(' ');
 }
 
 export function taxiMapPadding(width: number, height: number, insets?: MapViewportInsets, callouts = false) {

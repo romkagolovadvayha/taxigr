@@ -3,7 +3,8 @@ import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { signSession } from '../server/security';
-import type { RideOrder, Tariff, UserRole } from '../src/domain/models';
+import type { DestinationHistoryItem } from '../src/domain/address-history';
+import type { Address, RideOrder, Tariff, UserRole } from '../src/domain/models';
 import { confirmAddressPoint } from '../src/domain/route-stops';
 import { currentInitialLegalAcceptance } from '../src/legal/documents';
 
@@ -13,7 +14,8 @@ const databaseUrl = process.env.MYSQL_URL ?? '';
 const pickup = confirmAddressPoint({ id: 'preorder-pickup', label: 'с. Грахово, ул. Ачинцева, 5', houseNumber: '5', coordinates: { latitude: 56.04758, longitude: 51.95842 } }, { latitude: 56.04758, longitude: 51.95842 });
 const destination = confirmAddressPoint({ id: 'preorder-destination', label: 'с. Грахово, ул. Колпакова, 1Б', houseNumber: '1Б', coordinates: { latitude: 56.04576, longitude: 51.96165 } }, { latitude: 56.04576, longitude: 51.96165 });
 type Actor = { id: string; token: string; driverId?: string };
-type Bootstrap = { activePassengerOrder: RideOrder | null; driverQueue: { current: RideOrder | null; next: RideOrder | null; offer: RideOrder | null }; driverPreorders: RideOrder[] };
+type Bootstrap = { activePassengerOrder: RideOrder | null; driverQueue: { current: RideOrder | null; next: RideOrder | null; offer: RideOrder | null };
+  driverPreorders: RideOrder[]; addressHistory: DestinationHistoryItem[]; firstRideSuggestions: Address[] };
 let connection: Connection;
 let previousBooking: number;
 let previousDelay: number;
@@ -167,4 +169,59 @@ describe.runIf(enabled)('scheduled orders against an isolated API database', () 
     const expired = await accept(second, id, past.toISOString());
     expect(['ORDER_SEARCH_EXPIRED', 'ORDER_ALREADY_TAKEN']).toContain(expired.error?.code);
   });
+
+  it('lets only the assigned driver wait mid-trip and extend the route without losing waiting or duplicating an edit', async () => {
+    const rider = { id: randomUUID(), token: '' };
+    await seedActor(rider, 6, 'passenger');
+    const newRider = await bootstrap(rider);
+    expect(newRider.data.addressHistory).toEqual([]);
+    expect(newRider.data.firstRideSuggestions.map(address => address.place?.name)).toEqual(['Пятёрочка', 'Караоке-кафе «Максимум»']);
+    await connection.execute("UPDATE drivers SET status='online' WHERE id=?", [first.driverId!]);
+    const priced = await quote(rider);
+    const created = await api<RideOrder>(rider, '/v1/orders', orderPayload(rider, priced.data.quoteToken));
+    expect(created.status).toBe(201);
+    const id = created.data.id;
+    const path = `/v1/driver/orders/${id}`;
+    const stop = { id: 'stop-qa', label: 'с. Грахово, ул. Колпакова, 8', houseNumber: '8', kind: 'house',
+      coordinates: { latitude: 56.0469, longitude: 51.9613 } };
+    const finish = { id: 'finish-qa', label: 'с. Грахово, ул. Колпакова, 10', houseNumber: '10', kind: 'house',
+      coordinates: { latitude: 56.0472, longitude: 51.9618 } };
+    const stopEdit = { address: stop, kind: 'stop', requestId: randomUUID() };
+    expect((await accept(first, id)).status).toBe(200);
+    expect((await api(first, '/v1/addresses/search?query=Колпакова%208&mode=suggest')).status).toBe(200);
+    expect((await api(second, `${path}/destinations`, stopEdit)).status).toBe(404);
+    expect((await api(first, `${path}/waiting/start`, {})).status).toBe(409);
+    expect((await transition(first, id, 'driver_waiting')).status).toBe(200);
+    expect((await transition(first, id, 'in_progress')).data.waitingStartedAt).toBeUndefined();
+    const waiting = await api<RideOrder>(first, `${path}/waiting/start`, {});
+    expect(waiting.data.waitingStartedAt).toBeTruthy();
+    expect((await api<RideOrder>(first, `${path}/waiting/start`, {})).data.waitingStartedAt).toBe(waiting.data.waitingStartedAt);
+    await connection.execute(`UPDATE orders SET waiting_started_at=DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 125 SECOND),
+      waiting_free_minutes=0, waiting_per_minute_minor=500 WHERE id=?`, [id]);
+    const stopped = await api<RideOrder>(first, `${path}/waiting/stop`, {});
+    expect(stopped.data.waitingPriceMinor).toBeGreaterThan(0);
+    expect(stopped.data.waitingStartedAt).toBeUndefined();
+
+    const edits = await Promise.all([api<RideOrder>(first, `${path}/destinations`, stopEdit), api<RideOrder>(first, `${path}/destinations`, stopEdit)]);
+    for (const edit of edits) {
+      expect(edit.status, edit.error?.message).toBe(200);
+      expect(edit.data.destinations?.map(point => point.label)).toEqual([stop.label, destination.label]);
+      expect(edit.data.waitingPriceMinor).toBe(stopped.data.waitingPriceMinor);
+      expect(edit.data.priceMinor).toBeGreaterThan(stopped.data.priceMinor);
+    }
+    expect((await api(first, `${path}/destinations`, { ...stopEdit, requestId: randomUUID() })).status).toBe(422);
+    const afterStop = await api<RideOrder>(first, `${path}/stops/complete`, { destinationIndex: 0 });
+    expect(afterStop.data.nextDestinationIndex).toBe(1);
+    const extended = await api<RideOrder>(first, `${path}/destinations`, { address: finish, kind: 'destination', requestId: randomUUID() });
+    expect(extended.status, extended.error?.message).toBe(200);
+    expect(extended.data.destination.label).toBe(finish.label);
+    expect(extended.data.nextDestinationIndex).toBe(1);
+    const viewed = await api<RideOrder>(rider, `/v1/orders/${id}`);
+    expect(viewed.data.priceMinor).toBe(extended.data.priceMinor);
+    expect(viewed.data.destinations?.map(point => point.label)).toEqual([stop.label, destination.label, finish.label]);
+    const used = (await bootstrap(rider)).data.addressHistory.map(item => item.address.label);
+    expect(used).toEqual([pickup.label, stop.label]);
+    const [events] = await connection.query<RowDataPacket[]>(`SELECT COUNT(*) total FROM order_events WHERE order_id=? AND event_type='order.route_extended'`, [id]);
+    expect(Number(events[0]?.total)).toBe(2);
+  }, 30_000);
 });

@@ -9,6 +9,7 @@ import { TaxiMap } from '@/components/map/taxi-map';
 import { MapCredits } from '@/components/map/map-credits';
 import { ShiftSummary } from '@/components/driver/shift-summary';
 import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
+import { DriverRouteEditor } from '@/components/driver/driver-route-editor';
 import { DriverPreorderOffer, DriverPreorders, type DriverPreorderView } from '@/components/driver/driver-preorders';
 import { formatScheduledPickup } from '@/domain/scheduled-ride';
 import { RatingBadge } from '@/components/ratings/rating-badge';
@@ -27,6 +28,7 @@ import { StatusChip } from '@/components/ui/status-chip';
 import { formatNavigationDistance } from '@/domain/navigation';
 import { driverNavigationAddress } from '@/domain/external-navigation';
 import { headingBetweenCoordinates } from '@/domain/route-tracking';
+import { maxRideDestinations } from '@/domain/route-stops';
 import {
   formatRoutePointCount,
   formatMultiStopRouteAddresses,
@@ -34,6 +36,7 @@ import {
 } from '@/domain/route-label';
 import {
   driverRoutePointState,
+  canControlRideWaiting,
   driverRouteTarget,
   driverTransitionLabel,
   rideStatusLabel,
@@ -72,6 +75,7 @@ function DriverOrderCard({
   const [releaseReason, setReleaseReason] = useState('');
   const [nextVisible, setNextVisible] = useState(false);
   const [fareVisible, setFareVisible] = useState(false);
+  const [routeEditorOrder, setRouteEditorOrder] = useState<string | null>(null);
   const {
     driverRide: currentRide,
     nextDriverRide,
@@ -79,6 +83,9 @@ function DriverOrderCard({
     createDriverOffer: createRide,
     transitionDriverRide: transitionRide,
     completeDriverStop,
+    addDriverRoutePoint,
+    startWaiting,
+    stopWaiting,
     releaseDriverRide,
     resetDriverRide: resetRide,
     refresh,
@@ -207,6 +214,8 @@ function DriverOrderCard({
   const navigationAddress = driverNavigationAddress(currentRide);
   const nextDestinationIndex = currentRide.nextDestinationIndex ?? 0;
   const hasIntermediateStop = nextDestinationIndex < rideDestinations.length - 1;
+  const canChangeRoute = Boolean(routeTarget) && currentRide.driverQueuePosition !== 2 && rideDestinations.length < maxRideDestinations;
+  const canWait = canControlRideWaiting(currentRide.status) && currentRide.driverQueuePosition !== 2;
   const needsFareToFinish = currentRide.status === 'in_progress' && !hasIntermediateStop && isRidePricePending(currentRide);
   const canEditFare = currentRide.pricingMode === 'driver' && currentRide.driverQueuePosition !== 2 && nextStatus !== null;
   const canTakeNext = Boolean(nextDriverRide || driverOffer);
@@ -568,6 +577,17 @@ function DriverOrderCard({
         </AppButton>
       ) : null}
       {!!nextStatus && <WaitingBreakdown ride={currentRide} compact />}
+      {(canWait || canChangeRoute) && <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+        {canWait && <AppButton compact fullWidth={false} variant="secondary" style={{ flex: 1, minHeight: 42, minWidth: 0 }}
+          disabled={busy} accessibilityLabel={currentRide.waitingStartedAt ? 'Остановить ожидание' : 'Включить ожидание'}
+          onPress={() => void (currentRide.waitingStartedAt ? stopWaiting() : startWaiting())}>
+          {currentRide.waitingStartedAt ? 'Стоп ожидание' : 'Ожидание'}
+        </AppButton>}
+        {canChangeRoute && <AppButton compact fullWidth={false} variant="secondary" style={{ flex: 1, minHeight: 42, minWidth: 0 }}
+          disabled={busy} onPress={() => setRouteEditorOrder(currentRide.id)}>Добавить точку</AppButton>}
+      </View>}
+      <DriverRouteEditor key={currentRide.id} visible={routeEditorOrder === currentRide.id}
+        onClose={() => setRouteEditorOrder(null)} onSave={addDriverRoutePoint} busy={busy} />
       {!!error && (
         <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}

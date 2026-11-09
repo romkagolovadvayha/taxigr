@@ -11,8 +11,10 @@ import { useAppForeground } from '@/hooks/use-foreground-screen';
 import { useBookingAvailability } from '@/providers/booking-availability-provider';
 import { bookingUnavailableCode } from '@/domain/booking-availability';
 import { demoAddresses, demoDriver, demoOrders, demoPassenger } from '@/data/demo';
+import { firstRideAddresses } from '@/data/first-ride-addresses';
 import {
   buildDestinationHistory,
+  buildRideAddressHistory,
   type DestinationHistoryItem,
 } from '@/domain/address-history';
 import {
@@ -52,9 +54,9 @@ import {
   roundFareMinor,
   isGrahovoAddress,
 } from '@/domain/pricing';
-import { canTransitionRide, driverTransitionConfirmed } from '@/domain/ride-state';
+import { canControlRideWaiting, canTransitionRide, driverRouteTarget, driverTransitionConfirmed } from '@/domain/ride-state';
 import { isReservedRide } from '@/domain/scheduled-ride';
-import { normalizeRouteStops, replaceRouteStop } from '@/domain/route-stops';
+import { addRideRoutePoint, normalizeRouteStops, replaceRouteStop, sameRouteStop, type DriverRoutePointKind } from '@/domain/route-stops';
 import {
   searchPriceIncreaseChoices,
   searchPriceIncreaseOfferSlot,
@@ -90,6 +92,8 @@ type RideContextValue = {
   passengerOrdersLoaded: boolean;
   adminOrdersLoaded: boolean;
   destinationHistory: DestinationHistoryItem[];
+  addressHistory: DestinationHistoryItem[];
+  firstRideSuggestions: Address[];
   bootstrapReady: boolean;
   quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
   busy: boolean;
@@ -114,6 +118,7 @@ type RideContextValue = {
   transitionRide: (status: RideStatus) => Promise<void>;
   transitionDriverRide: (status: RideStatus) => Promise<boolean>;
   completeDriverStop: () => Promise<void>;
+  addDriverRoutePoint: (kind: DriverRoutePointKind, address: Address) => Promise<RideOrder>;
   startWaiting: () => Promise<void>;
   stopWaiting: () => Promise<void>;
   releaseDriverRide: (reason: string, orderId?: string) => Promise<boolean>;
@@ -133,6 +138,8 @@ type RideContextValue = {
 type RideBootstrap = {
   activePassengerOrder: RideOrder | null;
   destinationHistory: DestinationHistoryItem[];
+  addressHistory?: DestinationHistoryItem[];
+  firstRideSuggestions?: Address[];
   driverQueue: {
     current: RideOrder | null;
     next: RideOrder | null;
@@ -143,7 +150,7 @@ type RideBootstrap = {
 };
 
 const RideContext = createContext<RideContextValue | null>(null);
-type RideAddressValue = Pick<RideContextValue, 'pickup' | 'destinations' | 'setPickup' | 'setDestination' | 'setDestinationAt' | 'addDestination' | 'destinationHistory'>;
+type RideAddressValue = Pick<RideContextValue, 'pickup' | 'destinations' | 'setPickup' | 'setDestination' | 'setDestinationAt' | 'addDestination' | 'destinationHistory' | 'addressHistory' | 'firstRideSuggestions'>;
 const RideAddressContext = createContext<RideAddressValue | null>(null);
 const RideBootstrapContext = createContext(false);
 
@@ -265,6 +272,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [passengerOrdersLoaded, setPassengerOrdersLoaded] = useState(false);
   const [adminOrdersLoaded, setAdminOrdersLoaded] = useState(false);
   const [destinationHistory, setDestinationHistory] = useState<DestinationHistoryItem[]>([]);
+  const [addressHistory, setAddressHistory] = useState<DestinationHistoryItem[]>([]);
+  const [firstRideSuggestions, setFirstRideSuggestions] = useState(firstRideAddresses);
   const [bootstrappedToken, setBootstrappedToken] = useState<string | null>(null);
   const bootstrapReady = !!token && bootstrappedToken === token;
   const [bookingFare, setBookingFare] = useState<Tariff>(() =>
@@ -380,6 +389,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setOrders((previous) => upsertOrderSummary(previous, summary));
     setAdminOrders((previous) => upsertOrderSummary(previous, summary));
     setCurrentRide(ride);
+    if (ride.status !== 'draft') {
+      setAddressHistory(history => history.some(item => sameRouteStop(item.address, ride.pickup)) ? history :
+        [{ address: ride.pickup, lastUsedAt: ride.updatedAt, tripCount: 1, isLastDestination: false }, ...history].slice(0, 20));
+    }
     if (ride.status === 'completed' && !completedHistoryOrderIds.current.has(ride.id)) {
       completedHistoryOrderIds.current.add(ride.id);
       setDestinationHistory((history) => addCompletedDestination(history, ride));
@@ -427,6 +440,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setPassengerOrdersLoaded(true);
         setAdminOrdersLoaded(true);
         setDestinationHistory(demoHistory.items);
+        setAddressHistory(userId ? buildRideAddressHistory(passengerOrders, userId) : []);
         completedHistoryOrderIds.current = new Set(
           passengerOrders.filter((order) => order.status === 'completed').map((order) => order.id),
         );
@@ -453,6 +467,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setPassengerOrdersLoaded(false);
         setAdminOrdersLoaded(false);
         setDestinationHistory([]);
+        setAddressHistory([]);
         completedHistoryOrderIds.current.clear();
         setCurrentRide(null);
         setDriverRide(null);
@@ -480,6 +495,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverOffer(bootstrap.driverQueue.offer);
       setDriverPreorders(bootstrap.driverPreorders ?? []);
       setDestinationHistory(bootstrap.destinationHistory);
+      setAddressHistory(bootstrap.addressHistory ?? bootstrap.destinationHistory);
+      setFirstRideSuggestions(bootstrap.firstRideSuggestions ?? firstRideAddresses);
       setChatUnreadCounts(bootstrap.chatUnreadCounts);
       setBootstrapError(null);
     } catch (reason) {
@@ -1296,7 +1313,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const startWaiting = useCallback(async () => {
     const current = driverRide;
-    if (!current || current.status !== 'driver_waiting' || current.waitingStartedAt) return;
+    if (!current || !canControlRideWaiting(current.status) || current.waitingStartedAt || transitionInFlight.current) return;
     if (demoSession) {
       applyDriverOrder({
         ...current,
@@ -1306,6 +1323,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!token) return;
+    transitionInFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -1317,13 +1335,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось включить ожидание');
     } finally {
+      transitionInFlight.current = false;
       setBusy(false);
     }
   }, [applyDriverOrder, demoSession, driverRide, token]);
 
   const stopWaiting = useCallback(async () => {
     const current = driverRide;
-    if (!current || current.status !== 'driver_waiting' || !current.waitingStartedAt) return;
+    if (!current || !canControlRideWaiting(current.status) || !current.waitingStartedAt || transitionInFlight.current) return;
     if (demoSession) {
       const waitingSeconds =
         (current.waitingSeconds ?? 0) +
@@ -1351,6 +1370,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!token) return;
+    transitionInFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -1362,6 +1382,52 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось завершить ожидание');
     } finally {
+      transitionInFlight.current = false;
+      setBusy(false);
+    }
+  }, [applyDriverOrder, demoSession, driverRide, token]);
+
+  const routeAttempt = useRef<{ fingerprint: string; id: string } | null>(null);
+  const addDriverRoutePoint = useCallback(async (kind: DriverRoutePointKind, address: Address) => {
+    const current = driverRide;
+    if (!token || !current || !driverRouteTarget(current.status) || transitionInFlight.current) {
+      throw new Error('Маршрут сейчас нельзя изменить');
+    }
+    const fingerprint = JSON.stringify([current.id, kind, address]);
+    const attempt = routeAttempt.current?.fingerprint === fingerprint ? routeAttempt.current : { fingerprint, id: idempotencyKey() };
+    routeAttempt.current = attempt;
+    transitionInFlight.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      let ride: RideOrder;
+      if (demoSession) {
+        const pickup = current.pickup;
+        const destinations = addRideRoutePoint(pickup, current.destinations ?? [current.destination], address, kind);
+        if (!destinations) throw new Error('Выберите другую точку маршрута');
+        const route = await getDemoRoadRoute(pickup.coordinates, destinations.map(point => point.coordinates));
+        const pricingPoints = billableRoutePoints(pickup, destinations);
+        const pricingRoute = pricingPoints[0] === pickup ? route : await getDemoRoadRoute(
+          pricingPoints[0]!.coordinates, pricingPoints.slice(1).map(point => point.coordinates));
+        const basePriceMinor = calculateMultiStopFareMinor(pricingPoints.slice(1).map((point, index) => ({
+          origin: pricingPoints[index]!, destination: point, distanceMeters: pricingRoute.segmentDistances[index]!,
+          scope: classifyPricingScope(pricingPoints[index]!, point),
+        })), current.tariff, [pickup, ...destinations].every(isGrahovoAddress), undefined,
+        new Date(current.scheduledAt ?? current.createdAt));
+        const priceMinor = basePriceMinor + (current.waitingPriceMinor ?? 0) + (current.searchPriceIncreaseMinor ?? 0);
+        ride = { ...current, destinations, destination: destinations[destinations.length - 1]!, routeCoordinates: route.coordinates,
+          distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds, basePriceMinor, priceMinor,
+          serviceCommissionMinor: calculateCommissionMinor(priceMinor), updatedAt: new Date().toISOString() };
+      } else {
+        ride = await apiRequest<RideOrder>(`/v1/driver/orders/${current.id}/destinations`, {
+          method: 'POST', token, timeoutMs: 25_000, body: JSON.stringify({ kind, address, requestId: attempt.id }),
+        });
+      }
+      routeAttempt.current = null;
+      applyDriverOrder(ride);
+      return ride;
+    } finally {
+      transitionInFlight.current = false;
       setBusy(false);
     }
   }, [applyDriverOrder, demoSession, driverRide, token]);
@@ -1571,6 +1637,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       passengerOrdersLoaded,
       adminOrdersLoaded,
       destinationHistory,
+      addressHistory,
+      firstRideSuggestions,
       bootstrapReady,
       quoteStatus,
       busy,
@@ -1592,6 +1660,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       transitionRide,
       transitionDriverRide,
       completeDriverStop,
+      addDriverRoutePoint,
       startWaiting,
       stopWaiting,
       releaseDriverRide,
@@ -1626,6 +1695,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       nextDriverRide,
       destination,
       destinationHistory,
+      addressHistory,
+      firstRideSuggestions,
       quoteStatus,
       routeCoordinates,
       routeSummary,
@@ -1664,6 +1735,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       selectScheduledAt,
       startWaiting,
       stopWaiting,
+      addDriverRoutePoint,
       releaseDriverRide,
       transitionDriverRide,
       completeDriverStop,
@@ -1672,8 +1744,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   );
 
   const addressValue = useMemo(() => ({
-    pickup, destinations, setPickup: selectPickup, setDestination: selectDestination, setDestinationAt, addDestination, destinationHistory,
-  }), [pickup, destinations, selectPickup, selectDestination, setDestinationAt, addDestination, destinationHistory]);
+    pickup, destinations, setPickup: selectPickup, setDestination: selectDestination, setDestinationAt, addDestination, destinationHistory, addressHistory, firstRideSuggestions,
+  }), [pickup, destinations, selectPickup, selectDestination, setDestinationAt, addDestination, destinationHistory, addressHistory, firstRideSuggestions]);
 
   return <RideContext.Provider value={value}>
     <RideAddressContext.Provider value={addressValue}>

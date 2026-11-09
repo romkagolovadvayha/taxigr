@@ -7,9 +7,10 @@ import { registerMaxGroupBooking } from './max-group-booking';
 import { maxGroupOrderKey } from './max-group-booking-flow';
 import { intercitySettlementById } from '../src/data/intercity-settlements';
 import { grahovoDirectoryHousesById } from '../src/data/grahovo-address-catalog';
+import { firstRideAddresses } from '../src/data/first-ride-addresses';
 import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
-import { discountedFareRoundingMinor, firstOrderPromotionCode, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
+import { discountedFareRoundingMinor, firstOrderPromotionCode, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor, isLocalPromotionScope, renderPromotionMessage } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
 import { formatScheduledPickup, preorderBounds, preorderDepartureMinutes, preorderMaxLeadDays, preorderMinLeadMinutes } from '../src/domain/scheduled-ride';
 import { readPromotionSettings } from './promotion-settings';
@@ -35,16 +36,16 @@ import {
   isDestinationAddressBookable,
   isPickupAddressBookable,
 } from '../src/domain/address-precision';
-import { buildDestinationHistory } from '../src/domain/address-history';
+import { buildDestinationHistory, buildRideAddressHistory } from '../src/domain/address-history';
 import { filterRequestedHouse } from '../src/domain/address-search';
 import { rememberAddressPoint } from './remembered-addresses';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
-import { normalizeRouteStops } from '../src/domain/route-stops';
+import { addRideRoutePoint, maxRideDestinations, normalizeRouteStops } from '../src/domain/route-stops';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
   liveLocationUpdateDelay,
 } from '../src/domain/live-location';
-import { canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
+import { canControlRideWaiting, canTransitionRide, driverRouteTarget } from '../src/domain/ride-state';
 import { canSendRideChatMessage } from '../src/domain/ride-chat';
 import {
   maximumAssignedDriverOrders,
@@ -3550,7 +3551,8 @@ export async function registerRoutes(
   });
 
   app.get('/v1/addresses/search', async (request) => {
-    await auth(request, 'passenger');
+    const session = await auth(request);
+    if (!session.roles.includes('driver')) requireRole(session, 'passenger');
     const { query, kind, mode } = parse(z.object({ query: z.string().trim().min(2).max(180), kind: z.enum(['street', 'house']).optional(), mode: z.enum(['suggest']).optional() }), request.query);
     const placeResults = kind ? [] : filterRequestedHouse((await searchPlaces(query)).map(placeToAddress), query);
     try {
@@ -4063,7 +4065,7 @@ export async function registerRoutes(
       ),
       db.query<DestinationHistoryRow[]>(
         `${destinationHistorySelect}
-         WHERE o.passenger_id = ? AND o.status = 'completed'
+         WHERE o.passenger_id = ?
          ORDER BY o.updated_at DESC LIMIT 100`,
         [session.id],
       ),
@@ -4071,10 +4073,14 @@ export async function registerRoutes(
       getRideChatUnreadCounts(session.id),
     ]);
     const activePassengerRow = activePassengerResult[0][0];
-    const destinationHistory = buildDestinationHistory(
-      historyResult[0].map(presentDestinationHistoryOrder),
-      session.id,
-    );
+    const historyOrders = historyResult[0].map(presentDestinationHistoryOrder);
+    const destinationHistory = buildDestinationHistory(historyOrders, session.id);
+    const addressHistory = buildRideAddressHistory(historyOrders, session.id);
+    const firstRideSuggestions = session.roles.includes('passenger') && !destinationHistory.items.length
+      ? (await Promise.all(firstRideAddresses.map(async item => {
+        const place = await findPlace(item.placeId!);
+        return place?.active ? placeToAddress(place) : null;
+      }))).filter((address): address is Address => !!address) : [];
     let driverQueue: ReturnType<typeof selectDriverOrderQueue> = {
       current: null,
       next: null,
@@ -4109,6 +4115,8 @@ export async function registerRoutes(
           ? limitOrderRatings(presentOrder(activePassengerRow), 'passenger')
           : null,
         destinationHistory: destinationHistory.items.slice(0, 20),
+        addressHistory: addressHistory.slice(0, 20),
+        firstRideSuggestions,
         driverQueue,
         driverPreorders,
         chatUnreadCounts,
@@ -5572,9 +5580,9 @@ export async function registerRoutes(
       if (!driver || !row || row.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
       }
-      if (row.status !== 'driver_waiting') {
+      if (row.active_driver_id !== driver.id || !canControlRideWaiting(row.status)) {
         throw Object.assign(
-          new Error('Ожидание можно включить только после прибытия к пассажиру'),
+          new Error('Ожидание можно включить после прибытия или во время текущей поездки'),
           { statusCode: 409, code: 'WAITING_NOT_AVAILABLE' },
         );
       }
@@ -5648,9 +5656,9 @@ export async function registerRoutes(
       if (!driver || !row || row.driver_id !== driver.id) {
         throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
       }
-      if (row.status !== 'driver_waiting') {
+      if (row.active_driver_id !== driver.id || !canControlRideWaiting(row.status)) {
         throw Object.assign(
-          new Error('Ожидание можно завершить только до начала поездки'),
+          new Error('Ожидание можно завершить только в текущей поездке'),
           { statusCode: 409, code: 'WAITING_NOT_AVAILABLE' },
         );
       }
@@ -5743,6 +5751,105 @@ export async function registerRoutes(
     return { data: order };
   });
 
+  app.post('/v1/driver/orders/:id/destinations', {
+    config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const session = await auth(request, 'driver');
+    const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
+    const { address: input, kind, requestId } = parse(z.object({
+      address: destinationAddressSchema,
+      kind: z.enum(['stop', 'destination']),
+      requestId: z.string().min(8).max(100),
+    }), request.body);
+    const driver = await getDriver(session.id);
+    const assertAssigned = (row: OrderRow | null | undefined): OrderRow => {
+      if (!driver || !row || row.driver_id !== driver.id) {
+        throw Object.assign(new Error('Заказ водителя не найден'), { statusCode: 404 });
+      }
+      return row;
+    };
+    const assertEditable = (row: OrderRow) => {
+      if (row.active_driver_id !== driver?.id || !driverRouteTarget(row.status)) {
+        throw Object.assign(new Error('Маршрут можно изменить только в текущей поездке'), { statusCode: 409 });
+      }
+    };
+    const alreadySaved = async (executor: PoolConnection | typeof db) => {
+      const [rows] = await executor.query<RowDataPacket[]>(`SELECT 1 FROM order_events
+        WHERE order_id = ? AND actor_user_id = ? AND event_type = 'order.route_extended'
+          AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.requestId')) = ? LIMIT 1`, [id, session.id, requestId]);
+      return rows.length > 0;
+    };
+    const before = assertAssigned(await getOrder(id));
+    if (await alreadySaved(db)) return { data: presentOrder(assertAssigned(await getOrder(id))) };
+    assertEditable(before);
+    const order = presentOrder(before);
+    const previousDestinations = order.destinations ?? [order.destination];
+    if (previousDestinations.length >= maxRideDestinations) {
+      throw Object.assign(new Error(`В маршруте может быть до ${maxRideDestinations} точек после подачи`), { statusCode: 409 });
+    }
+    const address = await resolveTrustedAddress(input);
+    const destinations = addRideRoutePoint(order.pickup, previousDestinations, address, kind);
+    if (!destinations) {
+      throw Object.assign(new Error('Этот адрес совпадает с соседней точкой маршрута'), { statusCode: 422 });
+    }
+    const destination = destinations.at(-1)!;
+    const scope = classifyMultiStopPricingScope(order.pickup, destinations);
+    const [priced, rules, priorManualRoute] = await Promise.all([
+      getMultiStopPricedRouteMetrics(order.pickup, destinations),
+      pricingRules(),
+      before.pricing_mode === 'driver' && before.manual_price_set
+        ? getMultiStopPricedRouteMetrics(order.pickup, previousDestinations) : null,
+    ]);
+    const fareDate = new Date(before.scheduled_at ?? before.created_at);
+    const originalPrice = multiStopPrices(order.pickup, destinations, priced.pricingSegments, rules, fareDate)[before.tariff];
+    const discount = Number(before.promotion_code?.match(/^first-local-order-(\d+)$/u)?.[1] ?? 0);
+    const discounted = discount > 0 && discount <= 100 && isLocalPromotionScope(scope);
+    const basePrice = priorManualRoute ? Math.max(100, Number(before.base_price_minor) + originalPrice -
+      multiStopPrices(order.pickup, previousDestinations, priorManualRoute.pricingSegments, rules, fareDate)[before.tariff])
+      : discounted ? firstOrderPriceMinor(originalPrice, before.fare_rounding_minor ?? discountedFareRoundingMinor,
+        before.fare_rounding_mode ?? fareRoundingMode, discount) : originalPrice;
+    const changed = await withTransaction(async connection => {
+      const [rows] = await connection.query<OrderRow[]>('SELECT * FROM orders WHERE id = ? FOR UPDATE', [id]);
+      const current = assertAssigned(rows[0]);
+      if (await alreadySaved(connection)) return false;
+      assertEditable(current);
+      const currentOrder = presentOrder(current);
+      const currentDestinations = currentOrder.destinations ?? [currentOrder.destination];
+      if (currentDestinations.length !== previousDestinations.length ||
+          !currentDestinations.every((point, index) => addressesMatch(point, previousDestinations[index]!)) ||
+          Number(current.base_price_minor) !== Number(before.base_price_minor) || current.manual_price_set !== before.manual_price_set) {
+        throw Object.assign(new Error('Маршрут или стоимость уже изменились. Проверьте заказ и попробуйте снова'), { statusCode: 409 });
+      }
+      const price = basePrice + Number(current.search_price_increase_minor) + Number(current.waiting_price_minor);
+      const commission = calculateCommissionMinor(price, Number(current.commission_bps));
+      await connection.execute(`UPDATE orders SET destination_label = ?, destination_details = ?, destination_lat = ?, destination_lon = ?,
+        destinations_json = ?, pricing_scope = ?, distance_meters = ?, duration_seconds = ?, route_geometry = ?,
+        base_price_minor = ?, original_price_minor = ?, price_minor = ?, commission_minor = ?,
+        manual_price_set = IF(pricing_mode = 'driver', TRUE, manual_price_set), updated_at = UTC_TIMESTAMP(3) WHERE id = ?`, [
+        destination.label, destination.details ?? null, destination.coordinates.latitude, destination.coordinates.longitude,
+        JSON.stringify(destinations), scope, priced.tripRoute.distanceMeters, priced.tripRoute.durationSeconds,
+        JSON.stringify(priced.tripRoute.coordinates), basePrice, discounted ? originalPrice : null, price, commission, id,
+      ]);
+      await connection.execute(`INSERT INTO order_events (order_id, actor_user_id, event_type, payload)
+        VALUES (?, ?, 'order.route_extended', ?)`, [id, session.id, JSON.stringify({ requestId, kind, address: address.label, priceMinor: price })]);
+      return true;
+    });
+    const updated = await getOrder(id);
+    if (!updated) throw new Error('Order disappeared');
+    const payload = presentOrder(updated);
+    if (changed) {
+      publish(`user:${payload.passengerId}`, 'order:updated', payload);
+      publish(`driver:${payload.driverId}`, 'order:updated', payload);
+      publish('admins', 'order:updated', payload);
+      const title = kind === 'stop' ? 'Водитель добавил остановку' : 'Водитель добавил пункт назначения';
+      const body = `${address.label} · Стоимость ${ridePriceLabel(payload)}`;
+      void notifyUsers([payload.passengerId], { title, body, data: { orderId: id }, sound: 'notification.wav', channelId: 'general-voice-v1' })
+        .catch(error => app.log.warn({ error }, 'push notification failed'));
+      notifyMessengers(notifyUsersInMessengers([payload.passengerId], passengerRideNotification(payload, { title, body })), 'order.route_extended.passenger');
+    }
+    return { data: payload };
+  });
+
   app.post('/v1/driver/orders/:id/fare', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = parse(z.object({ id: z.string().uuid() }), request.params);
@@ -5760,9 +5867,10 @@ export async function registerRoutes(
       // Android may replay a POST when its successful response is lost.
       // Saving the same agreed fare must not create another event or notification.
       if (row.manual_price_set && Number(row.base_price_minor) === priceMinor) return false;
-      const commission = calculateCommissionMinor(priceMinor, Number(row.commission_bps));
+      const total = priceMinor + Number(row.waiting_price_minor) + Number(row.search_price_increase_minor);
+      const commission = calculateCommissionMinor(total, Number(row.commission_bps));
       await connection.execute(`UPDATE orders SET base_price_minor = ?, price_minor = ?, commission_minor = ?, manual_price_set = TRUE WHERE id = ?`,
-        [priceMinor, priceMinor, commission, id]);
+        [priceMinor, total, commission, id]);
       await connection.execute(`INSERT INTO order_events (order_id, actor_user_id, event_type, payload) VALUES (?, ?, 'order.driver_fare', ?)`,
         [id, session.id, JSON.stringify({ priceMinor })]);
       return true;

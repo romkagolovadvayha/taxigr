@@ -120,10 +120,16 @@ export type OrderSummaryRow = RowDataPacket & {
 export type DestinationHistoryRow = RowDataPacket & {
   passenger_id: string;
   status: RideStatus;
+  pickup_label: string;
+  pickup_details: string | null;
+  pickup_lat: number;
+  pickup_lon: number;
   destination_label: string;
   destination_details: string | null;
   destination_lat: number;
   destination_lon: number;
+  destinations_json: unknown;
+  next_destination_index: number;
   updated_at: Date | string;
 };
 
@@ -372,16 +378,15 @@ export function presentOrderSummary(row: OrderSummaryRow): RideOrderSummary {
 }
 
 export function presentDestinationHistoryOrder(row: DestinationHistoryRow) {
+  const ordered = destinations(row.destinations_json);
+  const destination = ordered.at(-1) ?? address('destination', row.destination_label, row.destination_details, row.destination_lat, row.destination_lon);
   return {
     passengerId: row.passenger_id,
     status: row.status,
-    destination: address(
-      'destination',
-      row.destination_label,
-      row.destination_details,
-      row.destination_lat,
-      row.destination_lon,
-    ),
+    pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
+    destination,
+    destinations: ordered.length ? ordered : [destination],
+    nextDestinationIndex: Number(row.next_destination_index ?? 0),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
@@ -447,7 +452,8 @@ export const orderSummarySelect = `
 
 export const destinationHistorySelect = `
   SELECT o.passenger_id, o.status,
+    o.pickup_label, o.pickup_details, o.pickup_lat, o.pickup_lon,
     o.destination_label, o.destination_details, o.destination_lat, o.destination_lon,
-    o.updated_at
+    o.destinations_json, o.next_destination_index, o.updated_at
   FROM orders o
 `;
