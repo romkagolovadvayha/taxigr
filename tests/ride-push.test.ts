@@ -45,7 +45,7 @@ const ride: RideOrder = {
 
 it.each([false,true])('marks child order push notifications explicitly, price increased: %s', increased => {
   const notification=driverOrderAvailablePush(ride.id,increased,'child');
-  expect(notification.title).toContain('Детский');
+  expect(notification.title).toBe(increased ? 'Стоимость заказа повышена' : 'Новый заказ');
   expect(notification.body).toContain('Поездка с ребёнком');
   expect(notification.body).toContain('вести аккуратно');
   expect(notification.body).not.toContain('кресло');

@@ -13,11 +13,11 @@ import {
 
 const orderId = '123e4567-e89b-12d3-a456-426614174000';
 
-it('labels the child tariff clearly and keeps the accept action for all drivers', () => {
+it('keeps the child passenger note and the accept action for all drivers', () => {
   const notification=driverRideNotification(ride({tariff:'child'}));
   const text=formatPersonalMessengerNotification(notification);
-  expect(text).toContain('Детский');
-  expect(text).toContain('поездка с ребёнком');
+  expect(text).not.toContain('Детский');
+  expect(text).toContain('Поездка с ребёнком');
   expect(text).toContain('вести аккуратно');
   expect(text).not.toContain('кресло');
   expect(JSON.stringify(notification.buttons)).toContain(rideMessengerActionData(orderId,'accept'));

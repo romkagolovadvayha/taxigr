@@ -433,9 +433,6 @@ export function DriverProfileScreen() {
               <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
                 Детское кресло
               </Text>
-              <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-                После проверки станет доступен детский тариф
-              </Text>
             </View>
             <AccessibleSwitch
               value={form.hasChildSeat}

@@ -7,7 +7,6 @@ import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
 import { ScheduledPickupControl } from '@/components/passenger/scheduled-pickup-control';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
-import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -29,7 +28,7 @@ import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrderConfirmationScreen() {
   const colors = useThemeColors();
-  const { width, height } = useResponsiveLayout();
+  const { height } = useResponsiveLayout();
   const dense = height < 560;
   const gap = dense ? spacing.x1 : spacing.x2;
   const insets = useSafeAreaInsets();
@@ -37,9 +36,7 @@ export function OrderConfirmationScreen() {
     pickup,
     destinations,
     destination,
-    tariffs,
-    selectedTariff,
-    setSelectedTariff,
+    bookingFare,
     selectedPaymentMethod,
     setSelectedPaymentMethod,
     scheduledAt,
@@ -55,8 +52,7 @@ export function OrderConfirmationScreen() {
   const [promotionVisible, setPromotionVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
-  const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
-  const promotionText = selected ? getOrderPromotionText(selected) : '';
+  const promotionText = getOrderPromotionText(bookingFare);
   const addressesAreBookable =
     isPickupAddressBookable(pickup) &&
     destinations.length > 0 &&
@@ -67,7 +63,6 @@ export function OrderConfirmationScreen() {
   const canSubmit =
     !!pickup &&
     !!destination &&
-    !!selected &&
     routeReady &&
     !busy;
   const routeGuidance = error ?? (pickup && destination && !addressesAreBookable
@@ -194,37 +189,22 @@ export function OrderConfirmationScreen() {
           </View>
         )}
 
-        {selected && (
-          <>
-            <View style={{ gap }}>
-              <TariffSelector
-                tariffs={tariffs}
-                selected={selectedTariff}
-                onSelect={setSelectedTariff}
-                compact
-                dense={dense}
-                showIllustrations={width >= 360 && height >= 600}
-                scheduled={!!scheduledAt}
-                loading={quotePending}
-                estimateAvailable={routeReady}
-              />
-              {!quotePending && routeReady && !!promotionText && (
-                <Text selectable testID="order-promotion-message" numberOfLines={dense ? 1 : 2}
-                  onPress={() => setPromotionVisible(true)} style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
-              )}
-              <ScheduledPickupControl disabled={busy} />
-            </View>
-
-          </>
+        {routeReady && !scheduledAt && (
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Подача около {bookingFare.etaMinutes} мин</Text>
         )}
+        {routeReady && !!promotionText && (
+          <Text selectable testID="order-promotion-message" numberOfLines={dense ? 1 : 2}
+            onPress={() => setPromotionVisible(true)} style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
+        )}
+        <ScheduledPickupControl disabled={busy} />
       </Screen>
-      {selected && <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: spacing.x4,
+      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: spacing.x4,
         paddingTop: gap, paddingBottom: Math.max(dense ? spacing.x2 : spacing.x4, insets.bottom), backgroundColor: colors.surface }}>
           <BookingSubmitButton
               checkAvailability={false}
               compact={dense}
-              priceMinor={selected.priceMinor}
-              etaMinutes={selected.etaMinutes}
+              priceMinor={bookingFare.priceMinor}
+              etaMinutes={bookingFare.etaMinutes}
               label={scheduledAt ? 'Заказать ко времени' : 'Заказать сейчас'}
               loadingLabel={busy ? 'Создаём заказ…' : 'Рассчитываем…'}
               disabled={!addressesAreBookable || quotePending || busy}
@@ -244,13 +224,13 @@ export function OrderConfirmationScreen() {
                   : quotePending
                     ? 'Рассчитываем стоимость и время подачи'
                     : routeReady
-                      ? `Подтвердить заказ за ${selected.priceMinor / 100} рублей`
+                      ? `Подтвердить заказ за ${bookingFare.priceMinor / 100} рублей`
                       : addressesAreBookable
                         ? 'Повторить расчёт стоимости поездки'
                         : 'Подтвердить заказ, сначала укажите маршрут'
               }
           />
-      </View>}
+      </View>
       <AppModal visible={promotionVisible} title="Скидка на первый заказ" onClose={() => setPromotionVisible(false)}>
         <ScrollView style={{ flexGrow: 0, maxHeight: height * 0.55 }}>
           <Text selectable style={{ ...typography.body, color: colors.ink }}>{promotionText}</Text>

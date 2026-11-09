@@ -322,7 +322,7 @@ export function driverRideNotification(
   const assigned = Boolean(ride.driverId);
   const details: PersonalMessengerNotification['details'] = [
     ...(ride.scheduledAt ? [['🕓 Подача', formatScheduledPickup(ride.scheduledAt)] as const] : []),
-    ...(ride.tariff === 'child' ? [['👶 Тариф', 'Детский — поездка с ребёнком. Просьба вести аккуратно.'] as const] : []),
+    ...(ride.tariff === 'child' ? [['👶 Поездка с ребёнком', 'Просьба вести аккуратно.'] as const] : []),
     ['👤 Пассажир', assigned ? ride.passenger?.name : null],
     ['📞 Телефон', assigned ? ride.passenger?.phone : null],
     ['💳 Стоимость', ridePriceLabel(ride)],

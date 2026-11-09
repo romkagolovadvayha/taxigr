@@ -37,7 +37,6 @@ import type {
   RideStatus,
   RouteSummary,
   Tariff,
-  TariffCode,
 } from '@/domain/models';
 import {
   buildTariffs,
@@ -71,8 +70,7 @@ type RideContextValue = {
   destination: Address | null;
   routeCoordinates: Coordinates[];
   routeSummary: RouteSummary | null;
-  tariffs: Tariff[];
-  selectedTariff: TariffCode;
+  bookingFare: Tariff;
   selectedPaymentMethod: PaymentMethod;
   scheduledAt?: string;
   selectScheduledAt: (value?: string) => void;
@@ -106,7 +104,6 @@ type RideContextValue = {
   removeDestination: (index: number) => void;
   reorderDestinations: (fromIndex: number, toIndex: number) => void;
   requestQuote: () => Promise<void>;
-  setSelectedTariff: (tariff: TariffCode) => void;
   setSelectedPaymentMethod: (method: PaymentMethod) => void;
   createRide: (
     comment?: string,
@@ -248,7 +245,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const destination = destinations[destinations.length - 1] ?? null;
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
-  const [selectedTariff, setSelectedTariff] = useState<TariffCode>('economy');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [currentRide, setCurrentRide] = useState<RideOrder | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string>();
@@ -271,8 +267,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [destinationHistory, setDestinationHistory] = useState<DestinationHistoryItem[]>([]);
   const [bootstrappedToken, setBootstrappedToken] = useState<string | null>(null);
   const bootstrapReady = !!token && bootstrappedToken === token;
-  const [tariffs, setTariffs] = useState<Tariff[]>(() =>
-    buildTariffs(11_600, 'district'),
+  const [bookingFare, setBookingFare] = useState<Tariff>(() =>
+    buildTariffs(11_600, 'district').find(({ code }) => code === 'economy')!,
   );
   const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
@@ -780,18 +776,17 @@ export function RideProvider({ children }: { children: ReactNode }) {
           scope: classifyPricingScope(pricingPoints[index]!, item),
         }));
         const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
-        setTariffs(
-          buildTariffs(route.distanceMeters, pricingScope).map((tariff) => ({
-            ...tariff,
-            priceMinor: calculateMultiStopFareMinor(
-              segments,
-              tariff.code,
-              allPointsInGrahovo,
-              undefined,
-              scheduledAt ? new Date(scheduledAt) : undefined,
-            ),
-          })),
-        );
+        const fare = buildTariffs(route.distanceMeters, pricingScope).find(({ code }) => code === 'economy')!;
+        setBookingFare({
+          ...fare,
+          priceMinor: calculateMultiStopFareMinor(
+            segments,
+            'economy',
+            allPointsInGrahovo,
+            undefined,
+            scheduledAt ? new Date(scheduledAt) : undefined,
+          ),
+        });
         setRouteCoordinates(route.coordinates);
         setRouteSummary(route);
         setQuoteStatus('ready');
@@ -816,7 +811,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setError('Не удалось рассчитать маршрут');
         return;
       }
-      setTariffs(response.tariffs);
+      const fare = response.tariffs.find(({ code }) => code === 'economy');
+      if (!fare) throw new Error('Не удалось рассчитать стоимость поездки');
+      setBookingFare(fare);
       setQuoteToken(response.quoteToken);
       setRouteCoordinates(route.coordinates);
       setRouteSummary(route);
@@ -945,7 +942,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setError('Дождитесь расчёта стоимости поездки');
         return null;
       }
-      const tariff = tariffs.find((item) => item.code === selectedTariff)!;
       if (demoSession) {
         const now = new Date().toISOString();
         const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
@@ -955,15 +951,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
           pickup,
           destinations,
           destination,
-          tariff: selectedTariff,
+          tariff: 'economy',
           status: 'searching',
           pricingScope,
-          basePriceMinor: tariff.priceMinor,
+          basePriceMinor: bookingFare.priceMinor,
           fareRoundingMinor,
           fareRoundingMode,
           searchPriceIncreaseStepMinor: roundFareMinor(defaultPricingRules.searchPriceIncreaseStepMinor),
-          priceMinor: tariff.priceMinor,
-          serviceCommissionMinor: calculateCommissionMinor(tariff.priceMinor),
+          priceMinor: bookingFare.priceMinor,
+          serviceCommissionMinor: calculateCommissionMinor(bookingFare.priceMinor),
           waitingSeconds: 0,
           waitingPriceMinor: 0,
           waitingFreeMinutes: defaultPricingRules.waitingFreeMinutes,
@@ -996,7 +992,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         pickup,
         destinations,
         destination,
-        tariff: selectedTariff,
+        tariff: 'economy',
         paymentMethod: selectedPaymentMethod,
         comment: comment ?? null,
         scheduledAt: scheduledAt ?? null,
@@ -1017,7 +1013,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
             pickup,
             destinations,
             destination,
-            tariff: selectedTariff,
+            tariff: 'economy',
             quoteToken,
             scheduledAt,
             paymentMethod: selectedPaymentMethod,
@@ -1078,6 +1074,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     },
     [
       applyPassengerOrder,
+      bookingFare,
       checkBooking,
       showBookingUnavailable,
       demoSession,
@@ -1091,9 +1088,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       requestQuote,
       routeCoordinates,
       routeSummary,
-      selectedTariff,
       selectedPaymentMethod,
-      tariffs,
       token,
       user,
     ],
@@ -1549,8 +1544,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       destination,
       routeCoordinates,
       routeSummary,
-      tariffs,
-      selectedTariff,
+      bookingFare,
       selectedPaymentMethod,
       scheduledAt,
       selectScheduledAt,
@@ -1584,7 +1578,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
       removeDestination,
       reorderDestinations,
       requestQuote,
-      setSelectedTariff,
       setSelectedPaymentMethod,
       createRide,
       createDriverOffer,
@@ -1658,14 +1651,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
       rateDriverRide,
       resetRide,
       resetDriverRide,
-      selectedTariff,
+      bookingFare,
       selectedPaymentMethod,
       scheduledAt,
       selectScheduledAt,
       startWaiting,
       stopWaiting,
       releaseDriverRide,
-      tariffs,
       transitionDriverRide,
       completeDriverStop,
       transitionRide,

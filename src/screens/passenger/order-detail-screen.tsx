@@ -93,7 +93,6 @@ export function OrderDetailScreen() {
   const routeAddresses = formatMultiStopRouteAddresses(order.pickup, destinations);
   const rows = [
     ...(order.scheduledAt ? [['Подача ко времени', formatScheduledPickup(order.scheduledAt)]] : []),
-    ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
     [
       'Расчёт маршрута',
       pricingScopeLabel[order.pricingScope ?? 'intercity'],

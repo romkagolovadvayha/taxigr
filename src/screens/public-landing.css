@@ -755,30 +755,6 @@
   position: relative;
   overflow: hidden;
 }
-.lp-tariff-switch {
-  display: flex;
-  align-self: flex-start;
-  padding: 4px;
-  background: #e9e1cc;
-  border-radius: 30px;
-  z-index: 2;
-}
-.lp-tariff-switch button {
-  border: 0;
-  background: transparent;
-  border-radius: 25px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 10px 23px;
-  transition:
-    background 0.25s,
-    color 0.25s;
-}
-.lp-tariff-switch button[aria-pressed="true"] {
-  background: #fff;
-  color: var(--lp-accent-ink);
-  box-shadow: 0 2px 8px #362c1408;
-}
 .lp-tariff-art {
   height: 260px;
   position: relative;
@@ -1629,10 +1605,6 @@
   }
   .lp h3 {
     font-size: 24px;
-  }
-  .lp-tariff-switch button {
-    font-size: 11px;
-    padding: 9px 21px;
   }
   .lp-clarity-card {
     padding: 28px;

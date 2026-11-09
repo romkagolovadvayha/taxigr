@@ -3,9 +3,6 @@ import {
   useServerDocumentContext,
 } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
-import { Asset } from 'expo-asset';
-
-import { inlineTariffImageSources } from '@/components/passenger/tariff-image-sources';
 import { MAP_GLYPHS_URL, MAP_TILES_URL } from '@/components/map/map-style';
 
 export default function RootHtml({ children }: PropsWithChildren) {
@@ -19,16 +16,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
         {[...new Set([MAP_TILES_URL, MAP_GLYPHS_URL].flatMap(value => {
           try { return [new URL(value).origin]; } catch { return []; }
         }))].map(origin => <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />)}
-        {Object.entries(inlineTariffImageSources).map(([code, source]) => (
-          <link
-            key={code}
-            rel="preload"
-            as="image"
-            type="image/webp"
-            href={Asset.fromModule(source).uri}
-            fetchPriority="high"
-          />
-        ))}
         <meta name="theme-color" content="#F6C945" />
         <meta name="color-scheme" content="light dark" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

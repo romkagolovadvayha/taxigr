@@ -76,7 +76,6 @@ export function DriverTripDetailScreen() {
   const routeAddresses = formatMultiStopRouteAddresses(order.pickup, destinations);
   const netMinor = order.priceMinor - order.serviceCommissionMinor;
   const rows = [
-    ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
     ['Расстояние', order.pricingMode === 'driver' ? 'Уточните у пассажира' : `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],
     ['В пути', order.pricingMode === 'driver' ? 'По фактическому маршруту' : formatDuration(Math.max(1, Math.round(order.durationSeconds / 60)))],
     ['Получено от пассажира', ridePriceLabel(order)],

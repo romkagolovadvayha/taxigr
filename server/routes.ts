@@ -271,10 +271,6 @@ const placeInputSchema = z.object({
   sourceCheckedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
 });
 const tariffSchema = z.enum(['economy', 'child']);
-const tariffLabels: Record<TariffCode, string> = {
-  economy: 'Эконом',
-  child: 'Детский',
-};
 const paymentMethodLabels = {
   direct: 'напрямую',
   cash: 'наличные',
@@ -4041,7 +4037,6 @@ export async function registerRoutes(
             result.order.pickup,
             result.order.destinations ?? [result.order.destination],
           )],
-          ['Тариф', tariffLabels[result.order.tariff]],
           ['Время подачи', result.order.scheduledAt ? formatScheduledPickup(result.order.scheduledAt) : null],
           ['Стоимость', ridePriceLabel(result.order)],
           ['Оплата', paymentMethodLabels[result.order.paymentMethod]],

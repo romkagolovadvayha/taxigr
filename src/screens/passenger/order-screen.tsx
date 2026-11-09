@@ -18,7 +18,6 @@ import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
 import { ScheduledPickupControl } from '@/components/passenger/scheduled-pickup-control';
-import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
@@ -42,16 +41,14 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   onInvalidRoute: () => void;
 }) {
   const colors = useThemeColors();
-  const { width, height } = useResponsiveLayout();
+  const { height } = useResponsiveLayout();
   const {
     pickup,
     destinations,
     destination,
-    tariffs,
-    selectedTariff,
+    bookingFare,
     scheduledAt,
     currentRide,
-    setSelectedTariff,
     cancelRide,
     rateRide,
     resetRide,
@@ -60,7 +57,6 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
     busy,
     error,
   } = useRide();
-  const selected = tariffs.find((item) => item.code === selectedTariff)!;
   const routeIsBookable =
     isPickupAddressBookable(pickup) &&
     destinations.length > 0 &&
@@ -73,11 +69,11 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
     if (currentRide) return null;
     return <BookingSubmitButton
       compact={height < 560}
-      priceMinor={selected.priceMinor}
-      etaMinutes={selected.etaMinutes}
+      priceMinor={bookingFare.priceMinor}
+      etaMinutes={bookingFare.etaMinutes}
       label={scheduledAt ? 'Заказать ко времени' : 'Заказать такси'}
       accessibilityLabel={scheduledAt && quoteReady
-        ? `Перейти к подтверждению предзаказа за ${selected.priceMinor / 100} рублей`
+        ? `Перейти к подтверждению предзаказа за ${bookingFare.priceMinor / 100} рублей`
         : undefined}
       loading={quotePending}
       estimateAvailable={quoteReady}
@@ -116,17 +112,6 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
         compact
         hideAddDestination
       />
-      <TariffSelector
-        tariffs={tariffs}
-        selected={selectedTariff}
-        onSelect={setSelectedTariff}
-        compact
-        dense={height < 560}
-        showIllustrations={width >= 360 && height >= 560}
-        scheduled={!!scheduledAt}
-        loading={quotePending}
-        estimateAvailable={quoteReady}
-      />
       <ScheduledPickupControl disabled={busy} />
       {!!error && (
         <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
@@ -156,8 +141,7 @@ export function OrderScreen() {
     destination,
     routeCoordinates,
     routeSummary,
-    tariffs,
-    selectedTariff,
+    bookingFare,
     scheduledAt,
     quoteStatus,
     currentRide,
@@ -177,7 +161,6 @@ export function OrderScreen() {
   const followDriver =
     !driverIsFinishingPreviousRide &&
     (currentRide?.status === 'driver_arriving' || rideInProgress);
-  const selectedPreviewTariff = tariffs.find((tariff) => tariff.code === selectedTariff);
   const clock = useScreenClock(30_000, !currentRide && !!pickup && !!destination && !!routeSummary);
   const arrivalClock = useMemo(() => new Date(clock), [clock]);
 
@@ -202,7 +185,7 @@ export function OrderScreen() {
             ? livePickupEtaMinutes
             : undefined
           : !scheduledAt && pickup && destination && quoteStatus === 'ready' && routeSummary
-            ? selectedPreviewTariff?.etaMinutes
+            ? bookingFare.etaMinutes
             : undefined
       }
       destinationArrivalLabel={
@@ -210,11 +193,10 @@ export function OrderScreen() {
         pickup &&
         destination &&
         quoteStatus === 'ready' &&
-        routeSummary &&
-        selectedPreviewTariff
+        routeSummary
           ? `прибытие в ${formatEstimatedArrivalTime(
               arrivalClock,
-              selectedPreviewTariff.etaMinutes,
+              bookingFare.etaMinutes,
               routeSummary.durationSeconds,
             )}`
           : undefined

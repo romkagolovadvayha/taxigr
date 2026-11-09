@@ -707,7 +707,7 @@ export function AdminAccountDetailScreen({ id, kind }: Props) {
                       ['Допущен', formatDateTime(detail.driver.approvedAt)],
                       ['Автомобиль', detail.driver.vehicle ? `${detail.driver.vehicle.make} ${detail.driver.vehicle.model}, ${detail.driver.vehicle.year}` : undefined],
                       ['Цвет и госномер', detail.driver.vehicle ? `${detail.driver.vehicle.color}, ${detail.driver.vehicle.plate}` : undefined],
-                      ['Детский тариф', detail.driver.hasChildSeat ? 'Доступен' : 'Недоступен'],
+                      ['Детское кресло', detail.driver.hasChildSeat ? 'Есть' : 'Нет'],
                       ['Пропуск в ОЭЗ', detail.driver.hasSezPass ? 'Есть' : 'Нет'],
                       ['Водительское удостоверение', detail.driver.licenseNumber ?? undefined],
                       ['Время на линии', formatDuration(detail.stats.onlineMinutes ?? 0)],

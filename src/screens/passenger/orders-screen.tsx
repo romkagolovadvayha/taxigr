@@ -120,11 +120,11 @@ export function OrdersScreen() {
                     backgroundColor: colors.canvas,
                   }}
                 >
-                  <AppIcon name={order.tariff === 'child' ? 'child-seat' : 'car'} />
+                  <AppIcon name="car" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text selectable style={{ ...typography.bodyStrong, fontSize: 14, color: colors.ink }}>
-                    {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {order.scheduledAt ? formatScheduledPickup(order.scheduledAt) : formatDateTime(order.createdAt)}
+                    {order.scheduledAt ? formatScheduledPickup(order.scheduledAt) : formatDateTime(order.createdAt)}
                   </Text>
                   <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
                     {formatRouteLabel(order.pickup, order.destination)}

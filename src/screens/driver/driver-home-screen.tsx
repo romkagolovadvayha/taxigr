@@ -127,7 +127,9 @@ function DriverOrderCard({
       <View testID="driver-order-offer" style={{ gap: compactTrip ? spacing.x1 : spacing.x2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <StatusChip label="Новый заказ" tone="info" />
-          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.tariff === 'child' ? 'Детский' : 'Эконом'}</Text>
+          {currentRide.tariff === 'child' && (
+            <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Поездка с ребёнком</Text>
+          )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
           <UserAvatar

@@ -199,7 +199,6 @@ export function DriverApplicationScreen() {
         >
           <View style={{ flex: 1 }}>
             <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Есть детское кресло</Text>
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>Сможете брать детский тариф</Text>
           </View>
           <AccessibleSwitch
             value={childSeat}

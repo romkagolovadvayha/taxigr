@@ -30,7 +30,6 @@ type EditableKey =
   | 'intercityPerKilometer07To22Minor'
   | 'intercityPerKilometer22To02Minor'
   | 'intercityPerKilometer02To07Minor'
-  | 'childSurchargeMinor'
   | 'additionalStopGrahovoSurchargeBps'
   | 'waitingFreeMinutes'
   | 'waitingPerMinuteMinor'
@@ -363,12 +362,6 @@ export function AdminSettingsScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: spacing.x4, flexWrap: 'wrap' }}>
           {field(
-            'Надбавка за детский тариф',
-            String(rules.childSurchargeMinor / 100),
-            (value) => changeRubles('childSurchargeMinor', value),
-            '₽',
-          )}
-          {field(
             'Каждая дополнительная точка по Грахово',
             String(rules.additionalStopGrahovoSurchargeBps / 100),
             (value) => changeInteger('additionalStopGrahovoSurchargeBps', value, 100),
@@ -383,10 +376,6 @@ export function AdminSettingsScreen() {
           Если весь маршрут проходит по Грахово, каждая дополнительная точка добавляет{' '}
           {rules.additionalStopGrahovoSurchargeBps / 100}% текущей фиксированной стоимости.
           Для точек в районе и межгороде каждый следующий участок считается по действующему тарифу.
-        </Text>
-        <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
-          Тариф «Детский» отмечает поездку с ребёнком и просьбу вести аккуратно.
-          Получать и принимать такие заказы могут все водители на линии.
         </Text>
       </SurfaceCard>
       <SurfaceCard>

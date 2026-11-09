@@ -148,7 +148,7 @@ function review(draft: BookingDraft): Reply {
       (compound ? `\nУточните место подачи: ${compound[1]}-${compound[2]} — это номер дома или дом ${compound[1]}, квартира ${compound[2]}?` : '') +
       (draft.originalPriceMinor === undefined ? '' : `\n${draft.promotionText ?? renderPromotionMessage({ ...defaultFirstOrderPromotionSettings, discountPercent: draft.discountPercent ?? defaultFirstOrderPromotionSettings.discountPercent })}\n${draft.originalPriceMinor / 100} ₽ → ${draft.priceMinor! / 100} ₽. Цена округлена до ближайших ${discountedFareRoundingMinor / 100} ₽.`) +
       (timing ? `\nВы указали «${timing}». Кнопка ниже начнёт поиск водителя сейчас.` : '') +
-      '\nТариф: Эконом. Оплата наличными водителю.\n\n' +
+      '\nОплата наличными водителю.\n\n' +
       'Нажимая «Вызвать такси», вы принимаете условия и даёте согласие на обработку данных:\n' +
       [legalDocuments.terms, legalDocuments.passengerRules, legalDocuments.privacy, legalDocuments.personalDataConsent]
         .map(document => `https://taxigr.ru${document.path}`).join('\n'),

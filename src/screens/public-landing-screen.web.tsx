@@ -30,14 +30,14 @@ const steps = [
     text: "Выберите адрес или отметьте точку на карте. Место подачи можно определить по геолокации — с вашего разрешения.",
     image: "app-home",
     detail: "Начните с двух адресов",
-    alt: "Экран приложения: поля «Откуда» и «Куда», тарифы «Эконом» и «Детский».",
+    alt: "Экран приложения с полями «Откуда» и «Куда» и выбором времени подачи.",
   },
   {
     title: "Посмотрите стоимость",
-    text: "Маршрут, расчётная цена и время подачи появятся до подтверждения. Выберите тариф и добавьте комментарий водителю.",
+    text: "Маршрут, расчётная цена и время подачи появятся до подтверждения. При оформлении можно добавить комментарий водителю.",
     image: "app-route",
     detail: "Все детали — до заказа",
-    alt: "Экран расчёта поездки по Грахово с маршрутом на карте, тарифами и стоимостью.",
+    alt: "Экран расчёта поездки по Грахово с маршрутом на карте и стоимостью.",
   },
   {
     title: "Встречайте свою машину",
@@ -244,7 +244,6 @@ export function PublicLandingScreen() {
   };
   const { details: operator } = useOperatorDetails();
   const [step, setStep] = useState(1);
-  const [tariff, setTariff] = useState<"economy" | "child">("economy");
   const [paused, setPaused] = useState(false);
   const root = useLandingMotion(paused);
   const selectedStep = steps[step]!;
@@ -260,7 +259,7 @@ export function PublicLandingScreen() {
         </a>
         <nav className="lp-nav" aria-label="Главная навигация">
           <a href="#how">Как это работает</a>
-          <a href="#tariffs">Тарифы</a>
+          <a href="#tariffs">Стоимость</a>
           <a href="#drivers">Водителям</a>
         </nav>
         <div className="lp-header-actions">
@@ -347,7 +346,7 @@ export function PublicLandingScreen() {
               <div
                 className="lp-magnifier"
                 role="img"
-                aria-label="Увеличенный фрагмент: тарифы и расчётная стоимость до подтверждения заказа"
+                aria-label="Увеличенный фрагмент с расчётной стоимостью до подтверждения заказа"
               >
                 <div className="lp-magnifier-image" />
               </div>
@@ -460,67 +459,35 @@ export function PublicLandingScreen() {
             <div>
               <p className="lp-eyebrow">ПОД ВАШИ ПЛАНЫ</p>
               <h2 id="tariffs-heading">
-                Одному. Вместе.
+                Стоимость поездки
                 <br />
-                <span>С самым важным.</span>
+                <span>видна заранее.</span>
               </h2>
             </div>
             <p>
-              Два понятных тарифа.
-              <br />
-              Выберите свой перед заказом.
+              Укажите адреса, чтобы увидеть расчёт.
             </p>
           </div>
           <div className="lp-tariff-grid">
             <div className="lp-tariff-showcase">
-              <div
-                className="lp-tariff-switch"
-                role="group"
-                aria-label="Посмотреть тариф"
-              >
-                <button
-                  aria-pressed={tariff === "economy"}
-                  onClick={() => setTariff("economy")}
-                >
-                  Эконом
-                </button>
-                <button
-                  aria-pressed={tariff === "child"}
-                  onClick={() => setTariff("child")}
-                >
-                  Детский
-                </button>
-              </div>
-              <div className="lp-tariff-art" key={tariff}>
+              <div className="lp-tariff-art">
                 <span className="lp-tariff-backdrop" aria-hidden="true">
-                  {tariff === "economy" ? "ПО ДЕЛАМ" : "С ЗАБОТОЙ"}
+                  ПО ДЕЛАМ
                 </span>
                 <img
                   src="/landing/economy-car.webp"
-                  alt={
-                    tariff === "economy"
-                      ? "Иллюстрация автомобиля тарифа «Эконом»"
-                      : "Автомобиль для поездки с ребёнком"
-                  }
+                  alt="Жёлтый автомобиль такси"
                   width="600"
                   height="400"
                   loading="lazy"
                 />
               </div>
-              <div className="lp-tariff-copy" aria-live="polite">
-                <h3>
-                  {tariff === "economy"
-                    ? "На каждый день"
-                    : "Для маленьких пассажиров"}
-                </h3>
-                <p>
-                  {tariff === "economy"
-                    ? "За покупками, на работу, к друзьям. Привычные поездки — с понятным заказом."
-                    : "Поездка с ребёнком. Выберите «Детский», чтобы водитель заранее видел пометку и просьбу вести аккуратно."}
-                </p>
+              <div className="lp-tariff-copy">
+                <h3>На каждый день</h3>
+                <p>За покупками, на работу или к друзьям.</p>
               </div>
               <Link href="/sign-in" onPress={requestBooking} className="lp-tariff-link">
-                Выбрать в приложении <Arrow diagonal />
+                Заказать в приложении <Arrow diagonal />
               </Link>
             </div>
             <div className="lp-clarity-card">
@@ -665,8 +632,8 @@ export function PublicLandingScreen() {
                 Можно поехать с ребёнком?<span>+</span>
               </summary>
               <p>
-                Да. Выберите тариф «Детский» — водитель увидит, что поездка с ребёнком,
-                и просьбу вести аккуратно.
+                Сообщите водителю в комментарии к заказу, что едете с ребёнком,
+                и уточните, какое кресло нужно.
               </p>
             </details>
             <details>

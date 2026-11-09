@@ -32,11 +32,6 @@ import { formatScheduledPickup } from '@/domain/scheduled-ride';
 
 type Props = { id: string };
 
-const tariffLabels: Record<RideOrder['tariff'], string> = {
-  economy: 'Эконом',
-  child: 'Детский',
-};
-
 const paymentLabels: Record<RideOrder['paymentMethod'], string> = {
   cash: 'Наличные',
   transfer: 'Перевод водителю',
@@ -151,7 +146,6 @@ export function AdminOrderDetailScreen({ id }: Props) {
   }
 
   const rows: [string, string][] = [
-    ['Тариф', tariffLabels[order.tariff]],
     ['Зона расчёта', pricingScopeLabel[order.pricingScope ?? 'intercity']],
     ['Оплата', paymentLabels[order.paymentMethod]],
     ['Расстояние', order.pricingMode === 'driver' ? 'Уточняет водитель' : `${(order.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км`],

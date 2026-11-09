@@ -108,8 +108,11 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
           <Text selectable numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.ink }}>Откуда: {route?.pickup}</Text>
           <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>Куда: {route?.destinations.join(' → ')}</Text>
           <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {selected.tariff === 'child' ? 'Детский' : 'Эконом'} · {ridePriceLabel(selected)}{selected.comment ? ` · ${selected.comment}` : ''}
+            {ridePriceLabel(selected)}{selected.comment ? ` · ${selected.comment}` : ''}
           </Text>
+          {selected.tariff === 'child' && (
+            <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Поездка с ребёнком</Text>
+          )}
         </>}
         {!!error && <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>{error}</Text>}
         {available ? <AppButton compact loading={pending} onPress={() => void run('accept')}>Подтвердить предзаказ</AppButton> : releasing ? <>
