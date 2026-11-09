@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
@@ -41,6 +41,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   onInvalidRoute: () => void;
 }) {
   const colors = useThemeColors();
+  const { width, height } = useResponsiveLayout();
   const {
     pickup,
     destinations,
@@ -70,6 +71,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   if (section === 'action') {
     if (currentRide) return null;
     return <BookingSubmitButton
+      compact={height < 560}
       priceMinor={selected.priceMinor}
       etaMinutes={selected.etaMinutes}
       loading={quotePending}
@@ -100,7 +102,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
   }
 
   return (
-    <View style={{ gap: spacing.x3 }}>
+    <View style={{ gap: spacing.x2 }}>
       <AddressFields
         pickup={pickup}
         destinations={destinations}
@@ -114,12 +116,14 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
           selected={selectedTariff}
           onSelect={setSelectedTariff}
           compact
+          dense={height < 560}
+          showIllustrations={width >= 360 && height >= 560}
           scheduled={!!scheduledAt}
           loading={quotePending}
           estimateAvailable={quoteReady}
         />
       {!!error && (
-        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
         </Text>
       )}
@@ -133,10 +137,8 @@ export function OrderScreen() {
   const { isPhone, isDesktop } = useResponsiveLayout();
   const { vibrationEnabled } = useFeedbackPreferences();
   const [validationAttempt, setValidationAttempt] = useState(0);
-  const bookingScrollRef = useRef<ScrollView>(null);
   const handleInvalidRoute = () => {
     setValidationAttempt((attempt) => attempt + 1);
-    bookingScrollRef.current?.scrollTo({ y: 0, animated: false });
     if (vibrationEnabled) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
     }
@@ -257,26 +259,24 @@ export function OrderScreen() {
         </View>
       </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row-reverse' }}>
-        <View testID="passenger-map-region" style={{ flex: 1, minHeight: isPhone ? 80 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
+        <View testID="passenger-map-region" style={{ flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
           {map}
           {!currentRide && <View style={{ position: 'absolute', bottom: 24, right: 16 }}>
             <IconButton icon="recenter" label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
               disabled={locationLoading} size={44} onPress={() => void selectCurrentLocation()} />
           </View>}
         </View>
-        <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1, flexBasis: isPhone ? 'auto' : 0,
-          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, maxHeight: isPhone ? '78%' : undefined, backgroundColor: colors.surface }}
+        <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 0, flexBasis: isPhone ? 'auto' : 0,
+          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, backgroundColor: colors.surface }}
         >
-        <ScrollView ref={bookingScrollRef} style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
-          contentContainerStyle={{ padding: spacing.x3, paddingBottom: currentRide ? spacing.x3 : spacing.x2 }}
-          keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{ padding: spacing.x3, paddingBottom: currentRide ? spacing.x3 : spacing.x2 }}>
           {!currentRide && !!locationError && (
-            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.warningText, marginBottom: spacing.x2 }}>
+            <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.warningText, marginBottom: spacing.x2 }}>
               {locationError}
             </Text>
           )}
           <BookingPanel pickupEtaMinutes={livePickupEtaMinutes} validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} />
-        </ScrollView>
+        </View>
         {!currentRide && <View style={{ padding: spacing.x4, paddingTop: spacing.x2, backgroundColor: colors.surface }}><BookingPanel section="action" validationAttempt={validationAttempt} onInvalidRoute={handleInvalidRoute} /></View>}
         </View>
       </View>

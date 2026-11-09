@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import { ApiError, apiRequest } from '@/api/client';
 import { resolveStreetCenter } from '@/api/street-center';
@@ -643,13 +643,12 @@ export function AddressSearchScreen() {
             Укажите точку дома
           </Text>
         </View>
-        <ScrollView style={{ flexGrow: 0, maxHeight: '25%' }} contentContainerStyle={{ gap: spacing.x2 }}>
-          <Text style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
-          <Text style={{ ...typography.body, color: colors.inkSecondary }}>
-            Двигайте и приближайте карту, затем нажмите на дом или удобный подъезд к нему.
-            {!pendingAddress.placeId && ` После подтверждения запомним этот адрес${demoSession ? ' на этом устройстве' : ''}.`}
+        <View style={{ gap: spacing.x1 }}>
+          <Text selectable numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.ink }}>{pendingAddress.label}</Text>
+          <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+            {resolvingHouse ? 'Уточняем адрес. Точку уже можно выбрать.' : 'Нажмите на дом или подъезд на карте.'}
           </Text>
-        </ScrollView>
+        </View>
         <View style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: radius.lg }}>
           {pendingCenter ? <TaxiMap
             selectionCenter={pendingCenter}
@@ -666,12 +665,8 @@ export function AddressSearchScreen() {
             <Text style={{ ...typography.body, color: colors.inkSecondary }}>Находим улицу на карте…</Text>
           </View>}
         </View>
-        {resolvingHouse && <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
-          Уточняем дом. Точку на карте уже можно выбрать.
-        </Text>}
-        {pointMapError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{pointMapError}</Text>}
-        {savePointError && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{savePointError}</Text>}
-        <AppButton disabled={!selectedPoint || Boolean(pointMapError)} loading={savingPoint} onPress={() => { void saveSelectedPoint(); }}>
+        {!!(pointMapError || savePointError) && <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>{pointMapError ?? savePointError}</Text>}
+        <AppButton compact disabled={!selectedPoint || Boolean(pointMapError)} loading={savingPoint} onPress={() => { void saveSelectedPoint(); }}>
           {savingPoint ? 'Сохраняем адрес…' : usingSavedPoint ? 'Подтвердить сохранённую точку'
             : pendingAddress.placeId ? 'Подтвердить точку' : 'Подтвердить и запомнить'}
         </AppButton>
@@ -682,40 +677,18 @@ export function AddressSearchScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
-    <Screen scroll={false} contentStyle={{ maxWidth: 760, paddingVertical: 0 }}>
-      <FlatList
-        style={{ flex: 1 }}
-        data={showPersonalSuggestions ? [] : results}
-        keyExtractor={addressKey}
-        keyboardShouldPersistTaps="handled"
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={5}
-        removeClippedSubviews={false}
-        contentContainerStyle={{ paddingVertical: spacing.x5, gap: spacing.x2 }}
-        renderItem={({ item: address }) => <AddressResult
-          address={address}
-          directSelectionAllowed={field === 'destination' && address.kind === 'settlement'}
-          history={historyByKey.get(addressKey(address))}
-          now={now}
-          onPress={() => selectAddress(address)}
-          onRefinePoint={isDirectoryHouseEstimate(address) ? () => openPointEditor(address) : undefined}
-        />}
-        ListHeaderComponent={<View style={{ gap: spacing.x5, marginBottom: spacing.x3 }}>
+    <Screen scroll={false} contentStyle={{ maxWidth: 760, paddingVertical: spacing.x2, gap: spacing.x2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="back" label="Назад" onPress={() => goBackOrReplace('/')} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
             {field === 'pickup' ? 'Место подачи' : 'Куда поедем?'}
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            Ищем по Граховскому району и всей России
           </Text>
         </View>
       </View>
       <View
         style={{
-          minHeight: 58,
+          minHeight: 48,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.x3,
@@ -755,7 +728,7 @@ export function AddressSearchScreen() {
             ...typography.body,
             color: colors.ink,
             flex: 1,
-            minHeight: 56,
+            minHeight: 46,
             outlineColor: colors.transparent,
             outlineWidth: 0,
           }}
@@ -783,7 +756,26 @@ export function AddressSearchScreen() {
             <AppIcon name="search" color={canSearchRemote ? colors.brandInk : colors.inkMuted} />
           </AnimatedPressable>
       </View>
-      {field === 'pickup' && (
+      <FlatList
+        style={{ flex: 1 }}
+        data={showPersonalSuggestions ? [] : results}
+        keyExtractor={addressKey}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={false}
+        contentContainerStyle={{ gap: spacing.x2 }}
+        renderItem={({ item: address }) => <AddressResult
+          address={address}
+          directSelectionAllowed={field === 'destination' && address.kind === 'settlement'}
+          history={historyByKey.get(addressKey(address))}
+          now={now}
+          onPress={() => selectAddress(address)}
+          onRefinePoint={isDirectoryHouseEstimate(address) ? () => openPointEditor(address) : undefined}
+        />}
+        ListHeaderComponent={<View style={{ gap: spacing.x2 }}>
+      {field === 'pickup' && !query.trim() && (
         <AnimatedPressable
           feedback="subtle"
           accessibilityRole="button"

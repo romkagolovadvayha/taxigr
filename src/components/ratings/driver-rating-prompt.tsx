@@ -1,5 +1,5 @@
 import { ridePriceLabel } from '@/domain/ride-price';
-import { ScrollView, Text } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { RideRatingCard } from '@/components/ratings/ride-rating-card';
 import { AppModal } from '@/components/ui/app-modal';
@@ -29,7 +29,7 @@ export function DriverRatingPrompt() {
       description={`Получено ${ridePriceLabel(ride)} · ${payment}`}
       onClose={dismissDriverRating}
     >
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.x3 }}>
+      <View style={{ gap: spacing.x2 }}>
         <RideRatingCard
           key={ride.id}
           participantRole="passenger"
@@ -42,11 +42,11 @@ export function DriverRatingPrompt() {
           onContinue={dismissDriverRating}
         />
         {!!driverRatingError && (
-          <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.danger }}>
+          <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
             {driverRatingError}
           </Text>
         )}
-      </ScrollView>
+      </View>
     </AppModal>
   );
 }

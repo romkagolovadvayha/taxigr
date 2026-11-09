@@ -17,6 +17,7 @@ type Props = {
   loadingLabel?: string;
   accessibilityLabel?: string;
   checkAvailability?: boolean;
+  compact?: boolean;
   onPress: () => void;
 };
 
@@ -31,6 +32,7 @@ export function BookingSubmitButton({
   loadingLabel = 'Рассчитываем…',
   accessibilityLabel,
   checkAvailability = true,
+  compact = false,
   onPress,
 }: Props) {
   const colors = useThemeColors();
@@ -66,11 +68,11 @@ export function BookingSubmitButton({
         void checkBooking().then((allowed) => { if (allowed) onPress(); });
       }}
       style={({ pressed }) => ({
-        minHeight: 56,
+        minHeight: compact ? 48 : 56,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: spacing.x4,
-        paddingVertical: spacing.x3,
+        paddingVertical: compact ? spacing.x2 : spacing.x3,
         borderRadius: radius.md,
         borderCurve: 'continuous',
         backgroundColor: colors.brand,

@@ -18,6 +18,7 @@ type Props = {
   selected: TariffCode;
   onSelect: (tariff: TariffCode) => void;
   compact?: boolean;
+  dense?: boolean;
   showIllustrations?: boolean;
   loading?: boolean;
   estimateAvailable: boolean;
@@ -25,10 +26,10 @@ type Props = {
 
 const timing = { duration: motion.duration.standard, easing: Easing.bezier(...motion.easing.out), reduceMotion: ReduceMotion.System };
 
-function TariffOption({ tariff, active, onSelect, compact, showIllustrations, loading, estimateAvailable, scheduled }: {
+function TariffOption({ tariff, active, onSelect, compact, dense, showIllustrations, loading, estimateAvailable, scheduled }: {
   tariff: Tariff;
   active: boolean;
-} & Pick<Props, 'onSelect' | 'compact' | 'showIllustrations' | 'loading' | 'estimateAvailable' | 'scheduled'>) {
+} & Pick<Props, 'onSelect' | 'compact' | 'dense' | 'showIllustrations' | 'loading' | 'estimateAvailable' | 'scheduled'>) {
   const colors = useThemeColors();
   const inline = compact && showIllustrations;
   const promotionText = getTariffPromotionText(tariff);
@@ -42,11 +43,11 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
       accessibilityLabel={loading
         ? `${tariff.title}, рассчитываем стоимость и время подачи`
         : estimateAvailable
-          ? `${tariff.title}, ${scheduled ? 'ко времени' : `${tariff.etaMinutes} минут`}, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`
+          ? `${tariff.title}, ${scheduled ? 'ко времени' : `${tariff.etaMinutes} минут`}, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', поездка с ребёнком' : ''}${promotionText ? `, ${promotionText}` : ''}`
           : `${tariff.title}${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`}
       onPress={() => onSelect(tariff.code)}
       style={{ flex: 1, minWidth: 0, flexDirection: inline ? 'row' : 'column', alignItems: 'center', justifyContent: 'center', padding: spacing.x2,
-        minHeight: inline || !showIllustrations ? 64 : undefined, borderRadius: radius.md, gap: inline ? 6 : 2 }}>
+        minHeight: dense ? 56 : inline || !showIllustrations ? 64 : undefined, borderRadius: radius.md, gap: inline ? 6 : 2 }}>
       {active && !inline && <View pointerEvents="none" style={{ position: 'absolute', right: 8, top: 8, width: 17, height: 17,
         borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand }}>
         <AppIcon name="check" size={12} color={colors.brandInk} />
@@ -58,19 +59,20 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
           <AppIcon name="check" size={10} color={colors.brandInk} />
         </View>}
       </View>}
-      <View style={{ flex: inline ? 1 : undefined, minWidth: 0, alignItems: inline ? 'flex-start' : 'center', gap: 2 }}>
+      <View style={{ flex: inline ? 1 : undefined, width: inline ? undefined : '100%', minWidth: 0, alignItems: inline ? 'flex-start' : 'center', gap: 2 }}>
         <Text selectable style={{ ...typography.bodyStrong, fontSize: compact ? 14 : 16, lineHeight: 20, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>
           {tariff.title}
         </Text>
         {loading ? <SkeletonBlock width={inline ? '100%' : 84} height={17} /> : (
-          <Text selectable style={{ ...typography.caption, fontSize: compact ? 12 : 13, lineHeight: 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
+          <Text selectable numberOfLines={dense ? 1 : undefined} style={{ ...typography.caption, maxWidth: '100%', fontSize: compact ? 12 : 13, lineHeight: 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
             {tariff.code === 'child'
-              ? estimateAvailable && !scheduled ? `С ребёнком · ~ ${tariff.etaMinutes} мин` : 'С ребёнком'
+              ? estimateAvailable && !scheduled && !dense ? `С ребёнком · ~ ${tariff.etaMinutes} мин` : 'С ребёнком'
               : estimateAvailable && !scheduled ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}
         {!loading && estimateAvailable && !!promotionText && (
-          <Text selectable testID={`tariff-promotion-${tariff.code}`} style={{ ...typography.caption, color: colors.ink, textAlign: inline ? 'left' : 'center' }}>{promotionText}</Text>
+          <Text selectable testID={`tariff-promotion-${tariff.code}`} numberOfLines={dense ? 1 : compact ? 2 : undefined}
+            style={{ ...typography.caption, maxWidth: '100%', color: colors.ink, textAlign: inline ? 'left' : 'center' }}>{promotionText}</Text>
         )}
         {!compact && !loading && estimateAvailable && tariff.originalPriceMinor !== undefined && (
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary, textDecorationLine: 'line-through' }}>{tariff.originalPriceMinor / 100} ₽</Text>
@@ -81,7 +83,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
   );
 }
 
-export function TariffSelector({ tariffs, selected, onSelect, compact = false, showIllustrations = true, loading = false, estimateAvailable, scheduled }: Props) {
+export function TariffSelector({ tariffs, selected, onSelect, compact = false, dense = false, showIllustrations = true, loading = false, estimateAvailable, scheduled }: Props) {
   const colors = useThemeColors();
   const [width, setWidth] = useState(0);
   const index = Math.max(0, tariffs.findIndex((tariff) => tariff.code === selected));
@@ -99,7 +101,7 @@ export function TariffSelector({ tariffs, selected, onSelect, compact = false, s
         indicatorStyle,
       ]} />}
       {tariffs.map((tariff) => <TariffOption key={tariff.code} tariff={tariff} active={tariff.code === selected}
-        onSelect={onSelect} compact={compact} showIllustrations={showIllustrations} loading={loading} estimateAvailable={estimateAvailable} scheduled={scheduled} />)}
+        onSelect={onSelect} compact={compact} dense={dense} showIllustrations={showIllustrations} loading={loading} estimateAvailable={estimateAvailable} scheduled={scheduled} />)}
     </View>
   );
 }

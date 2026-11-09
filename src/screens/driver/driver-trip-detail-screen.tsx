@@ -161,6 +161,11 @@ export function DriverTripDetailScreen() {
 
       <WaitingBreakdown ride={order} />
 
+      {!!order.comment && <View style={{ gap: spacing.x2, padding: spacing.x4, borderRadius: radius.lg, backgroundColor: colors.surface }}>
+        <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Комментарий</Text>
+        <Text selectable style={{ ...typography.body, color: colors.ink }}>{order.comment}</Text>
+      </View>}
+
       <View
         style={{
           borderRadius: radius.card,

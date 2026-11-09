@@ -60,19 +60,19 @@ export function RideRatingCard({
   return (
     <View
       style={{
-        gap: spacing.x3,
-        paddingTop: spacing.x4,
+        gap: spacing.x2,
+        paddingTop: spacing.x2,
         borderTopWidth: 1,
         borderColor: colors.border,
         alignItems: 'center',
       }}
     >
-      <View style={{ alignItems: 'center', gap: spacing.x2 }}>
+      <View style={{ width: '100%', alignItems: 'center', gap: spacing.x1 }}>
         <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
           {participantRole === 'driver' ? 'Оцените водителя' : 'Оцените пассажира'}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-          <Text selectable style={{ ...typography.caption, color: colors.ink }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x2, width: '100%' }}>
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, flexShrink: 1, color: colors.ink }}>
             {participantName}
           </Text>
           <RatingBadge
@@ -82,16 +82,20 @@ export function RideRatingCard({
           />
         </View>
       </View>
-      <StarRating value={score} onChange={setScore} disabled={loading} />
-      <View style={{ width: '100%', gap: spacing.x1 }}>
+      <StarRating value={score} onChange={setScore} disabled={loading} size={26} />
+      <View style={{ width: '100%', flexDirection: 'row', gap: spacing.x1 }}>
         <AppButton
+          compact
+          fullWidth={false}
+          style={{ flex: 1.5, minWidth: 0 }}
           disabled={score === 0}
           loading={loading}
+          accessibilityLabel="Отправить оценку"
           onPress={() => void onSubmit(score)}
         >
-          Отправить оценку
+          Оценить
         </AppButton>
-        <AppButton variant="quiet" disabled={loading} onPress={onContinue}>
+        <AppButton compact fullWidth={false} style={{ flex: 1, minWidth: 0 }} variant="quiet" disabled={loading} onPress={onContinue}>
           Не сейчас
         </AppButton>
       </View>

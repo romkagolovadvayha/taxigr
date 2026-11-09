@@ -46,6 +46,11 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
     setReleasing(false);
     setError(null);
   };
+  const back = () => {
+    if (releasing) setReleasing(false);
+    else setSelected(null);
+    setError(null);
+  };
   const run = async (action: 'accept' | 'transition' | 'release') => {
     if (!token || !selected || !scheduledAt || inFlight.current) return;
     inFlight.current = true;
@@ -78,7 +83,8 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
       onPress={() => { setVisible(true); void refresh(); }}>
       Предзаказы
     </AppButton>
-    <AppModal visible={visible} title={releasing ? 'Отказаться от предзаказа?' : selected ? available ? 'Подтвердите предзаказ' : 'Предзаказ принят' : 'Предзаказы'} onClose={close}>
+    <AppModal compact={height < 600} visible={visible}
+      title={releasing ? 'Отказаться от предзаказа?' : selected ? available ? 'Подтвердите предзаказ' : 'Предзаказ принят' : 'Предзаказы'} onClose={close}>
       {!selected ? <FlatList
         data={driverPreorders}
         keyExtractor={item => item.id}
@@ -95,22 +101,21 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
           </AppButton>
         </View>}
       /> : <View style={{ gap: spacing.x2 }}>
-        <Text selectable style={{ ...typography.caption, textAlign: 'center', color: colors.inkSecondary }}>Время подачи</Text>
         <Text selectable testID="driver-preorder-confirm-time" style={{ ...typography.sectionTitle, color: colors.danger, textAlign: 'center' }}>
           {formatScheduledPickup(scheduledAt!)}
         </Text>
         {!releasing && <>
           <Text selectable numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.ink }}>Откуда: {route?.pickup}</Text>
-          <Text selectable numberOfLines={3} style={{ ...typography.caption, color: colors.inkSecondary }}>Куда: {route?.destinations.join(' → ')}</Text>
-          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
+          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>Куда: {route?.destinations.join(' → ')}</Text>
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
             {selected.tariff === 'child' ? 'Детский' : 'Эконом'} · {ridePriceLabel(selected)}{selected.comment ? ` · ${selected.comment}` : ''}
           </Text>
         </>}
-        {!!error && <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>{error}</Text>}
+        {!!error && <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>{error}</Text>}
         {available ? <AppButton compact loading={pending} onPress={() => void run('accept')}>Подтвердить предзаказ</AppButton> : releasing ? <>
           <TextInput value={reason} onChangeText={setReason} maxLength={500} multiline accessibilityLabel="Причина отказа"
             placeholder="Укажите причину отказа" placeholderTextColor={colors.inkMuted}
-            style={{ ...typography.body, color: colors.ink, minHeight: 56, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.x2 }} />
+            style={{ ...typography.body, color: colors.ink, minHeight: 56, maxHeight: 92, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.x2 }} />
           <AppButton compact variant="danger" loading={pending} disabled={reason.trim().length < 3} onPress={() => void run('release')}>Отказаться от предзаказа</AppButton>
         </> : <>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
@@ -119,12 +124,16 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
           </View>
           {!!departureHint && <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>{departureHint}</Text>}
           <AppButton compact loading={pending} disabled={!!departureHint} onPress={() => void run('transition')}>Выехать к пассажиру</AppButton>
-          <AppButton compact variant="quiet" disabled={pending} onPress={() => { setReason(''); setReleasing(true); }}>Отказаться</AppButton>
+          <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+            <AppButton compact fullWidth={false} style={{ flex: 1 }} variant="quiet" disabled={pending} onPress={back}
+              accessibilityLabel="К списку предзаказов">К списку</AppButton>
+            <AppButton compact fullWidth={false} style={{ flex: 1 }} variant="quiet" disabled={pending}
+              onPress={() => { setReason(''); setReleasing(true); }}>Отказаться</AppButton>
+          </View>
         </>}
-        <AppButton compact variant="quiet" disabled={pending} onPress={() => {
-          if (releasing) setReleasing(false); else setSelected(null);
-          setError(null);
-        }}>{releasing ? 'Остаться на заказе' : 'К списку предзаказов'}</AppButton>
+        {(available || releasing) && <AppButton compact variant="quiet" disabled={pending} onPress={back}>
+          {releasing ? 'Остаться на заказе' : 'К списку предзаказов'}
+        </AppButton>}
       </View>}
     </AppModal>
   </>;

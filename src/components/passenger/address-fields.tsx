@@ -104,6 +104,7 @@ function AddressRow({
   const routeDestinations = destinations ?? [];
   const multipleDestinations =
     kind === 'destination' && routeDestinations.length > 1;
+  const expandedDestinations = multipleDestinations && !compact;
   const needsAddressDetails = kind === 'destination' && destinations?.length
     ? destinations.some((item) => !isDestinationAddressBookable(item))
     : !!address && (
@@ -158,16 +159,16 @@ function AddressRow({
           });
         }}
         style={({ pressed }) => ({
-          minHeight: compact ? 56 : 64,
+          minHeight: compact ? 50 : 64,
           flexDirection: 'row',
-          alignItems: multipleDestinations ? 'flex-start' : 'center',
+          alignItems: expandedDestinations ? 'flex-start' : 'center',
           gap: spacing.x3,
-          paddingVertical: multipleDestinations ? spacing.x3 : 0,
+          paddingVertical: expandedDestinations ? spacing.x3 : 0,
           paddingRight: compactLocationAction || addDestinationAction ? 56 : 0,
           opacity: pressed ? 0.68 : 1,
         })}
       >
-        {!multipleDestinations && (
+        {!expandedDestinations && (
           <View
             style={{
               width: 10,
@@ -186,7 +187,7 @@ function AddressRow({
               ? `Маршрут · ${formatRoutePointCount(routeDestinations.length)}`
               : label}
           </Text>
-          {multipleDestinations ? (
+          {expandedDestinations ? (
             <View style={{ gap: spacing.x2, marginTop: spacing.x2 }}>
               {routeDestinations.map((item, index) => {
                 const final = index === routeDestinations.length - 1;

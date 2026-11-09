@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddressFields } from '@/components/passenger/address-fields';
@@ -29,7 +29,9 @@ import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrderConfirmationScreen() {
   const colors = useThemeColors();
-  const { width } = useResponsiveLayout();
+  const { width, height } = useResponsiveLayout();
+  const dense = height < 560;
+  const gap = dense ? spacing.x1 : spacing.x2;
   const insets = useSafeAreaInsets();
   const {
     pickup,
@@ -70,16 +72,9 @@ export function OrderConfirmationScreen() {
     !!selected &&
     routeReady &&
     !busy;
-  const routeGuidance =
-    !pickup || !destination
-      ? null
-      : !addressesAreBookable
-        ? 'Для места подачи укажите номер дома. Назначением может быть точный адрес или населённый пункт.'
-        : quotePending
-          ? 'Рассчитываем маршрут, стоимость и время подачи…'
-          : quoteStatus === 'error'
-            ? 'Не удалось рассчитать маршрут. Проверьте адреса и попробуйте ещё раз.'
-            : null;
+  const routeGuidance = error ?? (pickup && destination && !addressesAreBookable
+    ? 'Уточните место подачи или назначения.'
+    : quoteStatus === 'error' ? 'Не удалось рассчитать маршрут. Попробуйте ещё раз.' : locationError);
 
   const confirm = async () => {
     if (!canSubmit) return;
@@ -107,7 +102,7 @@ export function OrderConfirmationScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
     >
-      <Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, paddingHorizontal: spacing.x4, paddingVertical: spacing.x2, gap: spacing.x2 }}>
+      <Screen scroll={false} style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, paddingHorizontal: spacing.x4, paddingVertical: gap, gap }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <IconButton icon="back" size={44} label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
           <View style={{ flex: 1 }}>
@@ -131,11 +126,6 @@ export function OrderConfirmationScreen() {
             onUseLocation={() => void selectCurrentLocation()}
             locationLoading={locationLoading}
           />
-          {!!locationError && (
-            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.warningText }}>
-              {locationError}
-            </Text>
-          )}
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
@@ -182,7 +172,7 @@ export function OrderConfirmationScreen() {
               backgroundColor: colors.warningSoft,
             }}
           >
-            <Text selectable style={{ ...typography.caption, color: colors.warningText, flex: 1 }}>
+            <Text selectable numberOfLines={dense ? 1 : 2} style={{ ...typography.caption, color: error ? colors.danger : colors.warningText, flex: 1 }}>
               {routeGuidance}
             </Text>
           </View>
@@ -190,37 +180,33 @@ export function OrderConfirmationScreen() {
 
         {selected && (
           <>
-            <View style={{ gap: spacing.x2 }}>
+            <View style={{ gap }}>
               <TariffSelector
                 tariffs={tariffs}
                 selected={selectedTariff}
                 onSelect={setSelectedTariff}
                 compact
-                showIllustrations={width >= 360}
+                dense={dense}
+                showIllustrations={width >= 360 && height >= 600}
                 scheduled={!!scheduledAt}
                 loading={quotePending}
                 estimateAvailable={routeReady}
               />
               {!quotePending && routeReady && !!promotionText && (
-                <Text selectable testID="order-promotion-message" numberOfLines={2}
+                <Text selectable testID="order-promotion-message" numberOfLines={dense ? 1 : 2}
                   onPress={() => setPromotionVisible(true)} style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
               )}
               <ScheduledPickupControl disabled={busy} />
             </View>
 
-            {!!error && (
-              <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
-                {error}
-              </Text>
-            )}
-
           </>
         )}
       </Screen>
       {selected && <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: spacing.x4,
-        paddingTop: spacing.x2, paddingBottom: Math.max(spacing.x4, insets.bottom), backgroundColor: colors.surface }}>
+        paddingTop: gap, paddingBottom: Math.max(dense ? spacing.x2 : spacing.x4, insets.bottom), backgroundColor: colors.surface }}>
           <BookingSubmitButton
               checkAvailability={false}
+              compact={dense}
               priceMinor={selected.priceMinor}
               etaMinutes={selected.etaMinutes}
               label={scheduledAt ? 'Заказать ко времени' : 'Заказать сейчас'}
@@ -252,20 +238,21 @@ export function OrderConfirmationScreen() {
       <AppModal visible={commentVisible} title="Комментарий водителю" onClose={() => setCommentVisible(false)}>
         <TextInput value={commentDraft} onChangeText={setCommentDraft} maxLength={500} multiline
           accessibilityLabel="Комментарий водителю" placeholder="Например: вход со стороны магазина"
-          placeholderTextColor={colors.inkMuted} style={{ ...typography.body, color: colors.ink, minHeight: 88,
+          placeholderTextColor={colors.inkMuted} style={{ ...typography.body, color: colors.ink, height: 88,
             textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.x3 }} />
         <AppButton compact onPress={() => { setComment(commentDraft); setCommentVisible(false); }}>Сохранить комментарий</AppButton>
       </AppModal>
       <AppModal visible={promotionVisible} title="Скидка на первый заказ" onClose={() => setPromotionVisible(false)}>
-        <Text selectable style={{ ...typography.body, color: colors.ink }}>{promotionText}</Text>
+        <ScrollView style={{ flexGrow: 0, maxHeight: height * 0.55 }}>
+          <Text selectable style={{ ...typography.body, color: colors.ink }}>{promotionText}</Text>
+        </ScrollView>
       </AppModal>
       <AppModal
         visible={consentVisible}
         title="Перед первым заказом"
-        description="Подтвердите условия сервиса и согласие на обработку данных. Повторно спрашивать не будем, пока документы не изменятся."
         onClose={() => setConsentVisible(false)}
       >
-        <View style={{ gap: spacing.x3 }}>
+        <View style={{ gap: spacing.x2 }}>
           <ConsentCheckbox
             checked={legalAccepted}
             onChange={setLegalAccepted}
@@ -279,20 +266,16 @@ export function OrderConfirmationScreen() {
             ]}
           />
           {!!error && (
-            <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.danger }}>
+            <Text accessibilityRole="alert" numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
               {error}
             </Text>
           )}
-          <AppButton
-            disabled={!legalAccepted || !canSubmit}
-            loading={busy}
-            onPress={() => void acceptAndConfirm()}
-          >
-            Согласен и заказать
-          </AppButton>
-          <AppButton variant="quiet" onPress={() => setConsentVisible(false)}>
-            Отмена
-          </AppButton>
+          <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+            <AppButton compact fullWidth={false} variant="quiet" style={{ flex: 1 }} disabled={busy}
+              onPress={() => setConsentVisible(false)}>Отмена</AppButton>
+            <AppButton compact fullWidth={false} style={{ flex: 2 }} disabled={!legalAccepted || !canSubmit} loading={busy}
+              accessibilityLabel="Согласен и заказать" onPress={() => void acceptAndConfirm()}>Заказать</AppButton>
+          </View>
         </View>
       </AppModal>
     </KeyboardAvoidingView>

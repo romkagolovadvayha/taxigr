@@ -17,6 +17,7 @@ import { useThemeColors } from '@/theme/theme-provider';
 
 type Props = {
   visible: boolean;
+  compact?: boolean;
   title: string;
   description?: string;
   children: ReactNode;
@@ -29,6 +30,7 @@ type FocusableWebNode = HTMLElement & { focus: () => void };
 
 export function AppModal({
   visible,
+  compact = false,
   title,
   description,
   children,
@@ -151,8 +153,8 @@ export function AppModal({
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.borderStrong,
-            padding: spacing.x5,
-            gap: spacing.x4,
+            padding: compact ? spacing.x3 : spacing.x5,
+            gap: compact ? spacing.x2 : spacing.x4,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.x3 }}>

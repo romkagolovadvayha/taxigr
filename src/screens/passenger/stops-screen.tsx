@@ -17,14 +17,15 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import type { Address } from '@/domain/models';
-import { routeDestinationTitle } from '@/domain/route-label';
+import { formatMultiStopRouteAddresses, routeDestinationTitle } from '@/domain/route-label';
 import { goBackOrReplace } from '@/navigation/back';
 import { useRide } from '@/state/ride-provider';
-import { layout, opacity, radius, shadows, spacing, typography } from '@/theme/tokens';
+import { opacity, radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 type StopRowProps = {
   address: Address;
+  label: string;
   index: number;
   count: number;
   onEdit: () => void;
@@ -32,8 +33,12 @@ type StopRowProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
 };
 
+const stopRowHeight = 56;
+const stopRowGap = spacing.x1;
+
 function StopRow({
   address,
+  label,
   index,
   count,
   onEdit,
@@ -66,7 +71,7 @@ function StopRow({
           translationY.set(event.translationY);
         })
         .onEnd((event) => {
-          const offset = Math.round(event.translationY / layout.stopRowHeight);
+          const offset = Math.round(event.translationY / (stopRowHeight + stopRowGap));
           const targetIndex = Math.max(0, Math.min(count - 1, index + offset));
           translationY.set(
             withSpring(0, {
@@ -100,18 +105,16 @@ function StopRow({
     <Animated.View
       style={[
         {
-          minHeight: layout.stopRowHeight,
+          height: stopRowHeight,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.x2,
-          paddingVertical: spacing.x2,
-          paddingHorizontal: spacing.x3,
+          paddingHorizontal: spacing.x2,
           borderRadius: radius.lg,
           borderCurve: 'continuous',
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          ...shadows.subtle,
         },
         animatedStyle,
       ]}
@@ -150,14 +153,9 @@ function StopRow({
         <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
           {routeDestinationTitle(index, count)}
         </Text>
-        <Text selectable numberOfLines={2} style={{ ...typography.body, color: colors.ink }}>
-          {address.label}
+        <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.ink }}>
+          {label}
         </Text>
-        {!!address.details && (
-          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {address.details}
-          </Text>
-        )}
       </AnimatedPressable>
       <IconButton
         icon="close"
@@ -210,28 +208,27 @@ function StopRow({
 
 export function StopsScreen() {
   const colors = useThemeColors();
-  const { destinations, removeDestination, reorderDestinations } = useRide();
+  const { pickup, destinations, removeDestination, reorderDestinations } = useRide();
+  const labels = pickup ? formatMultiStopRouteAddresses(pickup, destinations).destinations : [];
   const canAdd = destinations.length < 5;
 
   return (
-    <Screen contentStyle={{ maxWidth: 640, alignSelf: 'center' }}>
+    <Screen scroll={false} contentStyle={{ maxWidth: 640, paddingVertical: spacing.x2, gap: spacing.x2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
         <IconButton icon="close" label="Закрыть остановки" onPress={() => goBackOrReplace('/')} />
         <View style={{ flex: 1 }}>
-          <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+          <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
             Остановки
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            Перетащите точки в нужном порядке. Маршрут и цена обновятся автоматически
           </Text>
         </View>
       </View>
 
-      <View style={{ gap: spacing.x2 }} accessibilityRole="list">
+      <View style={{ gap: stopRowGap }} accessibilityRole="list">
         {destinations.map((address, index) => (
           <StopRow
             key={`${address.id}:${index}`}
             address={address}
+            label={labels[index] ?? address.label}
             index={index}
             count={destinations.length}
             onEdit={() =>
@@ -268,15 +265,15 @@ export function StopsScreen() {
         </View>
       )}
 
-      <AppButton
-        disabled={!canAdd}
-        icon={<AppIcon name="plus" size={22} color={canAdd ? colors.brandInk : colors.inkMuted} />}
+      {canAdd && <AppButton
+        compact
+        icon={<AppIcon name="plus" size={22} color={colors.brandInk} />}
         onPress={() =>
           router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })
         }
       >
-        {canAdd ? 'Добавить остановку' : 'Можно добавить не больше 5 точек'}
-      </AppButton>
+        Добавить остановку
+      </AppButton>}
     </Screen>
   );
 }

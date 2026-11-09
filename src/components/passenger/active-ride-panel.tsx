@@ -15,7 +15,6 @@ import { AppModal } from '@/components/ui/app-modal';
 import { UserAvatar } from '@/components/user-avatar';
 import { formatElapsedClock } from '@/domain/elapsed-time';
 import type { RideOrder } from '@/domain/models';
-import { rideStatusLabel } from '@/domain/ride-state';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
 import { useThemeColors } from '@/theme/theme-provider';
@@ -71,7 +70,7 @@ function rideHeadline(ride: RideOrder, pickupEtaMinutes?: number | null): string
   if (isReservedRide(ride)) return 'Предзаказ принят';
   if (ride.scheduledAt && ride.status === 'searching') return 'Предзаказ отправлен';
   if (ride.status === 'searching') return 'Ищем свободного водителя';
-  if (ride.driverQueuePosition === 2) return 'Водитель завершает предыдущий заказ';
+  if (ride.driverQueuePosition === 2) return 'Ваш заказ следующий';
   if (ride.status === 'driver_waiting') return 'Водитель приехал';
   if (ride.status === 'accepted' || ride.status === 'driver_arriving') {
     return pickupEtaMinutes != null
@@ -100,7 +99,6 @@ export function ActiveRidePanel({
   const driver = ride.driver;
   const showEta = pickupEtaMinutes != null && ride.driverQueuePosition !== 2 && !isReservedRide(ride) &&
     (ride.status === 'accepted' || ride.status === 'driver_arriving');
-  const stage = ride.status === 'searching' ? 1 : ride.status === 'accepted' || ride.status === 'driver_arriving' ? 2 : ride.status === 'driver_waiting' ? 3 : 4;
 
   const openDetails = () => {
     router.push({ pathname: '/orders/[id]', params: { id: ride.id } });
@@ -110,39 +108,26 @@ export function ActiveRidePanel({
     <View style={{ gap: spacing.x2 }}>
       <Animated.View key={ride.status} entering={FadeIn.duration(motion.duration.standard).reduceMotion(ReduceMotion.System)}
         accessibilityLiveRegion="polite" style={{ gap: spacing.x2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
-          <Text style={{ ...typography.caption, color: colors.inkSecondary, flex: 1 }}>
-            {ride.driverQueuePosition === 2 ? 'Ваш заказ следующий' : rideStatusLabel[ride.status]}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+          <Text accessibilityRole="header" selectable numberOfLines={2}
+            style={{ ...typography.sectionTitle, flex: 1, fontSize: showEta ? 26 : 20, lineHeight: showEta ? 32 : 26, color: colors.ink }}>
+            {showEta ? `Подача через ~${Math.max(1, pickupEtaMinutes)} мин` : rideHeadline(ride, pickupEtaMinutes)}
           </Text>
           {ride.status === 'searching' && !ride.scheduledAt && <SearchElapsedBadge startedAt={ride.createdAt} />}
         </View>
-        <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, fontSize: showEta ? 32 : 20, lineHeight: showEta ? 38 : 26, color: colors.ink }}>
-          {showEta ? `~ ${Math.max(1, pickupEtaMinutes)} ` : rideHeadline(ride, pickupEtaMinutes)}
-          {showEta && <Text style={{ fontSize: 20, fontWeight: '400', color: colors.inkSecondary }}>мин</Text>}
-        </Text>
-        {!!ride.scheduledAt && <Text selectable testID="passenger-scheduled-time" style={{ ...typography.bodyStrong, color: colors.danger }}>
+        {!!ride.scheduledAt && <Text selectable testID="passenger-scheduled-time" numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.danger }}>
           Подача {formatScheduledPickup(ride.scheduledAt)}
         </Text>}
-        {!terminal && !isReservedRide(ride) && !(ride.scheduledAt && ride.status === 'searching') && <>
-          <View accessible accessibilityLabel={`Этап поездки ${stage} из 4`} style={{ flexDirection: 'row', gap: 5, marginTop: 4 }}>
-            {[1, 2, 3, 4].map((step) => <View key={step} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: step <= stage ? colors.brand : colors.surfaceSecondary }} />)}
-          </View>
-        </>}
       </Animated.View>
 
       {ride.status === 'cancelled' && !!ride.cancellationReason && (
         <Text
           accessibilityRole="alert"
           selectable
+          numberOfLines={2}
           style={{ ...typography.caption, color: colors.inkSecondary }}
         >
           {ride.cancellationReason}
-        </Text>
-      )}
-
-      {ride.driverQueuePosition === 2 && (
-        <Text selectable style={{ ...typography.body, color: colors.infoText }}>
-          Водитель принял заказ заранее. Сообщим сразу, как он освободится и сможет выехать к вам.
         </Text>
       )}
 
@@ -158,23 +143,12 @@ export function ActiveRidePanel({
             borderColor: colors.border,
           }}
         >
-          <UserAvatar name={driver.name} avatarUrl={driver.avatarUrl} size={42} tone="brand" />
+          <UserAvatar name={driver.name} avatarUrl={driver.avatarUrl} size={36} tone="brand" />
           <View style={{ flex: 1, minWidth: 0, gap: spacing.x1 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: spacing.x2,
-              }}
-            >
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-                {driver.name}
-              </Text>
-            </View>
+            <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>{driver.name}</Text>
             <Text
               selectable
-              numberOfLines={2}
+              numberOfLines={1}
               style={{ ...typography.caption, color: colors.inkSecondary }}
             >
               {driver.vehicle.color} {driver.vehicle.make} {driver.vehicle.model}
@@ -210,7 +184,7 @@ export function ActiveRidePanel({
         </View>
       )}
 
-      <WaitingBreakdown ride={ride} compact />
+      {!terminal && <WaitingBreakdown ride={ride} compact />}
 
       {ride.status === 'completed' && driver ? (
         <RideRatingCard
@@ -224,7 +198,10 @@ export function ActiveRidePanel({
           onContinue={onReset}
         />
       ) : terminal ? (
-        <AppButton onPress={onReset}>Новая поездка</AppButton>
+        <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+          <AppButton compact fullWidth={false} style={{ flex: 1 }} onPress={onReset}>Новая поездка</AppButton>
+          <AppButton compact fullWidth={false} variant="quiet" style={{ flex: 1 }} onPress={openDetails}>Детали</AppButton>
+        </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
           {cancellable && (
@@ -246,7 +223,7 @@ export function ActiveRidePanel({
       )}
 
       {!!error && !cancelConfirmVisible && (
-        <Text accessibilityRole="alert" selectable style={{ ...typography.caption, color: colors.danger }}>
+        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
         </Text>
       )}

@@ -9,7 +9,7 @@ import { useThemeColors } from '@/theme/theme-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { AppButton } from '@/components/ui/app-button';
 
-export function DriverFareEditor({ ride }: { ride: RideOrder }) {
+export function DriverFareEditor({ ride, onSaved }: { ride: RideOrder; onSaved: () => void }) {
   const colors = useThemeColors();
   const { token } = useSession();
   const { refresh } = useRide();
@@ -29,6 +29,7 @@ export function DriverFareEditor({ ride }: { ride: RideOrder }) {
     try {
       await apiRequest(`/v1/driver/orders/${ride.id}/fare`, { method: 'POST', token: token ?? undefined, body: JSON.stringify({ priceMinor }) });
       await refresh();
+      onSaved();
     } catch (reason) {
       if (reason instanceof ApiError &&
         (reason.code === 'NETWORK_ERROR' || reason.code === 'TIMEOUT' || reason.status >= 500)) {
@@ -36,6 +37,7 @@ export function DriverFareEditor({ ride }: { ride: RideOrder }) {
           const saved = await apiRequest<RideOrder>(`/v1/orders/${ride.id}`, { token: token ?? undefined, timeoutMs: 8_000, cache: 'no-store' });
           if (saved.driverId === ride.driverId && saved.manualPriceSet && saved.basePriceMinor === priceMinor) {
             await refresh();
+            onSaved();
             return;
           }
         } catch { /* The entered amount remains available for a deliberate retry. */ }
@@ -43,15 +45,14 @@ export function DriverFareEditor({ ride }: { ride: RideOrder }) {
       setError(reason instanceof Error ? reason.message : 'Не удалось сохранить стоимость. Повторите попытку.');
     } finally { inFlight.current = false; setSaving(false); }
   };
-  return <View style={{ gap: spacing.x2, padding: spacing.x3, backgroundColor: colors.surfaceSecondary, borderRadius: radius.lg }}>
-    <Text style={{ ...typography.bodyStrong, color: colors.ink }}>Стоимость по договорённости</Text>
-    <Text style={{ ...typography.body, color: colors.inkSecondary }}>
-      Уточните адрес и согласуйте сумму с пассажиром. Сохранённую стоимость он получит в уведомлении.
+  return <View style={{ gap: spacing.x2 }}>
+    <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
+      Укажите сумму, которую согласовали с пассажиром.
     </Text>
     <TextInput accessibilityLabel="Согласованная стоимость в рублях" placeholder="Сумма, ₽" keyboardType="decimal-pad"
       value={value} onChangeText={setValue} editable={!saving} maxLength={10}
       placeholderTextColor={colors.inkSecondary}
-      style={{ ...typography.body, color: colors.ink, backgroundColor: colors.surface, padding: spacing.x3, borderRadius: radius.md }}/>
+      style={{ ...typography.body, color: colors.ink, backgroundColor: colors.surfaceSecondary, padding: spacing.x3, borderRadius: radius.md }}/>
     {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
     <AppButton compact loading={saving} disabled={saving || !value.trim()} onPress={() => void save()}>Сохранить стоимость</AppButton>
   </View>;

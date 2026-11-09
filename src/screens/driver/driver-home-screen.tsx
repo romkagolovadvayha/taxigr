@@ -1,7 +1,7 @@
 import { isRidePricePending } from '@/domain/ride-price';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, ScrollView, Text, TextInput, View } from 'react-native';
+import { AppState, Text, TextInput, View } from 'react-native';
 
 import { apiRequest } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -17,6 +17,8 @@ import { YandexNavigationButton } from '@/components/ride/yandex-navigation-butt
 import { WaitingBreakdown } from '@/components/ride/waiting-breakdown';
 import { AppButton } from '@/components/ui/app-button';
 import { AccessibleSwitch } from '@/components/ui/accessible-switch';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
 import { MoneyValue } from '@/components/ui/money-value';
 import { IconButton } from '@/components/ui/icon-button';
@@ -57,10 +59,13 @@ function DriverOrderCard({
   navigationLoading: boolean;
 }) {
   const colors = useThemeColors();
+  const { isPhone, height } = useResponsiveLayout();
+  const compactTrip = isPhone && height < 650;
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
   const [nextVisible, setNextVisible] = useState(false);
+  const [fareVisible, setFareVisible] = useState(false);
   const {
     driverRide: currentRide,
     nextDriverRide,
@@ -77,14 +82,10 @@ function DriverOrderCard({
 
   if (!currentRide) {
     return (
-      <View style={{ gap: spacing.x4 }}>
-        <StatusChip label="Нет активного заказа" />
-        <Text selectable style={{ ...typography.sectionTitle, color: colors.ink }}>Вы на линии</Text>
-        <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
-          Новый заказ появится здесь. Сообщим голосом и вибрацией.
-        </Text>
+      <View style={{ gap: spacing.x2 }}>
+        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Ждём новые заказы</Text>
         {!!error && (
-          <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+          <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
             {error}
           </Text>
         )}
@@ -101,6 +102,22 @@ function DriverOrderCard({
     );
   }
 
+  if (currentRide.status === 'cancelled' || currentRide.status === 'completed') {
+    return <View testID="driver-ended-order" style={{ gap: spacing.x2 }}>
+      <StatusChip label={currentRide.status === 'cancelled' ? 'Заказ отменён' : 'Поездка завершена'}
+        tone={currentRide.status === 'cancelled' ? 'danger' : 'success'} />
+      {!!currentRide.cancellationReason && <Text selectable numberOfLines={2}
+        style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.cancellationReason}</Text>}
+      <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+        <AppButton compact fullWidth={false} style={{ flex: 1 }} onPress={() => { resetRide(); void refresh(); }}>
+          К новым заказам
+        </AppButton>
+        <AppButton compact fullWidth={false} variant="quiet" style={{ flex: 1 }}
+          onPress={() => router.push({ pathname: '/driver/trips/[id]', params: { id: currentRide.id } })}>Детали</AppButton>
+      </View>
+    </View>;
+  }
+
   const rideDestinations = currentRide.destinations ?? [currentRide.destination];
   const routeAddresses = formatMultiStopRouteAddresses(
     currentRide.pickup,
@@ -109,8 +126,7 @@ function DriverOrderCard({
 
   if (currentRide.status === 'searching') {
     return (
-      <View style={{ flex: 1, minHeight: 0, gap: spacing.x2 }}>
-        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: spacing.x2 }} showsVerticalScrollIndicator={false}>
+      <View testID="driver-order-offer" style={{ gap: compactTrip ? spacing.x1 : spacing.x2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <StatusChip label="Новый заказ" tone="info" />
           <Text style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.tariff === 'child' ? 'Детский' : 'Эконом'}</Text>
@@ -119,9 +135,9 @@ function DriverOrderCard({
           <UserAvatar
             name={currentRide.passenger?.name ?? 'Пассажир'}
             avatarUrl={currentRide.passenger?.avatarUrl}
-            size={40}
+            size={compactTrip ? 28 : 40}
           />
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, flex: 1, color: colors.ink }}>
             {currentRide.passenger?.name ?? 'Пассажир'}
           </Text>
           <RatingBadge
@@ -130,20 +146,12 @@ function DriverOrderCard({
             compact
           />
         </View>
-        <View style={{ paddingVertical: spacing.x1, borderTopWidth: 1, borderColor: colors.border, gap: 2 }}>
-          <Text selectable style={{ ...typography.micro, color: colors.inkSecondary }}>○  Подача</Text>
-          <Text selectable style={{ ...typography.body, fontSize: 15, color: colors.ink }}>{routeAddresses.pickup}</Text>
-        </View>
-        <View style={{ gap: spacing.x2 }}>
+        <View style={{ padding: spacing.x2, gap: spacing.x1, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary }}>
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.ink }}>Подача · {routeAddresses.pickup}</Text>
           {routeAddresses.destinations.map((label, index) => (
-            <View key={`${label}:${index}`} style={{ paddingBottom: spacing.x1, borderBottomWidth: 1, borderColor: colors.border, gap: 2 }}>
-              <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
-                {routeDestinationTitle(index, routeAddresses.destinations.length)}
-              </Text>
-              <Text selectable style={{ ...typography.body, fontSize: 15, color: colors.ink }}>
-                {label}
-              </Text>
-            </View>
+            <Text key={`${label}:${index}`} selectable numberOfLines={1} style={{ ...typography.caption, color: colors.ink }}>
+              {routeDestinationTitle(index, routeAddresses.destinations.length)} · {label}
+            </Text>
           ))}
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -151,19 +159,18 @@ function DriverOrderCard({
             {currentRide.pricingMode === 'driver' ? 'Маршрут уточнит водитель' :
               `${(currentRide.distanceMeters / 1_000).toFixed(1).replace('.', ',')} км · около ${Math.max(1, Math.round(currentRide.durationSeconds / 60))} мин`}
           </Text>
-          <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} />
+          <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} compact={compactTrip} />
         </View>
         {!!currentRide.comment && (
-          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
+          <Text selectable numberOfLines={compactTrip ? 1 : 2} style={{ ...typography.caption, color: colors.inkSecondary }}>
             Комментарий: {currentRide.comment}
           </Text>
         )}
         {!!error && (
-          <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+          <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
             {error}
           </Text>
         )}
-        </ScrollView>
         <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
           <AppButton variant="quiet" compact fullWidth={false} style={{ flex: 1 }} disabled={busy} onPress={resetRide}>Пропустить</AppButton>
           <AppButton
@@ -193,6 +200,9 @@ function DriverOrderCard({
   const navigationAddress = driverNavigationAddress(currentRide);
   const nextDestinationIndex = currentRide.nextDestinationIndex ?? 0;
   const hasIntermediateStop = nextDestinationIndex < rideDestinations.length - 1;
+  const needsFareToFinish = currentRide.status === 'in_progress' && !hasIntermediateStop && isRidePricePending(currentRide);
+  const canEditFare = currentRide.pricingMode === 'driver' && currentRide.driverQueuePosition !== 2 && nextStatus !== null;
+  const canTakeNext = Boolean(nextDriverRide || driverOffer);
   const routePointLabels = [routeAddresses.pickup, ...routeAddresses.destinations];
   const routeMetricLabel =
     currentRide.pricingMode === 'driver' ? 'Уточните маршрут у пассажира' : remainingDistanceMeters != null
@@ -222,9 +232,7 @@ function DriverOrderCard({
   };
 
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.x2 }}>
-      <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: spacing.x2 }}
-        keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View testID="driver-active-order" style={{ gap: compactTrip ? spacing.x1 : spacing.x2 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -235,20 +243,18 @@ function DriverOrderCard({
       >
         <StatusChip
           label={rideStatusLabel[currentRide.status]}
-          tone={currentRide.status === 'completed' ? 'success' : 'info'}
+          tone="info"
         />
         <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} compact />
       </View>
-      {!!currentRide.scheduledAt && <Text selectable style={{ ...typography.caption, color: colors.danger }}>
+      {!!currentRide.scheduledAt && <Text selectable numberOfLines={compactTrip ? 1 : 2} style={{ ...typography.caption, color: colors.danger }}>
         Подача {formatScheduledPickup(currentRide.scheduledAt)}
       </Text>}
-      {currentRide.pricingMode === 'driver' && currentRide.driverQueuePosition !== 2 &&
-        ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(currentRide.status) ?
-        <DriverFareEditor key={currentRide.id} ride={currentRide}/> : null}
-      <View
+      <AnimatedPressable accessibilityRole="button" accessibilityLabel="Детали маршрута"
+        onPress={() => router.push({ pathname: '/driver/trips/[id]', params: { id: currentRide.id } })}
         style={{
-          gap: spacing.x2,
-          padding: spacing.x3,
+          gap: spacing.x1,
+          padding: spacing.x2,
           borderRadius: radius.lg,
           backgroundColor: colors.surfaceSecondary,
         }}
@@ -266,13 +272,7 @@ function DriverOrderCard({
             numberOfLines={1}
             style={{ ...typography.micro, color: colors.inkMuted, flexShrink: 1 }}
           >
-            {routeTarget === 'pickup'
-              ? 'СЛЕДУЮЩАЯ ТОЧКА · ПОДАЧА'
-              : routeTarget === 'destination'
-                ? rideDestinations.length > 1
-                  ? `ПО МАРШРУТУ · ${formatRoutePointCount(rideDestinations.length)}`
-                  : 'СЛЕДУЮЩАЯ ТОЧКА · ФИНИШ'
-                : 'МАРШРУТ'}
+            {rideDestinations.length > 1 ? `Маршрут · ${formatRoutePointCount(rideDestinations.length)}` : 'Маршрут'}
           </Text>
           <Text
             selectable
@@ -280,12 +280,14 @@ function DriverOrderCard({
             style={{
               ...typography.caption,
               color: colors.inkSecondary,
+              flexShrink: 1,
               fontWeight: '700',
               fontVariant: ['tabular-nums'],
             }}
           >
             {routeMetricLabel}
           </Text>
+          <AppIcon name="chevron" size={16} color={colors.inkMuted} />
         </View>
         <View style={{ gap: spacing.x1 }}>
           {routePointLabels.map((label, index) => {
@@ -350,14 +352,14 @@ function DriverOrderCard({
             );
           })}
         </View>
-      </View>
-      {routePointLabels.length > 2 && <AppButton variant="quiet" compact onPress={() => router.push({ pathname: '/driver/trips/[id]', params: { id: currentRide.id } })}>
-        Все остановки · {routePointLabels.length}
-      </AppButton>}
-      {currentRide.status === 'completed' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-            {paymentLabel}
+      </AnimatedPressable>
+      {compactTrip ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, flex: 1, color: colors.inkSecondary }}>
+            {currentRide.passenger?.name ?? 'Пассажир'}
+          </Text>
+          <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
+            {currentRide.paymentMethod === 'transfer' ? 'Переводом' : currentRide.paymentMethod === 'cash' ? 'Наличными' : 'Напрямую'}
           </Text>
         </View>
       ) : (
@@ -369,7 +371,7 @@ function DriverOrderCard({
           />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+              <Text selectable numberOfLines={1} style={{ ...typography.bodyStrong, flexShrink: 1, color: colors.ink }}>
                 {currentRide.passenger?.name ?? 'Пассажир'}
               </Text>
               <RatingBadge
@@ -397,8 +399,7 @@ function DriverOrderCard({
           </View>
         </View>
       )}
-      {!['completed', 'cancelled'].includes(currentRide.status) &&
-        (!!passengerPhone || currentRide.passenger || routeTarget) && (
+      {(!!passengerPhone || currentRide.passenger || routeTarget) && (
           <View
             style={{
               flexDirection: 'row',
@@ -433,37 +434,42 @@ function DriverOrderCard({
             )}
           </View>
         )}
-      {(nextDriverRide || driverOffer) && <AppButton compact variant="secondary" onPress={() => setNextVisible(true)}>
-        {nextDriverRide ? 'Следующий заказ принят' : 'Доступен следующий заказ'}
-      </AppButton>}
-      <AppModal visible={nextVisible && Boolean(nextDriverRide || driverOffer)} title="Следующий заказ" onClose={() => setNextVisible(false)}>
+      {(canTakeNext || (canEditFare && !needsFareToFinish)) && <View style={{ flexDirection: 'row', gap: spacing.x1 }}>
+        {canEditFare && !needsFareToFinish && <AppButton compact variant="secondary" fullWidth={false} style={{ flex: 1, minWidth: 0 }}
+          onPress={() => setFareVisible(true)}>Стоимость</AppButton>}
+        {canTakeNext && <AppButton compact variant="secondary" fullWidth={false} style={{ flex: 1, minWidth: 0 }}
+          accessibilityLabel={nextDriverRide ? 'Следующий заказ принят' : 'Доступен следующий заказ'} onPress={() => setNextVisible(true)}>
+          Следующий заказ
+        </AppButton>}
+      </View>}
+      {canEditFare && <AppModal visible={fareVisible} title="Стоимость поездки" onClose={() => setFareVisible(false)}>
+        <DriverFareEditor key={currentRide.id} ride={currentRide} onSaved={() => setFareVisible(false)} />
+      </AppModal>}
+      <AppModal compact={compactTrip} visible={nextVisible && Boolean(nextDriverRide || driverOffer)} title="Следующий заказ" onClose={() => setNextVisible(false)}>
       {nextDriverRide ? (
         <View
           style={{
-            gap: spacing.x3,
-            padding: spacing.x4,
+            gap: spacing.x2,
+            padding: spacing.x2,
             borderRadius: radius.lg,
             borderCurve: 'continuous',
             backgroundColor: colors.surfaceSecondary,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2 }}>
-            <StatusChip label="Следующий заказ принят" tone="warning" />
+            <Text style={{ ...typography.caption, color: colors.inkSecondary }}>После текущей поездки</Text>
             <MoneyValue pending={isRidePricePending(nextDriverRide)} valueMinor={nextDriverRide.priceMinor} compact />
           </View>
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
+          <Text selectable numberOfLines={2} style={{ ...typography.bodyStrong, color: colors.ink }}>
             {nextDriverRide.pickup.label}
           </Text>
-          <Text selectable numberOfLines={4} style={{ ...typography.caption, color: colors.inkSecondary }}>
+          <Text selectable numberOfLines={3} style={{ ...typography.caption, color: colors.inkSecondary }}>
             {formatMultiStopRouteAddresses(
               nextDriverRide.pickup,
               nextDriverRide.destinations ?? [nextDriverRide.destination],
             ).destinations.map((label, index, labels) =>
               `${routeDestinationTitle(index, labels.length)}: ${label}`,
             ).join('\n')}
-          </Text>
-          <Text selectable style={{ ...typography.caption, color: colors.infoText }}>
-            После завершения текущей поездки этот заказ автоматически станет текущим.
           </Text>
           {nextDriverRide.passenger && (
             <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
@@ -503,8 +509,8 @@ function DriverOrderCard({
       ) : driverOffer ? (
         <View
           style={{
-            gap: spacing.x3,
-            padding: spacing.x4,
+            gap: spacing.x2,
+            padding: spacing.x2,
             borderRadius: radius.lg,
             borderCurve: 'continuous',
             backgroundColor: colors.surfaceSecondary,
@@ -549,18 +555,17 @@ function DriverOrderCard({
         </View>
       ) : null}
       </AppModal>
-      {demo && !nextDriverRide && !driverOffer && !['completed', 'cancelled'].includes(currentRide.status) ? (
+      {demo && !nextDriverRide && !driverOffer ? (
         <AppButton variant="secondary" compact loading={busy} onPress={() => void createRide()}>
           Создать следующий демо-заказ
         </AppButton>
       ) : null}
-      <WaitingBreakdown ride={currentRide} compact />
+      {!!nextStatus && <WaitingBreakdown ride={currentRide} compact />}
       {!!error && (
-        <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
         </Text>
       )}
-      </ScrollView>
       {currentRide.status === 'driver_waiting' ? (
         <View style={{ gap: spacing.x2 }}>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
@@ -590,10 +595,14 @@ function DriverOrderCard({
         <AppButton
           compact
           loading={busy}
-          disabled={busy || (!hasIntermediateStop && isRidePricePending(currentRide))}
-          onPress={() => hasIntermediateStop ? void completeDriverStop() : void transitionRide('completed')}
+          disabled={busy}
+          onPress={() => {
+            if (needsFareToFinish) setFareVisible(true);
+            else if (hasIntermediateStop) void completeDriverStop();
+            else void transitionRide('completed');
+          }}
         >
-          {hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : isRidePricePending(currentRide) ? 'Сначала укажите стоимость выше' : 'Завершить поездку'}
+          {needsFareToFinish ? 'Указать стоимость' : hasIntermediateStop ? `Остановка ${nextDestinationIndex + 1} пройдена` : 'Завершить поездку'}
         </AppButton>
       ) : nextStatus ? (
         <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
@@ -618,30 +627,11 @@ function DriverOrderCard({
             {driverTransitionLabel[currentRide.status] ?? 'Продолжить'}
           </AppButton>
         </View>
-      ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x3 }}>
-          <AppButton
-            variant="secondary"
-            style={{ flexGrow: 1, flexBasis: 150 }}
-            onPress={() => {
-              resetRide();
-              void refresh();
-            }}
-          >
-            К новым заказам
-          </AppButton>
-          <AppButton
-            style={{ flexGrow: 1, flexBasis: 180 }}
-            onPress={() => router.push('/driver/earnings')}
-          >
-            Расчёты с сервисом
-          </AppButton>
-        </View>
-      )}
+      ) : null}
       <AppModal
         visible={releaseConfirmVisible}
         title={releaseOrderId === nextDriverRide?.id ? 'Отказаться от следующего заказа?' : 'Отказаться от заказа?'}
-        description="Пассажиру сразу будет найден другой водитель. Вернуться к этому заказу уже не получится."
+        description="Заказ снова станет доступен другим водителям."
         onClose={() => setReleaseConfirmVisible(false)}
       >
         <TextInput
@@ -654,7 +644,8 @@ function DriverOrderCard({
           accessibilityLabel="Причина отказа от заказа"
           style={{
             ...typography.body,
-            minHeight: 88,
+            minHeight: 56,
+            maxHeight: 92,
             padding: spacing.x3,
             borderWidth: 1,
             borderColor: colors.border,
@@ -665,6 +656,7 @@ function DriverOrderCard({
           }}
         />
         <AppButton
+          compact
           variant="danger"
           loading={busy}
           disabled={releaseReason.trim().length < 3}
@@ -676,7 +668,7 @@ function DriverOrderCard({
         >
           Отказаться и продолжить поиск
         </AppButton>
-        <AppButton variant="secondary" disabled={busy} onPress={() => setReleaseConfirmVisible(false)}>
+        <AppButton compact variant="secondary" disabled={busy} onPress={() => setReleaseConfirmVisible(false)}>
           Остаться на заказе
         </AppButton>
       </AppModal>
@@ -703,8 +695,8 @@ export function DriverHomeScreen() {
     currentRide &&
       !['searching', 'completed', 'cancelled'].includes(currentRide.status),
   );
-  const handlingOrder = activeTrip || currentRide?.status === 'searching';
-  const compactMap = isPhone && height < 740 && handlingOrder;
+  const handlingOrder = Boolean(currentRide && currentRide.status !== 'draft');
+  const compactMap = isPhone && height < 740;
   const location = useDriverLocation({
     enabled: online,
     navigationActive: navigationRequested,
@@ -822,7 +814,7 @@ export function DriverHomeScreen() {
   const panelContent = (
     <>
       {!!visibleError && (!handlingOrder || Boolean(statusError || navigation.error)) && (
-        <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
+        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {visibleError}
         </Text>
       )}
@@ -841,9 +833,8 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    padding: handlingOrder ? spacing.x3 : spacing.x5,
+    padding: spacing.x3,
     gap: handlingOrder ? spacing.x2 : spacing.x5,
-    flexGrow: 1,
   } as const;
   const map = <TaxiMap
     pickup={mapPickup}
@@ -877,20 +868,14 @@ export function DriverHomeScreen() {
         {(!activeTrip || compactMap) && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
           label={mapVisible ? 'Скрыть карту заказа' : 'Показать карту заказа'} onPress={() => setMapVisible((value) => !value)} />}
       </View>
-      <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row' }}>
-      {!compactMap && (activeTrip || mapVisible || !isPhone) && <View style={{ flex: activeTrip || !isPhone ? 1 : undefined, height: !activeTrip && isPhone ? 180 : undefined,
-        minHeight: isPhone ? 120 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
-        {map}
-      </View>}
-      {handlingOrder ? <View style={{ ...panelContentStyle, flexGrow: isPhone ? 1 : 0, flex: isPhone && compactMap ? 1 : undefined, minHeight: 0,
-        height: isPhone && !compactMap ? (activeTrip ? '74%' : undefined) : undefined,
-        width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
-        {panelContent}
-      </View> : <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
-        style={{ flexGrow: isPhone ? 1 : 0, flexShrink: 1, flexBasis: 'auto', width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
-        <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />
-        <View style={panelContentStyle}>{panelContent}</View>
-      </ScrollView>}
+      <View testID="driver-ride-workspace" style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row' }}>
+        {!compactMap && (activeTrip || mapVisible || !isPhone) && <View style={{ flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
+          {map}
+        </View>}
+        <View style={{ flexShrink: 0, width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
+          {!handlingOrder && <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />}
+          <View style={panelContentStyle}>{panelContent}</View>
+        </View>
       </View>
       <AppModal visible={compactMap && mapVisible} title="Карта заказа" onClose={() => setMapVisible(false)}>
         <View style={{ height: Math.min(360, height * 0.56), overflow: 'hidden' }}>{map}</View>
