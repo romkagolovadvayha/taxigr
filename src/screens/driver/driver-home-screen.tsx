@@ -8,7 +8,7 @@ import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ShiftSummary } from '@/components/driver/shift-summary';
 import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
-import { DriverPreorders } from '@/components/driver/driver-preorders';
+import { DriverPreorderOffer, DriverPreorders, type DriverPreorderView } from '@/components/driver/driver-preorders';
 import { formatScheduledPickup } from '@/domain/scheduled-ride';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
@@ -50,11 +50,13 @@ function DriverOrderCard({
   remainingDistanceMeters,
   remainingDurationSeconds,
   navigationLoading,
+  hasPreorderOffer,
 }: {
   demo: boolean;
   remainingDistanceMeters?: number;
   remainingDurationSeconds?: number;
   navigationLoading: boolean;
+  hasPreorderOffer: boolean;
 }) {
   const colors = useThemeColors();
   const { isPhone, height } = useResponsiveLayout();
@@ -81,7 +83,7 @@ function DriverOrderCard({
   if (!currentRide) {
     return (
       <View style={{ gap: spacing.x2 }}>
-        <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Ждём новые заказы</Text>
+        {!hasPreorderOffer && <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>Ждём новые заказы</Text>}
         {!!error && (
           <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
             {error}
@@ -685,9 +687,10 @@ export function DriverHomeScreen() {
   const statusChangeInFlight = useRef(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
+  const [preorderView, setPreorderView] = useState<DriverPreorderView>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { isPhone, height } = useResponsiveLayout();
-  const { driverRide: currentRide, refresh } = useRide();
+  const { driverRide: currentRide, driverPreorders, refresh } = useRide();
   const navigationRequested = Boolean(
     currentRide && driverRouteTarget(currentRide.status),
   );
@@ -696,6 +699,10 @@ export function DriverHomeScreen() {
       !['searching', 'completed', 'cancelled'].includes(currentRide.status),
   );
   const handlingOrder = Boolean(currentRide && currentRide.status !== 'draft');
+  const preorderOffer = online && !activeTrip
+    ? driverPreorders.filter(order => order.status === 'searching' && !order.driverId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+    : undefined;
   const compactMap = isPhone && height < 740;
   const location = useDriverLocation({
     enabled: online,
@@ -809,12 +816,14 @@ export function DriverHomeScreen() {
           {visibleError}
         </Text>
       )}
+      {preorderOffer && <DriverPreorderOffer order={preorderOffer} onOpen={() => setPreorderView(preorderOffer)} />}
       {online ? (
         <DriverOrderCard
           demo={demo}
           remainingDistanceMeters={navigation.summary?.distanceMeters}
           remainingDurationSeconds={navigation.summary?.durationSeconds}
           navigationLoading={navigation.loading}
+          hasPreorderOffer={!!preorderOffer}
         />
       ) : (
         <Text selectable style={{ ...typography.body, color: colors.inkSecondary }}>
@@ -824,8 +833,9 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    padding: spacing.x3,
-    gap: handlingOrder ? spacing.x2 : spacing.x5,
+    paddingHorizontal: spacing.x3,
+    paddingVertical: preorderOffer && handlingOrder && height < 600 ? spacing.x1 : spacing.x3,
+    gap: preorderOffer ? spacing.x1 : handlingOrder ? spacing.x2 : spacing.x5,
   } as const;
   const map = <TaxiMap
     pickup={mapPickup}
@@ -855,7 +865,7 @@ export function DriverHomeScreen() {
         </View>
         {!activeTrip && <AccessibleSwitch value={online === true} disabled={online === null || changingStatus}
           accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'} onValueChange={(next) => void changeOnline(next)} trackColor={{ true: colors.brand }} />}
-        <DriverPreorders online={online === true} activeTrip={activeTrip} />
+        <DriverPreorders online={online === true} activeTrip={activeTrip} view={preorderView} onViewChange={setPreorderView} />
         {(!activeTrip || compactMap) && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
           label={mapVisible ? 'Скрыть карту заказа' : 'Показать карту заказа'} onPress={() => setMapVisible((value) => !value)} />}
       </View>

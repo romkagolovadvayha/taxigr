@@ -27,6 +27,12 @@
       "bytes": 383428
     },
     {
+      "file": "new_preorder.wav",
+      "text": "Новый предзаказ.",
+      "seconds": 1.35,
+      "bytes": 119030
+    },
+    {
       "file": "ride_started.wav",
       "text": "Поездка началась. Хорошей дороги.",
       "seconds": 3.36,

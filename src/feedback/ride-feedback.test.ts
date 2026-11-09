@@ -35,6 +35,14 @@ function ride(status: RideStatus, overrides: Partial<RideOrder> = {}): RideOrder
 }
 
 describe('feedbackForRideChange', () => {
+  it('announces a new preorder once and uses the existing price update sound', () => {
+    const tracker = createRideFeedbackTracker();
+    const preorder = ride('searching', { scheduledAt: '2026-07-31T08:00:00.000Z' });
+    expect(tracker.observe(preorder, 'driver-user', true)?.feedback.sound).toBe('new-preorder');
+    expect(tracker.observe(preorder, 'driver-user', true)).toBeNull();
+    expect(tracker.observe({ ...preorder, priceMinor: 40_000, updatedAt: '2026-07-30T08:01:00.000Z' }, 'driver-user', true)?.feedback.sound).toBe('order-updated');
+  });
+
   it('announces a newly created passenger search', () => {
     expect(feedbackForRideChange(null, ride('searching'), 'passenger-1', false)?.sound).toBe('searching');
     expect(feedbackForRideChange(ride('draft'), ride('searching'), 'passenger-1', false)?.sound).toBe('searching');

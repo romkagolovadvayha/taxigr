@@ -17,6 +17,7 @@ export type PushMessage = {
     | 'ride-driver-arrived-v2'
     | 'ride-started-v2'
     | 'driver-orders-v2'
+    | 'driver-preorders-voice-v1'
     | 'ride-chat-v1'
     | 'ride-chat-voice-v1'
     | 'ride-driver-arriving-voice-v1'

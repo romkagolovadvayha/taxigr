@@ -109,6 +109,15 @@ describe('ride push copy', () => {
     expect(passengerRidePush({ ...ride, driverQueuePosition: 2 })?.sound).toBe('taxi_found_queued.wav');
   });
 
+  it('uses the preorder sound and shows the scheduled pickup time', () => {
+    expect(driverOrderAvailablePush(ride.id, false, 'economy', '2026-11-10T07:10:00.000Z')).toMatchObject({
+      title: 'Новый предзаказ',
+      body: expect.stringContaining('11:10'),
+      sound: 'new_preorder.wav',
+      channelId: 'driver-preorders-voice-v1',
+    });
+  });
+
   it.each(['cash', 'transfer'] as const)('matches completion speech to %s payment', (paymentMethod) => {
     expect(passengerRidePush({ ...ride, status: 'completed', paymentMethod })).toMatchObject({
       sound: `ride_complete_${paymentMethod}.wav`, channelId: `ride-complete-${paymentMethod}-voice-v1`,
@@ -130,6 +139,7 @@ describe('ride push copy', () => {
       ...(['cash', 'transfer', 'direct'] as const).map(paymentMethod => passengerRidePush({ ...ride, status: 'completed', paymentMethod })),
       ...(['passenger', 'admin', 'search_timeout'] as const).flatMap(cancellationCode => [passengerRidePush({ ...ride, status: 'cancelled', cancellationCode }), driverRideCancelledPush({ ...ride, status: 'cancelled', cancellationCode })]),
       passengerDriverReleasedPush(ride), driverOrderAvailablePush(ride.id), driverOrderAvailablePush(ride.id, true),
+      driverOrderAvailablePush(ride.id, false, 'economy', '2026-11-10T07:10:00.000Z'),
     ];
     for (const message of messages) {
       expect(plugin[1].sounds).toContain(`./assets/sounds/${message?.sound}`);

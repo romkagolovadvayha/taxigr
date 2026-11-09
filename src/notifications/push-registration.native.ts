@@ -40,6 +40,7 @@ async function createMissingAndroidChannels(): Promise<void> {
     ['ride-taxi-found-v2', 'Статусы поездки', Notifications.AndroidImportance.HIGH, 'taxi_found.wav'],
     ['ride-driver-arrived-v2', 'Водитель приехал', Notifications.AndroidImportance.HIGH, 'driver_arrived.wav'],
     ['driver-orders-v2', 'Новые заказы водителю', Notifications.AndroidImportance.MAX, 'new_order.wav'],
+    ['driver-preorders-voice-v1', 'Новые предзаказы водителю', Notifications.AndroidImportance.MAX, 'new_preorder.wav'],
     ['ride-chat-voice-v1', 'Сообщения поездки', Notifications.AndroidImportance.HIGH, 'chat_message.wav'],
     ['ride-driver-arriving-voice-v1', 'Водитель в пути', Notifications.AndroidImportance.HIGH, 'driver_arriving.wav'],
     ['driver-order-updated-voice-v1', 'Стоимость заказа повышена', Notifications.AndroidImportance.HIGH, 'order_updated.wav'],
@@ -56,6 +57,7 @@ async function createMissingAndroidChannels(): Promise<void> {
     ['ride-search-timeout-voice-v1', 'Водитель не найден', Notifications.AndroidImportance.HIGH, 'search_timeout.wav'],
   ] as const;
   const previousChannels: Record<string, string> = {
+    'driver-preorders-voice-v1': 'driver-orders-v2',
     'ride-chat-voice-v1': 'ride-chat-v1',
     'ride-driver-arriving-voice-v1': 'ride-taxi-found-v2',
     'driver-order-updated-voice-v1': 'driver-orders-v2',

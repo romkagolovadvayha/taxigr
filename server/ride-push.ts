@@ -101,8 +101,8 @@ export function driverOrderAvailablePush(
     title: priceIncreased ? 'Стоимость предзаказа повышена' : 'Новый предзаказ',
     body: `Подача ${formatScheduledPickup(scheduledAt)}. ${tariff === 'child' ? 'Поездка с ребёнком. ' : ''}Откройте «Предзаказы» в приложении.`,
     data: { orderId, role: 'driver' },
-    sound: 'new_order.wav',
-    channelId: 'driver-orders-v2',
+    sound: priceIncreased ? 'order_updated.wav' : 'new_preorder.wav',
+    channelId: priceIncreased ? 'driver-order-updated-voice-v1' : 'driver-preorders-voice-v1',
   };
   return {
     title: priceIncreased ? 'Стоимость заказа повышена' : 'Новый заказ',

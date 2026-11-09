@@ -6,6 +6,7 @@ import { useSession } from '@/auth/session-provider';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
 import { AppButton } from '@/components/ui/app-button';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppIcon } from '@/components/ui/app-icon';
 import { AppModal } from '@/components/ui/app-modal';
 import type { RideOrder } from '@/domain/models';
@@ -17,13 +18,39 @@ import { useRide } from '@/state/ride-provider';
 import { useThemeColors } from '@/theme/theme-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 
-export function DriverPreorders({ online, activeTrip }: { online: boolean; activeTrip: boolean }) {
+export type DriverPreorderView = 'list' | RideOrder | null;
+
+export function DriverPreorderOffer({ order, onOpen }: { order: RideOrder; onOpen: () => void }) {
+  const colors = useThemeColors();
+  if (!order.scheduledAt) return null;
+  const time = formatScheduledPickup(order.scheduledAt);
+  const price = ridePriceLabel(order);
+  return (
+    <AnimatedPressable testID="driver-preorder-offer" accessibilityRole="button"
+      accessibilityLabel={`Принять предзаказ · ${time} · ${price}`} onPress={onOpen}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2, minHeight: 44,
+        paddingHorizontal: spacing.x2, paddingVertical: spacing.x1, borderRadius: radius.md, backgroundColor: colors.brandSoft }}>
+      <AppIcon name="clock" size={18} color={colors.ink} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ ...typography.bodyStrong, color: colors.ink }}>Предзаказ · {price}</Text>
+        <Text numberOfLines={1} style={{ ...typography.caption, color: colors.dangerText }}>{formatScheduledPickup(order.scheduledAt, true)}</Text>
+      </View>
+      <Text style={{ ...typography.caption, color: colors.ink }}>Принять</Text>
+    </AnimatedPressable>
+  );
+}
+
+export function DriverPreorders({ online, activeTrip, view, onViewChange }: {
+  online: boolean;
+  activeTrip: boolean;
+  view: DriverPreorderView;
+  onViewChange: (view: DriverPreorderView) => void;
+}) {
   const colors = useThemeColors();
   const { height } = useWindowDimensions();
   const { token } = useSession();
   const { driverPreorders, refresh } = useRide();
-  const [visible, setVisible] = useState(false);
-  const [selected, setSelected] = useState<RideOrder | null>(null);
+  const selected = view === 'list' ? null : view;
   const [releasing, setReleasing] = useState(false);
   const [reason, setReason] = useState('');
   const [pending, setPending] = useState(false);
@@ -41,14 +68,13 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
 
   const close = () => {
     if (inFlight.current) return;
-    setSelected(null);
-    setVisible(false);
+    onViewChange(null);
     setReleasing(false);
     setError(null);
   };
   const back = () => {
     if (releasing) setReleasing(false);
-    else setSelected(null);
+    else onViewChange('list');
     setError(null);
   };
   const run = async (action: 'accept' | 'transition' | 'release') => {
@@ -63,9 +89,8 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
           : action === 'transition' ? { status: 'driver_arriving' } : { reason: reason.trim() }),
       });
       await refresh();
-      setSelected(action === 'accept' ? updated : null);
+      onViewChange(action === 'accept' ? updated : action === 'transition' ? null : 'list');
       setReleasing(false);
-      if (action === 'transition') setVisible(false);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Не удалось обновить предзаказ');
       await refresh();
@@ -80,10 +105,10 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
       accessibilityLabel={count ? `Предзаказы · ${count}` : 'Предзаказы'}
       badge={count ? <Text style={{ ...typography.micro, position: 'absolute', top: -4, right: -4, paddingHorizontal: spacing.x1,
         backgroundColor: colors.brand, color: colors.brandInk, borderRadius: radius.pill }}>{count}</Text> : undefined}
-      onPress={() => { setVisible(true); void refresh(); }}>
+      onPress={() => { onViewChange('list'); void refresh(); }}>
       Предзаказы
     </AppButton>
-    <AppModal compact={height < 600} visible={visible}
+    <AppModal compact={height < 600} visible={view !== null}
       title={releasing ? 'Отказаться от предзаказа?' : selected ? available ? 'Подтвердите предзаказ' : 'Предзаказ принят' : 'Предзаказы'} onClose={close}>
       {!selected ? <FlatList
         data={driverPreorders}
@@ -96,7 +121,7 @@ export function DriverPreorders({ online, activeTrip }: { online: boolean; activ
           <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
             {item.pickup.label} → {item.destination.label}
           </Text>
-          <AppButton compact variant={item.driverId ? 'secondary' : 'primary'} onPress={() => { setSelected(item); setError(null); }}>
+          <AppButton compact variant={item.driverId ? 'secondary' : 'primary'} onPress={() => { onViewChange(item); setError(null); }}>
             {`${item.driverId ? 'Открыть принятый' : 'Принять предзаказ'} · ${ridePriceLabel(item)}`}
           </AppButton>
         </View>}

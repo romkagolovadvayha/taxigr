@@ -31,6 +31,10 @@ function spoken(sound: RideSound, haptic: RideFeedback['haptic'] = 'success'): R
   return { kind: sound, sound, haptic };
 }
 
+function newDriverOfferSound(ride: RideOrder): RideSound {
+  return ride.scheduledAt ? 'new-preorder' : 'new-order';
+}
+
 export function completionSound(ride: Pick<RideOrder, 'paymentMethod'>, driver = false): RideSound {
   const base = driver ? 'driver-complete' : 'ride-complete';
   return ride.paymentMethod === 'cash' ? `${base}-cash`
@@ -51,7 +55,7 @@ export function feedbackForRideChange(
   if (isNewRide) {
     if (passengerOwnsRide && current.status === 'searching') return spoken('searching');
     if (isDriver && !passengerOwnsRide && current.status === 'searching') {
-      return spoken((current.searchPriceIncreaseMinor ?? 0) > 0 ? 'order-updated' : 'new-order', 'warning');
+      return spoken((current.searchPriceIncreaseMinor ?? 0) > 0 ? 'order-updated' : newDriverOfferSound(current), 'warning');
     }
     if (isDriver && !passengerOwnsRide && ['accepted', 'driver_arriving'].includes(current.status)) {
       return spoken(current.driverQueuePosition === 2 ? 'order-accepted-queued' : 'order-accepted');
@@ -67,7 +71,7 @@ export function feedbackForRideChange(
       return { kind: 'order-updated', haptic: 'warning', sound: 'order-updated' };
     }
     if (isDriver && !passengerOwnsRide && current.status === 'searching' && current.updatedAt > previous.updatedAt) {
-      return spoken('new-order', 'warning');
+      return spoken(newDriverOfferSound(current), 'warning');
     }
     return null;
   }
@@ -75,7 +79,7 @@ export function feedbackForRideChange(
   if (current.status === 'searching') {
     const released = ['accepted', 'driver_arriving', 'driver_waiting'].includes(previous.status);
     return spoken(passengerOwnsRide ? released ? 'driver-released' : 'searching'
-      : released ? 'order-released' : 'new-order', 'warning');
+      : released ? 'order-released' : newDriverOfferSound(current), 'warning');
   }
   if (current.status === 'completed') return spoken(completionSound(current, !passengerOwnsRide));
   if (current.status === 'cancelled') {

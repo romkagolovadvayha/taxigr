@@ -40,6 +40,7 @@ const soundSources: Record<NonNullable<RideFeedback["sound"]>, number> = {
   "driver-arriving": require("../../assets/sounds/driver_arriving.mp3"),
   "driver-arrived": require("../../assets/sounds/driver_arrived.mp3"),
   "new-order": require("../../assets/sounds/new_order.mp3"),
+  "new-preorder": require("../../assets/sounds/new_preorder.mp3"),
   "ride-started": require("../../assets/sounds/ride_started.mp3"),
   "ride-complete": require("../../assets/sounds/ride_complete.mp3"),
   "ride-cancelled": require("../../assets/sounds/ride_cancelled.mp3"),
@@ -70,7 +71,7 @@ const soundSources: Record<NonNullable<RideFeedback["sound"]>, number> = {
 };
 
 export function RideFeedbackProvider({ children }: { children: ReactNode }) {
-  const { currentRide, driverRide, nextDriverRide, driverOffer, latestIncomingChatMessage, subscribeRideUpdates, bootstrapReady } =
+  const { currentRide, driverRide, nextDriverRide, driverOffer, driverPreorders, latestIncomingChatMessage, subscribeRideUpdates, bootstrapReady } =
     useRide();
   const { user } = useSession();
   const { soundEnabled, vibrationEnabled } = useFeedbackPreferences();
@@ -169,14 +170,14 @@ export function RideFeedbackProvider({ children }: { children: ReactNode }) {
       tracking.current = { userId: user?.id, ready: false, tracker: createRideFeedbackTracker() };
     }
     if (!bootstrapReady || !user) return;
-    const snapshots = [currentRide, driverRide, nextDriverRide, driverOffer];
+    const snapshots = [currentRide, driverRide, nextDriverRide, driverOffer, ...driverPreorders.filter(ride => ride.status === 'searching')];
     if (!tracking.current.ready) {
       tracking.current.tracker.seed(snapshots);
       tracking.current.ready = true;
       return;
     }
     snapshots.forEach(ride => { if (ride) observeRide(ride); });
-  }, [bootstrapReady, currentRide, driverRide, nextDriverRide, driverOffer, user, observeRide]);
+  }, [bootstrapReady, currentRide, driverRide, nextDriverRide, driverOffer, driverPreorders, user, observeRide]);
 
   // Observe actions/socket transitions before batched state replaces a completed
   // order with the next one or removes a cancelled queued order.

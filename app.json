@@ -126,6 +126,7 @@
             "./assets/sounds/driver_arriving.wav",
             "./assets/sounds/driver_arrived.wav",
             "./assets/sounds/new_order.wav",
+            "./assets/sounds/new_preorder.wav",
             "./assets/sounds/ride_started.wav",
             "./assets/sounds/ride_complete.wav",
             "./assets/sounds/ride_cancelled.wav",

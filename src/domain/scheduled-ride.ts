@@ -14,9 +14,13 @@ export function preorderBounds(now: number) {
 const pickupTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   timeZone: 'Europe/Samara', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
+const compactPickupTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: 'Europe/Samara', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+});
 
-export function formatScheduledPickup(value: string): string {
-  return `${pickupTimeFormatter.format(new Date(value))} (Грахово)`;
+export function formatScheduledPickup(value: string, compact = false): string {
+  const date = new Date(value);
+  return compact ? compactPickupTimeFormatter.format(date) : `${pickupTimeFormatter.format(date)} (Грахово)`;
 }
 
 export function isReservedRide(ride: Pick<RideOrder, 'scheduledAt' | 'status' | 'driverQueuePosition'>): boolean {
