@@ -17,6 +17,7 @@ import { TaxiMap } from '@/components/map/taxi-map';
 import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
+import { ScheduledPickupControl } from '@/components/passenger/scheduled-pickup-control';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { PassengerWorkspace } from '@/components/passenger/passenger-workspace';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -74,6 +75,10 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
       compact={height < 560}
       priceMinor={selected.priceMinor}
       etaMinutes={selected.etaMinutes}
+      label={scheduledAt ? 'Заказать ко времени' : 'Заказать такси'}
+      accessibilityLabel={scheduledAt && quoteReady
+        ? `Перейти к подтверждению предзаказа за ${selected.priceMinor / 100} рублей`
+        : undefined}
       loading={quotePending}
       estimateAvailable={quoteReady}
       canRetry={routeIsBookable && quoteStatus === 'error'}
@@ -111,17 +116,18 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
         compact
         hideAddDestination
       />
-        <TariffSelector
-          tariffs={tariffs}
-          selected={selectedTariff}
-          onSelect={setSelectedTariff}
-          compact
-          dense={height < 560}
-          showIllustrations={width >= 360 && height >= 560}
-          scheduled={!!scheduledAt}
-          loading={quotePending}
-          estimateAvailable={quoteReady}
-        />
+      <TariffSelector
+        tariffs={tariffs}
+        selected={selectedTariff}
+        onSelect={setSelectedTariff}
+        compact
+        dense={height < 560}
+        showIllustrations={width >= 360 && height >= 560}
+        scheduled={!!scheduledAt}
+        loading={quotePending}
+        estimateAvailable={quoteReady}
+      />
+      <ScheduledPickupControl disabled={busy} />
       {!!error && (
         <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
           {error}
