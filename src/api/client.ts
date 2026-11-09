@@ -41,7 +41,8 @@ export class ApiError extends Error {
 
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 const configuredSocketUrl = process.env.EXPO_PUBLIC_SOCKET_URL?.replace(/\/$/, '');
-const localWebApiUrl = 'http://localhost:4100';
+const loopbackUrl = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i;
+const localWebApiUrl = configuredApiUrl && loopbackUrl.test(configuredApiUrl) ? configuredApiUrl : 'http://localhost:4100';
 
 function isLocalWebRuntime(): boolean {
   if (typeof window === 'undefined' || !window.location) return false;
@@ -57,7 +58,9 @@ export function getApiUrl(): string {
 }
 
 export function getSocketUrl(): string | null {
-  if (isLocalWebRuntime()) return localWebApiUrl;
+  if (isLocalWebRuntime()) {
+    return configuredSocketUrl && loopbackUrl.test(configuredSocketUrl) ? configuredSocketUrl : localWebApiUrl;
+  }
   return configuredSocketUrl ?? configuredApiUrl ?? null;
 }
 

@@ -148,6 +148,16 @@ describe('API client request bodies', () => {
     expect(getSocketUrl()).toBe('http://localhost:4100');
   });
 
+  it('uses explicit loopback API and socket ports for an isolated local preview', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'http://localhost:4101');
+    vi.stubEnv('EXPO_PUBLIC_SOCKET_URL', 'http://127.0.0.1:4102');
+    vi.stubGlobal('window', { location: { hostname: '127.0.0.1' } });
+    const { getApiUrl, getSocketUrl } = await import('../src/api/client');
+
+    expect(getApiUrl()).toBe('http://localhost:4101');
+    expect(getSocketUrl()).toBe('http://127.0.0.1:4102');
+  });
+
   it('sends an empty JSON object for a bodyless mutation', async () => {
     vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.test');
     const fetchMock = vi.fn().mockResolvedValue({
