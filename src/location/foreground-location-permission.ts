@@ -12,7 +12,7 @@ export function ensureForegroundLocationPermission(
   const existing = permissionRequests.get(purpose);
   if (existing) return existing;
   // Automatic tracking restarts on ride transitions. Only a new user action may
-  // repeat a declined prompt during this app session (for example going online).
+  // repeat a declined prompt during this app session.
   if (!retryDenied && declinedPurposes.has(purpose)) return Promise.resolve(deniedPermission);
 
   const permissionRequest = (async () => {

@@ -10,6 +10,7 @@ import {
 import type { Coordinates } from '@/domain/models';
 import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
 import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
+import { readLocationConsent } from '@/location/location-consent-storage';
 
 type DriverLocationState = {
   coordinates: Coordinates | null;
@@ -170,20 +171,25 @@ export function useDriverLocation({
     };
 
     void (async () => {
-      const permission = await ensureForegroundLocationPermission('driver', { retryDenied: false });
+      // Waiting for orders can reuse an existing permission without asking for it.
+      const permitted = navigationActive
+        ? (await ensureForegroundLocationPermission('driver', { retryDenied: false })).granted
+        : await readLocationConsent('driver') && (await Location.getForegroundPermissionsAsync()).granted;
       if (cancelled) return;
-      if (!permission.granted) {
-        setState((current) => ({
-          ...current,
-          error: 'Разрешите геолокацию — без неё навигация водителя не работает',
-        }));
+      if (!permitted) {
+        if (navigationActive) {
+          setState((current) => ({
+            ...current,
+            error: 'Геолокация недоступна для навигации',
+          }));
+        }
         return;
       }
 
       // Background setup must never prevent foreground navigation from starting.
-      void syncDriverBackgroundLocation(true, false).catch(() => false).then(backgroundEnabled => {
+      void syncDriverBackgroundLocation(true, navigationActive).catch(() => false).then(backgroundEnabled => {
         if (cancelled || backgroundEnabled) return;
-        backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы заказы и маршрут работали при свёрнутом приложении';
+        backgroundWarning = 'Разрешите геолокацию «Всегда», чтобы передавать местоположение при свёрнутом приложении';
         setState((current) => ({
           ...current,
           error: backgroundWarning,
@@ -212,7 +218,7 @@ export function useDriverLocation({
               accuracy: Location.Accuracy.Balanced,
               timeInterval: LIVE_LOCATION_UPDATE_INTERVAL_MS,
               distanceInterval: 0,
-              mayShowUserSettingsDialog: true,
+              mayShowUserSettingsDialog: false,
             },
         applyPosition,
         (message) => {

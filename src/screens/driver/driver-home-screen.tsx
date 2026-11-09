@@ -40,8 +40,6 @@ import {
 import { useDriverLocation } from '@/hooks/use-driver-location';
 import { useDriverNavigation } from '@/hooks/use-driver-navigation';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
-import { syncDriverBackgroundLocation } from '@/location/driver-background-location';
-import { ensureForegroundLocationPermission } from '@/location/foreground-location-permission';
 import { useRide } from '@/state/ride-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
@@ -770,14 +768,6 @@ export function DriverHomeScreen() {
     statusRequestRef.current += 1;
     setChangingStatus(true);
     try {
-      if (next) {
-        const permission = await ensureForegroundLocationPermission('driver');
-        if (!permission.granted) {
-          setStatusError('Разрешите геолокацию — без неё нельзя выйти на линию');
-          return;
-        }
-        await syncDriverBackgroundLocation(true);
-      }
       await apiRequest('/v1/driver/status', {
         method: 'POST',
         token,
@@ -788,7 +778,6 @@ export function DriverHomeScreen() {
       setStatusError(null);
     } catch (reason) {
       setOnline(!next);
-      if (next) void syncDriverBackgroundLocation(false).catch(() => undefined);
       setStatusError(reason instanceof Error ? reason.message : 'Не удалось изменить статус');
     } finally {
       statusChangeInFlight.current = false;
