@@ -28,6 +28,8 @@ export type TaxiMapProps = {
   navigationMode?: boolean;
   routeTarget?: DriverRouteTarget | null;
   viewportInsets?: MapViewportInsets;
+  /** Center to show before an address or route is selected. */
+  defaultCenter?: Coordinates;
   onMapReady?: () => void;
   onMapError?: (message: string) => void;
   selectionCenter?: Coordinates;

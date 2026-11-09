@@ -1,35 +1,46 @@
-import type { CSSProperties, MouseEvent } from 'react';
-import { View } from 'react-native';
+import { useState, type ComponentProps } from 'react';
+import { Text } from 'react-native';
 
-import { radius, spacing } from '@/theme/tokens';
+import { formatPickupDate } from '@/domain/scheduled-ride';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 import type { ScheduledPickupFieldsProps } from './scheduled-pickup-fields';
 
-function openPicker({ currentTarget }: MouseEvent<HTMLInputElement>) {
+function openPicker(input: HTMLInputElement) {
   try {
-    currentTarget.showPicker?.();
+    if (!input.showPicker) return false;
+    input.showPicker();
+    return true;
   } catch {
-    // Keep native input behavior when an embedded browser restricts showPicker.
+    return false;
   }
 }
 
-export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChange, onTimeChange }: ScheduledPickupFieldsProps) {
+function PickupInput({ label, display, basis, ...props }: ComponentProps<'input'> & { label: string; display: string; basis: number }) {
   const colors = useThemeColors();
-  const style: CSSProperties = {
-    minHeight: 44, width: '100%', minWidth: 0, boxSizing: 'border-box', cursor: 'pointer',
-    padding: '6px 8px', font: 'inherit', fontSize: 16, color: colors.ink,
-    backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radius.md,
-  };
-  return <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
-    <View style={{ flex: 1.4, minWidth: 0 }}>
-      <input type="date" aria-label="Дата подачи" value={date} min={minDate} max={maxDate} style={style}
-        onClick={openPicker}
-        onChange={(event) => onDateChange(event.currentTarget.value)} />
-    </View>
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <input type="time" aria-label="Время подачи" value={time} style={style}
-        onClick={openPicker}
-        onChange={(event) => onTimeChange(event.currentTarget.value)} />
-    </View>
-  </View>;
+  const [focused, setFocused] = useState(false);
+  return <label style={{ position: 'relative', flex: `1 1 ${basis}px`, minWidth: 0, minHeight: 54, boxSizing: 'border-box',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '6px 12px',
+    backgroundColor: colors.surfaceSecondary, borderRadius: radius.md,
+    border: `1px solid ${focused ? colors.inkSecondary : colors.border}` }}>
+    <Text aria-hidden style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
+    <Text aria-hidden numberOfLines={1} style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink, fontVariant: ['tabular-nums'] }}>{display}</Text>
+    {/* Keep the native picker without using its locale-dependent text for layout. */}
+    <input {...props} aria-label={`${label} подачи`} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+      onClick={(event) => { openPicker(event.currentTarget); }}
+      onKeyDown={(event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && openPicker(event.currentTarget)) event.preventDefault();
+      }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', minWidth: 0,
+        boxSizing: 'border-box', margin: 0, opacity: 0, cursor: 'pointer', fontSize: 16 }} />
+  </label>;
+}
+
+export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChange, onTimeChange }: ScheduledPickupFieldsProps) {
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.x2 }}>
+    <PickupInput label="Дата" type="date" basis={130} display={formatPickupDate(date)} value={date} min={minDate} max={maxDate}
+      onChange={(event) => onDateChange(event.currentTarget.value)} />
+    <PickupInput label="Время" type="time" basis={96} display={time} value={time}
+      onChange={(event) => onTimeChange(event.currentTarget.value)} />
+  </div>;
 }

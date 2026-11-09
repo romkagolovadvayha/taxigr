@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { grahovoMapLabel } from '@/data/service-area';
+
 import { useSession } from '@/auth/session-provider';
 import { getDemoPassengerProgression } from '@/domain/demo-flow';
 import {
@@ -219,6 +221,7 @@ export function OrderScreen() {
       followZoom={rideInProgress ? 17 : 16}
       trimCompletedRoute={rideInProgress || routeCompleted}
       viewportInsets={mapInsets}
+      defaultCenter={grahovoMapLabel}
     />
   );
 

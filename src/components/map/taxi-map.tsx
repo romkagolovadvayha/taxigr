@@ -47,7 +47,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const onReady = useEffectEvent(() => props.onMapReady?.());
   const onError = useEffectEvent((message: string) => props.onMapError?.(message));
   const [initialView] = useState(() => ({
-    center: lngLat(validMapCoordinate(props.selectionCenter) ? props.selectionCenter : grahovoCenter),
+    center: lngLat(validMapCoordinate(props.selectionCenter) ? props.selectionCenter : props.defaultCenter ?? grahovoCenter),
     zoom: props.selectionCenter ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM,
     pitch: 0,
   }));
@@ -101,7 +101,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     const layout = JSON.stringify([size, padding, props.followRequestId]);
     const previous = fitted.current;
     if (previous?.layout === layout && previous.coordinates === scene.fitCoordinates) return;
-    const location = taxiMapFit(scene.fitCoordinates, size.width, size.height, padding);
+    const location = taxiMapFit(scene.fitCoordinates, size.width, size.height, padding, props.defaultCenter);
     if (location) {
       const target = JSON.stringify(location);
       fitted.current = { layout, coordinates: scene.fitCoordinates, target };
@@ -109,7 +109,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       camera.current?.easeTo({ ...location, padding, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : motion.duration.tracking });
     }
   }, [initialized, size, props.selectionCenter, props.followDriver, props.followRequestId, props.driver, props.driverHeading,
-    props.followZoom, props.navigationMode, following, scene.fitCoordinates, padding, reducedMotion]);
+    props.followZoom, props.navigationMode, props.defaultCenter, following, scene.fitCoordinates, padding, reducedMotion]);
 
   const driverData = useMemo(() => ({ type: 'FeatureCollection' as const, features: validMapCoordinate(props.driver) ? [{
     type: 'Feature' as const, properties: { heading: mapBearing(props.driverHeading), image: driverMarkerKey(props.driverColorHex) },

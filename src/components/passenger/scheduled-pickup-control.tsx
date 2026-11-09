@@ -67,13 +67,10 @@ export function ScheduledPickupControl({ disabled, dense }: { disabled?: boolean
     <AppModal compact={dense} visible={step !== null} title={step === 'time' ? 'Выберите время подачи' : 'Когда подать машину?'}
       onClose={() => setStep(null)}>
       {step === 'time' ? <View style={{ gap: spacing.x3 }}>
-        <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-          Местное время Грахово. От {preorderMinLeadMinutes} минут до {preorderMaxLeadDays} дней вперёд.
-        </Text>
         <ScheduledPickupFields date={date} time={time} minDate={grahovoWallTime(min).slice(0, 10)}
           maxDate={grahovoWallTime(max).slice(0, 10)} onDateChange={setDate} onTimeChange={setTime} />
         {validation && <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.danger }}>
-          Выберите дату и время в указанном диапазоне.
+          Выберите время подачи через {preorderMinLeadMinutes} минут или позже, не дальше чем через {preorderMaxLeadDays} дней.
         </Text>}
         <AppButton compact onPress={confirm}>Установить время</AppButton>
       </View> : <View style={{ gap: spacing.x2 }}>

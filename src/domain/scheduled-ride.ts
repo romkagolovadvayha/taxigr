@@ -4,6 +4,10 @@ export const preorderMinLeadMinutes = 30;
 export const preorderMaxLeadDays = 30;
 export const preorderDepartureMinutes = 15;
 
+export function formatPickupDate(date: string): string {
+  return date.split('-').reverse().join('.');
+}
+
 export function preorderBounds(now: number) {
   return {
     min: Math.ceil((now + preorderMinLeadMinutes * 60_000) / 60_000) * 60_000,

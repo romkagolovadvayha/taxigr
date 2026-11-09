@@ -67,9 +67,9 @@ export function taxiMapPadding(width: number, height: number, insets?: MapViewpo
   return { top, right, bottom, left };
 }
 
-export function taxiMapFit(coordinates: Coordinates[], width: number, height: number, padding: ReturnType<typeof taxiMapPadding>) {
+export function taxiMapFit(coordinates: Coordinates[], width: number, height: number, padding: ReturnType<typeof taxiMapPadding>, defaultCenter = grahovoCenter) {
   if (width <= 0 || height <= 0) return null;
-  if (!coordinates.length) return { center: lngLat(grahovoCenter), zoom: MAP_DEFAULT_ZOOM };
+  if (!coordinates.length) return { center: lngLat(defaultCenter), zoom: MAP_DEFAULT_ZOOM };
   if (coordinates.length === 1 && validMapCoordinate(coordinates[0])) {
     return { center: lngLat(coordinates[0]), zoom: MAP_ADDRESS_ZOOM };
   }

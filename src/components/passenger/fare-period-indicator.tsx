@@ -42,7 +42,7 @@ export function FarePeriodIndicator({ scheduledAt }: { scheduledAt?: string }) {
       </View>
     </AnimatedPressable>
     <AppModal compact visible={visible} title="Тариф по времени" returnFocusRef={trigger} onClose={() => setVisible(false)}
-      description={scheduledAt ? `Предзаказ на ${formatScheduledPickup(scheduledAt, true)} · время Грахово` : 'Местное время Грахово'}>
+      description={scheduledAt ? `Предзаказ на ${formatScheduledPickup(scheduledAt, true)}` : undefined}>
       <View style={{ gap: spacing.x3 }}>
         <Text style={{ ...typography.caption, color: colors.inkSecondary }}>
           Поздним вечером и ночью поездка может стоить дороже, а ожидание машины — дольше.

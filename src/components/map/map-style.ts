@@ -10,6 +10,7 @@ export const OPEN_MAP_TILES_URL = 'https://openmaptiles.org/';
 export const OPEN_STREET_MAP_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 const mapAttribution = `© <a href="${OPEN_MAP_TILES_URL}">OpenMapTiles</a> · © <a href="${OPEN_STREET_MAP_COPYRIGHT_URL}">OpenStreetMap</a>`;
 const name: ExpressionSpecification = ['coalesce', ['get', 'name:ru'], ['get', 'name'], ''];
+const isGrahovo: ExpressionSpecification = ['==', name, 'Грахово'];
 
 export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', offline = false): StyleSpecification {
   const dark = scheme === 'dark';
@@ -71,7 +72,8 @@ export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', off
     { id: 'place-label', type: 'symbol', source: 'openmaptiles', 'source-layer': 'place',
       filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'hamlet', 'suburb', 'neighbourhood']]],
       layout: { 'text-field': name, 'text-font': [MAP_FONT], 'text-size': ['interpolate', ['linear'], ['zoom'], 6, 11, 12, 15, 16, 17],
-        'text-offset': [0, .8], 'text-anchor': 'top', 'text-max-width': 9 }, paint: labels },
+        'text-offset': ['case', isGrahovo, ['literal', [0, 0]], ['literal', [0, .8]]],
+        'text-anchor': ['case', isGrahovo, 'center', 'top'], 'text-max-width': 9 }, paint: labels },
   ];
   return { version: 8, name: 'Такси Грахово', glyphs: MAP_GLYPHS_URL,
     sources: { openmaptiles: { type: 'vector', url: MAP_TILES_URL, attribution: mapAttribution } },

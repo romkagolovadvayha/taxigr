@@ -230,7 +230,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       const layout = JSON.stringify([width, height, padding, props.followRequestId]);
       const previous = fitted.current;
       if (previous?.layout === layout && previous.coordinates === scene.fitCoordinates) return;
-      const location = taxiMapFit(scene.fitCoordinates, width, height, padding);
+      const location = taxiMapFit(scene.fitCoordinates, width, height, padding, props.defaultCenter);
       if (location) {
         const target = JSON.stringify(location);
         fitted.current = { layout, coordinates: scene.fitCoordinates, target };
@@ -264,7 +264,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       const current = latest.current;
       const selection = current.props.selectionCenter;
       const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme, current.offline),
-        center: lngLat(validMapCoordinate(selection) ? selection : grahovoCenter),
+        center: lngLat(validMapCoordinate(selection) ? selection : current.props.defaultCenter ?? grahovoCenter),
         zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, minZoom: MAP_MIN_ZOOM, maxZoom: MAP_MAX_ZOOM,
         scrollZoom: selection ? { around: 'center' } : true, touchZoomRotate: selection ? { around: 'center' } : true,
         attributionControl: false,
@@ -344,7 +344,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
   useEffect(() => { followRef.current = true; followTarget.current = ''; }, [props.followDriver, props.followRequestId]);
   useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.driverColorHex, props.passenger,
-    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, props.searching, props.onRoutePointEdit, sync]);
+    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter,
+    props.defaultCenter, props.searching, props.onRoutePointEdit, sync]);
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
     <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />

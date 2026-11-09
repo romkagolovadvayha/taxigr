@@ -1,9 +1,9 @@
 import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import { useState } from 'react';
-import { Platform, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import { AppButton } from '@/components/ui/app-button';
-import { spacing, typography } from '@/theme/tokens';
+import { formatPickupDate } from '@/domain/scheduled-ride';
+import { radius, spacing, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/theme-provider';
 
 export type ScheduledPickupFieldsProps = {
@@ -17,10 +17,10 @@ export type ScheduledPickupFieldsProps = {
 
 export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChange, onTimeChange }: ScheduledPickupFieldsProps) {
   const colors = useThemeColors();
-  const { width, height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
 
-  if (Platform.OS === 'ios') {
+  if (process.env.EXPO_OS === 'ios') {
     return <DateTimePicker mode="datetime" display="compact" locale="ru_RU" timeZoneName="Europe/Samara"
       value={new Date(`${date}T${time}:00+04:00`)} minimumDate={new Date(`${minDate}T00:00:00+04:00`)}
       maximumDate={new Date(`${maxDate}T23:59:00+04:00`)} onValueChange={(_, next) => {
@@ -31,13 +31,18 @@ export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChan
   }
 
   const [hour, minute] = time.split(':').map(Number);
-  return <View style={{ gap: spacing.x2 }}>
-    <Text style={{ ...typography.caption, color: colors.inkSecondary }}>Дата и время</Text>
-    <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
-      <AppButton compact fullWidth={false} variant="secondary" style={{ flex: 1 }}
-        accessibilityLabel="Выбрать дату подачи" onPress={() => setPicker('date')}>{date.split('-').reverse().join('.')}</AppButton>
-      <AppButton compact fullWidth={false} variant="secondary" style={{ flex: 1 }}
-        accessibilityLabel="Выбрать время подачи" onPress={() => setPicker('time')}>{time}</AppButton>
+  const fields = [{ key: 'date', label: 'Дата', value: formatPickupDate(date) }, { key: 'time', label: 'Время', value: time }] as const;
+  return <>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
+      {fields.map(({ key, label, value }) => <Pressable key={key} accessibilityRole="button"
+        accessibilityLabel={`${label} подачи: ${value}`} onPress={() => setPicker(key)}
+        style={({ pressed }) => ({ flexBasis: Math.ceil((key === 'date' ? 104 : 70) * fontScale) + 26,
+          flexGrow: 1, flexShrink: 1, minHeight: 54, justifyContent: 'center',
+          paddingHorizontal: spacing.x3, paddingVertical: spacing.x1, borderRadius: radius.md, borderWidth: 1,
+          borderColor: colors.border, backgroundColor: colors.surfaceSecondary, opacity: pressed ? 0.7 : 1 })}>
+        <Text style={{ ...typography.caption, color: colors.inkSecondary }}>{label}</Text>
+        <Text style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      </Pressable>)}
     </View>
     {picker === 'date' && <DateTimePicker mode="date" display={width < 360 || height < 560 ? 'spinner' : 'default'}
       value={new Date(`${date}T00:00:00Z`)}
@@ -50,5 +55,5 @@ export function ScheduledPickupFields({ date, time, minDate, maxDate, onDateChan
         onTimeChange(`${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`);
         setPicker(null);
       }} />}
-  </View>;
+  </>;
 }
