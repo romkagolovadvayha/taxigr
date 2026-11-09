@@ -52,8 +52,6 @@ export function OrderConfirmationScreen() {
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const { initialLegalConsentRequired } = useSession();
   const [comment, setComment] = useState('');
-  const [commentDraft, setCommentDraft] = useState('');
-  const [commentVisible, setCommentVisible] = useState(false);
   const [promotionVisible, setPromotionVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
@@ -128,8 +126,8 @@ export function OrderConfirmationScreen() {
           />
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
-          <View accessibilityRole="radiogroup" accessibilityLabel="Способ оплаты" style={{ flexDirection: 'row', gap: spacing.x1 }}>
+        <View style={{ gap }}>
+          <View accessibilityRole="radiogroup" accessibilityLabel="Способ оплаты" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x1 }}>
             {([
               ['cash', 'Наличными'],
               ['transfer', 'Переводом'],
@@ -157,8 +155,26 @@ export function OrderConfirmationScreen() {
               );
             })}
           </View>
-          <IconButton icon="chat" size={44} label="Комментарий водителю"
-            onPress={() => { setCommentDraft(comment); setCommentVisible(true); }} />
+          <TextInput
+            accessibilityLabel="Комментарий водителю"
+            placeholder="Комментарий водителю"
+            placeholderTextColor={colors.inkMuted}
+            value={comment}
+            onChangeText={setComment}
+            maxLength={500}
+            multiline
+            style={{
+              ...typography.caption,
+              color: colors.ink,
+              height: 48,
+              textAlignVertical: 'top',
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: radius.md,
+              paddingHorizontal: spacing.x3,
+              paddingVertical: spacing.x1,
+            }}
+          />
         </View>
 
         {!!routeGuidance && (
@@ -235,13 +251,6 @@ export function OrderConfirmationScreen() {
               }
           />
       </View>}
-      <AppModal visible={commentVisible} title="Комментарий водителю" onClose={() => setCommentVisible(false)}>
-        <TextInput value={commentDraft} onChangeText={setCommentDraft} maxLength={500} multiline
-          accessibilityLabel="Комментарий водителю" placeholder="Например: вход со стороны магазина"
-          placeholderTextColor={colors.inkMuted} style={{ ...typography.body, color: colors.ink, height: 88,
-            textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.x3 }} />
-        <AppButton compact onPress={() => { setComment(commentDraft); setCommentVisible(false); }}>Сохранить комментарий</AppButton>
-      </AppModal>
       <AppModal visible={promotionVisible} title="Скидка на первый заказ" onClose={() => setPromotionVisible(false)}>
         <ScrollView style={{ flexGrow: 0, maxHeight: height * 0.55 }}>
           <Text selectable style={{ ...typography.body, color: colors.ink }}>{promotionText}</Text>
