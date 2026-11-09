@@ -177,6 +177,11 @@ export function OrderScreen() {
       destinations={currentRide?.destinations ?? destinations}
       destination={currentRide?.destination ?? destination}
       routeCoordinates={currentRide ? currentRide.routeCoordinates : routeCoordinates}
+      onRoutePointEdit={currentRide ? undefined : (index) => router.push({
+        pathname: '/address-search',
+        params: index === null ? { field: 'pickup', mapEdit: '1' } :
+          { field: 'destination', destinationIndex: String(index), mapEdit: '1' },
+      })}
       pickupEtaMinutes={
         currentRide
           ? livePickupEtaMinutes != null && livePickupEtaMinutes > 0

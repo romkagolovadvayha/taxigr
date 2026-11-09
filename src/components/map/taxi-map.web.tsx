@@ -1,6 +1,7 @@
 import type { Map as LibreMap, Marker, MapLibreEvent } from 'maplibre-gl';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useNetInfo } from '@react-native-community/netinfo';
 
 import { grahovoCenter } from '@/data/service-area';
 import { useForegroundScreen } from '@/hooks/use-foreground-screen';
@@ -25,9 +26,12 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   'use no memo';
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
+  const [offlineFallback, setOfflineFallback] = useState(false);
+  const { isConnected } = useNetInfo();
+  const offline = isConnected === false || offlineFallback;
   const scene = useMapScene(props);
-  const latest = useRef({ props, scene, colors, colorScheme });
-  useLayoutEffect(() => { latest.current = { props, scene, colors, colorScheme }; });
+  const latest = useRef({ props, scene, colors, colorScheme, offline });
+  useLayoutEffect(() => { latest.current = { props, scene, colors, colorScheme, offline }; });
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LibreMap | null>(null);
   const apiRef = useRef<MapApi | null>(null);
@@ -44,9 +48,10 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const fitted = useRef('');
   const fittedCoordinates = useRef<ReturnType<typeof useMapScene>['fitCoordinates'] | null>(null);
   const selectionKey = useRef('');
+  const movingSelection = useRef(false);
   const followRef = useRef(true);
   const driverAnimation = useRef(0);
-  const previousStyle = useRef(colorScheme);
+  const previousStyle = useRef(`${colorScheme}:${offline}`);
   const styleLoaded = useRef(false);
   const [initialized, setInitialized] = useState(false);
   const [ready, setReady] = useState(false);
@@ -66,29 +71,43 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     const updatePoint = (point: RouteMapPoint) => {
       let marker = pointsRef.current.get(point.id);
       const searching = Boolean(props.searching && point.kind === 'pickup');
-      const value = JSON.stringify([point, searching, colors.brand, colors.ink, colors.surface, colors.brandInk]);
+      const editable = !!props.onRoutePointEdit;
+      const value = JSON.stringify([point, searching, editable, colors.brand, colors.ink, colors.surface, colors.brandInk]);
       if (marker && pointValues.current.get(point.id) === value) return;
       pointValues.current.set(point.id, value);
       if (!marker) {
         const element = document.createElement('div');
-        element.setAttribute('role', 'img');
-        Object.assign(element.style, { display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' });
+        Object.assign(element.style, { display: 'flex', flexDirection: 'column', alignItems: 'center' });
+        const edit = () => latest.current.props.onRoutePointEdit?.(point.destinationIndex);
+        element.addEventListener('click', edit);
+        element.addEventListener('keydown', event => {
+          if (latest.current.props.onRoutePointEdit && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            edit();
+          }
+        });
         const label = document.createElement('div');
-        Object.assign(label.style, { whiteSpace: 'nowrap', padding: '5px 10px', marginBottom: '6px', borderRadius: '12px',
-          fontFamily: 'Manrope, system-ui, sans-serif', fontSize: '14px', fontWeight: '600', lineHeight: '20px',
-          boxShadow: '0 2px 8px rgba(0,0,0,.16)' });
+        Object.assign(label.style, { whiteSpace: 'nowrap', padding: '5px 9px', marginBottom: '3px', borderRadius: '16px',
+          fontFamily: 'Manrope, system-ui, sans-serif', fontSize: '12px', fontWeight: '700', lineHeight: '18px',
+          boxShadow: '0 2px 7px rgba(0,0,0,.14)' });
         const dot = document.createElement('div');
-        Object.assign(dot.style, { position: 'relative', width: '16px', height: '16px', borderRadius: '50%', border: '2px solid white', boxSizing: 'border-box' });
+        Object.assign(dot.style, { position: 'relative', width: '12px', height: '12px', borderRadius: '50%', border: '2px solid', boxSizing: 'border-box' });
         element.append(label, dot);
-        marker = new api.Marker({ element, anchor: 'bottom', offset: [0, 8] }).setLngLat(point.coordinates).addTo(map);
+        marker = new api.Marker({ element, anchor: 'bottom', offset: [0, 6] }).setLngLat(point.coordinates).addTo(map);
         pointsRef.current.set(point.id, marker);
       }
       const element = marker.getElement();
-      element.setAttribute('aria-label', searching ? `${point.label} · Ищем водителя` : point.label);
+      element.setAttribute('role', editable ? 'button' : 'img');
+      element.setAttribute('aria-label', `${editable ? 'Изменить точку ' + point.badge + ' · ' : ''}${point.label}${searching ? ' · Ищем водителя' : ''}`);
+      element.tabIndex = editable ? 0 : -1;
+      element.style.pointerEvents = editable ? 'auto' : 'none';
+      element.style.cursor = editable ? 'pointer' : '';
       const label = element.children[0] as HTMLDivElement, dot = element.children[1] as HTMLDivElement;
-      label.textContent = point.label;
-      label.style.background = dot.style.background = point.kind === 'pickup' ? colors.brand : point.kind === 'destination' ? colors.ink : colors.surface;
-      label.style.color = point.kind === 'destination' ? colors.surface : point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      label.textContent = `${point.badge} · ${point.label}${editable ? ' ›' : ''}`;
+      label.style.background = point.kind === 'pickup' ? colors.brand : colors.surface;
+      label.style.color = point.kind === 'pickup' ? colors.brandInk : colors.ink;
+      dot.style.background = colors.surface;
+      dot.style.borderColor = colors.ink;
       label.style.zIndex = '1';
       dot.style.setProperty('--pickup-radar-color', colors.brand);
       if (searching && !dot.firstChild) {
@@ -154,7 +173,6 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     if (nextInsetStyle !== insetStyle.current) {
       insetStyle.current = nextInsetStyle;
       host.style.setProperty('--taxi-map-attribution-bottom', String((props.viewportInsets?.bottom ?? 0) + 4) + 'px');
-      host.style.setProperty('--taxi-map-control-top', String((props.viewportInsets?.top ?? 0) + 8) + 'px');
     }
     if (validMapCoordinate(props.selectionCenter)) {
       followTarget.current = '';
@@ -193,14 +211,11 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     const onError = (message: string) => latest.current.props.onMapError?.(message);
     let observer: ResizeObserver | undefined;
     let stopWatchingReadiness: (() => void) | undefined;
-    let attribution: HTMLDetailsElement | null = null;
-    const collapseAttribution = () => {
-      // Set compact before source metadata arrives so MapLibre cannot auto-expand it.
-      attribution?.classList.add('maplibregl-compact');
-      attribution?.classList.remove('maplibregl-compact-show');
-      attribution?.removeAttribute('open');
-    };
-    const slowTimer = setTimeout(() => { if (active && !rendered) setSlow(true); }, 8_000);
+    const slowTimer = setTimeout(() => {
+      if (!active || rendered) return;
+      if (!latest.current.offline && mapRef.current) setOfflineFallback(true);
+      else setSlow(true);
+    }, 8_000);
     const timeout = setTimeout(() => {
       if (!active || rendered) return;
       const message = 'Не удалось загрузить данные карты. Нажмите «Повторить».';
@@ -212,41 +227,55 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       apiRef.current = api;
       const current = latest.current;
       const selection = current.props.selectionCenter;
-      const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme),
+      const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme, current.offline),
         center: lngLat(validMapCoordinate(selection) ? selection : grahovoCenter),
         zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, pitch: selection ? 0 : 25, minZoom: 5, maxZoom: MAP_MAX_ZOOM,
         attributionControl: false, locale: { 'AttributionControl.ToggleAttribution': 'Источники карты' },
         canvasContextAttributes: { antialias: true }, renderWorldCopies: false });
       mapRef.current = map;
-      map.addControl(new api.AttributionControl({ compact: true }), 'bottom-right');
-      attribution = container.current.querySelector<HTMLDetailsElement>('.maplibregl-ctrl-attrib');
-      collapseAttribution();
-      map.addControl(new api.NavigationControl({ showZoom: false, showCompass: true, visualizePitch: true }), 'top-right');
+      map.addControl(new api.AttributionControl({ compact: false }), 'bottom-right');
       map.getCanvas().setAttribute('aria-label', 'Карта поездки');
       map.getCanvas().addEventListener('webglcontextlost', contextLost);
-      map.on('style.load', () => { if (!active) return; styleLoaded.current = true; fitted.current = ''; setInitialized(true); sync(); });
-      stopWatchingReadiness = watchBaseMapReady(map, () => {
+      const markReady = () => {
         if (!active || rendered) return;
         clearTimeout(slowTimer); clearTimeout(timeout);
         rendered = true; setReady(true); setError(null); latest.current.props.onMapReady?.();
+      };
+      map.on('style.load', () => {
+        if (!active) return;
+        styleLoaded.current = true; fitted.current = ''; setInitialized(true); sync();
+        if (latest.current.offline) map.once('render', markReady);
       });
+      stopWatchingReadiness = watchBaseMapReady(map, markReady);
       map.on('error', event => {
         if (!active) return;
         // A failed tile must not tear down an already usable map.
-        if (!rendered) {
+        if (!rendered && latest.current.offline) {
           setError('Не удалось открыть карту. Нажмите «Повторить».'); onError(event.error.message);
         }
       });
       map.on('click', event => {
         const point = { latitude: event.lngLat.lat, longitude: event.lngLat.lng };
-        if (validMapCoordinate(point)) latest.current.props.onCoordinateSelect?.(point);
+        if (!validMapCoordinate(point) || !latest.current.props.selectionCenter) return;
+        latest.current.props.onSelectionInteraction?.();
+        map.jumpTo({ center: lngLat(point) });
+        latest.current.props.onCoordinateSelect?.(point);
       });
       const stopFollowing = (event: MapLibreEvent) => {
         if (event.originalEvent) {
-          followRef.current = false; collapseAttribution(); latest.current.props.onSelectionInteraction?.();
+          followRef.current = false;
+          if (latest.current.props.selectionCenter) movingSelection.current = true;
+          latest.current.props.onSelectionInteraction?.();
         }
       };
       map.on('dragstart', stopFollowing); map.on('rotatestart', stopFollowing); map.on('zoomstart', stopFollowing);
+      map.on('moveend', () => {
+        if (!movingSelection.current) return;
+        movingSelection.current = false;
+        const { lat, lng } = map.getCenter();
+        const point = { latitude: lat, longitude: lng };
+        if (latest.current.props.selectionCenter && validMapCoordinate(point)) latest.current.props.onCoordinateSelect?.(point);
+      });
       observer = new ResizeObserver(() => { map.resize(); fitted.current = ''; sync(); });
       observer.observe(container.current);
     }).catch((reason: unknown) => {
@@ -270,19 +299,22 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   }, [sync]);
 
   useEffect(() => {
-    if (previousStyle.current === colorScheme) return;
-    previousStyle.current = colorScheme;
+    const key = `${colorScheme}:${offline}`;
+    if (previousStyle.current === key) return;
+    previousStyle.current = key;
     styleLoaded.current = false;
-    mapRef.current?.setStyle(taxiMapStyle(colors, colorScheme));
-  }, [colors, colorScheme]);
+    mapRef.current?.setStyle(taxiMapStyle(colors, colorScheme, offline));
+  }, [colors, colorScheme, offline]);
 
   useEffect(() => { followRef.current = true; followTarget.current = ''; }, [props.followDriver, props.followRequestId]);
   useEffect(() => { sync(); }, [initialized, scene, colors, props.driver, props.driverHeading, props.passenger,
-    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, props.searching, sync]);
+    props.followDriver, props.followZoom, props.followRequestId, props.navigationMode, props.viewportInsets, props.selectionCenter, props.searching, props.onRoutePointEdit, sync]);
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
     <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />
-    <style>{'[data-taxi-map="maplibre"] .maplibregl-ctrl-bottom-right{bottom:var(--taxi-map-attribution-bottom,4px)}[data-taxi-map="maplibre"] .maplibregl-ctrl-top-right{top:var(--taxi-map-control-top,8px)}'}</style>
+    {offline && ready && <div style={{ position: 'absolute', top: 8 + (props.viewportInsets?.top ?? 0), left: 8, padding: 4,
+      fontFamily: 'Manrope, system-ui, sans-serif', fontSize: 11, color: colors.inkSecondary, background: colors.surface }}>Карта района офлайн</div>}
+    <style>{'[data-taxi-map="maplibre"] .maplibregl-ctrl-bottom-right{bottom:var(--taxi-map-attribution-bottom,4px)}[data-taxi-map="maplibre"] .maplibregl-ctrl-attrib{font-size:9px;line-height:14px}'}</style>
     <style>{`
       .taxi-pickup-radar{position:absolute;left:50%;top:50%;width:160px;height:160px;transform:translate(-50%,-50%);pointer-events:none}
       .taxi-pickup-radar span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--pickup-radar-color);background:var(--pickup-radar-color);box-sizing:border-box;animation:taxi-pickup-pulse 2400ms linear infinite}

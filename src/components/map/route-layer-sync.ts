@@ -23,9 +23,9 @@ export function createRouteLayerSync() {
     if (!current) {
       map.addSource('taxi-route', { type: 'geojson', data: route, tolerance: 0 });
       map.addLayer({ id: 'taxi-route-outline', type: 'line', source: 'taxi-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': nextOutline, 'line-width': 10 } });
+        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': nextOutline, 'line-width': 7 } });
       map.addLayer({ id: 'taxi-route-line', type: 'line', source: 'taxi-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': nextLine, 'line-width': 7 } });
+        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': nextLine, 'line-width': 4 } });
       source = map.getSource('taxi-route') as GeoJSONSource;
     } else {
       if (current !== source || !sameGeometry(route, previous)) current.setData(route);

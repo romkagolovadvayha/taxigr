@@ -32,4 +32,5 @@ export type TaxiMapProps = {
   selectionCenter?: Coordinates;
   onCoordinateSelect?: (coordinates: Coordinates) => void;
   onSelectionInteraction?: () => void;
+  onRoutePointEdit?: (destinationIndex: number | null) => void;
 };

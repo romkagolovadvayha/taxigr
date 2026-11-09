@@ -8,11 +8,34 @@ export const MAP_GLYPHS_URL = process.env.EXPO_PUBLIC_MAP_GLYPHS_URL || 'https:/
 export const MAP_FONT = 'Noto Sans Regular';
 const name: ExpressionSpecification = ['coalesce', ['get', 'name:ru'], ['get', 'name'], ''];
 
-export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark'): StyleSpecification {
+export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', offline = false): StyleSpecification {
   const dark = scheme === 'dark';
   const road = dark ? '#59574F' : '#FFFFFF';
   const green = dark ? '#253D30' : '#D8E5CC';
   const water = dark ? '#274B5E' : '#B8DAE7';
+  if (offline) {
+    // A regional road map from OpenFreeMap's OpenStreetMap tiles. Keep it in the
+    // app so a cold start can draw the district without requesting any tiles.
+    const district = require('../../data/grahovo-offline-map.json') as GeoJSON.FeatureCollection;
+    return {
+      version: 8,
+      sources: { district: { type: 'geojson', data: district,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · OpenMapTiles · OpenFreeMap' } },
+      layers: [
+        { id: 'background', type: 'background', paint: { 'background-color': colors.mapFallback } },
+        { id: 'district-water', type: 'fill', source: 'district', filter: ['==', ['get', 'kind'], 'water'],
+          paint: { 'fill-color': water } },
+        { id: 'district-road-outline', type: 'line', source: 'district', filter: ['==', ['get', 'kind'], 'road'],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': colors.borderStrong, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 17, 12] } },
+        { id: 'district-roads', type: 'line', source: 'district', filter: ['==', ['get', 'kind'], 'road'],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': road, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 17, 9] } },
+        { id: 'district-places', type: 'circle', source: 'district', filter: ['==', ['get', 'kind'], 'place'],
+          paint: { 'circle-radius': 2.5, 'circle-color': colors.inkSecondary } },
+      ],
+    };
+  }
   const labels = { 'text-color': colors.inkSecondary, 'text-halo-color': colors.mapFallback, 'text-halo-width': 1.5 };
   const layers: LayerSpecification[] = [
     { id: 'background', type: 'background', paint: { 'background-color': colors.mapFallback } },

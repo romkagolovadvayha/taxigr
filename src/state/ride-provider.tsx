@@ -143,7 +143,7 @@ type RideBootstrap = {
 };
 
 const RideContext = createContext<RideContextValue | null>(null);
-type RideAddressValue = Pick<RideContextValue, 'setPickup' | 'setDestination' | 'setDestinationAt' | 'addDestination' | 'destinationHistory'>;
+type RideAddressValue = Pick<RideContextValue, 'pickup' | 'destinations' | 'setPickup' | 'setDestination' | 'setDestinationAt' | 'addDestination' | 'destinationHistory'>;
 const RideAddressContext = createContext<RideAddressValue | null>(null);
 const RideBootstrapContext = createContext(false);
 
@@ -1672,8 +1672,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   );
 
   const addressValue = useMemo(() => ({
-    setPickup: selectPickup, setDestination: selectDestination, setDestinationAt, addDestination, destinationHistory,
-  }), [selectPickup, selectDestination, setDestinationAt, addDestination, destinationHistory]);
+    pickup, destinations, setPickup: selectPickup, setDestination: selectDestination, setDestinationAt, addDestination, destinationHistory,
+  }), [pickup, destinations, selectPickup, selectDestination, setDestinationAt, addDestination, destinationHistory]);
 
   return <RideContext.Provider value={value}>
     <RideAddressContext.Provider value={addressValue}>

@@ -10,7 +10,7 @@ import { hasApproximateCoordinates, isDirectoryHouseEstimate } from '../../domai
 
 export { lngLat, mapBearing, validMapCoordinate, type LngLat } from '../../domain/map-coordinates';
 
-export type RouteMapPoint = { id: string; kind: 'pickup' | 'stop' | 'destination'; coordinates: LngLat; label: string };
+export type RouteMapPoint = { id: string; kind: 'pickup' | 'stop' | 'destination'; coordinates: LngLat; label: string; badge: string; destinationIndex: number | null };
 export const MAP_SELECTION_ZOOM = 18;
 export const MAP_DEFAULT_ZOOM = 14;
 export const MAP_MAX_ZOOM = 19;
@@ -25,7 +25,7 @@ export function taxiMapScene(props: TaxiMapProps) {
     : original[0] ?? props.pickup?.coordinates;
   const approximatePickup = isDirectoryHouseEstimate(props.pickup);
   if (props.pickup && (!hasApproximateCoordinates(props.pickup) || approximatePickup) && validMapCoordinate(pickup)) points.push({
-    id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup),
+    id: 'pickup', kind: 'pickup', coordinates: lngLat(pickup), badge: 'А', destinationIndex: null,
     label: approximatePickup ? 'Подача · примерно' : props.pickupEtaMinutes ? `Старт · ${props.pickupEtaMinutes} мин` : 'Старт',
   });
   const destinations = props.destinations?.length ? props.destinations : props.destination ? [props.destination] : [];
@@ -36,6 +36,7 @@ export function taxiMapScene(props: TaxiMapProps) {
     const approximate = isDirectoryHouseEstimate(destination);
     if ((!hasApproximateCoordinates(destination) || approximate) && validMapCoordinate(coordinates)) points.push({
       id: `destination-${index}`, kind: final ? 'destination' : 'stop', coordinates: lngLat(coordinates),
+      badge: final ? 'Б' : String(index + 1), destinationIndex: index,
       label: routeDestinationMapLabel(index, destinations.length, final && !approximate ? props.destinationArrivalLabel : undefined) +
         (approximate ? ' · примерно' : ''),
     });
