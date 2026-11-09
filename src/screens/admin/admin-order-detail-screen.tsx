@@ -28,6 +28,7 @@ import { spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
 import { VehiclePlate } from '@/components/vehicle/vehicle-plate';
 import { useThemeColors } from '@/theme/theme-provider';
+import { formatScheduledPickup } from '@/domain/scheduled-ride';
 
 type Props = { id: string };
 
@@ -167,6 +168,7 @@ export function AdminOrderDetailScreen({ id }: Props) {
       : []),
     ['Комиссия сервиса', isRidePricePending(order) ? 'После указания стоимости' : formatMoney(order.serviceCommissionMinor)],
     ['Итого', ridePriceLabel(order)],
+    ...(order.scheduledAt ? [['Подача ко времени', formatScheduledPickup(order.scheduledAt)] as [string, string]] : []),
     ['Создан', formatDateTime(order.createdAt)],
     ['Обновлён', formatDateTime(order.updatedAt)],
   ];

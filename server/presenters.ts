@@ -22,6 +22,7 @@ export type OrderRow = RowDataPacket & {
   passenger_id: string;
   driver_id: string | null;
   active_driver_id: string | null;
+  scheduled_at?: Date | string | null;
   tariff: TariffCode;
   status: RideStatus;
   pricing_scope: PricingScope;
@@ -96,6 +97,7 @@ export type OrderRow = RowDataPacket & {
 };
 
 export type OrderSummaryRow = RowDataPacket & {
+  scheduled_at?: Date | string | null;
   pricing_mode?: 'fixed' | 'driver';
   manual_price_set?: number;
   id: string;
@@ -226,7 +228,8 @@ export function presentOrder(row: OrderRow): RideOrder {
     id: row.id,
     passengerId: row.passenger_id,
     driverId: row.driver_id ?? undefined,
-    driverQueuePosition: assigned ? (row.active_driver_id ? 1 : 2) : undefined,
+    driverQueuePosition: assigned ? (row.active_driver_id ? 1 : row.scheduled_at ? undefined : 2) : undefined,
+    scheduledAt: row.scheduled_at ? new Date(row.scheduled_at).toISOString() : undefined,
     pickup: address('pickup', row.pickup_label, row.pickup_details, row.pickup_lat, row.pickup_lon),
     destinations: orderedDestinations.length ? orderedDestinations : [legacyDestination],
     nextDestinationIndex: Math.max(0, Math.min(Number(row.next_destination_index ?? 0),
@@ -362,6 +365,7 @@ export function presentOrderSummary(row: OrderSummaryRow): RideOrderSummary {
     tariff: row.tariff,
     status: row.status,
     priceMinor: row.price_minor,
+    scheduledAt: row.scheduled_at ? new Date(row.scheduled_at).toISOString() : undefined,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -437,7 +441,7 @@ export const orderSummarySelect = `
   SELECT o.id, o.passenger_id, o.tariff, o.status,
     o.pickup_label, o.pickup_details, o.pickup_lat, o.pickup_lon,
     o.destination_label, o.destination_details, o.destination_lat, o.destination_lon,
-    o.price_minor, o.pricing_mode, o.manual_price_set, o.created_at, o.updated_at
+    o.price_minor, o.pricing_mode, o.manual_price_set, o.created_at, o.updated_at, o.scheduled_at
   FROM orders o
 `;
 

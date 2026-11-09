@@ -12,6 +12,7 @@ import {
   isPickupAddressBookable,
 } from '@/domain/address-precision';
 import { estimatePickupEtaMinutes } from '@/domain/pickup-eta';
+import { isReservedRide } from '@/domain/scheduled-ride';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ActiveRidePanel } from '@/components/passenger/active-ride-panel';
 import { AddressFields } from '@/components/passenger/address-fields';
@@ -46,6 +47,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
     destination,
     tariffs,
     selectedTariff,
+    scheduledAt,
     currentRide,
     setSelectedTariff,
     cancelRide,
@@ -112,6 +114,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', validationAttempt
           selected={selectedTariff}
           onSelect={setSelectedTariff}
           compact
+          scheduled={!!scheduledAt}
           loading={quotePending}
           estimateAvailable={quoteReady}
         />
@@ -147,6 +150,7 @@ export function OrderScreen() {
     routeSummary,
     tariffs,
     selectedTariff,
+    scheduledAt,
     quoteStatus,
     currentRide,
     transitionRide,
@@ -154,7 +158,7 @@ export function OrderScreen() {
   const { token, user } = useSession();
   const demoSession = token?.startsWith('demo:') ?? false;
   const trackedDriver = usePassengerDriverTracking(currentRide, demoSession);
-  const driverIsFinishingPreviousRide = currentRide?.driverQueuePosition === 2;
+  const driverIsFinishingPreviousRide = currentRide?.driverQueuePosition === 2 || Boolean(currentRide && isReservedRide(currentRide));
   const livePickupEtaMinutes = estimatePickupEtaMinutes({
     driver: driverIsFinishingPreviousRide ? null : trackedDriver.coordinates,
     pickup: currentRide?.pricingMode === 'driver' ? undefined : currentRide?.pickup.coordinates,
@@ -170,7 +174,7 @@ export function OrderScreen() {
   const arrivalClock = useMemo(() => new Date(clock), [clock]);
 
   useEffect(() => {
-    if (!token?.startsWith('demo:passenger') || !currentRide) return;
+    if (!token?.startsWith('demo:passenger') || !currentRide || currentRide.scheduledAt) return;
     const progression = getDemoPassengerProgression(currentRide.status);
     if (!progression) return;
     const timer = setTimeout(() => transitionRide(progression.next), progression.delay);
@@ -189,12 +193,12 @@ export function OrderScreen() {
           ? livePickupEtaMinutes != null && livePickupEtaMinutes > 0
             ? livePickupEtaMinutes
             : undefined
-          : pickup && destination && quoteStatus === 'ready' && routeSummary
+          : !scheduledAt && pickup && destination && quoteStatus === 'ready' && routeSummary
             ? selectedPreviewTariff?.etaMinutes
             : undefined
       }
       destinationArrivalLabel={
-        !currentRide &&
+        !currentRide && !scheduledAt &&
         pickup &&
         destination &&
         quoteStatus === 'ready' &&
@@ -253,7 +257,7 @@ export function OrderScreen() {
         </View>
       </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row-reverse' }}>
-        <View testID="passenger-map-region" style={{ flex: 1, minHeight: isPhone ? 120 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
+        <View testID="passenger-map-region" style={{ flex: 1, minHeight: isPhone ? 80 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
           {map}
           {!currentRide && <View style={{ position: 'absolute', bottom: 24, right: 16 }}>
             <IconButton icon="recenter" label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
@@ -261,10 +265,10 @@ export function OrderScreen() {
           </View>}
         </View>
         <View testID="passenger-booking-panel" style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1, flexBasis: isPhone ? 'auto' : 0,
-          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, maxHeight: isPhone ? '72%' : undefined, backgroundColor: colors.surface }}
+          width: isPhone ? '100%' : 400, maxWidth: isPhone ? undefined : 440, maxHeight: isPhone ? '78%' : undefined, backgroundColor: colors.surface }}
         >
         <ScrollView ref={bookingScrollRef} style={{ flexGrow: isPhone ? 0 : 1, flexShrink: 1 }}
-          contentContainerStyle={{ padding: spacing.x4, paddingTop: spacing.x5, paddingBottom: currentRide ? spacing.x4 : spacing.x2 }}
+          contentContainerStyle={{ padding: spacing.x3, paddingBottom: currentRide ? spacing.x3 : spacing.x2 }}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {!currentRide && !!locationError && (
             <Text accessibilityRole="alert" style={{ ...typography.caption, color: colors.warningText, marginBottom: spacing.x2 }}>

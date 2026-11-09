@@ -19,6 +19,7 @@ import { useBookingAvailability } from '@/providers/booking-availability-provide
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
+import { formatScheduledPickup } from '@/domain/scheduled-ride';
 
 export function OrdersScreen() {
   const colors = useThemeColors();
@@ -123,7 +124,7 @@ export function OrdersScreen() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text selectable style={{ ...typography.bodyStrong, fontSize: 14, color: colors.ink }}>
-                    {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {formatDateTime(order.createdAt)}
+                    {order.tariff === 'child' ? 'Детский' : 'Эконом'} · {order.scheduledAt ? formatScheduledPickup(order.scheduledAt) : formatDateTime(order.createdAt)}
                   </Text>
                   <Text selectable numberOfLines={1} style={{ ...typography.caption, color: colors.inkSecondary }}>
                     {formatRouteLabel(order.pickup, order.destination)}

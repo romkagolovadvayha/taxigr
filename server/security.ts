@@ -34,6 +34,7 @@ export type OrderQuoteClaims = {
     originalPrices: Record<TariffCode, number>;
   };
   pricedAt: string;
+  scheduledAt?: string;
 };
 
 export function randomToken(bytes = 32): string {

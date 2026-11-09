@@ -1,4 +1,5 @@
 import type { RideOrder } from '@/domain/models';
+import { isReservedRide } from './scheduled-ride';
 
 export const maximumAssignedDriverOrders = 2;
 
@@ -10,7 +11,7 @@ const assignedStatuses = new Set<RideOrder['status']>([
 ]);
 
 export function isAssignedDriverOrder(order: RideOrder): boolean {
-  return Boolean(order.driverId) && assignedStatuses.has(order.status);
+  return Boolean(order.driverId) && assignedStatuses.has(order.status) && !isReservedRide(order);
 }
 
 export function isQueuedDriverOrder(order: RideOrder): boolean {
@@ -29,7 +30,7 @@ export function selectDriverOrderQueue(
   const current = assigned.find((order) => order.driverQueuePosition !== 2) ?? null;
   const next = assigned.find(isQueuedDriverOrder) ?? null;
   const offer = assigned.length < maximumAssignedDriverOrders
-    ? offers.find((order) => order.status === 'searching' && !order.driverId) ?? null
+    ? offers.find((order) => order.status === 'searching' && !order.driverId && !order.scheduledAt) ?? null
     : null;
 
   return { current, next, offer };

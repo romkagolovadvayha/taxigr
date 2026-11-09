@@ -111,6 +111,7 @@ export type RideOrder = {
   passengerId: string;
   driverId?: string;
   driverQueuePosition?: 1 | 2;
+  scheduledAt?: string;
   pickup: Address;
   /** Ordered drop-off points. `destination` remains the final point for compatibility. */
   destinations?: Address[];
@@ -166,6 +167,7 @@ export type RideOrderSummary = Pick<
   | 'pricingMode'
   | 'manualPriceSet'
   | 'createdAt'
+  | 'scheduledAt'
   | 'updatedAt'
 >;
 

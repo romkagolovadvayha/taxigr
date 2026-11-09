@@ -11,6 +11,7 @@ import { registerMiniAppRoutes } from './mini-app-routes';
 import { registerVkBroadcastRoutes, recordVkBroadcastPermission } from './vk-broadcasts';
 import { discountedFareRoundingMinor, firstOrderPromotionCode, firstOrderPriceMinor, firstOrderRateMinor, firstOrderWaitingRoundingMinor, renderPromotionMessage } from '../src/domain/first-order-discount';
 import { firstLocalOrderEligible } from './first-order-discount';
+import { formatScheduledPickup, preorderBounds, preorderDepartureMinutes, preorderMaxLeadDays, preorderMinLeadMinutes } from '../src/domain/scheduled-ride';
 import { readPromotionSettings } from './promotion-settings';
 import { registerPromotionRoutes } from './promotion-routes';
 import { isCrawlerImageError } from '../src/errors/web-error-classifier';
@@ -293,6 +294,7 @@ const quoteSchema = z.object({
   pickup: pickupAddressSchema,
   destination: destinationAddressSchema,
   destinations: z.array(destinationAddressSchema).min(1).max(5).optional(),
+  scheduledAt: z.iso.datetime({ offset: true }).transform(value => new Date(value).toISOString()).optional(),
 });
 const createOrderSchema = quoteSchema.extend({
   // Completeness is checked after verifying the server-issued quote. Only a
@@ -739,6 +741,7 @@ async function estimateTariffEtaMinutes(pickup: Address): Promise<Record<TariffC
          SELECT 1 FROM orders active_order
          WHERE active_order.driver_id = d.id
            AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+           AND (active_order.scheduled_at IS NULL OR active_order.active_driver_id IS NOT NULL)
        )
        AND l.recorded_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 10 MINUTE)`,
   );
@@ -1083,7 +1086,7 @@ async function loadDriverOfferRows(
   if (!['online', 'busy'].includes(driver.status)) return [];
   const [rows] = await db.query<OrderRow[]>(
     `${orderSelect}
-     WHERE o.status = 'searching' AND o.driver_id IS NULL
+     WHERE o.status = 'searching' AND o.driver_id IS NULL AND o.scheduled_at IS NULL
         AND o.created_at > DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)
         AND (
           o.priority_release_at IS NULL
@@ -1097,6 +1100,7 @@ async function loadDriverOfferRows(
           SELECT COUNT(*) FROM orders active_order
           WHERE active_order.driver_id = ?
             AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+            AND (active_order.scheduled_at IS NULL OR active_order.active_driver_id IS NOT NULL)
         ) < ?
         AND NOT EXISTS (
           SELECT 1 FROM driver_order_rejections rejected
@@ -1113,6 +1117,20 @@ async function loadDriverOfferRows(
     ],
   );
   return rows;
+}
+
+async function loadDriverPreorders(driver: NonNullable<Awaited<ReturnType<typeof getDriver>>>, userId: string) {
+  if (driver.status === 'suspended' || !driver.vehicle_id) return [];
+  const [rows] = await db.query<OrderRow[]>(
+    `${orderSelect}
+     WHERE o.scheduled_at IS NOT NULL AND o.passenger_id <> ? AND (
+       (o.driver_id = ? AND o.status = 'accepted' AND o.active_driver_id IS NULL)
+       OR (o.status = 'searching' AND o.driver_id IS NULL AND o.scheduled_at > UTC_TIMESTAMP(3)
+         AND NOT EXISTS (SELECT 1 FROM driver_order_rejections r WHERE r.order_id = o.id AND r.driver_id = ?))
+     ) ORDER BY o.scheduled_at, o.id`,
+    [userId, driver.id, driver.id],
+  );
+  return rows.map(row => limitOrderRatings(presentOrder(row), 'driver'));
 }
 
 async function openDriverShift(driverId: string, connection?: PoolConnection): Promise<void> {
@@ -1458,7 +1476,7 @@ async function rebalanceDriverOrderQueue(
     (RowDataPacket & { id: string; passenger_id: string })[]
   >(
     `SELECT id, passenger_id FROM orders
-     WHERE driver_id = ? AND active_driver_id IS NULL AND status = 'accepted'
+     WHERE driver_id = ? AND active_driver_id IS NULL AND status = 'accepted' AND scheduled_at IS NULL
      ORDER BY created_at ASC, id ASC
      LIMIT 1 FOR UPDATE`,
     [driverId],
@@ -1531,13 +1549,18 @@ async function eligibleDriverIdsForOrder(
   const [rows] = await executor.query<(RowDataPacket & { id: string })[]>(
     `SELECT d.id
      FROM orders o
-     JOIN drivers d ON d.status IN ('online', 'busy')
+     JOIN drivers d ON (o.scheduled_at IS NULL AND d.status IN ('online', 'busy'))
+       OR (o.scheduled_at > UTC_TIMESTAMP(3) AND d.status <> 'suspended'
+         AND EXISTS (SELECT 1 FROM vehicles v WHERE v.driver_id = d.id AND v.active = TRUE)
+         AND EXISTS (SELECT 1 FROM users u WHERE u.id = d.user_id AND u.blocked_at IS NULL AND u.deleted_at IS NULL))
      WHERE o.id = ?
-       AND (
+       AND (o.scheduled_at IS NOT NULL OR (
          SELECT COUNT(*) FROM orders active_order
          WHERE active_order.driver_id = d.id
            AND active_order.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
-       ) < ?
+           AND (active_order.scheduled_at IS NULL OR active_order.active_driver_id IS NOT NULL)
+       ) < ?)
+       AND (o.scheduled_at IS NULL OR d.user_id <> o.passenger_id)
        AND NOT EXISTS (
          SELECT 1 FROM driver_order_rejections rejected
          WHERE rejected.order_id = o.id AND rejected.driver_id = d.id
@@ -1553,10 +1576,11 @@ async function preparePriorityDispatch(
   connection: PoolConnection,
 ): Promise<string[]> {
   const [orders] = await connection.query<
-    (RowDataPacket & { pricing_scope: DriverPriorityScope })[]
-  >('SELECT pricing_scope FROM orders WHERE id = ? LIMIT 1 FOR UPDATE', [orderId]);
+    (RowDataPacket & { pricing_scope: DriverPriorityScope; scheduled_at: Date | null })[]
+  >('SELECT pricing_scope, scheduled_at FROM orders WHERE id = ? LIMIT 1 FOR UPDATE', [orderId]);
   const order = orders[0];
   if (!order) throw new Error('Order dispatch setup failed');
+  if (order.scheduled_at) return eligibleDriverIdsForOrder(orderId, 'all', connection);
   const priorityDriverIds = await eligibleDriverIdsForOrder(orderId, 'priority', connection);
   const settings = await driverDispatchSettings(connection);
   const delayMinutes = settings[order.pricing_scope];
@@ -1628,12 +1652,11 @@ export async function registerRoutes(
     driverIds: string[],
     options: { priceIncreased?: boolean; delayed?: boolean } = {},
   ): void => {
-    for (const driverId of driverIds) {
-      publish(`driver:${driverId}`, 'order:available', order);
-    }
+    if (order.scheduledAt) publish('drivers', 'preorders:changed', {});
+    else for (const driverId of driverIds) publish(`driver:${driverId}`, 'order:available', order);
     void notifyDrivers(
       driverIds,
-      driverOrderAvailablePush(order.id, options.priceIncreased, order.tariff),
+      driverOrderAvailablePush(order.id, options.priceIncreased, order.tariff, order.scheduledAt),
     ).catch((error) => app.log.warn({ error }, 'driver order push failed'));
     notifyMessengers(
       notifyDriversInMessengers(
@@ -1708,7 +1731,8 @@ export async function registerRoutes(
       const [rows] = await connection.query<OrderRow[]>(
         `SELECT * FROM orders
          WHERE status = 'searching' AND driver_id IS NULL
-           AND created_at <= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE)
+           AND ((scheduled_at IS NULL AND created_at <= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? MINUTE))
+             OR scheduled_at <= UTC_TIMESTAMP(3))
          ORDER BY created_at ASC LIMIT 100 FOR UPDATE`,
         [config.ORDER_SEARCH_TTL_MINUTES],
       );
@@ -1718,7 +1742,7 @@ export async function registerRoutes(
             cancelled_at = UTC_TIMESTAMP(3),
             cancellation_code = 'search_timeout', cancellation_reason = ?
            WHERE id = ?`,
-          ['Свободный водитель не найден за отведённое время', row.id],
+          [row.scheduled_at ? 'Водитель не найден к назначенному времени подачи' : 'Свободный водитель не найден за отведённое время', row.id],
         );
         await connection.execute(
           `INSERT INTO order_events
@@ -1736,7 +1760,8 @@ export async function registerRoutes(
       const payload = presentOrder(row);
       publish(`user:${item.passengerId}`, 'order:updated', payload);
       publish('admins', 'order:updated', payload);
-      publish('drivers', 'order:unavailable', { orderId: item.id });
+      if (payload.scheduledAt) publish('drivers', 'preorders:changed', {});
+      else publish('drivers', 'order:unavailable', { orderId: item.id });
       const push = row.idempotency_key?.startsWith(maxGroupOrderKey) ? null : passengerRidePush(payload);
       if (push) {
         void notifyUsers([item.passengerId], {
@@ -3592,6 +3617,15 @@ export async function registerRoutes(
   app.post('/v1/quotes', async (request) => {
     const session = await auth(request, 'passenger');
     const input = parse(quoteSchema, request.body);
+    if (input.scheduledAt) {
+      const { min, max } = preorderBounds(Date.now());
+      const time = Date.parse(input.scheduledAt);
+      if (time < min || time > max || time % 60_000 !== 0) {
+        throw Object.assign(new Error(`Выберите время подачи от ${preorderMinLeadMinutes} минут до ${preorderMaxLeadDays} дней вперёд`), {
+          statusCode: 400, code: 'INVALID_SCHEDULED_PICKUP',
+        });
+      }
+    }
     const { pickup, destination, destinations } = await resolveTrustedAddresses(input);
     const pricingScope = classifyMultiStopPricingScope(pickup, destinations);
     const [pricedRoute, rules, etaMinutes, eligible, promotionSettings] = await Promise.all([
@@ -3604,12 +3638,13 @@ export async function registerRoutes(
     const discountEligible = eligible && promotionSettings.discountPercent > 0;
     const { tripRoute: route, pricingSegments, driverApproachRoute, pricingDistanceMeters } = pricedRoute;
     const pricedAt = new Date();
+    const fareTime = input.scheduledAt ? new Date(input.scheduledAt) : pricedAt;
     const originalPrices = multiStopPrices(
       pickup,
       destinations,
       pricingSegments,
       rules,
-      pricedAt,
+      fareTime,
     );
     const prices = discountEligible
       ? {
@@ -3624,7 +3659,7 @@ export async function registerRoutes(
       rules,
       pricingScope,
       driverApproachRoute !== null && pricingDistanceMeters > route.distanceMeters,
-      pricedAt,
+      fareTime,
       etaMinutes,
       prices,
       destinations.length,
@@ -3658,6 +3693,7 @@ export async function registerRoutes(
       },
       promotion,
       pricedAt: pricedAt.toISOString(),
+      scheduledAt: input.scheduledAt,
     });
     return {
       data: {
@@ -3745,6 +3781,11 @@ export async function registerRoutes(
       });
     }
     const manualPricing = quote.pricingMode === 'driver';
+    if (input.scheduledAt !== quote.scheduledAt) {
+      throw Object.assign(new Error('Время подачи изменилось. Обновите расчёт стоимости'), {
+        statusCode: 409, code: 'QUOTE_SCHEDULE_MISMATCH',
+      });
+    }
     if (Boolean(quote.maxGroupBooking) !== input.idempotencyKey.startsWith(maxGroupOrderKey)) {
       throw Object.assign(new Error('Расчёт выдан для другого канала заказа'), { statusCode: 409, code: 'QUOTE_EXPIRED_OR_INVALID' });
     }
@@ -3798,6 +3839,11 @@ export async function registerRoutes(
       );
       if (existingRows[0]) {
         return { order: presentOrder(existingRows[0]), created: false, initialDriverIds: [] };
+      }
+      if (quote.scheduledAt && Date.parse(quote.scheduledAt) <= Date.now()) {
+        throw Object.assign(new Error('Выбранное время подачи прошло. Укажите новое время'), {
+          statusCode: 409, code: 'INVALID_SCHEDULED_PICKUP',
+        });
       }
       await assertBookingEnabled(connection);
       const passenger = userRows[0];
@@ -3907,8 +3953,8 @@ export async function registerRoutes(
           base_price_minor, price_minor, commission_minor, commission_bps,
           waiting_free_minutes, waiting_per_minute_minor,
           search_price_increase_interval_minutes, search_price_increase_step_minor,
-          payment_method, comment, idempotency_key, fare_rounding_minor, fare_rounding_mode
-        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          payment_method, comment, idempotency_key, fare_rounding_minor, fare_rounding_mode, scheduled_at
+        ) VALUES (?, ?, ?, ?, 'searching', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderId,
           session.id,
@@ -3944,6 +3990,7 @@ export async function registerRoutes(
           input.idempotencyKey,
           manualPricing ? null : quote.fareRoundingMinor ?? null,
           manualPricing ? null : quote.fareRoundingMode ?? null,
+          quote.scheduledAt ? new Date(quote.scheduledAt) : null,
         ],
       );
       if (manualPricing) await connection.execute("UPDATE orders SET pricing_mode = 'driver' WHERE id = ?", [orderId]);
@@ -3962,6 +4009,7 @@ export async function registerRoutes(
             pricingDistanceMeters,
             driverApproachDistanceMeters: quote.driverApproachDistanceMeters,
             quotePricedAt: quote.pricedAt,
+            scheduledAt: quote.scheduledAt,
             promotion: quote.promotion,
           }),
         ],
@@ -3981,7 +4029,7 @@ export async function registerRoutes(
       publish('admins', 'order:updated', result.order);
       notifyAdmins({
         icon: '🚕',
-        title: 'Создан новый заказ',
+        title: result.order.scheduledAt ? 'Создан предзаказ' : 'Создан новый заказ',
         actor: {
           role: 'пассажир',
           id: session.id,
@@ -3994,6 +4042,7 @@ export async function registerRoutes(
             result.order.destinations ?? [result.order.destination],
           )],
           ['Тариф', tariffLabels[result.order.tariff]],
+          ['Время подачи', result.order.scheduledAt ? formatScheduledPickup(result.order.scheduledAt) : null],
           ['Стоимость', ridePriceLabel(result.order)],
           ['Оплата', paymentMethodLabels[result.order.paymentMethod]],
           ['Комментарий', result.order.comment],
@@ -4037,18 +4086,22 @@ export async function registerRoutes(
       next: null,
       offer: null,
     };
+    let driverPreorders: Awaited<ReturnType<typeof loadDriverPreorders>> = [];
 
     if (driver) {
-      const [assignedResult, offerRows] = await Promise.all([
+      const [assignedResult, offerRows, preorders] = await Promise.all([
         db.query<OrderRow[]>(
           `${orderSelect}
            WHERE o.driver_id = ?
              AND o.status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+             AND (o.scheduled_at IS NULL OR o.active_driver_id IS NOT NULL)
            ORDER BY o.created_at ASC LIMIT ?`,
           [driver.id, maximumAssignedDriverOrders],
         ),
         loadDriverOfferRows(driver, 1),
+        loadDriverPreorders(driver, session.id),
       ]);
+      driverPreorders = preorders;
       const assignedOrders = assignedResult[0].map((row) =>
         limitOrderRatings(presentOrder(row), 'driver'),
       );
@@ -4063,6 +4116,7 @@ export async function registerRoutes(
           : null,
         destinationHistory: destinationHistory.items.slice(0, 20),
         driverQueue,
+        driverPreorders,
         chatUnreadCounts,
       },
     };
@@ -4414,7 +4468,7 @@ export async function registerRoutes(
         });
       }
       if (row.pricing_mode === 'driver') throw Object.assign(new Error('Стоимость этого заказа определяет водитель'), { statusCode: 409 });
-      if (row.status !== 'searching' || row.driver_id) {
+      if (row.status !== 'searching' || row.driver_id || row.scheduled_at) {
         throw Object.assign(new Error('Водитель уже найден или поиск завершён'), {
           statusCode: 409,
           code: 'PRICE_INCREASE_NOT_AVAILABLE',
@@ -4733,7 +4787,8 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     if (participants.driverId) publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
-    publish('drivers', 'order:unavailable', { orderId: id });
+    if (payload.scheduledAt) publish('drivers', 'preorders:changed', {});
+    else publish('drivers', 'order:unavailable', { orderId: id });
     if (participants.driverId) {
       await announcePromotedDriverOrder(participants.promotion, participants.driverId);
     }
@@ -4896,6 +4951,7 @@ export async function registerRoutes(
         `SELECT id FROM orders
          WHERE driver_id = ?
            AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+           AND (scheduled_at IS NULL OR active_driver_id IS NOT NULL)
          LIMIT 1 FOR UPDATE`,
         [current.id],
       );
@@ -5203,6 +5259,7 @@ export async function registerRoutes(
   app.post('/v1/driver/orders/:id/accept', async (request) => {
     const session = await auth(request, 'driver');
     const { id } = request.params as { id: string };
+    const { confirmedScheduledAt } = parse(z.object({ confirmedScheduledAt: z.iso.datetime({ offset: true }).optional() }), request.body ?? {});
     // The driver and order rows serialize assignment. Avoid gap locks on the
     // empty driver-order index ranges while different drivers accept together.
     const updated = await withTransaction(async (connection) => {
@@ -5215,6 +5272,15 @@ export async function registerRoutes(
         [id],
       );
       const row = rows[0];
+      const scheduledAt = row?.scheduled_at ? new Date(row.scheduled_at) : null;
+      if (scheduledAt && (!confirmedScheduledAt || Date.parse(confirmedScheduledAt) !== scheduledAt.getTime())) {
+        throw Object.assign(new Error('Подтвердите дату и время подачи в разделе «Предзаказы»'), {
+          statusCode: 409, code: 'SCHEDULE_CONFIRMATION_REQUIRED',
+        });
+      }
+      if (row && scheduledAt && row.driver_id === driver.id && row.status === 'accepted') {
+        return { passengerId: row.passenger_id, driverId: driver.id, changed: false };
+      }
       if (!row || row.status !== 'searching' || row.driver_id) {
         throw Object.assign(new Error('Заказ уже взял другой водитель'), {
           statusCode: 409,
@@ -5222,15 +5288,15 @@ export async function registerRoutes(
         });
       }
       if (
-        Date.now() - new Date(row.created_at).getTime() >=
-        config.ORDER_SEARCH_TTL_MINUTES * 60_000
+        scheduledAt ? scheduledAt.getTime() <= Date.now() :
+          Date.now() - new Date(row.created_at).getTime() >= config.ORDER_SEARCH_TTL_MINUTES * 60_000
       ) {
         throw Object.assign(new Error('Время поиска по этому заказу истекло'), {
           statusCode: 409,
           code: 'ORDER_SEARCH_EXPIRED',
         });
       }
-      if (!['online', 'busy'].includes(driver.status)) {
+      if (scheduledAt ? driver.status === 'suspended' : !['online', 'busy'].includes(driver.status)) {
         throw Object.assign(new Error('Включите статус «На линии»'), { statusCode: 409 });
       }
       const [priorityRows] = await connection.query<(RowDataPacket & { assigned: number })[]>(
@@ -5241,7 +5307,7 @@ export async function registerRoutes(
         [driver.id, row.pricing_scope],
       );
       if (
-        !canDriverReceivePriorityOrder(
+        !scheduledAt && !canDriverReceivePriorityOrder(
           row.priority_release_at,
           Boolean(priorityRows[0]?.assigned),
         )
@@ -5251,12 +5317,13 @@ export async function registerRoutes(
           { statusCode: 403, code: 'ORDER_PRIORITY_DELAY' },
         );
       }
-      const [activeRows] = await connection.query<
+      const [activeRows] = scheduledAt ? [[]] : await connection.query<
         (RowDataPacket & { id: string; active_driver_id: string | null })[]
       >(
         `SELECT id, active_driver_id FROM orders
          WHERE driver_id = ?
            AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+           AND (scheduled_at IS NULL OR active_driver_id IS NOT NULL)
          ORDER BY created_at ASC, id ASC
          LIMIT ? FOR UPDATE`,
         [driver.id, maximumAssignedDriverOrders],
@@ -5271,6 +5338,20 @@ export async function registerRoutes(
         throw Object.assign(new Error('Нельзя принять собственный заказ'), {
           statusCode: 409,
           code: 'SELF_ACCEPT_FORBIDDEN',
+        });
+      }
+      if (scheduledAt) {
+        const departureAt = new Date(scheduledAt.getTime() - preorderDepartureMinutes * 60_000);
+        const [conflicts] = await connection.query<RowDataPacket[]>(
+          `SELECT id FROM orders
+           WHERE driver_id = ? AND status IN ('accepted','driver_arriving','driver_waiting','in_progress')
+             AND scheduled_at < TIMESTAMPADD(SECOND, ?, ?)
+             AND TIMESTAMPADD(SECOND, GREATEST(duration_seconds, 900), scheduled_at) > ?
+           LIMIT 1`,
+          [driver.id, Math.max(Number(row.duration_seconds), 900) + preorderDepartureMinutes * 60, scheduledAt, departureAt],
+        );
+        if (conflicts.length) throw Object.assign(new Error('На это время у вас уже есть другой предзаказ'), {
+          statusCode: 409, code: 'PREORDER_TIME_CONFLICT',
         });
       }
       const [rejectedRows] = await connection.query<(RowDataPacket & { rejected: number })[]>(
@@ -5289,30 +5370,31 @@ export async function registerRoutes(
       const rules = await pricingRules(connection);
       const commissionBps = driver.commission_bps ?? rules.serviceCommissionBps;
       const commissionMinor = calculateCommissionMinor(row.price_minor, commissionBps);
-      const queuePosition = activeRows.length === 0 ? 1 : 2;
-      const activeDriverId = queuePosition === 1 ? driver.id : null;
-      const acceptedStatus = queuePosition === 1 ? 'driver_arriving' : 'accepted';
+      const activeDriverId = !scheduledAt && activeRows.length === 0 ? driver.id : null;
+      const acceptedStatus = activeDriverId ? 'driver_arriving' : 'accepted';
       await connection.execute(
         `UPDATE orders SET driver_id = ?, active_driver_id = ?, vehicle_id = ?, status = ?,
           commission_minor = ?, commission_bps = ?
          WHERE id = ? AND status = 'searching'`,
         [driver.id, activeDriverId, driver.vehicle_id, acceptedStatus, commissionMinor, commissionBps, id],
       );
-      await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
+      if (!scheduledAt) await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, from_status, to_status)
          VALUES (?, ?, 'order.accepted', 'searching', ?)`,
         [id, session.id, acceptedStatus],
       );
-      return { passengerId: row.passenger_id, driverId: driver.id, queuePosition };
+      return { passengerId: row.passenger_id, driverId: driver.id, changed: true };
     }, { isolationLevel: 'READ COMMITTED' });
     const row = await getOrder(id);
     if (!row) throw new Error('Order disappeared');
     const payload = presentOrder(row);
+    if (!updated.changed) return { data: payload };
     publish(`user:${updated.passengerId}`, 'order:updated', payload);
     publish(`driver:${updated.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
-    publish('drivers', 'order:unavailable', { orderId: id });
+    if (payload.scheduledAt) publish('drivers', 'preorders:changed', {});
+    else publish('drivers', 'order:unavailable', { orderId: id });
     notifyAdmins({
       icon: '✅',
       title: 'Водитель принял заказ',
@@ -5330,6 +5412,7 @@ export async function registerRoutes(
           : null],
         ['Пассажир', payload.passenger?.name],
         ['Маршрут', formatMultiStopRouteLabel(payload.pickup, payload.destinations ?? [payload.destination])],
+        ['Время подачи', payload.scheduledAt ? formatScheduledPickup(payload.scheduledAt) : null],
         ['Стоимость', formatMoney(payload.priceMinor)],
       ],
     });
@@ -5479,7 +5562,7 @@ export async function registerRoutes(
       const changed = !row.waiting_started_at;
       if (!row.waiting_started_at) {
         await connection.execute(
-          'UPDATE orders SET waiting_started_at = UTC_TIMESTAMP(3) WHERE id = ?',
+          'UPDATE orders SET waiting_started_at = GREATEST(UTC_TIMESTAMP(3), COALESCE(scheduled_at, UTC_TIMESTAMP(3))) WHERE id = ?',
           [id],
         );
         await connection.execute(
@@ -5702,7 +5785,24 @@ export async function registerRoutes(
       if (row.status === status) {
         return { passengerId: row.passenger_id, driverId: driver.id, promotion: null, changed: false };
       }
-      if (row.active_driver_id !== driver.id) {
+      const departure = status === 'driver_arriving' && row.status === 'accepted' && row.scheduled_at && !row.active_driver_id;
+      if (departure) {
+        if (new Date(row.scheduled_at!).getTime() - Date.now() > preorderDepartureMinutes * 60_000) {
+          throw Object.assign(new Error(`Выезд доступен за ${preorderDepartureMinutes} минут до подачи`), {
+            statusCode: 409, code: 'PREORDER_DEPARTURE_TOO_EARLY',
+          });
+        }
+        if (!['online', 'busy'].includes(driver.status)) {
+          throw Object.assign(new Error('Выйдите на линию перед началом поездки'), { statusCode: 409, code: 'DRIVER_OFFLINE' });
+        }
+        const [active] = await connection.query<RowDataPacket[]>(
+          'SELECT id FROM orders WHERE active_driver_id = ? LIMIT 1 FOR UPDATE', [driver.id],
+        );
+        if (active.length) throw Object.assign(new Error('Сначала завершите текущую поездку'), {
+          statusCode: 409, code: 'DRIVER_ORDER_QUEUED',
+        });
+        await connection.execute("UPDATE drivers SET status = 'busy' WHERE id = ?", [driver.id]);
+      } else if (row.active_driver_id !== driver.id) {
         throw Object.assign(new Error('Сначала завершите текущую поездку'), {
           statusCode: 409,
           code: 'DRIVER_ORDER_QUEUED',
@@ -5730,12 +5830,12 @@ export async function registerRoutes(
       }
       await connection.execute(
         `UPDATE orders SET status = ?,
-          waiting_started_at = IF(? = 'driver_waiting', COALESCE(waiting_started_at, UTC_TIMESTAMP(3)), waiting_started_at),
-          active_driver_id = IF(? = 'completed', NULL, active_driver_id),
+          waiting_started_at = IF(? = 'driver_waiting', COALESCE(waiting_started_at, GREATEST(UTC_TIMESTAMP(3), COALESCE(scheduled_at, UTC_TIMESTAMP(3)))), waiting_started_at),
+          active_driver_id = CASE WHEN ? = 'completed' THEN NULL WHEN ? THEN ? ELSE active_driver_id END,
           completed_at = IF(? = 'completed', UTC_TIMESTAMP(3), completed_at),
           payment_confirmed_at = IF(? = 'completed' AND ? = TRUE, UTC_TIMESTAMP(3), payment_confirmed_at)
          WHERE id = ?`,
-        [status, status, status, status, status, paymentReceived === true, id],
+        [status, status, status, Boolean(departure), driver.id, status, status, paymentReceived === true, id],
       );
       await connection.execute(
         `INSERT INTO order_events (order_id, actor_user_id, event_type, from_status, to_status)
@@ -5756,6 +5856,7 @@ export async function registerRoutes(
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);
+    if (payload.scheduledAt) publish('drivers', 'preorders:changed', {});
     await announcePromotedDriverOrder(participants.promotion, participants.driverId);
     notifyAdmins({
       icon:

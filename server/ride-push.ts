@@ -1,4 +1,5 @@
 import type { RideOrder } from '../src/domain/models';
+import { formatScheduledPickup, isReservedRide } from '../src/domain/scheduled-ride';
 import type { PushMessage } from './push';
 import { completionSound } from '../src/feedback/ride-feedback';
 
@@ -16,6 +17,15 @@ export function passengerRidePush(ride: RideOrder): PushMessage | null {
   const common = { data: { orderId: ride.id } };
   switch (ride.status) {
     case 'accepted':
+      if (isReservedRide(ride) && ride.scheduledAt) {
+        return {
+          ...common,
+          title: 'Водитель принял предзаказ',
+          body: `Подача ${formatScheduledPickup(ride.scheduledAt)}`,
+          sound: 'notification.wav',
+          channelId: 'general-voice-v1',
+        };
+      }
       if (ride.driverQueuePosition === 2) {
         return {
           ...common,
@@ -85,7 +95,15 @@ export function driverOrderAvailablePush(
   orderId: string,
   priceIncreased = false,
   tariff?: RideOrder['tariff'],
+  scheduledAt?: string,
 ): PushMessage {
+  if (scheduledAt) return {
+    title: `Новый предзаказ${tariff === 'child' ? ' · Детский' : ''}`,
+    body: `Подача ${formatScheduledPickup(scheduledAt)}. Откройте «Предзаказы» в приложении.`,
+    data: { orderId, role: 'driver' },
+    sound: 'new_order.wav',
+    channelId: 'driver-orders-v2',
+  };
   return {
     title: (priceIncreased ? 'Стоимость заказа повышена' : 'Новый заказ') + (tariff === 'child' ? ' · Детский' : ''),
     body: tariff === 'child' ? 'Поездка с ребёнком — просьба вести аккуратно. Примите или отклоните заказ в приложении.'

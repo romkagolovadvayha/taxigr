@@ -54,6 +54,7 @@ import {
   isGrahovoAddress,
 } from '@/domain/pricing';
 import { canTransitionRide, driverTransitionConfirmed } from '@/domain/ride-state';
+import { isReservedRide } from '@/domain/scheduled-ride';
 import { normalizeRouteStops, replaceRouteStop } from '@/domain/route-stops';
 import {
   searchPriceIncreaseOfferSlot,
@@ -73,10 +74,13 @@ type RideContextValue = {
   tariffs: Tariff[];
   selectedTariff: TariffCode;
   selectedPaymentMethod: PaymentMethod;
+  scheduledAt?: string;
+  selectScheduledAt: (value?: string) => void;
   currentRide: RideOrder | null;
   driverRide: RideOrder | null;
   nextDriverRide: RideOrder | null;
   driverOffer: RideOrder | null;
+  driverPreorders: RideOrder[];
   driverRatingRide: RideOrder | null;
   driverRatingBusy: boolean;
   driverRatingError: string | null;
@@ -137,6 +141,7 @@ type RideBootstrap = {
     next: RideOrder | null;
     offer: RideOrder | null;
   };
+  driverPreorders?: RideOrder[];
   chatUnreadCounts: Record<string, number>;
 };
 
@@ -158,6 +163,7 @@ function toOrderSummary(ride: RideOrder): RideOrderSummary {
     tariff: ride.tariff,
     status: ride.status,
     priceMinor: ride.priceMinor,
+    scheduledAt: ride.scheduledAt,
     createdAt: ride.createdAt,
     updatedAt: ride.updatedAt,
   };
@@ -245,6 +251,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [selectedTariff, setSelectedTariff] = useState<TariffCode>('economy');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [currentRide, setCurrentRide] = useState<RideOrder | null>(null);
+  const [scheduledAt, setScheduledAt] = useState<string>();
+  const [driverPreorders, setDriverPreorders] = useState<RideOrder[]>([]);
   const [driverRide, setDriverRide] = useState<RideOrder | null>(null);
   const [nextDriverRide, setNextDriverRide] = useState<RideOrder | null>(null);
   const [driverOffer, setDriverOffer] = useState<RideOrder | null>(null);
@@ -302,6 +310,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setQuoteToken(null);
     setQuoteStatus('idle');
   }, []);
+
+  const selectScheduledAt = useCallback((value?: string) => {
+    if (value === scheduledAt) return;
+    invalidateQuote();
+    setScheduledAt(value);
+  }, [invalidateQuote, scheduledAt]);
 
   useEffect(() => {
     if (!quoteVisible && quoteRequestController.current) invalidateQuote();
@@ -380,6 +394,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const applyDriverOrder = useCallback((ride: RideOrder) => {
     emitRideUpdate(ride);
     dispatchDriverRating({ type: 'updated', ride });
+    if (isReservedRide(ride) || (ride.scheduledAt && ride.status === 'searching')) return;
     if (isAssignedDriverOrder(ride)) {
       if (ride.driverQueuePosition === 2) {
         setNextDriverRide(ride);
@@ -401,6 +416,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      setScheduledAt(undefined);
+      setDriverPreorders([]);
       if (demoSession) {
         const passengerOrders = userId === demoPassenger.id ? demoOrders : [];
         const demoHistory = buildDestinationHistory(passengerOrders, userId);
@@ -465,6 +482,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setDriverRide(bootstrap.driverQueue.current ?? bootstrap.driverQueue.offer);
       setNextDriverRide(bootstrap.driverQueue.next);
       setDriverOffer(bootstrap.driverQueue.offer);
+      setDriverPreorders(bootstrap.driverPreorders ?? []);
       setDestinationHistory(bootstrap.destinationHistory);
       setChatUnreadCounts(bootstrap.chatUnreadCounts);
       setBootstrapError(null);
@@ -579,6 +597,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     };
     // Also close the gap between the initial bootstrap and socket connection.
     socket.on('connect', handleReconnect);
+    socket.on('preorders:changed', () => { if (isDriver) void refresh(); });
     let offerRequestId = 0;
     socket.on('order:updated', (order: RideOrder) => {
       invalidateApiCache(['orders', 'stats', 'admin', 'profile']);
@@ -768,6 +787,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
               segments,
               tariff.code,
               allPointsInGrahovo,
+              undefined,
+              scheduledAt ? new Date(scheduledAt) : undefined,
             ),
           })),
         );
@@ -785,7 +806,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }>('/v1/quotes', {
         method: 'POST',
         token,
-        body: JSON.stringify({ pickup, destination, destinations }),
+        body: JSON.stringify({ pickup, destination, destinations, scheduledAt }),
         signal: controller.signal,
       });
       if (quoteRequestId.current !== requestId) return;
@@ -814,6 +835,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     destinations,
     invalidateQuote,
     pickup,
+    scheduledAt,
     token,
   ]);
 
@@ -951,6 +973,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           routeCoordinates,
           paymentMethod: selectedPaymentMethod,
           comment,
+          scheduledAt,
           createdAt: now,
           updatedAt: now,
           passenger: user
@@ -976,6 +999,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         tariff: selectedTariff,
         paymentMethod: selectedPaymentMethod,
         comment: comment ?? null,
+        scheduledAt: scheduledAt ?? null,
       });
       const creationAttempt =
         pendingOrderCreation.current?.fingerprint === creationFingerprint
@@ -995,6 +1019,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
             destination,
             tariff: selectedTariff,
             quoteToken,
+            scheduledAt,
             paymentMethod: selectedPaymentMethod,
             comment,
             idempotencyKey: creationAttempt.key,
@@ -1062,6 +1087,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       pickup,
       quoteStatus,
       quoteToken,
+      scheduledAt,
       requestQuote,
       routeCoordinates,
       routeSummary,
@@ -1504,6 +1530,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const resetRide = useCallback(() => {
     pendingOrderCreation.current = null;
     setCurrentRide(null);
+    setScheduledAt(undefined);
     setError(null);
     // The completed trip may have consumed a first-trip discount or crossed a
     // fare period. The next booking needs a fresh quote even on the same route.
@@ -1525,10 +1552,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
       tariffs,
       selectedTariff,
       selectedPaymentMethod,
+      scheduledAt,
+      selectScheduledAt,
       currentRide,
       driverRide,
       nextDriverRide,
       driverOffer,
+      driverPreorders,
       driverRatingRide,
       driverRatingBusy,
       driverRatingError,
@@ -1587,6 +1617,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       currentRide,
       destinations,
       driverOffer,
+      driverPreorders,
       driverRatingRide,
       driverRatingBusy,
       driverRatingError,
@@ -1629,6 +1660,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       resetDriverRide,
       selectedTariff,
       selectedPaymentMethod,
+      scheduledAt,
+      selectScheduledAt,
       startWaiting,
       stopWaiting,
       releaseDriverRide,

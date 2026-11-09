@@ -8,6 +8,8 @@ import { useSession } from '@/auth/session-provider';
 import { TaxiMap } from '@/components/map/taxi-map';
 import { ShiftSummary } from '@/components/driver/shift-summary';
 import { DriverFareEditor } from '@/components/driver/driver-fare-editor';
+import { DriverPreorders } from '@/components/driver/driver-preorders';
+import { formatScheduledPickup } from '@/domain/scheduled-ride';
 import { RatingBadge } from '@/components/ratings/rating-badge';
 import { PhoneCallButton } from '@/components/ride/phone-call-button';
 import { RideChatButton } from '@/components/ride/ride-chat-button';
@@ -58,6 +60,7 @@ function DriverOrderCard({
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [releaseOrderId, setReleaseOrderId] = useState<string | null>(null);
   const [releaseReason, setReleaseReason] = useState('');
+  const [nextVisible, setNextVisible] = useState(false);
   const {
     driverRide: currentRide,
     nextDriverRide,
@@ -106,12 +109,12 @@ function DriverOrderCard({
 
   if (currentRide.status === 'searching') {
     return (
-      <View style={{ gap: spacing.x4 }}>
+      <View style={{ flex: 1, minHeight: 0, gap: spacing.x2 }}>
+        <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: spacing.x2 }} showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <StatusChip label="Новый заказ" tone="info" />
           <Text style={{ ...typography.caption, color: colors.inkSecondary }}>{currentRide.tariff === 'child' ? 'Детский' : 'Эконом'}</Text>
         </View>
-        <Text style={{ ...typography.pageTitle, color: colors.ink }}>Новая поездка</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
           <UserAvatar
             name={currentRide.passenger?.name ?? 'Пассажир'}
@@ -127,13 +130,13 @@ function DriverOrderCard({
             compact
           />
         </View>
-        <View style={{ paddingVertical: spacing.x3, borderTopWidth: 1, borderColor: colors.border, gap: 4 }}>
+        <View style={{ paddingVertical: spacing.x1, borderTopWidth: 1, borderColor: colors.border, gap: 2 }}>
           <Text selectable style={{ ...typography.micro, color: colors.inkSecondary }}>○  Подача</Text>
           <Text selectable style={{ ...typography.body, fontSize: 15, color: colors.ink }}>{routeAddresses.pickup}</Text>
         </View>
         <View style={{ gap: spacing.x2 }}>
           {routeAddresses.destinations.map((label, index) => (
-            <View key={`${label}:${index}`} style={{ paddingBottom: spacing.x3, borderBottomWidth: 1, borderColor: colors.border, gap: 4 }}>
+            <View key={`${label}:${index}`} style={{ paddingBottom: spacing.x1, borderBottomWidth: 1, borderColor: colors.border, gap: 2 }}>
               <Text selectable style={{ ...typography.micro, color: colors.inkMuted }}>
                 {routeDestinationTitle(index, routeAddresses.destinations.length)}
               </Text>
@@ -151,7 +154,7 @@ function DriverOrderCard({
           <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} />
         </View>
         {!!currentRide.comment && (
-          <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
+          <Text selectable numberOfLines={2} style={{ ...typography.caption, color: colors.inkSecondary }}>
             Комментарий: {currentRide.comment}
           </Text>
         )}
@@ -160,15 +163,19 @@ function DriverOrderCard({
             {error}
           </Text>
         )}
-        <View style={{ gap: spacing.x1 }}>
+        </ScrollView>
+        <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
+          <AppButton variant="quiet" compact fullWidth={false} style={{ flex: 1 }} disabled={busy} onPress={resetRide}>Пропустить</AppButton>
           <AppButton
+            compact
+            fullWidth={false}
+            style={{ flex: 1.6 }}
             loading={busy}
             disabled={busy}
             onPress={() => void transitionRide('accepted')}
           >
             Принять заказ
           </AppButton>
-          <AppButton variant="quiet" compact disabled={busy} onPress={resetRide}>Пропустить заказ</AppButton>
         </View>
       </View>
     );
@@ -215,7 +222,9 @@ function DriverOrderCard({
   };
 
   return (
-    <View style={{ gap: spacing.x3 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.x2 }}>
+      <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: spacing.x2 }}
+        keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View
         style={{
           flexDirection: 'row',
@@ -230,6 +239,9 @@ function DriverOrderCard({
         />
         <MoneyValue pending={isRidePricePending(currentRide)} valueMinor={currentRide.priceMinor} compact />
       </View>
+      {!!currentRide.scheduledAt && <Text selectable style={{ ...typography.caption, color: colors.danger }}>
+        Подача {formatScheduledPickup(currentRide.scheduledAt)}
+      </Text>}
       {currentRide.pricingMode === 'driver' && currentRide.driverQueuePosition !== 2 &&
         ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(currentRide.status) ?
         <DriverFareEditor key={currentRide.id} ride={currentRide}/> : null}
@@ -279,6 +291,7 @@ function DriverOrderCard({
           {routePointLabels.map((label, index) => {
             const pointState = driverRoutePointState(currentRide.status, index, nextDestinationIndex);
             const current = pointState === 'current';
+            if (routePointLabels.length > 2 && !current && index !== routePointLabels.length - 1) return null;
             const dotColor =
               pointState === 'completed'
                 ? colors.success
@@ -338,6 +351,9 @@ function DriverOrderCard({
           })}
         </View>
       </View>
+      {routePointLabels.length > 2 && <AppButton variant="quiet" compact onPress={() => router.push({ pathname: '/driver/trips/[id]', params: { id: currentRide.id } })}>
+        Все остановки · {routePointLabels.length}
+      </AppButton>}
       {currentRide.status === 'completed' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
@@ -417,6 +433,10 @@ function DriverOrderCard({
             )}
           </View>
         )}
+      {(nextDriverRide || driverOffer) && <AppButton compact variant="secondary" onPress={() => setNextVisible(true)}>
+        {nextDriverRide ? 'Следующий заказ принят' : 'Доступен следующий заказ'}
+      </AppButton>}
+      <AppModal visible={nextVisible && Boolean(nextDriverRide || driverOffer)} title="Следующий заказ" onClose={() => setNextVisible(false)}>
       {nextDriverRide ? (
         <View
           style={{
@@ -471,6 +491,7 @@ function DriverOrderCard({
             compact
             disabled={busy}
             onPress={() => {
+              setNextVisible(false);
               setReleaseOrderId(nextDriverRide.id);
               setReleaseReason('');
               setReleaseConfirmVisible(true);
@@ -511,7 +532,7 @@ function DriverOrderCard({
               fullWidth={false}
               disabled={busy}
               style={{ flex: 1 }}
-              onPress={resetRide}
+              onPress={() => { resetRide(); setNextVisible(false); }}
             >
               Пропустить
             </AppButton>
@@ -520,13 +541,15 @@ function DriverOrderCard({
               fullWidth={false}
               loading={busy}
               style={{ flex: 1.5 }}
-              onPress={() => void transitionRide('accepted')}
+              onPress={() => { setNextVisible(false); void transitionRide('accepted'); }}
             >
               Взять следующим
             </AppButton>
           </View>
         </View>
-      ) : demo && !['completed', 'cancelled'].includes(currentRide.status) ? (
+      ) : null}
+      </AppModal>
+      {demo && !nextDriverRide && !driverOffer && !['completed', 'cancelled'].includes(currentRide.status) ? (
         <AppButton variant="secondary" compact loading={busy} onPress={() => void createRide()}>
           Создать следующий демо-заказ
         </AppButton>
@@ -537,6 +560,7 @@ function DriverOrderCard({
           {error}
         </Text>
       )}
+      </ScrollView>
       {currentRide.status === 'driver_waiting' ? (
         <View style={{ gap: spacing.x2 }}>
           <View style={{ flexDirection: 'row', gap: spacing.x2 }}>
@@ -670,7 +694,7 @@ export function DriverHomeScreen() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const { isPhone } = useResponsiveLayout();
+  const { isPhone, height } = useResponsiveLayout();
   const { driverRide: currentRide, refresh } = useRide();
   const navigationRequested = Boolean(
     currentRide && driverRouteTarget(currentRide.status),
@@ -679,6 +703,8 @@ export function DriverHomeScreen() {
     currentRide &&
       !['searching', 'completed', 'cancelled'].includes(currentRide.status),
   );
+  const handlingOrder = activeTrip || currentRide?.status === 'searching';
+  const compactMap = isPhone && height < 740 && handlingOrder;
   const location = useDriverLocation({
     enabled: online,
     navigationActive: navigationRequested,
@@ -792,10 +818,10 @@ export function DriverHomeScreen() {
         : currentRide?.destination;
   const activeRouteCoordinates =
     navigation.active ? navigation.coordinates : currentRide?.routeCoordinates;
-  const visibleError = statusError ?? location.error ?? navigation.error;
+  const visibleError = statusError ?? navigation.error ?? (location.error ? 'Геолокация недоступна' : null);
   const panelContent = (
     <>
-      {!!visibleError && (
+      {!!visibleError && (!handlingOrder || Boolean(statusError || navigation.error)) && (
         <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>
           {visibleError}
         </Text>
@@ -815,52 +841,60 @@ export function DriverHomeScreen() {
     </>
   );
   const panelContentStyle = {
-    padding: spacing.x5,
-    gap: activeTrip ? spacing.x3 : spacing.x5,
+    padding: handlingOrder ? spacing.x3 : spacing.x5,
+    gap: handlingOrder ? spacing.x2 : spacing.x5,
     flexGrow: 1,
   } as const;
+  const map = <TaxiMap
+    pickup={mapPickup}
+    destinations={currentRide?.destinations?.slice(currentRide.nextDestinationIndex ?? 0)}
+    destination={mapDestination}
+    routeCoordinates={activeRouteCoordinates}
+    routeTarget={navigation.targetKind}
+    driver={mapDriverCoordinates}
+    driverHeading={mapDriverHeading}
+    passenger={currentRide?.passengerCoordinates}
+    followDriver={navigation.active || !currentRide}
+    navigationMode={navigation.active}
+    trimCompletedRoute={navigation.active}
+  />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
-      <View style={{ paddingHorizontal: spacing.x5, paddingVertical: spacing.x4, backgroundColor: activeTrip ? colors.surface : colors.canvas,
-        flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
-        <View style={{ flex: 1, gap: 4 }}>
+      <View style={{ paddingHorizontal: spacing.x3, paddingVertical: spacing.x2, backgroundColor: activeTrip ? colors.surface : colors.canvas,
+        flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text accessibilityRole="header" numberOfLines={2} style={{ ...typography.bodyStrong, fontSize: 16, color: colors.ink }}>
-            {activeTrip ? 'Текущая поездка' : `Хорошего дня, ${user?.name.split(' ')[0] || 'водитель'}`}
+            {activeTrip ? 'Текущая поездка' : isPhone ? 'Заказы' : `Хорошего дня, ${user?.name.split(' ')[0] || 'водитель'}`}
           </Text>
-          <Text style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
-            {activeTrip ? 'Маршрут и действия по заказу' : online === null ? 'Проверяем статус…' : online ? 'На линии · ждём заказы рядом' : 'Вы не на линии'}
-          </Text>
+          {!activeTrip && <Text numberOfLines={1} style={{ ...typography.caption, fontSize: 11, color: colors.inkSecondary }}>
+            {online === null ? 'Подключение…' : online ? 'На линии' : 'Не на линии'}
+          </Text>}
         </View>
         {!activeTrip && <AccessibleSwitch value={online === true} disabled={online === null || changingStatus}
           accessibilityLabel={online ? 'Завершить смену' : 'Выйти на линию'} onValueChange={(next) => void changeOnline(next)} trackColor={{ true: colors.brand }} />}
-        {!activeTrip && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
+        <DriverPreorders online={online === true} activeTrip={activeTrip} />
+        {(!activeTrip || compactMap) && <IconButton icon={mapVisible ? 'close' : 'location'} size={44}
           label={mapVisible ? 'Скрыть карту заказа' : 'Показать карту заказа'} onPress={() => setMapVisible((value) => !value)} />}
       </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: isPhone ? 'column' : 'row' }}>
-      {(activeTrip || mapVisible || !isPhone) && <View style={{ flex: activeTrip || !isPhone ? 1 : undefined, height: !activeTrip && isPhone ? 180 : undefined,
+      {!compactMap && (activeTrip || mapVisible || !isPhone) && <View style={{ flex: activeTrip || !isPhone ? 1 : undefined, height: !activeTrip && isPhone ? 180 : undefined,
         minHeight: isPhone ? 120 : 0, overflow: 'hidden', backgroundColor: colors.mapFallback }}>
-        <TaxiMap
-          pickup={mapPickup}
-          destinations={currentRide?.destinations?.slice(currentRide.nextDestinationIndex ?? 0)}
-          destination={mapDestination}
-          routeCoordinates={activeRouteCoordinates}
-          routeTarget={navigation.targetKind}
-          driver={mapDriverCoordinates}
-          driverHeading={mapDriverHeading}
-          passenger={currentRide?.passengerCoordinates}
-          followDriver={navigation.active || !currentRide}
-          navigationMode={navigation.active}
-          trimCompletedRoute={navigation.active}
-        />
+        {map}
       </View>}
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
-        style={{ flexGrow: isPhone && !activeTrip ? 1 : 0, flexShrink: 1, flexBasis: 'auto', width: isPhone ? '100%' : 420,
-          maxHeight: activeTrip && isPhone ? '68%' : undefined, backgroundColor: colors.surface }}>
-        {!activeTrip && <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />}
+      {handlingOrder ? <View style={{ ...panelContentStyle, flexGrow: isPhone ? 1 : 0, flex: isPhone && compactMap ? 1 : undefined, minHeight: 0,
+        height: isPhone && !compactMap ? (activeTrip ? '74%' : undefined) : undefined,
+        width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
+        {panelContent}
+      </View> : <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        style={{ flexGrow: isPhone ? 1 : 0, flexShrink: 1, flexBasis: 'auto', width: isPhone ? '100%' : 420, backgroundColor: colors.surface }}>
+        <ShiftSummary key={currentRide?.status === 'completed' ? currentRide.id : 'shift'} />
         <View style={panelContentStyle}>{panelContent}</View>
-      </ScrollView>
+      </ScrollView>}
       </View>
+      <AppModal visible={compactMap && mapVisible} title="Карта заказа" onClose={() => setMapVisible(false)}>
+        <View style={{ height: Math.min(360, height * 0.56), overflow: 'hidden' }}>{map}</View>
+      </AppModal>
     </View>
   );
 }

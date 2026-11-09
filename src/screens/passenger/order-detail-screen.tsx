@@ -25,6 +25,7 @@ import { useRide } from '@/state/ride-provider';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
+import { formatScheduledPickup } from '@/domain/scheduled-ride';
 
 export function OrderDetailScreen() {
   const colors = useThemeColors();
@@ -91,6 +92,7 @@ export function OrderDetailScreen() {
   const destinations = order.destinations ?? [order.destination];
   const routeAddresses = formatMultiStopRouteAddresses(order.pickup, destinations);
   const rows = [
+    ...(order.scheduledAt ? [['Подача ко времени', formatScheduledPickup(order.scheduledAt)]] : []),
     ['Тариф', order.tariff === 'child' ? 'Детский' : 'Эконом'],
     [
       'Расчёт маршрута',

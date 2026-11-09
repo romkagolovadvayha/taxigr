@@ -28,11 +28,18 @@ export function WaitingBreakdown({
   const seconds = rideWaitingSeconds(ride, now);
   const priceMinor = rideWaitingPriceMinor(ride, now);
   if (!active && seconds <= 0 && priceMinor <= 0) return null;
+  if (compact) return <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.x2,
+    padding: spacing.x2, borderRadius: radius.md, backgroundColor: active ? colors.warningSoft : colors.surfaceSecondary }}>
+    <Text selectable style={{ ...typography.caption, color: colors.ink, flex: 1 }}>
+      Ожидание · {formatWaitingDuration(seconds)}
+    </Text>
+    <Text selectable style={{ ...typography.caption, color: colors.ink }}>Доплата {formatMoney(priceMinor)}</Text>
+  </View>;
 
   return (
     <View
       style={{
-        minHeight: compact ? 54 : 66,
+        minHeight: 66,
         paddingHorizontal: spacing.x4,
         paddingVertical: spacing.x3,
         borderRadius: radius.md,

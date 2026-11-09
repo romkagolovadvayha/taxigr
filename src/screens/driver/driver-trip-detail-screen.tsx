@@ -21,6 +21,7 @@ import { rideStatusLabel } from '@/domain/ride-state';
 import { radius, spacing, typography } from '@/theme/tokens';
 import { formatDateTime, formatDuration, formatMoney } from '@/utils/format';
 import { useThemeColors } from '@/theme/theme-provider';
+import { formatScheduledPickup } from '@/domain/scheduled-ride';
 
 export function DriverTripDetailScreen() {
   const colors = useThemeColors();
@@ -81,6 +82,7 @@ export function DriverTripDetailScreen() {
     ['Получено от пассажира', ridePriceLabel(order)],
     ['Комиссия сервиса', isRidePricePending(order) ? 'После указания стоимости' : `− ${formatMoney(order.serviceCommissionMinor)}`],
     ['Остаётся водителю', isRidePricePending(order) ? 'После указания стоимости' : formatMoney(netMinor)],
+    ...(order.scheduledAt ? [['Подача ко времени', formatScheduledPickup(order.scheduledAt)]] : []),
     ['Создан', formatDateTime(order.createdAt)],
   ];
 

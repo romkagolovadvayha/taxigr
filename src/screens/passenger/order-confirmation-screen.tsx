@@ -1,18 +1,20 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddressFields } from '@/components/passenger/address-fields';
 import { BookingSubmitButton } from '@/components/passenger/booking-submit-button';
+import { ScheduledPickupControl } from '@/components/passenger/scheduled-pickup-control';
 import { ConsentCheckbox } from '@/components/legal/consent-checkbox';
 import { TariffSelector } from '@/components/passenger/tariff-selector';
 import { AppButton } from '@/components/ui/app-button';
 import { AppModal } from '@/components/ui/app-modal';
-import { AppIcon } from '@/components/ui/app-icon';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { usePassengerPickupLocation } from '@/hooks/use-passenger-pickup-location';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useRide } from '@/state/ride-provider';
 import {
   isDestinationAddressBookable,
@@ -27,6 +29,8 @@ import { useThemeColors } from '@/theme/theme-provider';
 
 export function OrderConfirmationScreen() {
   const colors = useThemeColors();
+  const { width } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
   const {
     pickup,
     destinations,
@@ -36,6 +40,7 @@ export function OrderConfirmationScreen() {
     setSelectedTariff,
     selectedPaymentMethod,
     setSelectedPaymentMethod,
+    scheduledAt,
     quoteStatus,
     requestQuote,
     createRide,
@@ -45,6 +50,9 @@ export function OrderConfirmationScreen() {
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const { initialLegalConsentRequired } = useSession();
   const [comment, setComment] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentVisible, setCommentVisible] = useState(false);
+  const [promotionVisible, setPromotionVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const selected = tariffs.find((tariff) => tariff.code === selectedTariff);
@@ -99,44 +107,28 @@ export function OrderConfirmationScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
     >
-      <Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, alignSelf: 'center', paddingHorizontal: spacing.x4 }}>
+      <Screen style={{ backgroundColor: colors.surface }} contentStyle={{ maxWidth: 560, paddingHorizontal: spacing.x4, paddingVertical: spacing.x2, gap: spacing.x2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x3 }}>
           <IconButton icon="back" size={44} label="Назад к заказу" onPress={() => goBackOrReplace('/')} />
           <View style={{ flex: 1 }}>
-            <Text accessibilityRole="header" selectable style={{ ...typography.pageTitle, color: colors.ink }}>
+            <Text accessibilityRole="header" selectable style={{ ...typography.sectionTitle, color: colors.ink }}>
               Подтверждение
             </Text>
-            <Text selectable style={{ ...typography.caption, color: colors.inkSecondary }}>
-              Проверьте детали перед поиском водителя
-            </Text>
           </View>
+          {destinations.length < 5 && (
+            <IconButton icon="plus" size={44} label="Добавить ещё одну точку назначения"
+              onPress={() => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })} />
+          )}
         </View>
 
         <View style={{ gap: spacing.x2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.x2 }}>
-            <Text style={{ ...typography.bodyStrong, color: colors.ink, flex: 1 }}>Маршрут</Text>
-            <IconButton
-              icon="recenter"
-              size={44}
-              label={locationLoading ? 'Определяем местоположение' : 'Использовать моё местоположение'}
-              disabled={locationLoading}
-              onPress={() => void selectCurrentLocation()}
-            />
-            {destinations.length < 5 && (
-              <IconButton
-                icon="plus"
-                size={44}
-                label="Добавить ещё одну точку назначения"
-                onPress={() => router.push({ pathname: '/address-search', params: { field: 'destination', append: '1' } })}
-              />
-            )}
-          </View>
           <AddressFields
             pickup={pickup}
             destinations={destinations}
             destination={destination}
             compact
             hideAddDestination
+            onUseLocation={() => void selectCurrentLocation()}
             locationLoading={locationLoading}
           />
           {!!locationError && (
@@ -146,11 +138,8 @@ export function OrderConfirmationScreen() {
           )}
         </View>
 
-        <View style={{ gap: spacing.x2 }} accessibilityRole="radiogroup">
-          <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-            Способ оплаты
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.x2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.x2 }}>
+          <View accessibilityRole="radiogroup" accessibilityLabel="Способ оплаты" style={{ flexDirection: 'row', gap: spacing.x1 }}>
             {([
               ['cash', 'Наличными'],
               ['transfer', 'Переводом'],
@@ -178,6 +167,8 @@ export function OrderConfirmationScreen() {
               );
             })}
           </View>
+          <IconButton icon="chat" size={44} label="Комментарий водителю"
+            onPress={() => { setCommentDraft(comment); setCommentVisible(true); }} />
         </View>
 
         {!!routeGuidance && (
@@ -186,12 +177,11 @@ export function OrderConfirmationScreen() {
             style={{
               flexDirection: 'row',
               gap: spacing.x3,
-              padding: spacing.x3,
+              padding: spacing.x2,
               borderRadius: radius.md,
               backgroundColor: colors.warningSoft,
             }}
           >
-            <AppIcon name="location" size={21} color={colors.warningText} />
             <Text selectable style={{ ...typography.caption, color: colors.warningText, flex: 1 }}>
               {routeGuidance}
             </Text>
@@ -200,64 +190,22 @@ export function OrderConfirmationScreen() {
 
         {selected && (
           <>
-            <View style={{ gap: spacing.x3 }}>
+            <View style={{ gap: spacing.x2 }}>
               <TariffSelector
                 tariffs={tariffs}
                 selected={selectedTariff}
                 onSelect={setSelectedTariff}
                 compact
+                showIllustrations={width >= 360}
+                scheduled={!!scheduledAt}
                 loading={quotePending}
                 estimateAvailable={routeReady}
               />
               {!quotePending && routeReady && !!promotionText && (
-                <Text selectable testID="order-promotion-message" style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
+                <Text selectable testID="order-promotion-message" numberOfLines={2}
+                  onPress={() => setPromotionVisible(true)} style={{ ...typography.caption, color: colors.ink }}>{promotionText}</Text>
               )}
-              {selectedTariff === 'child' && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: spacing.x3,
-                    padding: spacing.x3,
-                    borderRadius: radius.md,
-                    backgroundColor: colors.brandSoft,
-                  }}
-                >
-                  <AppIcon name="users" size={21} />
-                  <Text selectable style={{ ...typography.caption, color: colors.ink, flex: 1 }}>
-                    Поездка с ребёнком. Водитель увидит пометку и просьбу вести аккуратно.
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={{ gap: spacing.x2 }}>
-              <Text selectable style={{ ...typography.bodyStrong, color: colors.ink }}>
-                Комментарий водителю
-              </Text>
-              <TextInput
-                value={comment}
-                onChangeText={(value) => setComment(value.slice(0, 500))}
-                placeholder="Например: вход со стороны магазина"
-                placeholderTextColor={colors.inkMuted}
-                multiline
-                maxLength={500}
-                accessibilityLabel="Комментарий водителю"
-                style={{
-                  ...typography.body,
-                  minHeight: 96,
-                  paddingHorizontal: spacing.x4,
-                  paddingVertical: spacing.x3,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface,
-                  color: colors.ink,
-                  textAlignVertical: 'top',
-                }}
-              />
-              <Text selectable style={{ ...typography.caption, color: colors.inkMuted }}>
-                Необязательно · {comment.length}/500
-              </Text>
+              <ScheduledPickupControl disabled={busy} />
             </View>
 
             {!!error && (
@@ -266,11 +214,16 @@ export function OrderConfirmationScreen() {
               </Text>
             )}
 
-            <BookingSubmitButton
+          </>
+        )}
+      </Screen>
+      {selected && <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: spacing.x4,
+        paddingTop: spacing.x2, paddingBottom: Math.max(spacing.x4, insets.bottom), backgroundColor: colors.surface }}>
+          <BookingSubmitButton
               checkAvailability={false}
               priceMinor={selected.priceMinor}
               etaMinutes={selected.etaMinutes}
-              label="Подтвердить"
+              label={scheduledAt ? 'Заказать ко времени' : 'Заказать сейчас'}
               loadingLabel={busy ? 'Создаём заказ…' : 'Рассчитываем…'}
               disabled={!addressesAreBookable || quotePending || busy}
               loading={busy || quotePending}
@@ -294,10 +247,18 @@ export function OrderConfirmationScreen() {
                         ? 'Повторить расчёт стоимости поездки'
                         : 'Подтвердить заказ, сначала укажите маршрут'
               }
-            />
-          </>
-        )}
-      </Screen>
+          />
+      </View>}
+      <AppModal visible={commentVisible} title="Комментарий водителю" onClose={() => setCommentVisible(false)}>
+        <TextInput value={commentDraft} onChangeText={setCommentDraft} maxLength={500} multiline
+          accessibilityLabel="Комментарий водителю" placeholder="Например: вход со стороны магазина"
+          placeholderTextColor={colors.inkMuted} style={{ ...typography.body, color: colors.ink, minHeight: 88,
+            textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.x3 }} />
+        <AppButton compact onPress={() => { setComment(commentDraft); setCommentVisible(false); }}>Сохранить комментарий</AppButton>
+      </AppModal>
+      <AppModal visible={promotionVisible} title="Скидка на первый заказ" onClose={() => setPromotionVisible(false)}>
+        <Text selectable style={{ ...typography.body, color: colors.ink }}>{promotionText}</Text>
+      </AppModal>
       <AppModal
         visible={consentVisible}
         title="Перед первым заказом"

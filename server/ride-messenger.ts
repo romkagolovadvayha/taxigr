@@ -4,6 +4,7 @@ import { driverNavigationAddress, navigationPagePath } from '../src/domain/exter
 import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 import { formatElapsedClock } from '../src/domain/elapsed-time';
 import { formatMultiStopRouteLabel } from '../src/domain/route-label';
+import { formatScheduledPickup, isReservedRide } from '../src/domain/scheduled-ride';
 import { formatMoney } from './admin-telegram';
 import {
   appUrl,
@@ -142,6 +143,9 @@ export function passengerRideButtons(ride: RideOrder): MessengerButton[][] {
 }
 
 export function driverRideButtons(ride: RideOrder): MessengerButton[][] {
+  if (ride.scheduledAt && (ride.status === 'searching' || isReservedRide(ride))) {
+    return [[link('📱 Открыть предзаказы', appUrl('/driver'))]];
+  }
   if (ride.status === 'searching') {
     return [
       [callback(ride, 'accept', '✅ Принять заказ', 'positive')],
@@ -260,11 +264,14 @@ export function passengerRideNotification(
   const icon = queued ? '🕓' : baseIcon;
   const title = queued
     ? 'Водитель завершает предыдущий заказ'
+    : isReservedRide(ride) ? 'Водитель принял предзаказ'
+    : ride.scheduledAt && ride.status === 'searching' ? 'Ищем водителя на предзаказ'
     : ride.status === 'searching'
     ? `${baseTitle} · ${formatElapsedClock(ride.createdAt)}`
     : baseTitle;
   const activeDriver = ride.driverId && ride.driver;
   const details: PersonalMessengerNotification['details'] = [
+    ...(ride.scheduledAt ? [['🕓 Подача', formatScheduledPickup(ride.scheduledAt)] as const] : []),
     ['👤 Водитель', activeDriver ? ride.driver?.name : null],
     ['📞 Телефон', activeDriver ? ride.driver?.phone : null],
     ['🚘 Машина', activeDriver ? vehicle(ride) : null],
@@ -281,7 +288,7 @@ export function passengerRideNotification(
       : formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: passengerRideButtons(ride),
-    locations: activeDriver && !queued && !['completed', 'cancelled'].includes(ride.status)
+    locations: activeDriver && !queued && !isReservedRide(ride) && !['completed', 'cancelled'].includes(ride.status)
       ? driverLocation(ride)
       : [],
   };
@@ -307,11 +314,14 @@ export function driverRideNotification(
   const icon = queued ? '🕓' : baseIcon;
   const title = queued
     ? 'Следующий заказ принят'
+    : isReservedRide(ride) ? 'Предзаказ принят'
+    : ride.scheduledAt && ride.status === 'searching' ? 'Новый предзаказ'
     : ride.status === 'searching'
     ? `${baseTitle} · поиск ${formatElapsedClock(ride.createdAt)}`
     : baseTitle;
   const assigned = Boolean(ride.driverId);
   const details: PersonalMessengerNotification['details'] = [
+    ...(ride.scheduledAt ? [['🕓 Подача', formatScheduledPickup(ride.scheduledAt)] as const] : []),
     ...(ride.tariff === 'child' ? [['👶 Тариф', 'Детский — поездка с ребёнком. Просьба вести аккуратно.'] as const] : []),
     ['👤 Пассажир', assigned ? ride.passenger?.name : null],
     ['📞 Телефон', assigned ? ride.passenger?.phone : null],
@@ -337,6 +347,6 @@ export function driverRideNotification(
       : formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination])),
     details: overrides.details ? [...details, ...overrides.details] : details,
     buttons: driverRideButtons(ride),
-    locations: ride.pricingMode === 'driver' ? [] : driverTargetLocation(ride),
+    locations: ride.pricingMode === 'driver' || isReservedRide(ride) ? [] : driverTargetLocation(ride),
   };
 }

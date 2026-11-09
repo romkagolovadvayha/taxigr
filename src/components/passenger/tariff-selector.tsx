@@ -13,6 +13,7 @@ import { useThemeColors } from '@/theme/theme-provider';
 import { motion, radius, spacing, typography } from '@/theme/tokens';
 
 type Props = {
+  scheduled?: boolean;
   tariffs: Tariff[];
   selected: TariffCode;
   onSelect: (tariff: TariffCode) => void;
@@ -24,10 +25,10 @@ type Props = {
 
 const timing = { duration: motion.duration.standard, easing: Easing.bezier(...motion.easing.out), reduceMotion: ReduceMotion.System };
 
-function TariffOption({ tariff, active, onSelect, compact, showIllustrations, loading, estimateAvailable }: {
+function TariffOption({ tariff, active, onSelect, compact, showIllustrations, loading, estimateAvailable, scheduled }: {
   tariff: Tariff;
   active: boolean;
-} & Pick<Props, 'onSelect' | 'compact' | 'showIllustrations' | 'loading' | 'estimateAvailable'>) {
+} & Pick<Props, 'onSelect' | 'compact' | 'showIllustrations' | 'loading' | 'estimateAvailable' | 'scheduled'>) {
   const colors = useThemeColors();
   const inline = compact && showIllustrations;
   const promotionText = getTariffPromotionText(tariff);
@@ -41,7 +42,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
       accessibilityLabel={loading
         ? `${tariff.title}, рассчитываем стоимость и время подачи`
         : estimateAvailable
-          ? `${tariff.title}, ${tariff.etaMinutes} минут, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`
+          ? `${tariff.title}, ${scheduled ? 'ко времени' : `${tariff.etaMinutes} минут`}, ${tariff.priceMinor / 100} рублей${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`
           : `${tariff.title}${tariff.code === 'child' ? ', поездка с ребёнком' : ''}`}
       onPress={() => onSelect(tariff.code)}
       style={{ flex: 1, minWidth: 0, flexDirection: inline ? 'row' : 'column', alignItems: 'center', justifyContent: 'center', padding: spacing.x2,
@@ -64,8 +65,8 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
         {loading ? <SkeletonBlock width={inline ? '100%' : 84} height={17} /> : (
           <Text selectable style={{ ...typography.caption, fontSize: compact ? 12 : 13, lineHeight: 17, color: colors.inkSecondary, textAlign: inline ? 'left' : 'center' }}>
             {tariff.code === 'child'
-              ? estimateAvailable ? `С ребёнком · ~ ${tariff.etaMinutes} мин` : 'С ребёнком'
-              : estimateAvailable ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
+              ? estimateAvailable && !scheduled ? `С ребёнком · ~ ${tariff.etaMinutes} мин` : 'С ребёнком'
+              : estimateAvailable && !scheduled ? `Подача ~ ${tariff.etaMinutes} мин` : 'На каждый день'}
           </Text>
         )}
         {!loading && estimateAvailable && !!promotionText && (
@@ -80,7 +81,7 @@ function TariffOption({ tariff, active, onSelect, compact, showIllustrations, lo
   );
 }
 
-export function TariffSelector({ tariffs, selected, onSelect, compact = false, showIllustrations = true, loading = false, estimateAvailable }: Props) {
+export function TariffSelector({ tariffs, selected, onSelect, compact = false, showIllustrations = true, loading = false, estimateAvailable, scheduled }: Props) {
   const colors = useThemeColors();
   const [width, setWidth] = useState(0);
   const index = Math.max(0, tariffs.findIndex((tariff) => tariff.code === selected));
@@ -98,7 +99,7 @@ export function TariffSelector({ tariffs, selected, onSelect, compact = false, s
         indicatorStyle,
       ]} />}
       {tariffs.map((tariff) => <TariffOption key={tariff.code} tariff={tariff} active={tariff.code === selected}
-        onSelect={onSelect} compact={compact} showIllustrations={showIllustrations} loading={loading} estimateAvailable={estimateAvailable} />)}
+        onSelect={onSelect} compact={compact} showIllustrations={showIllustrations} loading={loading} estimateAvailable={estimateAvailable} scheduled={scheduled} />)}
     </View>
   );
 }
