@@ -279,6 +279,7 @@ export function passengerRideNotification(
   ];
   return {
     orderId: ride.id,
+    orderUpdatedAt: ride.updatedAt,
     audience: 'passenger',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,
@@ -303,6 +304,20 @@ const driverTitles: Record<RideOrder['status'], [string, string]> = {
   completed: ['🏁', 'Заказ завершён'],
   cancelled: ['❌', 'Заказ отменён'],
 };
+
+export function unavailableDriverOrderNotification(ride: RideOrder): PersonalMessengerNotification {
+  const cancelled = ride.status === 'cancelled';
+  return {
+    orderId: ride.id,
+    orderUpdatedAt: ride.updatedAt,
+    audience: 'driver',
+    icon: cancelled ? '❌' : '🚕',
+    title: cancelled ? 'Заказ отменён' : 'Заказ уже взят',
+    body: formatMultiStopRouteLabel(ride.pickup, ride.destinations ?? [ride.destination]) +
+      (cancelled ? '\nПассажир больше не ожидает машину по этому заказу.' : '\nЭтот заказ принял другой водитель.'),
+    buttons: [],
+  };
+}
 
 export function driverRideNotification(
   ride: RideOrder,
@@ -336,6 +351,7 @@ export function driverRideNotification(
   ];
   return {
     orderId: ride.id,
+    orderUpdatedAt: ride.updatedAt,
     audience: 'driver',
     icon: overrides.icon ?? icon,
     title: overrides.title ?? title,

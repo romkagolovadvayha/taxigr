@@ -148,9 +148,11 @@ export async function sendMaxMessage(
       throw new Error(error.message ?? error.code ?? `MAX Bot API HTTP ${response.status}`);
     }
     const result = await response.json().catch(() => ({})) as {
+      message?: { body?: { mid?: unknown } };
       body?: { mid?: unknown };
     };
-    return typeof result.body?.mid === 'string' ? result.body.mid : null;
+    const messageId = result.message?.body?.mid ?? result.body?.mid;
+    return typeof messageId === 'string' ? messageId : null;
   } finally {
     clearTimeout(timeout);
     releaseQueue();

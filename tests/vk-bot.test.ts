@@ -10,6 +10,7 @@ vi.mock('../server/config', () => ({
 
 import {
   deleteVkMessage,
+  editVkMessage,
   isVkMessagesAllowed,
   sendVkMessage,
   vkInlineKeyboard,
@@ -80,5 +81,23 @@ describe('VK community bot', () => {
     expect(body.get('peer_id')).toBe('42');
     expect(body.get('cmids')).toBe('17');
     expect(body.get('delete_for_all')).toBe('1');
+  });
+
+  it('removes buttons when closing a legacy tracked message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ response: 1 })));
+    vi.stubGlobal('fetch', fetchMock);
+    await editVkMessage('42', '17', { message: 'Заказ уже взят' });
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(request.body));
+    expect(url).toBe('https://api.vk.com/method/messages.edit');
+    expect(body.get('message_id')).toBe('17');
+    expect(JSON.parse(body.get('keyboard')!)).toEqual({ inline: true, buttons: [] });
+  });
+
+  it('reports a failed per-message deletion so its tracking can be retained', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ response: [
+      { conversation_message_id: 17, response: 0 },
+    ] }))));
+    await expect(deleteVkMessage('42', 'conversation:17')).rejects.toThrow('did not delete');
   });
 });

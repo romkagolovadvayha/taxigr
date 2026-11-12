@@ -3,6 +3,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { config } from './config';
 import { normalizeRussianPhone } from './phone-verification';
 import { db, firstRow } from './db';
+import { syncMessengerOrderMessages } from './messenger-order-sync';
 import {
   deleteMaxMessage,
   editMaxMessage,
@@ -46,6 +47,7 @@ export type MessengerLocation = {
 
 export type PersonalMessengerNotification = {
   orderId?: string;
+  orderUpdatedAt?: string;
   audience?: 'passenger' | 'driver';
   syncExistingOrderMessages?: boolean;
   icon?: string;
@@ -193,7 +195,7 @@ function vkMessageBody(notification: PersonalMessengerNotification) {
   };
 }
 
-async function editOrderMessage(
+export async function editOrderMessage(
   account: MessengerAccountRow,
   messageId: string,
   notification: PersonalMessengerNotification,
@@ -217,6 +219,7 @@ async function trackOrderMessage(
   account: MessengerAccountRow,
   notification: PersonalMessengerNotification,
   messageId: string,
+  syncAfterSend = true,
 ): Promise<void> {
   if (
     !notification.orderId ||
@@ -225,10 +228,12 @@ async function trackOrderMessage(
   ) return;
   await db.execute(
     `INSERT IGNORE INTO messenger_order_messages
-      (order_id, messenger_account_id, audience, message_id)
-     VALUES (?, ?, ?, ?)`,
-    [notification.orderId, account.id, notification.audience, messageId],
+      (order_id, messenger_account_id, audience, message_id, synced_order_updated_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [notification.orderId, account.id, notification.audience, messageId,
+      notification.orderUpdatedAt ? new Date(notification.orderUpdatedAt) : null],
   );
+  if (syncAfterSend) await syncMessengerOrderMessages({ orderId: notification.orderId, accountId: account.id, messageId });
 }
 
 async function trackedOrderMessageIds(
@@ -291,19 +296,8 @@ async function syncTrackedOrderMessages(
   sourceMessageId?: string,
 ): Promise<void> {
   if (!notification.orderId) return;
-  const [rows] = await db.query<TrackedOrderMessageRow[]>(
-    `SELECT message_id FROM messenger_order_messages
-     WHERE order_id = ? AND messenger_account_id = ?`,
-    [notification.orderId, account.id],
-  );
-  const messageIds = [...new Set([
-    ...rows.map((row) => row.message_id),
-    ...(sourceMessageId ? [sourceMessageId] : []),
-  ])];
-  if (sourceMessageId) await trackOrderMessage(account, notification, sourceMessageId);
-  for (const messageId of messageIds) {
-    await editOrderMessage(account, messageId, notification).catch(() => undefined);
-  }
+  if (sourceMessageId) await trackOrderMessage(account, notification, sourceMessageId, false);
+  await syncMessengerOrderMessages({ orderId: notification.orderId, accountId: account.id, force: true });
 }
 
 async function deliver(
@@ -391,34 +385,9 @@ export async function refreshMessengerAccountOrderMessages(
 export async function closeUnassignedDriverOrderOffers(
   orderId: string,
   assignedDriverUserId = '',
-  reason: 'accepted' | 'expired' = 'accepted',
+  _reason: 'accepted' | 'expired' | 'cancelled' = 'accepted',
 ): Promise<void> {
-  const [rows] = await db.query<(MessengerAccountRow & TrackedOrderMessageRow)[]>(
-    `SELECT uma.id, uma.user_id, uma.provider, uma.external_user_id, uma.chat_id,
-       mom.message_id
-     FROM messenger_order_messages mom
-     JOIN user_messenger_accounts uma ON uma.id = mom.messenger_account_id
-     WHERE mom.order_id = ? AND mom.audience = 'driver'
-       AND uma.user_id <> ? AND uma.active = TRUE AND uma.bot_contact_available = TRUE`,
-    [orderId, assignedDriverUserId],
-  );
-  const notification: PersonalMessengerNotification = {
-    orderId,
-    audience: 'driver',
-    icon: '🚕',
-    title: reason === 'expired' ? 'Поиск по заказу завершён' : 'Заказ уже принят',
-    body: reason === 'expired'
-      ? 'Пассажир больше не ожидает водителя по этому заказу.'
-      : 'Этот заказ принял другой водитель.',
-    buttons: [[{
-      type: 'link',
-      label: '🚕 К доступным заказам',
-      url: appUrl('/driver'),
-    }]],
-  };
-  for (const row of rows) {
-    await editOrderMessage(row, row.message_id, notification).catch(() => undefined);
-  }
+  await syncMessengerOrderMessages({ orderId, excludeUserId: assignedDriverUserId, audience: 'driver' });
 }
 
 export async function notifyUsersInMessengers(

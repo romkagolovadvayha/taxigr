@@ -136,6 +136,7 @@ import {
   type OrderSummaryRow,
 } from './presenters';
 import { driverRideNotification, passengerRideNotification } from './ride-messenger';
+import { registerMessengerOrderSync } from './messenger-order-sync';
 import {
   decodeRideChatImage,
   MAX_RIDE_CHAT_IMAGE_BYTES,
@@ -1614,6 +1615,7 @@ export async function registerRoutes(
   realtime: RealtimeControls,
 ): Promise<RegisteredRouteHandlers> {
   registerAppReleaseRoutes(app);
+  registerMessengerOrderSync(app);
   registerGroupAlertRoutes(app);
   registerMaxGroupBooking(app, {
     estimate: async (pickup, destination) => {
@@ -4862,6 +4864,10 @@ export async function registerRoutes(
         ],
       })),
       'order.cancelled.passenger',
+    );
+    notifyMessengers(
+      closeUnassignedDriverOrderOffers(id, '', 'cancelled'),
+      'order.cancelled.other_drivers',
     );
     if (participants.driverId) {
       notifyMessengers(

@@ -24,6 +24,8 @@ vi.mock('../server/config', () => ({
   },
 }));
 
+vi.mock('../server/messenger-order-sync', () => ({ syncMessengerOrderMessages: vi.fn() }));
+
 vi.mock('../server/db', () => ({
   db: { query: mocks.query, execute: mocks.execute },
   firstRow: vi.fn(),

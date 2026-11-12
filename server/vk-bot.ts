@@ -72,8 +72,8 @@ export async function editVkMessage(
   trackedMessageId: string,
   input: { message: string; keyboard?: unknown },
 ): Promise<void> {
-  const [kind, messageId] = trackedMessageId.split(':', 2);
-  if (!messageId || !kind || !['conversation', 'message'].includes(kind)) return;
+  const [kind, messageId] = (/^\d+$/u.test(trackedMessageId) ? `message:${trackedMessageId}` : trackedMessageId).split(':', 2);
+  if (!messageId || !kind || !['conversation', 'message'].includes(kind)) throw new Error('Invalid VK message identifier');
   await callVkApi('messages.edit', {
     peer_id: peerId,
     [kind === 'conversation' ? 'conversation_message_id' : 'message_id']: messageId,
@@ -86,13 +86,16 @@ export async function deleteVkMessage(
   peerId: string,
   trackedMessageId: string,
 ): Promise<void> {
-  const [kind, messageId] = trackedMessageId.split(':', 2);
-  if (!messageId || !kind || !['conversation', 'message'].includes(kind)) return;
-  await callVkApi('messages.delete', {
+  const [kind, messageId] = (/^\d+$/u.test(trackedMessageId) ? `message:${trackedMessageId}` : trackedMessageId).split(':', 2);
+  if (!messageId || !kind || !['conversation', 'message'].includes(kind)) throw new Error('Invalid VK message identifier');
+  const result = await callVkApi<number | { response?: number }[] | Record<string, number>>('messages.delete', {
     peer_id: peerId,
     [kind === 'conversation' ? 'cmids' : 'message_ids']: messageId,
     delete_for_all: '1',
   });
+  const deleted = Array.isArray(result) ? result.some(item => item.response === 1)
+    : typeof result === 'object' ? Object.values(result).some(value => value === 1) : result === 1;
+  if (!deleted) throw new VkApiError(0, 'VK did not delete the tracked message');
 }
 
 export async function answerVkMessageEvent(input: {
