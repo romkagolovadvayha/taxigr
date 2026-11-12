@@ -11,7 +11,7 @@ permissions:
 jobs:
   native-ui:
     name: Review on ${{ matrix.device }}
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -19,7 +19,6 @@ jobs:
         device: [iphone, ipad]
     env:
       TAXIGR_IOS_QA_DEVICE: ${{ matrix.device }}
-      TAXIGR_IOS_QA_RUNTIME: '26.5'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
