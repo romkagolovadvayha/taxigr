@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [ipad]
+        device: [iphone]
     env:
       TAXIGR_IOS_QA_DEVICE: ${{ matrix.device }}
       TAXIGR_IOS_QA_RUNTIME: '27.0'
