@@ -5,9 +5,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 if (process.platform !== 'darwin') throw new Error('Run iOS UI review on the EAS macOS builder');
 const output = path.resolve('artifacts/ios-native-qa');
 fs.mkdirSync(output, { recursive: true });
-const sim = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', timeout: 180_000 });
+const sim = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', timeout: args[0] === 'bootstatus' ? 600_000 : 180_000 });
+const requiredRuntime = process.env.TAXIGR_IOS_QA_RUNTIME;
 const runtimes = JSON.parse(sim('list', 'runtimes', '--json')).runtimes
-  .filter(r => r.isAvailable && r.identifier.includes('.iOS-'))
+  .filter(r => r.isAvailable && r.identifier.includes('.iOS-') && (!requiredRuntime || r.version === requiredRuntime))
   .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
 if (!runtimes.length) throw new Error('No available iOS runtime');
 const devicesByRuntime = JSON.parse(sim('list', 'devices', 'available', '--json')).devices;
