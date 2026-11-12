@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "description": "Заказ местного такси в Грахово и поездок по Удмуртии.",
     "ios": {
+      "icon": "./assets/brand/icon-ios.png",
       "supportsTablet": true,
       "bundleIdentifier": "ru.grahovo.taxi",
       "buildNumber": "1",

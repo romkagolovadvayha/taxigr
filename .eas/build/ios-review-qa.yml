@@ -1,0 +1,7 @@
+build:
+  name: iOS release smoke test and screenshots
+  steps:
+    - eas/build
+    - eas/maestro_test:
+        inputs:
+          flow_path: .maestro/ios-review.yaml

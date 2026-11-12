@@ -48,6 +48,8 @@ type LoginMethod = Exclude<AuthAction, "code" | null> | DemoPersona;
 const MAX_BRAND_COLOR = "#471AFF";
 const TELEGRAM_BRAND_COLOR = "#229ED9";
 const VK_BRAND_COLOR = "#0077FF";
+// iOS uses our own phone login; social sign-in requires an equivalent private login.
+const SOCIAL_LOGIN_ENABLED = process.env.EXPO_OS !== "ios";
 // Link asChild forwards DOM attributes; React Native Web Pressable uses hrefAttrs.
 const consentLinkWebProps =
   process.env.EXPO_OS === "web"
@@ -635,7 +637,7 @@ export function SignInScreen() {
                 gap: compact ? 8 : 10,
               }}
             >
-              {providers.map((provider) => (
+              {providers.filter(() => SOCIAL_LOGIN_ENABLED).map((provider) => (
                 <AnimatedPressable
                   key={provider.key}
                   accessibilityRole="button"
@@ -698,7 +700,15 @@ export function SignInScreen() {
                 </AnimatedPressable>
               ))}
             </View>
-            <AnimatedPressable
+            {!SOCIAL_LOGIN_ENABLED ? (
+              <AppButton
+                disabled={authenticating}
+                onPress={() => chooseLogin("sms")}
+                accessibilityLabel="Войти по SMS"
+              >
+                Войти по SMS
+              </AppButton>
+            ) : <AnimatedPressable
               accessibilityRole="button"
               accessibilityLabel="Войти по SMS"
               disabled={authenticating}
@@ -732,7 +742,7 @@ export function SignInScreen() {
               >
                 Войти по SMS
               </Text>
-            </AnimatedPressable>
+            </AnimatedPressable>}
           </>
         )}
 

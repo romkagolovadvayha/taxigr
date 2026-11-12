@@ -92,6 +92,7 @@
     "typecheck": "tsc --noEmit",
     "check:store-review": "tsx server/scripts/check-store-review-auth.ts",
     "review:rustore": "tsx server/scripts/prepare-rustore-review.ts",
+    "review:app-store": "tsx server/scripts/prepare-app-store-review.ts",
     "test": "vitest run",
     "release:available": "tsx server/scripts/publish-app-release.ts",
     "test:integration": "node scripts/run-integration-tests.mjs",

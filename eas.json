@@ -29,6 +29,24 @@
         "resourceClass": "m-medium"
       }
     },
+    "app-store": {
+      "extends": "production",
+      "credentialsSource": "local",
+      "ios": {
+        "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_DISTRIBUTION_STORE": "app-store"
+      }
+    },
+    "ios-review-qa": {
+      "extends": "app-store",
+      "autoIncrement": false,
+      "ios": {
+        "simulator": true,
+        "config": "ios-review-qa.yml"
+      }
+    },
     "rustore": {
       "autoIncrement": true,
       "channel": "production",
@@ -43,6 +61,15 @@
     }
   },
   "submit": {
+    "app-store": {
+      "ios": {
+        "ascAppId": "6834034004",
+        "appleTeamId": "GJVRBGFVG5",
+        "ascApiKeyPath": "./credentials/apple/app-store-connect.p8",
+        "ascApiKeyId": "JZX48RRLU7",
+        "ascApiKeyIssuerId": "54422ecf-7ee1-441d-887b-315cbdc5f315"
+      }
+    },
     "production": {
       "android": {
         "serviceAccountKeyPath": "./credentials/google-play/service-account.json",

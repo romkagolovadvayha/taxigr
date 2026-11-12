@@ -3,6 +3,8 @@ import { Linking, Text, View } from 'react-native';
 
 import { webHeadingLevel } from '@/accessibility/heading';
 import { BrandMark } from '@/components/brand-mark';
+import { DeleteAccountPanel } from '@/components/auth/delete-account-panel';
+import { useSession } from '@/auth/session-provider';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { AppButton } from '@/components/ui/app-button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -63,6 +65,7 @@ function BulletList({ items }: { items: readonly string[] }) {
 
 export function AccountDeletionScreen() {
   const colors = useThemeColors();
+  const { token } = useSession();
   const { operatorDetails } = useOperatorDetails();
   const requestSteps = getRequestSteps(operatorDetails.email);
   const subject = 'Удаление аккаунта — Такси Грахово';
@@ -84,6 +87,8 @@ export function AccountDeletionScreen() {
     }
     router.replace('/');
   };
+
+  if (process.env.EXPO_OS === 'ios' && token) return <Screen><DeleteAccountPanel /></Screen>;
 
   return (
     <Screen contentStyle={{ maxWidth: 900 }}>

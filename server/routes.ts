@@ -1,4 +1,5 @@
 import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { registerAccountDeletion } from './account-deletion';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { z } from 'zod';
@@ -1615,6 +1616,7 @@ export async function registerRoutes(
   realtime: RealtimeControls,
 ): Promise<RegisteredRouteHandlers> {
   registerAppReleaseRoutes(app);
+  registerAccountDeletion(app, realtime.disconnectUser);
   registerMessengerOrderSync(app);
   registerGroupAlertRoutes(app);
   registerMaxGroupBooking(app, {

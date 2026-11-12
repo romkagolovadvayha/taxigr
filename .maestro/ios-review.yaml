@@ -1,0 +1,39 @@
+appId: ru.grahovo.taxi
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- extendedWaitUntil:
+    visible: "Войти по SMS"
+    timeout: 60000
+- takeScreenshot: ios-login
+- assertNotVisible: "Войти через VK"
+- tapOn: "Войти по SMS"
+- tapOn: "Принять и продолжить"
+- tapOn: "Номер телефона, код страны плюс семь уже указан"
+- inputText: "9998887766"
+- tapOn: "Получить код по SMS"
+- extendedWaitUntil:
+    visible: "Код из SMS"
+    timeout: 30000
+- tapOn: "Код из SMS"
+- inputText: "4455"
+- tapOn: "Подтвердить код"
+- extendedWaitUntil:
+    visible: "Открыть профиль"
+    timeout: 60000
+- takeScreenshot: ios-home
+- tapOn: "Открыть профиль"
+- takeScreenshot: ios-profile
+- openLink: "taxigrahovo://account-deletion"
+- extendedWaitUntil:
+    visible: "Удалить мой аккаунт"
+    timeout: 15000
+- tapOn: "Удалить мой аккаунт"
+- assertVisible: "Удалить аккаунт навсегда?"
+- tapOn: "Оставить аккаунт"
+- assertVisible: "Удалить мой аккаунт"
+- openLink: "taxigrahovo://"
+- assertVisible: "Открыть профиль"
+- takeScreenshot: ios-order-start

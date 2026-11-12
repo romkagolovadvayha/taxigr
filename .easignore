@@ -38,6 +38,12 @@ assets/vk-community
 docs
 
 # Previously generated store artifacts
+/artifacts
+/outputs
+/output
+/companion-android
+/group-bridge
+/android-ndk-*
 *.apk
 *.aab
 rustore-pepk-out.zip
