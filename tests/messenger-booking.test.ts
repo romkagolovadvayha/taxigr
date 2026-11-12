@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookingDraft, BookingMessage } from '../server/messenger-booking';
-const mocks=vi.hoisted(()=>({firstRow:vi.fn(),execute:vi.fn(),query:vi.fn(),user:vi.fn(),send:vi.fn(),resolve:vi.fn(),options:vi.fn(),inject:vi.fn(),signQuote:vi.fn(),link:vi.fn(),phone:vi.fn()}));
+const mocks=vi.hoisted(()=>({firstRow:vi.fn(),execute:vi.fn(),query:vi.fn(),user:vi.fn(),send:vi.fn(),resolve:vi.fn(),options:vi.fn(),inject:vi.fn(),signQuote:vi.fn(),link:vi.fn(),phone:vi.fn(),refresh:vi.fn()}));
 vi.mock('../server/db',()=>({db:{execute:mocks.execute},firstRow:mocks.firstRow,withTransaction:(fn:(c:unknown)=>unknown)=>fn({query:mocks.query,execute:mocks.execute})}));
 vi.mock('../server/repositories',()=>({findUserWithRoles:mocks.user,findOrCreatePhoneUser:mocks.phone,linkMessengerIdentity:mocks.link}));
 vi.mock('../server/security', async original => ({
@@ -15,7 +15,7 @@ vi.mock('../server/places',()=>({listPlaces:vi.fn(),placeToAddress:vi.fn()}));
 vi.mock('../server/telegram-bot',()=>({sendTelegramMessage:mocks.send}));
 vi.mock('../server/max-bot',()=>({sendMaxMessage:mocks.send}));
 vi.mock('../server/vk-bot',()=>({sendVkMessage:mocks.send,vkInlineKeyboard:(rows:unknown)=>rows}));
-vi.mock('../server/messenger-notifications',()=>({appUrl:(path:string)=>`https://taxigr.ru${path}`}));
+vi.mock('../server/messenger-notifications',()=>({appUrl:(path:string)=>`https://taxigr.ru${path}`,refreshMessengerAccountOrderMessages:mocks.refresh}));
 import { createMessengerBookingHandler } from '../server/messenger-booking';
 import { interpretBotAddress } from '../server/bot-address-ai';
 import type { FastifyInstance } from 'fastify';
@@ -399,6 +399,13 @@ describe('taxi booking in messenger conversations',()=>{
     active={id:orderId,status:'in_progress'};await handle(message('Отмена'));
     expect(replyText()).toContain('Поездка уже началась');
     expect(JSON.stringify(replyButtons())).not.toContain('cancel');expect(mocks.inject).not.toHaveBeenCalled();
+  });
+  it.each(['telegram','max','vk'] as const)('tracks passenger order replies for status updates in %s', async provider => {
+    mocks.send.mockResolvedValue('sent-order-card');
+    active={id:orderId,status:'accepted'};
+    await handle({...message('ММ'),provider});
+    expect(mocks.refresh).toHaveBeenCalledExactlyOnceWith(provider, '42',
+      expect.objectContaining({orderId,audience:'passenger'}), 'sent-order-card');
   });
   it('cancels an unfinished draft and requires a new explicit start',async()=>{
     await start();await handle(message('у клуба'));await handle(message('отмена'));

@@ -17,7 +17,7 @@ import { sendTelegramMessage } from './telegram-bot';
 import { sendMaxMessage } from './max-bot';
 import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
-import { appUrl } from './messenger-notifications';
+import { appUrl, refreshMessengerAccountOrderMessages } from './messenger-notifications';
 import { config } from './config';
 import { explicitBotAddress, interpretConversationalBotRoute, isConversationalBotRoute } from '../src/domain/free-text-address';
 
@@ -27,7 +27,7 @@ export type BookingMessage = MessengerIdentityInput & {
   /** Only contacts authenticated by the provider adapter may populate this. */
   verifiedPhone?: string | null;
 };
-type Reply = { text: string; buttons?: ({ label: string; data: string } | { label: string; url: string } | { label: string; miniApp: true })[]; requestContact?: boolean };
+type Reply = { text: string; orderId?: string; buttons?: ({ label: string; data: string } | { label: string; url: string } | { label: string; miniApp: true })[]; requestContact?: boolean };
 export type BookingDraft = {
   id: string;
   flowVersion?: 2;
@@ -70,6 +70,7 @@ type ActiveOrder = Pick<RideOrder, 'id' | 'status'>;
 const canCancel = (order: ActiveOrder) => ['searching', 'accepted', 'driver_arriving', 'driver_waiting'].includes(order.status);
 function activeOrderReply(order: ActiveOrder, text = 'У вас уже есть активный заказ.'): Reply {
   return {
+    orderId: order.id,
     text: `${text}\nСтатус заказа: https://taxigr.ru/orders/${order.id}`,
     buttons: [
       ...(['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(order.status) ? [
@@ -105,8 +106,9 @@ async function withBookingSlot<T>(work: () => Promise<T>): Promise<T> {
 
 export async function sendBookingReply(message: BookingMessage, reply: Reply): Promise<void> {
   const buttons = reply.buttons ?? [];
+  let messageId: string | null;
   if (message.provider === 'telegram') {
-    await sendTelegramMessage(message.chatId, {
+    messageId = await sendTelegramMessage(message.chatId, {
       text: reply.text,
       reply_markup: reply.requestContact ? {
         keyboard: [[{ text: 'Поделиться номером для заказа', request_contact: true }]],
@@ -116,7 +118,7 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
       } : { remove_keyboard: true },
     });
   } else if (message.provider === 'max') {
-    await sendMaxMessage(message.externalUserId, {
+    messageId = await sendMaxMessage(message.externalUserId, {
       text: reply.text,
       attachments: reply.requestContact || buttons.length ? [{ type: 'inline_keyboard', payload: { buttons: reply.requestContact ?
         [[{ type: 'request_contact', text: 'Поделиться номером для заказа' }]] :
@@ -124,12 +126,17 @@ export async function sendBookingReply(message: BookingMessage, reply: Reply): P
           { type: 'callback', text: button.label, payload: button.data }]) } }] : undefined,
     });
   } else {
-    await sendVkMessage(message.chatId, {
+    messageId = await sendVkMessage(message.chatId, {
       message: reply.text,
       keyboard: buttons.length ? vkInlineKeyboard(buttons.map(button => ['miniApp' in button
         ? { type: 'link' as const, label: button.label, url: `https://vk.com/app${config.VK_MINI_APP_ID}` }
         : { type: 'url' in button ? 'link' as const : 'callback' as const, ...button }])) : undefined,
     });
+  }
+  if (reply.orderId && messageId) {
+    await refreshMessengerAccountOrderMessages(message.provider, message.externalUserId, {
+      orderId: reply.orderId, audience: 'passenger', title: 'Статус заказа', body: reply.text,
+    }, messageId);
   }
 }
 
