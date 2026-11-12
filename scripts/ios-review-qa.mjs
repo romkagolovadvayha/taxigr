@@ -5,7 +5,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 if (process.platform !== 'darwin') throw new Error('Run iOS UI review on the EAS macOS builder');
 const output = path.resolve('artifacts/ios-native-qa');
 fs.mkdirSync(output, { recursive: true });
-const sim = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', timeout: args[0] === 'bootstatus' ? 600_000 : 180_000 });
+const sim = (...args) => execFileSync('xcrun', ['simctl', ...args], {
+  encoding: 'utf8', timeout: args[0] === 'bootstatus' ? 600_000 : 180_000,
+  stdio: args[0] === 'bootstatus' ? 'inherit' : 'pipe',
+});
 const requiredRuntime = process.env.TAXIGR_IOS_QA_RUNTIME;
 const runtimes = JSON.parse(sim('list', 'runtimes', '--json')).runtimes
   .filter(r => r.isAvailable && r.identifier.includes('.iOS-') && (!requiredRuntime || r.version === requiredRuntime))
@@ -52,6 +55,8 @@ for (const [kind, matches] of [
   console.log(`Testing ${device.name} on iOS ${runtime.version}`);
   if (device.state !== 'Booted') sim('boot', device.udid);
   try {
+    const developerDirectory = execFileSync('xcode-select', ['-p'], { encoding: 'utf8', timeout: 30_000 }).trim();
+    execFileSync('open', ['-a', path.join(developerDirectory, 'Applications/Simulator.app'), '--args', '-CurrentDeviceUDID', device.udid], { timeout: 30_000 });
     sim('bootstatus', device.udid, '-b');
     sim('install', device.udid, apps[0]);
     sim('status_bar', device.udid, 'override', '--time', '09:41', '--batteryState', 'charged', '--batteryLevel', '100', '--wifiBars', '3', '--cellularBars', '4');
