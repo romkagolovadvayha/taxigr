@@ -83,10 +83,10 @@ export function useBookingAvailability() {
   return value;
 }
 
-export function useBookingAvailabilityPolling() {
+export function useBookingAvailabilityPolling(enabled = true) {
   const { observeBooking } = useBookingAvailability();
   const visible = useForegroundScreen();
   useEffect(() => {
-    if (visible) return observeBooking();
-  }, [observeBooking, visible]);
+    if (visible && enabled) return observeBooking();
+  }, [observeBooking, visible, enabled]);
 }

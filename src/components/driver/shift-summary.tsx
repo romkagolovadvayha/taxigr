@@ -20,7 +20,7 @@ export function ShiftSummary() {
   useFocusEffect(useCallback(() => {
     if (!token || token.startsWith('demo:')) return;
     const controller = new AbortController();
-    void apiRequest<EarningsSummary>('/v1/driver/earnings?period=today', { token, signal: controller.signal })
+    void apiRequest<EarningsSummary>('/v1/driver/earnings?period=today', { token, signal: controller.signal, offlineFallback:true })
       .then((result) => { setSummary(result); setFailed(false); })
       .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();

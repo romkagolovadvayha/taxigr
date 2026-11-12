@@ -4,6 +4,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { db } from '../server/db';
 
 const transport = vi.hoisted(() => ({ edit: vi.fn() }));
+vi.mock('../server/config', async importOriginal => {
+  const actual = await importOriginal<typeof import('../server/config')>();
+  return { ...actual, config: { ...actual.config, VK_BOT_TOKEN: 'mocked-sync-transport' } };
+});
 vi.mock('../server/messenger-notifications', () => ({
   editOrderMessage: transport.edit, notifyMessengerAccount: vi.fn(), appUrl: (path: string) => `https://taxi.example${path}`,
 }));

@@ -1,6 +1,7 @@
 import type { Address, Coordinates } from '../domain/models';
 import { validMapCoordinate } from '../domain/map-coordinates';
 import { searchMapAddresses, type MapAddressOptions } from './map-addresses';
+import { nearestOfflineAddress } from '../offline/addresses';
 
 /** A geocoder supplies the label; pickup stays at the passenger's GPS position. */
 export function pickupAddressAtCoordinates(
@@ -21,6 +22,8 @@ export async function resolvePickupAddress(coordinates: Coordinates, options: Ma
   if (!options.token || options.signal?.aborted) return null;
   const mapPoint = pickupAddressAtCoordinates({ label: 'Точка на карте' }, coordinates);
   if (!mapPoint) return null;
+  const local = nearestOfflineAddress(coordinates);
+  if (local) return pickupAddressAtCoordinates(local,coordinates);
   try {
     const addresses = await searchMapAddresses(coordinates.longitude + ',' + coordinates.latitude, options);
     if (options.signal?.aborted) return null;

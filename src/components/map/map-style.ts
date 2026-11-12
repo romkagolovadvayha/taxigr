@@ -1,5 +1,6 @@
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
 import type { ColorPalette } from '@/theme/tokens';
+import { getOfflineDistrict } from '../../offline/district';
 
 // The style ships with the application; no remote JS, style download or API key.
 // TileJSON can be replaced with a self-hosted OpenMapTiles-compatible endpoint.
@@ -12,22 +13,28 @@ const mapAttribution = `© <a href="${OPEN_MAP_TILES_URL}">OpenMapTiles</a> · �
 const name: ExpressionSpecification = ['coalesce', ['get', 'name:ru'], ['get', 'name'], ''];
 const isGrahovo: ExpressionSpecification = ['==', name, 'Грахово'];
 
-export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', offline = false): StyleSpecification {
+export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', offline = false, bundledGlyphsUrl?: string): StyleSpecification {
   const dark = scheme === 'dark';
   const road = dark ? '#59574F' : '#FFFFFF';
   const green = dark ? '#253D30' : '#D8E5CC';
   const water = dark ? '#274B5E' : '#B8DAE7';
   if (offline) {
-    // A regional road map from OpenFreeMap's OpenStreetMap tiles. Keep it in the
-    // app so a cold start can draw the district without requesting any tiles.
-    const district = require('../../data/grahovo-offline-map.json') as GeoJSON.FeatureCollection;
+    const district = getOfflineDistrict().map;
+    const labels = { 'text-color': colors.inkSecondary, 'text-halo-color': colors.mapFallback, 'text-halo-width': 1.5 };
     return {
       version: 8,
+      ...(bundledGlyphsUrl ? { glyphs: bundledGlyphsUrl } : {}),
       sources: { district: { type: 'geojson', data: district, attribution: mapAttribution } },
       layers: [
         { id: 'background', type: 'background', paint: { 'background-color': colors.mapFallback } },
+        { id: 'district-land', type: 'fill', source: 'district', filter: ['==', ['get', 'kind'], 'land'],
+          paint: { 'fill-color': ['case', ['==', ['get', 'class'], 'residential'], colors.mapFallback, green], 'fill-opacity': .7 } },
         { id: 'district-water', type: 'fill', source: 'district', filter: ['==', ['get', 'kind'], 'water'],
           paint: { 'fill-color': water } },
+        { id: 'district-waterways', type: 'line', source: 'district', filter: ['==', ['get', 'kind'], 'waterway'],
+          paint: { 'line-color': water, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, .5, 17, 4] } },
+        { id: 'district-buildings', type: 'fill', source: 'district', minzoom: 14, filter: ['==', ['get', 'kind'], 'building'],
+          paint: { 'fill-color': dark ? '#666053' : '#D0C5AC', 'fill-outline-color': colors.borderStrong } },
         { id: 'district-road-outline', type: 'line', source: 'district', filter: ['==', ['get', 'kind'], 'road'],
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': colors.borderStrong, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 17, 12] } },
@@ -36,6 +43,15 @@ export function taxiMapStyle(colors: ColorPalette, scheme: 'light' | 'dark', off
           paint: { 'line-color': road, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 17, 9] } },
         { id: 'district-places', type: 'circle', source: 'district', filter: ['==', ['get', 'kind'], 'place'],
           paint: { 'circle-radius': 2.5, 'circle-color': colors.inkSecondary } },
+        ...(bundledGlyphsUrl ? [
+          { id: 'district-road-label', type: 'symbol', source: 'district', minzoom: 13, filter: ['==', ['get', 'kind'], 'road'],
+            layout: { 'symbol-placement': 'line', 'text-field': name, 'text-font': [MAP_FONT], 'text-size': 12, 'text-max-angle': 35 }, paint: labels },
+          { id: 'district-house-label', type: 'symbol', source: 'district', minzoom: 17, filter: ['==', ['get', 'kind'], 'building'],
+            layout: { 'text-field': ['coalesce', ['get', 'housenumber'], ''], 'text-font': [MAP_FONT], 'text-size': 11 }, paint: labels },
+          { id: 'district-place-label', type: 'symbol', source: 'district', filter: ['==', ['get', 'kind'], 'place'],
+            layout: { 'text-field': name, 'text-font': [MAP_FONT], 'text-size': ['interpolate', ['linear'], ['zoom'], 6, 11, 12, 15, 16, 17],
+              'text-anchor': ['case', isGrahovo, 'center', 'top'], 'text-offset': ['case', isGrahovo, ['literal', [0, 0]], ['literal', [0, .8]]] }, paint: labels },
+        ] as LayerSpecification[] : []),
       ],
     };
   }

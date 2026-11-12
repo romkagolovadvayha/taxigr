@@ -71,10 +71,12 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', dense, validation
     if (currentRide) return null;
     return <BookingSubmitButton
       compact={dense}
+      checkAvailability={routeIsBookable && quoteStatus !== 'offline'}
       priceMinor={bookingFare.priceMinor}
       etaMinutes={bookingFare.etaMinutes}
       label={scheduledAt ? 'Заказать ко времени' : 'Заказать'}
-      accessibilityLabel={scheduledAt && quoteReady
+      {...(quoteStatus === 'offline' ? {label:'Продолжить',checkAvailability:false} : {})}
+      accessibilityLabel={quoteStatus === 'offline' ? 'Продолжить оформление черновика' : scheduledAt && quoteReady
         ? `Перейти к подтверждению предзаказа за ${bookingFare.priceMinor / 100} рублей`
         : undefined}
       loading={quotePending}
@@ -82,7 +84,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', dense, validation
       canRetry={routeIsBookable && quoteStatus === 'error'}
       onPress={() => {
         if (!routeIsBookable) { onInvalidRoute(); return; }
-        if (quoteReady) { router.push('/order-confirmation'); return; }
+        if (quoteReady || quoteStatus === 'offline') { router.push('/order-confirmation'); return; }
         void requestQuote();
       }}
     />;
@@ -118,7 +120,7 @@ function BookingPanel({ pickupEtaMinutes, section = 'content', dense, validation
         <ScheduledPickupControl disabled={busy} dense={dense} />
       </View>
       {!!error && (
-        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: colors.danger }}>
+        <Text accessibilityRole="alert" selectable numberOfLines={2} style={{ ...typography.caption, color: quoteStatus === 'offline' ? colors.warningText : colors.danger }}>
           {error}
         </Text>
       )}

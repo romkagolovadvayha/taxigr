@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 import { useForegroundScreen } from './use-foreground-screen';
 
-import { apiRequest } from '@/api/client';
+import { apiRequest, isConnectionFailure } from '@/api/client';
+import { getOfflineRoadRoute } from '@/offline/road-route';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import {
   drawableNavigationRoute,
@@ -112,6 +113,12 @@ export function useDriverNavigation({
       retryTimer = setTimeout(() => setRetryKey((value) => value + 1), delay);
     };
     setLoading(true);
+    let localRoute: RouteSummary | null = null;
+    try {
+      localRoute = getOfflineRoadRoute(requestOrigin,
+        (JSON.parse(targetsKey) as [number,number][]).map(([latitude,longitude])=>({latitude,longitude})));
+      setSummary(localRoute); setCoordinates(localRoute.coordinates);
+    } catch { /* Some intercity routes are outside the embedded district. */ }
     const request = demo
       ? getDemoRoadRoute(
           requestOrigin,
@@ -140,6 +147,12 @@ export function useDriverNavigation({
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
+        if (localRoute && isConnectionFailure(reason)) {
+          setSummary(localRoute); setCoordinates(localRoute.coordinates);
+          setError('Маршрут по встроенной карте. Нет связи с сервером.');
+          retryAfter(NAVIGATION_RETRY_MS);
+          return;
+        }
         setError(
           reason instanceof Error ? reason.message : 'Не удалось построить маршрут',
         );

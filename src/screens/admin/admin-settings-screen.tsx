@@ -56,8 +56,8 @@ export function AdminSettingsScreen() {
   const loadSettings = useCallback((signal?: AbortSignal) => {
     if (demo || !token) return;
     return Promise.all([
-        apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal }),
-        apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', { token, signal }),
+        apiRequest<PricingRules>('/v1/admin/tariffs', { token, signal, offlineFallback:true }),
+        apiRequest<DriverDispatchSettings>('/v1/admin/driver-dispatch-settings', { token, signal, offlineFallback:true }),
       ]).then(([nextRules, nextDispatchSettings]) => {
       if (!signal?.aborted) {
         setRules({ ...nextRules, ...intercityTimeRates(nextRules) });

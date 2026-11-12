@@ -4645,6 +4645,13 @@ export async function registerRoutes(
           });
         }
 
+        // INSERT takes shared FK locks on both users. Acquire their write locks
+        // in a stable order first, so parallel ratings cannot deadlock while
+        // upgrading a shared lock to recalculate the recipient's aggregate.
+        for (const userId of [session.id, rateeUserId].sort()) {
+          await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+        }
+
         await connection.execute(
           `INSERT INTO ride_ratings
             (id, order_id, rater_user_id, ratee_user_id, rater_role, score)
@@ -4667,7 +4674,7 @@ export async function registerRoutes(
           driverId: order.driver_id,
           raterRole,
         };
-      });
+      }, { isolationLevel: 'READ COMMITTED' });
 
       const updated = await getOrder(id);
       if (!updated) throw new Error('Order disappeared');
@@ -5311,7 +5318,8 @@ export async function registerRoutes(
           statusCode: 409, code: 'SCHEDULE_CONFIRMATION_REQUIRED',
         });
       }
-      if (row && scheduledAt && row.driver_id === driver.id && row.status === 'accepted') {
+      if (row && row.driver_id === driver.id &&
+          ['accepted', 'driver_arriving', 'driver_waiting', 'in_progress'].includes(row.status)) {
         return { passengerId: row.passenger_id, driverId: driver.id, changed: false };
       }
       if (!row || row.status !== 'searching' || row.driver_id) {
@@ -5916,7 +5924,11 @@ export async function registerRoutes(
       // A retried arrival/start/completion must not restart the timer, charge
       // waiting again, promote another order or send duplicate notifications.
       if (row.status === status) {
-        return { passengerId: row.passenger_id, driverId: driver.id, promotion: null, changed: false };
+        const paymentChanged = status === 'completed' && paymentReceived === true && !row.payment_confirmed_at;
+        if (paymentChanged) await connection.execute(
+          'UPDATE orders SET payment_confirmed_at=UTC_TIMESTAMP(3) WHERE id=?', [id],
+        );
+        return { passengerId: row.passenger_id, driverId: driver.id, promotion: null, changed: false, paymentChanged };
       }
       const departure = status === 'driver_arriving' && row.status === 'accepted' && row.scheduled_at && !row.active_driver_id;
       if (departure) {
@@ -5980,12 +5992,19 @@ export async function registerRoutes(
         promotion = await rebalanceDriverOrderQueue(connection, driver.id);
         await connection.execute('DELETE FROM passenger_locations WHERE order_id = ?', [id]);
       }
-      return { passengerId: row.passenger_id, driverId: driver.id, promotion, changed: true };
+      return { passengerId: row.passenger_id, driverId: driver.id, promotion, changed: true, paymentChanged: false };
     });
     const updated = await getOrder(id);
     if (!updated) throw new Error('Order disappeared');
     const payload = presentOrder(updated);
-    if (!participants.changed) return { data: payload };
+    if (!participants.changed) {
+      if (participants.paymentChanged) {
+        publish(`user:${participants.passengerId}`, 'order:updated', payload);
+        publish(`driver:${participants.driverId}`, 'order:updated', payload);
+        publish('admins', 'order:updated', payload);
+      }
+      return { data: payload };
+    }
     publish(`user:${participants.passengerId}`, 'order:updated', payload);
     publish(`driver:${participants.driverId}`, 'order:updated', payload);
     publish('admins', 'order:updated', payload);

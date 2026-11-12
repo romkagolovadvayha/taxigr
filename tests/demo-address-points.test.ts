@@ -46,7 +46,9 @@ describe('address confirmation persistence', () => {
     const fetch = vi.fn().mockRejectedValue(new Error('offline')); vi.stubGlobal('fetch', fetch);
     await rememberAddressPoint(address, address.coordinates, 'demo:passenger');
     expect(fetch).not.toHaveBeenCalled();
-    await expect(rememberAddressPoint(address, address.coordinates, 'session-token')).rejects.toThrow('Нет связи');
+    await expect(rememberAddressPoint(address, address.coordinates, 'session-token')).resolves.toMatchObject({
+      coordinatePrecision:'precise',coordinates:address.coordinates,label:address.label,
+    });
     await expect(rememberAddressPoint(address, address.coordinates, null)).rejects.toThrow('Войдите');
   });
 });

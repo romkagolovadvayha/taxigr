@@ -2,6 +2,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { View } from 'react-native';
+import { OfflineNotice } from '@/components/ui/offline-notice';
 
 import { SessionProvider, useSession } from '@/auth/session-provider';
 import { VkCommunityPromptHost } from '@/components/auth/vk-community-prompt';
@@ -17,9 +19,13 @@ import { RideProvider, useRideBootstrapReady } from '@/state/ride-provider';
 import { AppUpdateProvider } from '@/updates/app-update-provider';
 import { BookingAvailabilityProvider } from '@/providers/booking-availability-provider';
 import { MiniAppBoundary } from '@/mini-apps/mini-app-boundary';
+import { setPhysicalConnectivity } from '@/offline/connectivity';
 
 onlineManager.setEventListener((setOnline) =>
-  NetInfo.addEventListener((state) => setOnline(state.isConnected ?? true)),
+  NetInfo.addEventListener((state) => {
+    setOnline(state.isConnected ?? true);
+    setPhysicalConnectivity(state.isConnected !== false);
+  }),
 );
 
 function PostBootstrapServices() {
@@ -37,7 +43,7 @@ function SessionScopedRideProviders({ children }: { children: ReactNode }) {
       <RideFeedbackProvider>
         <PostBootstrapServices />
         <PassengerLocationPublisher />
-        <PassengerRideDialogs>{children}</PassengerRideDialogs>
+        <PassengerRideDialogs><View style={{flex:1}}><OfflineNotice /><View style={{flex:1}}>{children}</View></View></PassengerRideDialogs>
       </RideFeedbackProvider>
     </RideProvider>
   );

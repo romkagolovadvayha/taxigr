@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Address, RideOrder, Tariff } from '../src/domain/models';
@@ -19,6 +19,7 @@ import { sendVkMessage, vkInlineKeyboard } from './vk-bot';
 import { rideMessengerActionData } from './ride-messenger';
 import { appUrl, refreshMessengerAccountOrderMessages } from './messenger-notifications';
 import { config } from './config';
+import { verifiedUserClientAddress } from './relay-client-address';
 import { explicitBotAddress, interpretConversationalBotRoute, isConversationalBotRoute } from '../src/domain/free-text-address';
 
 export type BookingMessage = MessengerIdentityInput & {
@@ -253,8 +254,7 @@ export function createMessengerBookingHandler(app: FastifyInstance) {
       WHERE provider = ? AND external_user_id = ? AND active = TRUE`, [message.provider, message.externalUserId]);
     const token = await signSession({ id: user.id, roles: user.roles });
     // Separate the regular API limiter for authenticated bot passengers.
-    const identityHash = createHash('sha256').update(user.id).digest('hex').slice(0, 24);
-    const remoteAddress = `fd00:0:${identityHash.match(/.{4}/gu)!.join(':')}`;
+    const remoteAddress = verifiedUserClientAddress(user.id);
     const call = async <T>(url: string, payload: Record<string, unknown>): Promise<T> => {
       const response = await app.inject({ method: 'POST', url, remoteAddress, headers: { authorization: `Bearer ${token}` }, payload });
       const body = response.json<{ data?: T; error?: { message?: string; code?: string } }>();

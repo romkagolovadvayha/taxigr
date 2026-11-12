@@ -36,7 +36,7 @@ export function DriverTripDetailScreen() {
   useEffect(() => {
     if (!token || token.startsWith('demo:') || !id) return;
     const controller = new AbortController();
-    void apiRequest<RideOrder>(`/v1/orders/${id}`, { token, signal: controller.signal })
+    void apiRequest<RideOrder>(`/v1/orders/${id}`, { token, signal: controller.signal, offlineFallback:true })
       .then((result) => {
         if (controller.signal.aborted) return;
         setOrder(result);

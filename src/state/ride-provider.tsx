@@ -2,9 +2,12 @@ import type { ReactNode } from 'react';
 import React, { createContext, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { usePathname } from 'expo-router';
-import { io, type Socket } from 'socket.io-client';
+import { createAppSocket } from '@/api/realtime';
 
-import { ApiError, apiRequest, getSocketUrl, invalidateApiCache } from '@/api/client';
+import { ApiError, apiRequest, getSocketUrl, invalidateApiCache, isConnectionFailure } from '@/api/client';
+import { offlineSnapshots, type BookingDraft } from '@/offline/snapshots';
+import { isServerReachable } from '@/offline/connectivity';
+import { getOfflineRoadRoute } from '@/offline/road-route';
 import { getDemoRoadRoute } from '@/api/demo-routing';
 import { useSession } from '@/auth/session-provider';
 import { useAppForeground } from '@/hooks/use-foreground-screen';
@@ -65,6 +68,7 @@ import { activeWaitingSeconds } from '@/domain/waiting';
 import { getInstallationId } from '@/storage/device-id';
 
 const ESTIMATED_ROUTE_RETRY_MS = 31_000;
+const DRIVER_OFFERS_REFRESH_ERROR = 'Не удалось обновить доступные заказы. Проверьте соединение.';
 
 type RideContextValue = {
   pickup: Address | null;
@@ -74,6 +78,8 @@ type RideContextValue = {
   routeSummary: RouteSummary | null;
   bookingFare: Tariff;
   selectedPaymentMethod: PaymentMethod;
+  bookingComment: string;
+  setBookingComment: (value: string) => void;
   scheduledAt?: string;
   selectScheduledAt: (value?: string) => void;
   currentRide: RideOrder | null;
@@ -95,7 +101,7 @@ type RideContextValue = {
   addressHistory: DestinationHistoryItem[];
   firstRideSuggestions: Address[];
   bootstrapReady: boolean;
-  quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
+  quoteStatus: 'idle' | 'loading' | 'ready' | 'offline' | 'error';
   busy: boolean;
   error: string | null;
   chatUnreadCounts: Record<string, number>;
@@ -253,6 +259,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [bookingComment, setBookingComment] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
   const [currentRide, setCurrentRide] = useState<RideOrder | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string>();
   const [driverPreorders, setDriverPreorders] = useState<RideOrder[]>([]);
@@ -279,8 +287,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [bookingFare, setBookingFare] = useState<Tariff>(() =>
     buildTariffs(11_600, 'district').find(({ code }) => code === 'economy')!,
   );
-  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'offline' | 'error'>('idle');
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
+  const [quoteRequestPending, setQuoteRequestPending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -303,6 +312,30 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const sessionUserIdRef = useRef(userId);
 
   useEffect(() => {
+    if (!userId || demoSession) return;
+    let active = true;
+    void offlineSnapshots.get<BookingDraft>(userId,'booking-draft').then(draft => {
+      if (!active) return;
+      if (draft && Array.isArray(draft.destinations) && draft.destinations.length <= 10 &&
+          draft.destinations.every(address => Number.isFinite(address?.coordinates?.latitude) && Number.isFinite(address?.coordinates?.longitude))) {
+        if (draft.pickup && Number.isFinite(draft.pickup.coordinates?.latitude) && Number.isFinite(draft.pickup.coordinates?.longitude)) setPickup(draft.pickup);
+        setDestinations(draft.destinations);
+        setSelectedPaymentMethod(draft.paymentMethod === 'transfer' ? 'transfer' : 'cash');
+        setBookingComment(typeof draft.comment === 'string' ? draft.comment.slice(0,1000) : '');
+        if (draft.scheduledAt && Date.parse(draft.scheduledAt) > Date.now()+30*60_000) setScheduledAt(draft.scheduledAt);
+      }
+      setDraftRestored(true);
+    });
+    return () => { active=false; };
+  }, [demoSession,userId]);
+
+  useEffect(() => {
+    if (!userId || demoSession || !draftRestored) return;
+    // No automatic booking is queued. Restoring a draft always requires a new server quote and a tap.
+    void offlineSnapshots.set(userId,'booking-draft',{pickup,destinations,paymentMethod:selectedPaymentMethod,scheduledAt,comment:bookingComment});
+  }, [userId,demoSession,draftRestored,pickup,destinations,selectedPaymentMethod,scheduledAt,bookingComment]);
+
+  useEffect(() => {
     sessionUserIdRef.current = userId;
   }, [userId]);
 
@@ -310,6 +343,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     quoteRequestId.current += 1;
     quoteRequestController.current?.abort();
     quoteRequestController.current = null;
+    setQuoteRequestPending(false);
     setRouteCoordinates([]);
     setRouteSummary(null);
     setQuoteToken(null);
@@ -425,9 +459,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setScheduledAt(undefined);
       setDriverPreorders([]);
       if (demoSession) {
+        setScheduledAt(undefined);
         const passengerOrders = userId === demoPassenger.id ? demoOrders : [];
         const demoHistory = buildDestinationHistory(passengerOrders, userId);
         const passengerOrderSummaries = passengerOrders.map(toOrderSummary);
@@ -458,6 +492,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       // that are also offered to demo passengers.
 
       if (!token) {
+        setScheduledAt(undefined);
         setPickup(null);
         setDestinations([]);
         setOrders([]);
@@ -484,21 +519,22 @@ export function RideProvider({ children }: { children: ReactNode }) {
     if (!token || demoSession) return;
     const sessionUserId = userId;
     try {
-      const bootstrap = await apiRequest<RideBootstrap>('/v1/bootstrap', { token });
+      const bootstrap = await apiRequest<RideBootstrap>('/v1/bootstrap', { token, offlineFallback:true });
       if (sessionUserIdRef.current !== sessionUserId) return;
       // Bootstrap only contains active trips. Reconnecting after a failed
       // rating request must not discard the completed trip and selected stars.
       setCurrentRide(current => bootstrap.activePassengerOrder ??
         (current?.status === 'completed' && !current.ratings?.byPassenger ? current : null));
-      setDriverRide(bootstrap.driverQueue.current ?? bootstrap.driverQueue.offer);
+      setDriverRide(bootstrap.driverQueue.current ?? (isServerReachable() ? bootstrap.driverQueue.offer : null));
       setNextDriverRide(bootstrap.driverQueue.next);
-      setDriverOffer(bootstrap.driverQueue.offer);
-      setDriverPreorders(bootstrap.driverPreorders ?? []);
+      setDriverOffer(isServerReachable() ? bootstrap.driverQueue.offer : null);
+      setDriverPreorders(isServerReachable() ? bootstrap.driverPreorders ?? [] : []);
       setDestinationHistory(bootstrap.destinationHistory);
       setAddressHistory(bootstrap.addressHistory ?? bootstrap.destinationHistory);
       setFirstRideSuggestions(bootstrap.firstRideSuggestions ?? firstRideAddresses);
       setChatUnreadCounts(bootstrap.chatUnreadCounts);
       setBootstrapError(null);
+      if (isServerReachable()) setError(current => current === DRIVER_OFFERS_REFRESH_ERROR ? null : current);
     } catch (reason) {
       if (sessionUserIdRef.current !== sessionUserId) return;
       setBootstrapError(reason instanceof Error ? reason.message : 'Не удалось обновить заказы');
@@ -526,7 +562,22 @@ export function RideProvider({ children }: { children: ReactNode }) {
     if (!token || demoSession) return;
     let active = true;
     const bootstrapTimer = setTimeout(() => {
-      void refresh().finally(() => {
+      void (async () => {
+        const saved = userId ? await offlineSnapshots.get<RideBootstrap>(userId,'/v1/bootstrap') : null;
+        if (!active) return;
+        if (saved?.driverQueue && Array.isArray(saved.destinationHistory)) {
+          setCurrentRide(saved.activePassengerOrder);
+          if (saved.activePassengerOrder?.routeCoordinates) setRouteCoordinates(saved.activePassengerOrder.routeCoordinates);
+          setDriverRide(saved.driverQueue.current);
+          setNextDriverRide(saved.driverQueue.next);
+          setDestinationHistory(saved.destinationHistory);
+          setAddressHistory(saved.addressHistory ?? saved.destinationHistory);
+          setFirstRideSuggestions(saved.firstRideSuggestions ?? firstRideAddresses);
+          setChatUnreadCounts(saved.chatUnreadCounts ?? {});
+        }
+        setBootstrappedToken(token);
+        await refresh();
+      })().finally(() => {
         if (active) setBootstrappedToken(token);
       });
     }, 0);
@@ -534,7 +585,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       active = false;
       clearTimeout(bootstrapTimer);
     };
-  }, [demoSession, refresh, token]);
+  }, [demoSession, refresh, token, userId]);
 
   const loadPassengerOrders = useCallback(async () => {
     if (!token || demoSession) return;
@@ -542,7 +593,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setError(null);
       const firstPage = await apiRequest<RideOrderSummary[]>(
         '/v1/orders?scope=passenger&view=summary&limit=20',
-        { token },
+        { token, offlineFallback:true },
       );
       setOrders(firstPage);
       setPassengerOrdersHasMore(firstPage.length === 20);
@@ -595,15 +646,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
   }, [adminOrders, adminOrdersHasMore, demoSession, isAdmin, token]);
 
   useEffect(() => {
-    if (!token || demoSession || !bootstrapReady) return;
+    if (!token || demoSession || !bootstrapReady || !foreground) return;
     const socketUrl = getSocketUrl();
     if (!socketUrl) return;
-    const socket: Socket = io(socketUrl, {
-      path: '/socket.io',
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionDelayMax: 8_000,
-    });
+    const socket = createAppSocket(socketUrl, token);
     const handleReconnect = () => {
       invalidateApiCache(['orders', 'stats', 'admin', 'profile']);
       void refresh();
@@ -671,9 +717,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
         const offer = offers[0] ?? null;
         setDriverOffer(offer);
         setDriverRide((current) => current && isAssignedDriverOrder(current) ? current : offer);
-      }).catch(() => {
+        setError(current => current === DRIVER_OFFERS_REFRESH_ERROR ? null : current);
+      }).catch(reason => {
+        if (reason instanceof ApiError && reason.code === 'REQUEST_ABORTED') return;
         if (socket.connected && requestId === offerRequestId) {
-          setError('Не удалось обновить доступные заказы. Проверьте соединение.');
+          setError(DRIVER_OFFERS_REFRESH_ERROR);
         }
       });
     });
@@ -722,6 +770,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     applyDriverOrder,
     applyPassengerOrder,
     bootstrapReady,
+    foreground,
     demoSession,
     isAdmin,
     isDriver,
@@ -771,7 +820,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     quoteRequestController.current = controller;
     setQuoteStatus('loading');
+    setQuoteRequestPending(true);
     setError(null);
+
+    let localRoute: RouteSummary | null = null;
+    if (!demoSession) {
+      try {
+        localRoute = getOfflineRoadRoute(pickup.coordinates,destinations.map(address=>address.coordinates));
+        setRouteCoordinates(localRoute.coordinates);
+        setRouteSummary(localRoute);
+        setQuoteStatus('offline');
+      } catch { /* Outside the bundled road network, wait for the authenticated router. */ }
+    }
 
     try {
       if (demoSession) {
@@ -838,10 +898,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setError(confirmationMessage ?? null);
     } catch (reason) {
       if (controller.signal.aborted || quoteRequestId.current !== requestId) return;
-      setQuoteStatus('error');
-      setError(reason instanceof Error ? reason.message : 'Не удалось рассчитать стоимость');
+      if (localRoute && isConnectionFailure(reason)) {
+        setQuoteStatus('offline');
+        setError('Маршрут доступен без интернета. Черновик сохранён. Для стоимости и отправки заказа нужна связь.');
+      } else {
+        setQuoteStatus('error');
+        setError(reason instanceof Error ? reason.message : 'Не удалось рассчитать стоимость');
+      }
     } finally {
-      if (quoteRequestId.current === requestId) quoteRequestController.current = null;
+      if (quoteRequestId.current === requestId) { quoteRequestController.current = null; setQuoteRequestPending(false); }
     }
   }, [
     demoSession,
@@ -892,8 +957,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
       !quoteVisible ||
       demoSession ||
       currentRide ||
-      quoteStatus !== 'ready' ||
-      routeSummary?.source !== 'estimate'
+      quoteRequestPending ||
+      !['ready','offline'].includes(quoteStatus) ||
+      !['estimate','offline'].includes(routeSummary?.source ?? '')
     ) return;
 
     const timer = setTimeout(() => {
@@ -901,7 +967,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }, ESTIMATED_ROUTE_RETRY_MS);
 
     return () => clearTimeout(timer);
-  }, [currentRide, demoSession, quoteStatus, quoteVisible, requestQuote, routeSummary?.source]);
+  }, [currentRide, demoSession, quoteRequestPending, quoteStatus, quoteVisible, requestQuote, routeSummary?.source]);
 
   useEffect(
     () => () => {
@@ -1619,6 +1685,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       routeSummary,
       bookingFare,
       selectedPaymentMethod,
+      bookingComment,
+      setBookingComment,
       scheduledAt,
       selectScheduledAt,
       currentRide,
@@ -1731,6 +1799,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       resetDriverRide,
       bookingFare,
       selectedPaymentMethod,
+      bookingComment,
       scheduledAt,
       selectScheduledAt,
       startWaiting,

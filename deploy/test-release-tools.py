@@ -1,5 +1,6 @@
 """Exercise release contents and upload recovery without contacting a server."""
 import os
+import importlib.util
 from pathlib import Path
 import re
 import shlex
@@ -21,6 +22,22 @@ def shell_path(path):
 
 
 class ReleaseToolsTests(unittest.TestCase):
+    def test_nginx_keeps_existing_tls_gateway_and_owned_proxy_identity(self):
+        spec = importlib.util.spec_from_file_location('prepare_nginx', ROOT / 'deploy/prepare-nginx.py')
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        template = (ROOT / 'deploy/nginx.taxigr.conf').read_text()
+        previous = template.replace('listen 443 ssl http2;', 'listen 127.0.0.1:18444 ssl http2 proxy_protocol;').replace('listen [::]:443 ssl http2;', 'listen [::1]:18444 ssl http2 proxy_protocol;')
+        prepared = helper.prepare(template, previous, True)
+        self.assertEqual(prepared.count('listen 127.0.0.1:18444 ssl http2 proxy_protocol;'), 2)
+        self.assertEqual(prepared.count('listen [::1]:18444 ssl http2 proxy_protocol;'), 2)
+        self.assertNotIn('listen 443 ', prepared)
+        self.assertIn('proxy_set_header X-Real-IP $taxigr_request_client_ip;', prepared)
+        self.assertIn('proxy_set_header X-Taxigr-Proxy-Key "";', prepared)
+        self.assertEqual(helper.prepare(template), template)
+        with self.assertRaises(ValueError):
+            helper.prepare(template, previous.replace('listen [::1]:18444 ssl http2 proxy_protocol;', ''), True)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix='taxigr-release-test-')
         self.addCleanup(self.directory.cleanup)
@@ -32,7 +49,7 @@ class ReleaseToolsTests(unittest.TestCase):
 
     def test_archive_keeps_web_assets_and_shared_api_sources(self):
         required = ['dist/index.html', 'dist/assets/map.webp', 'dist/assets/voice.mp3',
-                    'server/index.ts', 'server/package-lock.json', 'server/migrations/001.sql',
+                    'server/index.ts', 'server/package-lock.json', 'server/scripts/check-runtime.ts', 'server/migrations/001.sql',
                     'src/domain/models.ts', 'src/domain/app-updates.ts', 'package.json',
                     'package-lock.json', 'tsconfig.json', 'app.json',
                     'dist/vendor/maplibre/6.9.0/entry.mjs',
@@ -75,7 +92,11 @@ class ReleaseToolsTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         generated = dict(line.split('=', 1) for line in (self.root / '.taxigr.env').read_text().splitlines())
-        for name in ['RUSTORE_PUSH_PROJECT_ID', 'RUSTORE_PUSH_SERVICE_TOKEN']:
+        for name in ['RUSTORE_PUSH_PROJECT_ID', 'RUSTORE_PUSH_SERVICE_TOKEN',
+                     'MAX_RELAY_ENABLED', 'MAX_RELAY_CHANNEL', 'MAX_RELAY_CHAT_ID',
+                     'MAX_RELAY_SERVICE_USER_ID', 'MAX_RELAY_BOT_TOKEN', 'MAX_RELAY_SECRET_KEY',
+                     'VK_RELAY_ENABLED', 'VK_RELAY_CHANNEL', 'VK_RELAY_GROUP_ID',
+                     'VK_RELAY_SERVICE_USER_ID', 'VK_RELAY_BOT_TOKEN', 'VK_RELAY_SECRET_KEY']:
             self.assertEqual(shlex.split(generated[name]), ['fixture-' + name.lower()])
 
     def upload(self, mode):

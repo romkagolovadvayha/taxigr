@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { apiRequest } from '@/api/client';
+import { apiRequest, isConnectionFailure } from '@/api/client';
 import {
   LIVE_LOCATION_UPDATE_INTERVAL_MS,
   liveLocationUpdateDelay,
@@ -92,6 +92,8 @@ export function useDriverLocation({
       })
         .catch((reason: unknown) => {
           if (cancelled) return;
+          // GPS remains usable for the bundled map and local navigation when upload fails.
+          if (isConnectionFailure(reason)) return;
           setState((current) => ({
             ...current,
             error:

@@ -503,12 +503,12 @@ export function AddressSearchScreen() {
   };
 
   useEffect(() => {
-    if (!canSearchRemote || !edited || !isFocused || pendingAddress) return;
+    if (!canSearchRemote || !edited || !isFocused || pendingAddress || localResults.length > 0) return;
     const timer = setTimeout(() => {
       if (lastSearchQuery.current !== `${token}:${query.trim()}`) runRemoteSearch();
     }, 300);
     return () => clearTimeout(timer);
-  }, [canSearchRemote, edited, isFocused, pendingAddress, query, runRemoteSearch, token]);
+  }, [canSearchRemote, edited, isFocused, pendingAddress, query, runRemoteSearch, token, localResults.length]);
 
   useEffect(
     () => {

@@ -7,7 +7,7 @@ archive="${1:?Usage: package-release.sh archive.tar.gz}"
 # dist contains the exported website, including its images, fonts and audio.
 # Keep shared TypeScript sources used by the API, but not native/design projects.
 files=(dist server src deploy package.json package-lock.json tsconfig.json app.json)
-for required in dist/index.html server/index.ts server/package-lock.json src/domain/models.ts; do
+for required in dist/index.html server/index.ts server/package-lock.json server/scripts/check-runtime.ts src/domain/models.ts; do
   test -f "$required" || { echo "Missing release input: $required" >&2; exit 1; }
 done
 

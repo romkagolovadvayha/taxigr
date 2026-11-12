@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 import { parse } from 'dotenv';
+import { publicBuildEnvironment } from './public-build-env.mjs';
 
 const productionFile = resolve(process.cwd(), '.env.production');
 const production = existsSync(productionFile)
@@ -16,6 +17,7 @@ if (!publicUrl) {
 
 const environment = {
   ...process.env,
+  ...publicBuildEnvironment(production, process.env),
   EXPO_NO_DOTENV: '1',
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || production.EXPO_PUBLIC_API_URL || publicUrl,
   EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || production.EXPO_PUBLIC_SOCKET_URL || publicUrl,

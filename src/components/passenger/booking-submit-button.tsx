@@ -36,9 +36,9 @@ export function BookingSubmitButton({
   onPress,
 }: Props) {
   const colors = useThemeColors();
-  useBookingAvailabilityPolling();
+  useBookingAvailabilityPolling(checkAvailability && (estimateAvailable || canRetry || loading));
   const { enabled, checking, checkBooking } = useBookingAvailability();
-  if (enabled !== true && !loading) {
+  if (checkAvailability && enabled !== true && !loading) {
     disabled = false;
     loading = false;
     estimateAvailable = false;

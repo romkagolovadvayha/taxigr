@@ -133,6 +133,15 @@ SQL
 cd "$release_path"
 echo 'Installing API dependencies'
 npm ci --omit=dev --prefix server --no-audit --no-fund
+# Shared modules under src/api resolve packages from the release root.
+# Keep the production dependency set small while making those imports work.
+if [[ -e node_modules && ! -L node_modules ]]; then
+  echo 'Expected no root node_modules directory in a server release' >&2
+  exit 1
+fi
+ln -sfn server/node_modules node_modules
+echo 'Verifying isolated API runtime imports'
+./server/node_modules/.bin/tsx server/scripts/check-runtime.ts
 echo 'Running database migrations'
 ./server/node_modules/.bin/tsx server/scripts/migrate.ts
 echo 'Importing district house addresses'
@@ -192,7 +201,17 @@ if [[ -f /etc/letsencrypt/live/taxigr.ru/fullchain.pem ]]; then
     previous_nginx="$(mktemp /tmp/taxigr-nginx.XXXXXX)"
     cp /etc/nginx/sites-available/taxigr "$previous_nginx"
   fi
-  install -m 0644 deploy/nginx.taxigr.conf /etc/nginx/sites-available/taxigr
+  prepared_nginx="$(mktemp /tmp/taxigr-nginx-prepared.XXXXXX)"
+  nginx_prepare_args=(deploy/nginx.taxigr.conf "$prepared_nginx")
+  if [[ -n "$previous_nginx" ]]; then
+    nginx_prepare_args+=(--previous "$previous_nginx")
+  fi
+  if [[ -f /etc/nginx/conf.d/taxigr-fallback-client-map.conf ]]; then
+    nginx_prepare_args+=(--forwarded-client)
+  fi
+  python3 deploy/prepare-nginx.py "${nginx_prepare_args[@]}"
+  install -m 0644 "$prepared_nginx" /etc/nginx/sites-available/taxigr
+  rm -f "$prepared_nginx"
   ln -sfn /etc/nginx/sites-available/taxigr /etc/nginx/sites-enabled/taxigr
   if nginx -t; then
     systemctl reload nginx

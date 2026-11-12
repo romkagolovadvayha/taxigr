@@ -5,6 +5,8 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { Asset } from 'expo-asset';
 
 import { grahovoCenter } from '@/data/service-area';
+import { insideOfflineDistrict } from '@/offline/district';
+import { BUNDLED_GLYPHS_URL, bundledGlyphRequest } from '@/offline/map-glyphs';
 import { useForegroundScreen } from '@/hooks/use-foreground-screen';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
@@ -55,8 +57,9 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const colors = useThemeColors();
   const { colorScheme } = useAppTheme();
   const [offlineFallback, setOfflineFallback] = useState(false);
+  const [regional, setRegional] = useState(() => insideOfflineDistrict(props.selectionCenter ?? props.defaultCenter ?? grahovoCenter));
   const { isConnected } = useNetInfo();
-  const offline = isConnected === false || offlineFallback;
+  const offline = regional || isConnected === false || offlineFallback;
   const scene = useMapScene(props);
   const latest = useRef({ props, scene, colors, colorScheme, offline });
   useLayoutEffect(() => { latest.current = { props, scene, colors, colorScheme, offline }; });
@@ -290,7 +293,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       apiRef.current = api;
       const current = latest.current;
       const selection = current.props.selectionCenter;
-      const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme, current.offline),
+      const map = new api.Map({ container: container.current, style: taxiMapStyle(current.colors, current.colorScheme, current.offline, BUNDLED_GLYPHS_URL),
+        transformRequest: bundledGlyphRequest,
         center: lngLat(validMapCoordinate(selection) ? selection : current.props.defaultCenter ?? grahovoCenter),
         zoom: selection ? MAP_SELECTION_ZOOM : MAP_DEFAULT_ZOOM, minZoom: MAP_MIN_ZOOM, maxZoom: MAP_MAX_ZOOM,
         scrollZoom: selection ? { around: 'center' } : true, touchZoomRotate: selection ? { around: 'center' } : true,
@@ -333,6 +337,8 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
       };
       map.on('dragstart', stopFollowing); map.on('rotatestart', stopFollowing); map.on('zoomstart', stopFollowing);
       map.on('moveend', () => {
+        const center = map.getCenter();
+        setRegional(insideOfflineDistrict({ latitude: center.lat, longitude: center.lng }));
         if (!movingSelection.current) return;
         movingSelection.current = false;
         const { lat, lng } = map.getCenter();
@@ -366,7 +372,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     if (previousStyle.current === key) return;
     previousStyle.current = key;
     styleLoaded.current = false;
-    mapRef.current?.setStyle(taxiMapStyle(colors, colorScheme, offline));
+    mapRef.current?.setStyle(taxiMapStyle(colors, colorScheme, offline, BUNDLED_GLYPHS_URL));
   }, [colors, colorScheme, offline]);
 
   useEffect(() => { followRef.current = true; followTarget.current = ''; }, [props.followDriver, props.followRequestId]);
@@ -376,7 +382,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
 
   return <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.mapFallback }}>
     <div ref={container} style={{ flex: 1, minHeight: 0 }} data-taxi-map="maplibre" />
-    {offline && ready && <div style={{ position: 'absolute', top: 8 + (props.viewportInsets?.top ?? 0), left: 8, padding: 4,
+    {(isConnected === false || offlineFallback) && ready && <div style={{ position: 'absolute', top: 8 + (props.viewportInsets?.top ?? 0), left: 8, padding: 4,
       fontFamily: 'Manrope, system-ui, sans-serif', fontSize: 11, color: colors.inkSecondary, background: colors.surface }}>Карта района офлайн</div>}
     <style>{`
       .taxi-pickup-radar{position:absolute;left:50%;top:50%;width:160px;height:160px;transform:translate(-50%,-50%);pointer-events:none}

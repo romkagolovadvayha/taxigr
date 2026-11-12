@@ -32,6 +32,18 @@ jobs:
       EXPO_PUBLIC_VK_COMMUNITY_ID: ${{ vars.VK_COMMUNITY_ID }}
       EXPO_PUBLIC_MAP_TILES_URL: ${{ vars.EXPO_PUBLIC_MAP_TILES_URL }}
       EXPO_PUBLIC_MAP_GLYPHS_URL: ${{ vars.EXPO_PUBLIC_MAP_GLYPHS_URL }}
+      EXPO_PUBLIC_VK_RELAY_ENABLED: ${{ vars.VK_RELAY_ENABLED || '0' }}
+      EXPO_PUBLIC_VK_RELAY_CHANNEL: ${{ vars.VK_RELAY_CHANNEL }}
+      EXPO_PUBLIC_VK_RELAY_PUBLIC_KEY: ${{ vars.VK_RELAY_PUBLIC_KEY }}
+      EXPO_PUBLIC_VK_RELAY_BOT_TOKEN: ${{ secrets.VK_RELAY_BOT_TOKEN || secrets.VK_BOT_TOKEN }}
+      EXPO_PUBLIC_VK_RELAY_GROUP_ID: ${{ vars.VK_COMMUNITY_ID }}
+      EXPO_PUBLIC_VK_RELAY_SERVICE_USER_ID: ${{ vars.VK_RELAY_SERVICE_USER_ID }}
+      EXPO_PUBLIC_MAX_RELAY_ENABLED: ${{ vars.MAX_RELAY_ENABLED || '0' }}
+      EXPO_PUBLIC_MAX_RELAY_CHANNEL: ${{ vars.MAX_RELAY_CHANNEL }}
+      EXPO_PUBLIC_MAX_RELAY_PUBLIC_KEY: ${{ vars.MAX_RELAY_PUBLIC_KEY }}
+      EXPO_PUBLIC_MAX_RELAY_BOT_TOKEN: ${{ secrets.MAX_RELAY_BOT_TOKEN || secrets.MAX_BOT_TOKEN }}
+      EXPO_PUBLIC_MAX_RELAY_CHAT_ID: ${{ vars.MAX_RELAY_CHAT_ID }}
+      EXPO_PUBLIC_MAX_RELAY_SERVICE_USER_ID: ${{ vars.MAX_RELAY_SERVICE_USER_ID }}
       EXPO_PUBLIC_OPERATOR_LEGAL_NAME: ${{ vars.EXPO_PUBLIC_OPERATOR_LEGAL_NAME }}
       EXPO_PUBLIC_OPERATOR_STATUS: ${{ vars.EXPO_PUBLIC_OPERATOR_STATUS }}
       EXPO_PUBLIC_OPERATOR_INN: ${{ vars.EXPO_PUBLIC_OPERATOR_INN }}
@@ -95,6 +107,9 @@ jobs:
       - name: Verify and build
         run: npm run check
 
+      - name: Verify clean production API dependencies
+        run: node scripts/check-server-release.mjs
+
       - name: Create server environment file
         shell: bash
         env:
@@ -117,6 +132,18 @@ jobs:
           VK_MINI_APP_SECRET: ${{ secrets.VK_MINI_APP_SECRET }}
           RUSTORE_PUSH_PROJECT_ID: ${{ vars.RUSTORE_PUSH_PROJECT_ID }}
           RUSTORE_PUSH_SERVICE_TOKEN: ${{ secrets.RUSTORE_PUSH_SERVICE_TOKEN }}
+          MAX_RELAY_ENABLED: ${{ vars.MAX_RELAY_ENABLED || '0' }}
+          MAX_RELAY_CHANNEL: ${{ vars.MAX_RELAY_CHANNEL }}
+          MAX_RELAY_CHAT_ID: ${{ vars.MAX_RELAY_CHAT_ID }}
+          MAX_RELAY_SERVICE_USER_ID: ${{ vars.MAX_RELAY_SERVICE_USER_ID }}
+          MAX_RELAY_BOT_TOKEN: ${{ secrets.MAX_RELAY_BOT_TOKEN || secrets.MAX_BOT_TOKEN }}
+          MAX_RELAY_SECRET_KEY: ${{ secrets.MAX_RELAY_SECRET_KEY }}
+          VK_RELAY_ENABLED: ${{ vars.VK_RELAY_ENABLED || '0' }}
+          VK_RELAY_CHANNEL: ${{ vars.VK_RELAY_CHANNEL }}
+          VK_RELAY_SERVICE_USER_ID: ${{ vars.VK_RELAY_SERVICE_USER_ID }}
+          VK_RELAY_GROUP_ID: ${{ vars.VK_COMMUNITY_ID }}
+          VK_RELAY_BOT_TOKEN: ${{ secrets.VK_RELAY_BOT_TOKEN || secrets.VK_BOT_TOKEN }}
+          VK_RELAY_SECRET_KEY: ${{ secrets.VK_RELAY_SECRET_KEY }}
         run: |
           python3 - <<'PY'
           import os, shlex
@@ -169,6 +196,16 @@ jobs:
               'AUTH_ATTEMPT_RETENTION_DAYS': '30',
               'GLOBAL_RATE_LIMIT_MAX': '10000',
           }
+          for provider in ['MAX', 'VK']:
+              suffixes = ['ENABLED', 'CHANNEL', 'SERVICE_USER_ID', 'BOT_TOKEN', 'SECRET_KEY']
+              suffixes += ['CHAT_ID'] if provider == 'MAX' else ['GROUP_ID']
+              for suffix in suffixes:
+                  key = f'{provider}_RELAY_{suffix}'
+                  values[key] = os.environ.get(key, '')
+              if values[f'{provider}_RELAY_ENABLED'] == '1':
+                  for suffix in suffixes:
+                      if not values[f'{provider}_RELAY_{suffix}']:
+                          raise SystemExit(f'Missing server relay setting: {provider}_RELAY_{suffix}')
           for key, value in values.items():
               if '\n' in value or '\r' in value:
                   raise SystemExit(f'Newlines are not allowed in {key}')

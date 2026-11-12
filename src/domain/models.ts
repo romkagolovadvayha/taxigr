@@ -92,7 +92,7 @@ export type Tariff = {
 export type RouteSummary = {
   distanceMeters: number;
   durationSeconds: number;
-  source: 'osrm' | 'estimate';
+  source: 'osrm' | 'estimate' | 'offline';
   coordinates: Coordinates[];
 };
 

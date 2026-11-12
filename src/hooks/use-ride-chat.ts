@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { createAppSocket } from '@/api/realtime';
 
 import { ApiError, apiRequest, getSocketUrl } from '@/api/client';
 import { useSession } from '@/auth/session-provider';
@@ -53,6 +53,7 @@ export function useRideChat(orderId: string | undefined) {
     try {
       const result = await apiRequest<RideChatThread>(`/v1/orders/${active.orderId}/messages`, {
         token: active.token,
+        offlineFallback:true,
         signal: controller.signal,
         cache: 'no-store',
       });
@@ -71,14 +72,8 @@ export function useRideChat(orderId: string | undefined) {
 
     const active: ChatSession = { orderId, token, received: [] };
     session.current = active;
-    void reload();
     const socketUrl = getSocketUrl();
-    const socket: Socket | undefined = socketUrl ? io(socketUrl, {
-      path: '/socket.io',
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionDelayMax: 8_000,
-    }) : undefined;
+    const socket = socketUrl ? createAppSocket(socketUrl, token) : undefined;
     const handleConnect = () => {
       setConnected(true);
       // Resync after subscription to cover messages sent before it connected.
@@ -110,6 +105,9 @@ export function useRideChat(orderId: string | undefined) {
     socket?.on('disconnect', handleDisconnect);
     socket?.on('ride-chat:message', handleMessage);
     socket?.on('order:updated', handleOrderUpdate);
+    // A pooled connection immediately notifies this late subscriber. Let that
+    // callback load the snapshot once instead of starting then aborting a copy.
+    if (!socket?.connected) void reload();
 
     return () => {
       session.current = null;

@@ -5,6 +5,8 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { useNetInfo } from '@react-native-community/netinfo';
 
 import { grahovoCenter } from '@/data/service-area';
+import { insideOfflineDistrict } from '@/offline/district';
+import { prepareBundledGlyphs } from '@/offline/map-glyphs.native';
 import { useForegroundScreen } from '@/hooks/use-foreground-screen';
 import { useAppTheme, useThemeColors } from '@/theme/theme-provider';
 import { motion } from '@/theme/tokens';
@@ -33,13 +35,15 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
   const [slow, setSlow] = useState(false);
   const [following, setFollowing] = useState(true);
   const [offlineFallback, setOfflineFallback] = useState(false);
+  const [regional, setRegional] = useState(() => insideOfflineDistrict(props.selectionCenter ?? props.defaultCenter ?? grahovoCenter));
+  const [glyphsUrl, setGlyphsUrl] = useState<string>();
   const { isConnected } = useNetInfo();
-  const offline = isConnected === false || offlineFallback;
+  const offline = regional || isConnected === false || offlineFallback;
   const readyRef = useRef(false);
   const followTarget = useRef('');
   const scene = useMapScene(props);
   const fitted = useRef<{ layout: string; coordinates: typeof scene.fitCoordinates; target: string } | null>(null);
-  const style = useMemo(() => JSON.stringify(taxiMapStyle(colors, colorScheme, offline)), [colors, colorScheme, offline]);
+  const style = useMemo(() => JSON.stringify(taxiMapStyle(colors, colorScheme, offline, glyphsUrl)), [colors, colorScheme, offline, glyphsUrl]);
   // Adding the first selection pin must not change padding and reset a panned camera.
   const hasCallouts = !props.selectionCenter && scene.points.length > 0;
   const padding = useMemo(() => taxiMapPadding(size.width, size.height, props.viewportInsets, hasCallouts),
@@ -56,6 +60,9 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
     // Configure asynchronously once per process; never clear or await the tile
     // cache before showing a map, including after signing out or switching roles.
     void configureNativeMapCache();
+    let active = true;
+    void prepareBundledGlyphs().then(url => { if (active) setGlyphsUrl(url); }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -141,9 +148,10 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         }
       }}
       onRegionDidChange={event => {
+        const [longitude, latitude] = event.nativeEvent.center;
+        setRegional(insideOfflineDistrict({ latitude, longitude }));
         if (!movingSelection.current || !props.selectionCenter) return;
         movingSelection.current = false;
-        const [longitude, latitude] = event.nativeEvent.center;
         if (validMapCoordinate({ latitude, longitude })) props.onCoordinateSelect?.({ latitude, longitude });
       }}
       onPress={event => {
@@ -185,7 +193,7 @@ const ActiveTaxiMap = memo(function ActiveTaxiMap(props: TaxiMapProps & { retry:
         </View>
       </Marker>)}
     </MapLibreMap>
-    {offline && ready && <Text style={{ position: 'absolute', left: 8, top: (props.viewportInsets?.top ?? 0) + 8,
+    {(isConnected === false || offlineFallback) && ready && <Text style={{ position: 'absolute', left: 8, top: (props.viewportInsets?.top ?? 0) + 8,
       fontSize: 11, color: colors.inkSecondary, backgroundColor: colors.surface, padding: 4 }}>Карта района офлайн</Text>}
     {(!ready || error) && <MapLoadingOverlay error={error} slow={slow} mapVisible={initialized} onRetry={props.retry} insets={props.viewportInsets} />}
   </View>;

@@ -12,6 +12,16 @@ function deferred<T>() {
 afterEach(() => vi.useRealTimers());
 
 describe('client response cache', () => {
+  it('does not share an in-flight request with a refreshed authentication token', async () => {
+    const cache=new ResponseCache(),old=deferred<string>(),fresh=deferred<string>();
+    const oldLoad=vi.fn(()=>old.promise),freshLoad=vi.fn(()=>fresh.promise);
+    const a=cache.read('same-account',policy,oldLoad,undefined,false,'expired-token');
+    const b=cache.read('same-account',policy,freshLoad,undefined,false,'fresh-token');
+    const c=cache.read('same-account',policy,freshLoad,undefined,false,'fresh-token');
+    await Promise.resolve();old.reject(new Error('401'));fresh.resolve('current-profile');
+    await expect(a).rejects.toThrow('401');expect(await b).toBe('current-profile');expect(await c).toBe('current-profile');
+    expect(oldLoad).toHaveBeenCalledOnce();expect(freshLoad).toHaveBeenCalledOnce();
+  });
   it('reuses reads, separates accounts and expires entries', async () => {
     vi.useFakeTimers();
     const cache = new ResponseCache();

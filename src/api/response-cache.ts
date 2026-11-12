@@ -108,7 +108,7 @@ export class ResponseCache {
   }
 
   async read<T>(key: string, policy: CachePolicy, request: (signal: AbortSignal) => Promise<T>,
-    signal?: AbortSignal | null, refresh = false): Promise<T> {
+    signal?: AbortSignal | null, refresh = false,requestScope = ''): Promise<T> {
     if (signal?.aborted) throw aborted();
     const generation = this.generation;
     const tagVersion = this.versions.get(policy.tag) ?? 0;
@@ -121,7 +121,10 @@ export class ResponseCache {
     }
     if (cached?.expiresAt && cached.expiresAt <= Date.now()) this.remove(key);
 
-    let pending = this.pending.get(key);
+    // Persisted data can follow the account through refresh. An in-flight
+    // network request must use the exact session that authenticated it.
+    const pendingKey=JSON.stringify([key,requestScope]);
+    let pending = this.pending.get(pendingKey);
     if (!pending || pending.controller.signal.aborted) {
       const controller = new AbortController();
       const version = this.versions.get(policy.tag) ?? 0;
@@ -135,8 +138,8 @@ export class ResponseCache {
           if (policy.persist) this.scheduleWrite();
         }
         return value;
-      }).finally(() => { if (this.pending.get(key) === task) this.pending.delete(key); });
-      this.pending.set(key, task);
+      }).finally(() => { if (this.pending.get(pendingKey) === task) this.pending.delete(pendingKey); });
+      this.pending.set(pendingKey, task);
       pending = task;
     }
     const task = pending;
@@ -148,8 +151,8 @@ export class ResponseCache {
         done = true;
         signal?.removeEventListener('abort', cancel);
         task.users -= 1;
-        if (task.users === 0 && this.pending.get(key) === task) {
-          this.pending.delete(key);
+        if (task.users === 0 && this.pending.get(pendingKey) === task) {
+          this.pending.delete(pendingKey);
           task.controller.abort();
         }
         if (error) reject(error); else resolve(value as T);

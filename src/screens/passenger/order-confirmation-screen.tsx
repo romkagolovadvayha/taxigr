@@ -38,6 +38,8 @@ export function OrderConfirmationScreen() {
     destination,
     bookingFare,
     selectedPaymentMethod,
+    bookingComment: comment,
+    setBookingComment: setComment,
     setSelectedPaymentMethod,
     scheduledAt,
     quoteStatus,
@@ -48,7 +50,6 @@ export function OrderConfirmationScreen() {
   } = useRide();
   const { locationError, locationLoading, selectCurrentLocation } = usePassengerPickupLocation();
   const { initialLegalConsentRequired } = useSession();
-  const [comment, setComment] = useState('');
   const [editingComment, setEditingComment] = useState(false);
   const [availableHeight, setAvailableHeight] = useState(height);
   const compactEditing = editingComment && availableHeight < 420;
@@ -197,7 +198,7 @@ export function OrderConfirmationScreen() {
               backgroundColor: colors.warningSoft,
             }}
           >
-            <Text selectable numberOfLines={dense ? 1 : 2} style={{ ...typography.caption, color: error ? colors.danger : colors.warningText, flex: 1 }}>
+            <Text selectable numberOfLines={dense ? 1 : 2} style={{ ...typography.caption, color: error && quoteStatus !== 'offline' ? colors.danger : colors.warningText, flex: 1 }}>
               {routeGuidance}
             </Text>
           </View>
@@ -223,7 +224,7 @@ export function OrderConfirmationScreen() {
               disabled={!addressesAreBookable || quotePending || busy}
               loading={busy || quotePending}
               estimateAvailable={routeReady}
-              canRetry={addressesAreBookable && quoteStatus === 'error'}
+              canRetry={addressesAreBookable && ['error','offline'].includes(quoteStatus)}
               onPress={() => {
                 if (routeReady) {
                   void confirm();

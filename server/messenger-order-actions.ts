@@ -27,6 +27,7 @@ import {
 import { signSession } from './security';
 import { isRidePricePending, ridePriceLabel } from '../src/domain/ride-price';
 import { normalizeRussianPhone } from './phone-verification';
+import { verifiedUserClientAddress } from './relay-client-address';
 
 export type MessengerOrderActionRequest = {
   provider: 'max' | 'telegram' | 'vk';
@@ -110,6 +111,7 @@ export function createMessengerOrderActionHandler(app: FastifyInstance) {
       const response = await app.inject({
         method,
         url,
+        remoteAddress: verifiedUserClientAddress(user.id),
         headers: { authorization: `Bearer ${token}` },
         ...(payload ? { payload } : {}),
       });

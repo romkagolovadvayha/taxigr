@@ -3,7 +3,7 @@ import { pickupAddressAtCoordinates, resolvePickupAddress } from '../src/api/pic
 import { clearApiCache } from '../src/api/client';
 import { isPickupAddressComplete } from '../src/domain/address-precision';
 
-const coordinates = { latitude: 56.0477, longitude: 51.9586 };
+const coordinates = { latitude: 56.86, longitude: 53.22 };
 const result = { id: 'osm-house', label: 'улица Ачинцева, 5', houseNumber: '5', details: 'село Грахово',
   kind: 'house', coordinates: { latitude: 56.048, longitude: 51.959 } };
 const mockResponse = (data: unknown = [result]) => {
@@ -23,7 +23,7 @@ describe('pickup address without a map-provider key', () => {
     const url = new URL(fetch.mock.calls[0]![0]);
     expect(url.origin).toBe('http://localhost:4100');
     expect(url.pathname).toBe('/v1/addresses/search');
-    expect(url.searchParams.get('query')).toBe('51.9586,56.0477');
+    expect(url.searchParams.get('query')).toBe('53.22,56.86');
     expect(fetch.mock.calls[0]![1].headers.Authorization).toBe('Bearer session-token');
     expect(address).toMatchObject({ label: result.label, houseNumber: '5', coordinates });
     expect(isPickupAddressComplete(address)).toBe(true);

@@ -14,8 +14,14 @@ import { processVkBroadcasts } from './vk-broadcast-worker';
 import { closeGatewayDispatcher } from './gateway-proxy';
 import { pruneMessengerBookingData } from './messenger-booking';
 import { registerRoutes } from './routes';
-import { verifySession } from './security';
+import { authenticate, verifySession } from './security';
 import { registerSocketLifecycle } from './socket-lifecycle';
+import { pruneTransportReplays, registerTransportIdempotency } from './transport-idempotency';
+import { RealtimeEvents } from './realtime-events';
+import { registerReadBatch } from './read-batch';
+import { createRoomPublisher } from './publish-events';
+import { startMaxApiRelay } from './max-api-relay';
+import { startVkApiRelay } from './vk-api-relay';
 
 const app = Fastify({
   logger: {
@@ -53,6 +59,7 @@ await app.register(helmet, {
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 });
 await app.register(cors, {
+  maxAge: 600,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   origin(origin, callback) {
     if (!origin || config.corsOrigins.includes(origin)) callback(null, true);
@@ -96,6 +103,22 @@ app.addHook('onSend', async (request, reply, payload) => {
   return payload;
 });
 
+registerTransportIdempotency(app);
+const relayEvents = new RealtimeEvents();
+registerReadBatch(app);
+app.get('/v1/transport-health', async () => ({ data: { ok: true, capabilities:{readBatch:1} } }));
+app.get('/v1/realtime/events', async request => {
+  const session = await authenticate(request);
+  const rooms = new Set([`user:${session.id}`]);
+  if (session.roles.includes('admin')) rooms.add('admins');
+  if (session.roles.includes('driver')) {
+    const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>('SELECT id FROM drivers WHERE user_id = ?', [session.id]);
+    if (rows[0]) { rooms.add('drivers'); rooms.add(`driver:${String(rows[0].id)}`); }
+  }
+  const rawCursor = (request.query as { after?: unknown }).after;
+  const cursor = typeof rawCursor === 'string' ? rawCursor : undefined;
+  return { data: relayEvents.read(cursor, rooms) };
+});
 const io = new SocketServer(app.server, {
   path: '/socket.io',
   cors: { origin: config.corsOrigins },
@@ -129,14 +152,17 @@ io.use(async (socket, next) => {
   }
 });
 
-const routeHandlers = await registerRoutes(app, (room, event, payload) => {
-  io.to(room).emit(event, payload);
-}, {
+const publish=createRoomPublisher((rooms,event,payload)=>{
+  io.to(rooms).emit(event,payload);relayEvents.publishTo(rooms,event,payload);
+});
+const routeHandlers = await registerRoutes(app, publish, {
   disconnectUser(userId) {
     setTimeout(() => io.in(`user:${userId}`).disconnectSockets(true), 0);
   },
 });
 
+let stopMaxRelay: (() => Promise<void>) | undefined;
+let stopVkRelay: (() => Promise<void>) | undefined;
 let groupAlertDelivery: Promise<void> | undefined;
 const groupAlertTimer = setInterval(() => {
   if (groupAlertDelivery) return;
@@ -147,7 +173,7 @@ const groupAlertTimer = setInterval(() => {
 groupAlertTimer.unref();
 
 const authAbusePruneTimer = setInterval(() => {
-  void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).catch((error) => {
+  void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).then(pruneTransportReplays).catch((error) => {
     app.log.error(error, 'auth abuse data pruning failed');
     reportCritical({
       source: 'server-process',
@@ -157,7 +183,7 @@ const authAbusePruneTimer = setInterval(() => {
   });
 }, 24 * 60 * 60 * 1_000);
 (authAbusePruneTimer as unknown as { unref?: () => void }).unref?.();
-void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).catch((error) => {
+void pruneAuthAbuseData().then(pruneMessengerBookingData).then(pruneMaxGroupBookingData).then(pruneTransportReplays).catch((error) => {
   app.log.error(error, 'initial auth abuse data pruning failed');
   reportCritical({
     source: 'server-process',
@@ -264,6 +290,7 @@ const broadcastTimer = setInterval(() => {
 broadcastTimer.unref();
 
 app.addHook('onClose', async () => {
+  await Promise.all([stopMaxRelay?.(), stopVkRelay?.()]);
   clearInterval(broadcastTimer);
   await broadcastWork;
   clearInterval(authAbusePruneTimer);
@@ -311,3 +338,22 @@ process.on('uncaughtException', (error, origin) => {
 });
 
 await app.listen({ port: config.PORT, host: config.HOST });
+if (config.MAX_RELAY_ENABLED === '1') {
+  try {
+    stopMaxRelay = await startMaxApiRelay(app, { token: config.MAX_RELAY_BOT_TOKEN, chatId: config.MAX_RELAY_CHAT_ID,
+      serviceUserId: config.MAX_RELAY_SERVICE_USER_ID, channel: config.MAX_RELAY_CHANNEL, secretKey: config.MAX_RELAY_SECRET_KEY });
+    app.log.info('MAX reserve channel started for the configured service dialog');
+  } catch {
+    app.log.error('MAX reserve channel configuration is invalid; primary API remains available');
+  }
+}
+
+if (config.VK_RELAY_ENABLED === '1') {
+  try {
+    stopVkRelay = await startVkApiRelay(app, { token: config.VK_RELAY_BOT_TOKEN, groupId: config.VK_RELAY_GROUP_ID,
+      serviceUserId: config.VK_RELAY_SERVICE_USER_ID, channel: config.VK_RELAY_CHANNEL, secretKey: config.VK_RELAY_SECRET_KEY });
+    app.log.info('VK reserve channel started for the configured service dialog');
+  } catch {
+    app.log.error('VK reserve channel configuration is invalid; primary API remains available');
+  }
+}

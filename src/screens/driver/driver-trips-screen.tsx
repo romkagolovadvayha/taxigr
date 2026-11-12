@@ -43,7 +43,7 @@ export function DriverTripsScreen() {
         setOrders(demoOrders.filter((order) => order.driverId === demoDriver.id));
         setHasMore(false);
       } else {
-        const fetched = await apiRequest<RideOrder[]>('/v1/orders?scope=driver&limit=50', { token });
+        const fetched = await apiRequest<RideOrder[]>('/v1/orders?scope=driver&limit=50', { token, offlineFallback:true });
         setOrders(fetched);
         setHasMore(fetched.length === 50);
       }

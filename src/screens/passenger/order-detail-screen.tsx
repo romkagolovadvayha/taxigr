@@ -43,7 +43,7 @@ export function OrderDetailScreen() {
     if (!token || demoSession || activeOrder) return;
     setLoading(true);
     try {
-      setLoadedOrder(await apiRequest<RideOrder>(`/v1/orders/${id}`, { token }));
+      setLoadedOrder(await apiRequest<RideOrder>(`/v1/orders/${id}`, { token, offlineFallback:true }));
       setError(undefined);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось загрузить заказ');

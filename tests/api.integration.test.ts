@@ -12,9 +12,12 @@ import type {
   RideChatMessage,
   RideChatThread,
   RideOrder,
+  Tariff,
   VehicleChangeRequest,
 } from '../src/domain/models';
 import type { PricingRules } from '../src/domain/pricing';
+import {calculateWaitingChargeMinor, fareRoundingMinor, fareRoundingMode} from '../src/domain/pricing';
+import {firstOrderPriceMinor, firstOrderWaitingRoundingMinor} from '../src/domain/first-order-discount';
 import {
   currentDriverLegalAcceptance,
   currentInitialLegalAcceptance,
@@ -403,6 +406,37 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     }
     await cleanup();
     await connection.end();
+  });
+
+  it('batches live reads with the same permissions and response bodies as legacy GETs for every role',async()=>{
+    for(const [token,paths] of [
+      [passengerToken,['/v1/bootstrap','/v1/orders?scope=passenger','/v1/admin/tariffs']],
+      [driverOneToken,['/v1/driver/profile','/v1/orders?scope=driver','/v1/admin/tariffs']],
+      [adminToken,['/v1/admin/tariffs','/v1/admin/booking-settings','/v1/orders?scope=passenger']],
+    ] as const){
+      const batch=await api<{results:{id:string;status:number;body:string}[]}>('/v1/transport/read-batch',{method:'POST',token,body:{requests:paths.map((path,index)=>({id:String(index),path}))}});
+      expect(batch.status).toBe(200);
+      for(const [index,path] of paths.entries()){
+        const legacy=await api(path,{token}),child=batch.data!.results[index]!;
+        expect(child.id).toBe(String(index));expect(child.status).toBe(legacy.status);
+        const parsed=JSON.parse(child.body);expect(parsed.data).toEqual(legacy.data);expect(parsed.error?.code).toBe(legacy.error?.code);
+      }
+    }
+    expect((await api('/v1/transport/read-batch',{method:'POST',body:{requests:[{id:'0',path:'/v1/bootstrap'}]}})).status).toBe(401);
+  });
+
+  it('delivers one update when the same account is both administrator and passenger',async()=>{
+    await setDriverStatus(driverOneToken,'online');const order=await createOrder(adminToken);expect(order.status).toBe(201);
+    const socket=io(apiUrl,{auth:{token:adminToken},transports:['websocket'],forceNew:true});
+    try{
+      await socketEvent(socket,'connect');const updates:RideOrder[]=[];
+      socket.on('order:updated',(value:RideOrder)=>{if(value.id===order.data!.id)updates.push(value);});
+      const initial=await api<{cursor:string}>('/v1/realtime/events',{token:adminToken});
+      expect((await api(`/v1/driver/orders/${order.data!.id}/accept`,{method:'POST',token:driverOneToken,body:{}})).status).toBe(200);
+      await new Promise(resolve=>setTimeout(resolve,100));expect(updates).toHaveLength(1);
+      const page=await api<{events:{event:string;payload:{id?:string}}[]}>(`/v1/realtime/events?after=${encodeURIComponent(initial.data!.cursor)}`,{token:adminToken});
+      expect(page.data!.events.filter(event=>event.event==='order:updated'&&event.payload.id===order.data!.id)).toHaveLength(1);
+    }finally{socket.disconnect();await api(`/v1/orders/${order.data!.id}/cancel`,{method:'POST',token:adminToken});}
   });
 
   it('keeps the released 1.0.23 driver flow, queue and legacy waiting/payment requests compatible', async () => {
@@ -991,7 +1025,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         durationSeconds: number;
         coordinates: { latitude: number; longitude: number }[];
       };
-      tariffs: { code: string; priceMinor: number; childSeatIncluded: boolean }[];
+      tariffs: Tariff[];
     }>('/v1/quotes', {
       method: 'POST',
       token: passengerToken,
@@ -1008,7 +1042,9 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(quote.data?.tariffs[1]?.priceMinor).toBeGreaterThan(
       quote.data?.tariffs[0]?.priceMinor ?? 0,
     );
-    expect(quote.data?.tariffs[0]?.priceMinor).toBe(7_500);
+    const economy=quote.data!.tariffs[0]!;
+    expect(economy.originalPriceMinor).toBeGreaterThan(0);
+    expect(economy.priceMinor).toBe(firstOrderPriceMinor(economy.originalPriceMinor!,fareRoundingMinor,fareRoundingMode,economy.discountPercent));
 
     const secondLocalDestination = {
       id: 'integration-second-local-destination',
@@ -1020,7 +1056,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     const multiStopQuote = await api<{
       quoteToken: string;
       route: { coordinates: { latitude: number; longitude: number }[] };
-      tariffs: { code: string; priceMinor: number }[];
+      tariffs: Tariff[];
     }>('/v1/quotes', {
       method: 'POST',
       token: passengerToken,
@@ -1030,14 +1066,12 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
         destination: secondLocalDestination,
       },
     });
-    const baseEconomyPrice = quote.data?.tariffs[0]?.priceMinor ?? 0;
     expect(multiStopQuote.status).toBe(200);
     expect(multiStopQuote.data?.route.coordinates.length).toBeGreaterThanOrEqual(3);
     expect(multiStopQuote.data?.tariffs[0]?.priceMinor).toBe(
-      baseEconomyPrice +
-        Math.round(
-          (baseEconomyPrice * originalTariffs.additionalStopGrahovoSurchargeBps) / 10_000,
-        ),
+      firstOrderPriceMinor(economy.originalPriceMinor! + Math.round(
+        economy.originalPriceMinor! * originalTariffs.additionalStopGrahovoSurchargeBps / 10_000,
+      ),fareRoundingMinor,fareRoundingMode,economy.discountPercent),
     );
 
     const tamperedOrder = await api('/v1/orders', {
@@ -1794,16 +1828,16 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     });
   }, 15_000);
 
-  it('filters child orders and blocks a driver without a child seat', async () => {
+  it('keeps legacy child-tariff requests available to ordinary online drivers', async () => {
     await setDriverStatus(driverOneToken, 'online');
     await setDriverStatus(driverTwoToken, 'online');
     const order = await createOrder(passengerToken, 'child');
     expect(order.status).toBe(201);
 
     const eligibleOffers = await api<RideOrder[]>('/v1/driver/offers', { token: driverOneToken });
-    const ineligibleOffers = await api<RideOrder[]>('/v1/driver/offers', { token: driverTwoToken });
+    const ordinaryOffers = await api<RideOrder[]>('/v1/driver/offers', { token: driverTwoToken });
     expect(eligibleOffers.data?.some((item) => item.id === order.data!.id)).toBe(true);
-    expect(ineligibleOffers.data?.some((item) => item.id === order.data!.id)).toBe(false);
+    expect(ordinaryOffers.data?.some((item) => item.id === order.data!.id)).toBe(true);
     expect(
       (
         await api(`/v1/driver/orders/${order.data!.id}/accept`, {
@@ -1812,7 +1846,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
           body: {},
         })
       ).status,
-    ).toBe(409);
+    ).toBe(200);
     await api(`/v1/orders/${order.data!.id}/cancel`, { method: 'POST', token: passengerToken });
   }, 15_000);
 
@@ -2341,6 +2375,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
     expect(accepted.data?.status).toBe('driver_arriving');
     expect(accepted.data?.waitingStartedAt).toBeUndefined();
     let settledWaitingSeconds = 0;
+    let settledWaitingPriceMinor = 0;
     for (const status of ['driver_waiting', 'in_progress', 'completed'] as const) {
       const transitioned = await api<RideOrder>(
         `/v1/driver/orders/${order.data!.id}/transition`,
@@ -2369,8 +2404,10 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       if (status === 'in_progress') {
         expect(transitioned.data?.waitingStartedAt).toBeUndefined();
         expect(transitioned.data?.waitingSeconds).toBeGreaterThanOrEqual(270);
-        expect(transitioned.data?.waitingPriceMinor).toBe(400);
-        expect(transitioned.data?.priceMinor).toBe((transitioned.data?.basePriceMinor ?? 0) + 400);
+        const waiting=calculateWaitingChargeMinor(transitioned.data!.waitingSeconds!,order.data!.waitingFreeMinutes!,order.data!.waitingPerMinuteMinor!,order.data!.fareRoundingMinor??firstOrderWaitingRoundingMinor(order.data!.promotionCode),order.data!.fareRoundingMode??'up');
+        expect(transitioned.data?.waitingPriceMinor).toBe(waiting);
+        expect(transitioned.data?.priceMinor).toBe((transitioned.data?.basePriceMinor ?? 0) + waiting);
+        settledWaitingPriceMinor=waiting;
         settledWaitingSeconds = transitioned.data!.waitingSeconds!;
         const retried = await api<RideOrder>(`/v1/driver/orders/${order.data!.id}/transition`, {
           method: 'POST', token: driverOneToken, body: { status },
@@ -2399,7 +2436,7 @@ describe.skipIf(!runIntegration)('live API role and order flows', () => {
       if (status === 'completed') {
         expect(transitioned.data?.waitingStartedAt).toBeUndefined();
         expect(transitioned.data?.waitingSeconds).toBe(settledWaitingSeconds);
-        expect(transitioned.data?.waitingPriceMinor).toBe(400);
+        expect(transitioned.data?.waitingPriceMinor).toBe(settledWaitingPriceMinor);
         expect(transitioned.data?.paymentConfirmedAt).toBeUndefined();
       }
     }

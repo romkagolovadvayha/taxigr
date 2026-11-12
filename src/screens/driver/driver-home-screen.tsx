@@ -761,7 +761,7 @@ export function DriverHomeScreen() {
       return;
     }
     try {
-      const profile = await apiRequest<{ status: string; colorHex: string | null }>('/v1/driver/profile', { token });
+      const profile = await apiRequest<{ status: string; colorHex: string | null }>('/v1/driver/profile', { token, offlineFallback:true });
       if (statusRequestRef.current !== requestId) return;
       setOnline(profile.status === 'online' || profile.status === 'busy');
       setVehicleColorHex(profile.colorHex);

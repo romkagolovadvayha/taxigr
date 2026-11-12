@@ -62,6 +62,7 @@ export function EarningsScreen() {
     const controller = new AbortController();
     void apiRequest<EarningsSummary>(`/v1/driver/earnings?period=${period}`, {
       token,
+      offlineFallback:true,
       signal: controller.signal,
     })
       .then((result) => {

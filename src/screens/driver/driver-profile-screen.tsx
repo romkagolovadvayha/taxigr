@@ -106,7 +106,7 @@ export function DriverProfileScreen() {
     }
     try {
       const [nextProfile, nextRequests] = await Promise.all([
-        apiRequest<DriverProfile>('/v1/driver/profile', { token }),
+        apiRequest<DriverProfile>('/v1/driver/profile', { token, offlineFallback:true }),
         apiRequest<VehicleChangeRequest[]>('/v1/driver/vehicle-change-requests/me', { token }),
       ]);
       if (loadRequestRef.current !== requestId) return;
