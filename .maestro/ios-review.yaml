@@ -8,25 +8,90 @@ appId: ru.grahovo.taxi
     visible: "Войти по SMS"
     timeout: 60000
 - takeScreenshot: ios-login
-- assertNotVisible: "Войти через VK"
-- tapOn: "Войти по SMS"
+- assertVisible: "Войти через VK"
+- assertVisible: "Войти через MAX"
+- assertVisible: "Войти с Apple"
+- tapOn: "Войти с Apple"
 - tapOn: "Принять и продолжить"
+- extendedWaitUntil:
+    visible: "Sign in to your Apple Account"
+    timeout: 45000
+- takeScreenshot: ios-apple-authorization
+- tapOn:
+    text: "Close"
+- extendedWaitUntil:
+    visible:
+      text: "Войти по SMS"
+      enabled: true
+    timeout: 15000
+- tapOn: "Войти по SMS"
+- tapOn:
+    text: "Принять и продолжить"
+    optional: true
 - tapOn: "Номер телефона, код страны плюс семь уже указан"
 - inputText: "9998887766"
-- tapOn: "Получить код по SMS"
+- assertVisible: "(?i)delete"
+- tapOn:
+    text: "dismiss popup"
+    point: "90%,10%"
+    optional: true
+- tapOn:
+    text: "Done"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible:
+        text: "Получить код по SMS"
+        enabled: true
+    commands:
+      - tapOn:
+          text: "Получить код по SMS"
+          retryTapIfNoChange: true
+          waitToSettleTimeoutMs: 5000
 - extendedWaitUntil:
     visible: "Код из SMS"
     timeout: 30000
 - tapOn: "Код из SMS"
 - inputText: "4455"
-- tapOn: "Подтвердить код"
+- assertVisible: "(?i)delete"
+- tapOn:
+    text: "dismiss popup"
+    point: "90%,10%"
+    optional: true
+- tapOn:
+    text: "Done"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible:
+        text: "Подтвердить код"
+        enabled: true
+    commands:
+      - tapOn:
+          text: "Подтвердить код"
+          retryTapIfNoChange: true
+          waitToSettleTimeoutMs: 5000
 - extendedWaitUntil:
     visible: "Открыть профиль"
     timeout: 60000
 - takeScreenshot: ios-home
+- tapOn: "Время подачи: Как можно скорее"
+- assertVisible: "Когда подать машину?"
+- tapOn: "Заказать ко времени"
+- assertVisible: "Выберите время подачи"
+- takeScreenshot: ios-scheduled-pickup
+- tapOn: "Закрыть"
 - tapOn: "Открыть профиль"
 - takeScreenshot: ios-profile
-- openLink: "taxigrahovo://account-deletion"
+- tapOn: "Настройки"
+- scrollUntilVisible:
+    element: "Запросить удаление аккаунта и данных"
+    direction: DOWN
+- tapOn: "Запросить удаление аккаунта и данных"
 - extendedWaitUntil:
     visible: "Удалить мой аккаунт"
     timeout: 15000
@@ -35,5 +100,8 @@ appId: ru.grahovo.taxi
 - tapOn: "Оставить аккаунт"
 - assertVisible: "Удалить мой аккаунт"
 - openLink: "taxigrahovo://"
+- tapOn:
+    text: "Open"
+    optional: true
 - assertVisible: "Открыть профиль"
 - takeScreenshot: ios-order-start
