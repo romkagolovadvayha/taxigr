@@ -8,4 +8,5 @@ export GIT_CONFIG_VALUE_0=HTTP/1.1
 npm ci --no-audit --no-fund
 python3 deploy/test-release-tools.py
 npm run check
+node scripts/check-server-release.mjs
 bash deploy/package-release.sh "$PWD/release.tar.gz"

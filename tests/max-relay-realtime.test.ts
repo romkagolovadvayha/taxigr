@@ -5,8 +5,8 @@ vi.mock('../src/api/client',()=>({apiRequest:mocks.api}));
 vi.mock('../src/api/reserve-config',()=>({reserveChannelsEnabled:()=>mocks.enabled}));
 vi.mock('socket.io-client',()=>({io:()=>{const events=new Map<string,Set<(...args:unknown[])=>void>>();const socket={connected:false,on:(event:string,fn:(...args:unknown[])=>void)=>{const set=events.get(event)??new Set();set.add(fn);events.set(event,set);},onAny:vi.fn(),disconnect:vi.fn(),emit:(event:string)=>{for(const fn of events.get(event)??[])fn();}};mocks.sockets.push(socket);return socket;}}));
 
-beforeEach(()=>{vi.useFakeTimers();mocks.enabled=true;mocks.api.mockReset().mockResolvedValue({cursor:'epoch:1',reset:true,events:[]});mocks.sockets.length=0;});
-afterEach(()=>{vi.useRealTimers();vi.resetModules();});
+beforeEach(()=>{vi.useFakeTimers();vi.stubEnv('EXPO_PUBLIC_FALLBACK_API_URL','');mocks.enabled=true;mocks.api.mockReset().mockResolvedValue({cursor:'epoch:1',reset:true,events:[]});mocks.sockets.length=0;});
+afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs();vi.resetModules();});
 describe('MAX realtime sessions',()=>{
  it('also shares the ordinary web socket with reserve disabled and never polls bots',async()=>{
    mocks.enabled=false;
